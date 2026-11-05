@@ -14,6 +14,13 @@
   - Like a lever, it gives weak power in every direction and strong power into the block it's attached to (`getDirectSignal`).
   - When its output changes, it also updates that block's neighbors (`afterOutputChanged`).
   - It pops off with drops via `updateShape` when its support goes.
+- **Wall Redstone:**
+  - `facing` points away from the wall. Its `up`/`down`/`left`/`right` arms are drawn only toward in-plane neighbors, using vanilla's dust textures, tinted with `RedStoneWireBlock.getColorForPower`.
+  - Power works like vanilla dust:
+    - while calculating, it switches off its own output (`shouldSignal`);
+    - it takes the best non-wire signal from all 6 neighbors, or the strongest neighboring wire (its own or vanilla dust) minus 1.
+  - **Vanilla dust has its own private switch**, so plain neighbors would latch each other on. To stop that, Wall Redstone hands vanilla dust 1 less, and strongly powers its wall block at 1 less. Mixed loops then always fade to 0 (covered by a GameTest).
+  - It re-works its connections in `onPlace`, so `/fill` and `/setblock` give correct lines.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -31,7 +38,7 @@
 
 ## Verified
 
-- 9 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 13 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -40,6 +47,7 @@
 
 ## History
 
+- **v0.4.0:** added Wall Redstone.
 - **v0.3.0:** added the Compact Radio Receiver (button-sized).
 - **v0.1.0:** dye-colored channels (16), reach from stacked masts on both ends. Replaced in v0.2.0 at Reiko's request.
 

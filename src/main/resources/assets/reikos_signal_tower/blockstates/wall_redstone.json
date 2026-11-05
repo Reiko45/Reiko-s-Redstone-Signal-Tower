@@ -1,0 +1,195 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "facing": "south"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_dot"
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "up": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_up"
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "down": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_down"
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "left": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_left"
+      }
+    },
+    {
+      "when": {
+        "facing": "south",
+        "right": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_right"
+      }
+    },
+    {
+      "when": {
+        "facing": "west"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_dot",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "up": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_up",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "down": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_down",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "left": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_left",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "west",
+        "right": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_right",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "north"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_dot",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "up": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_up",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "down": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_down",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "left": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_left",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "north",
+        "right": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_right",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "east"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_dot",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "up": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_up",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "down": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_down",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "left": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_left",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "east",
+        "right": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_right",
+        "y": 270
+      }
+    }
+  ]
+}

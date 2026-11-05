@@ -6,6 +6,7 @@ import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
+import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
@@ -79,6 +80,14 @@ public final class ModRegistry {
                     .sound(SoundType.CHAIN)
                     .noOcclusion()));
 
+    /** Redstone dust that sticks to walls. Breaks instantly and gets knocked off by pistons, like dust. */
+    public static final DeferredBlock<WallRedstoneBlock> WALL_REDSTONE = BLOCKS.register("wall_redstone",
+            () -> new WallRedstoneBlock(BlockBehaviour.Properties.of()
+                    .noCollission()
+                    .instabreak()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)));
+
     // ---- Items ----
 
     public static final DeferredItem<BlockItem> RADIO_TRANSMITTER_ITEM =
@@ -89,6 +98,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
             ITEMS.registerSimpleBlockItem("radio_mast", RADIO_MAST);
+    public static final DeferredItem<BlockItem> WALL_REDSTONE_ITEM =
+            ITEMS.registerSimpleBlockItem("wall_redstone", WALL_REDSTONE);
     public static final DeferredItem<FrequencyTunerItem> FREQUENCY_TUNER =
             ITEMS.register("frequency_tuner", () -> new FrequencyTunerItem(new Item.Properties().stacksTo(1)));
 

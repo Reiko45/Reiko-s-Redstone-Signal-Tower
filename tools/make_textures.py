@@ -259,6 +259,27 @@ def compact_receiver(lit):
     return img
 
 
+def wall_redstone_item():
+    """A strip of wall with redstone dust running up it and branching sideways."""
+    img = blank()
+    px = img.load()
+    stone_l, stone, stone_d = (150, 150, 150, 255), (120, 120, 120, 255), (90, 90, 90, 255)
+    for y in range(1, 15):
+        for x in range(2, 6):
+            px[x, y] = stone if (x + y) % 3 else stone_l
+        px[5, y] = stone_d
+    dust = [(170, 12, 8, 255), (230, 30, 20, 255), (255, 90, 70, 255)]
+    for y in range(2, 14):
+        px[9, y] = dust[1]
+        px[10, y] = dust[0]
+    for x in range(7, 14):
+        px[x, 7] = dust[1]
+        px[x, 8] = dust[0]
+    px[9, 2] = px[12, 7] = dust[2]
+    px[9, 7] = px[10, 7] = dust[2]
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -276,7 +297,7 @@ blocks = {
     "antenna_tip": antenna_tip(False),
     "antenna_tip_on": antenna_tip(True),
 }
-items = {"frequency_tuner": tuner_item()}
+items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

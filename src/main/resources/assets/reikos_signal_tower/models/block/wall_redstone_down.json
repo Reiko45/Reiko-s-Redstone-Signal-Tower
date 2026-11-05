@@ -1,0 +1,35 @@
+{
+  "ambientocclusion": false,
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "minecraft:block/redstone_dust_dot",
+    "line": "minecraft:block/redstone_dust_line0"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0.3
+      ],
+      "to": [
+        16,
+        8,
+        0.3
+      ],
+      "shade": false,
+      "faces": {
+        "south": {
+          "uv": [
+            0,
+            8,
+            16,
+            16
+          ],
+          "texture": "#line",
+          "tintindex": 0
+        }
+      }
+    }
+  ]
+}

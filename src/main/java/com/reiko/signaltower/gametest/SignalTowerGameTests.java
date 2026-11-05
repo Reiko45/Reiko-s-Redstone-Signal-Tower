@@ -3,6 +3,7 @@ package com.reiko.signaltower.gametest;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
+import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.radio.RadioHelper;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.minecraft.world.level.block.RedstoneLampBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
@@ -305,5 +307,122 @@ public final class SignalTowerGameTests {
         return ModRegistry.COMPACT_RADIO_RECEIVER.get().defaultBlockState()
                 .setValue(CompactRadioReceiverBlock.FACE, AttachFace.WALL)
                 .setValue(CompactRadioReceiverBlock.FACING, pointing);
+    }
+
+    // ---- Wall Redstone ----
+
+    private static BlockState wallRedstone(Direction facing) {
+        return ModRegistry.WALL_REDSTONE.get().defaultBlockState().setValue(WallRedstoneBlock.FACING, facing);
+    }
+
+    private static void assertWallPower(GameTestHelper helper, BlockPos pos, int expected) {
+        helper.assertBlockProperty(pos, WallRedstoneBlock.POWER, expected);
+    }
+
+    /** A line up the side of a pillar: 15 at the bottom, one less per block, and it lights a lamp at the top. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void wallRedstoneClimbsAWall(GameTestHelper helper) {
+        int height = 8;
+        for (int y = 1; y <= height; y++) {
+            helper.setBlock(new BlockPos(3, y, 1), Blocks.STONE);
+            helper.setBlock(new BlockPos(2, y, 1), wallRedstone(Direction.WEST));
+        }
+        BlockPos source = new BlockPos(1, 1, 1);  // in front of the bottom piece
+        BlockPos lamp = new BlockPos(2, height + 1, 1);
+        helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(source, Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> {
+                    for (int y = 1; y <= height; y++) {
+                        assertWallPower(helper, new BlockPos(2, y, 1), 16 - y);
+                    }
+                    helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true);
+                })
+                .thenExecute(() -> helper.setBlock(source, Blocks.AIR))
+                .thenWaitUntil(() -> {
+                    for (int y = 1; y <= height; y++) {
+                        assertWallPower(helper, new BlockPos(2, y, 1), 0);
+                    }
+                    helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, false);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Normal dust feeds Wall Redstone and gets powered by it, and when the source goes away everything
+     * turns off again. Includes the tricky loop where dust touches the block the wall wire powers.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void wallRedstoneWorksWithNormalDust(GameTestHelper helper) {
+        for (int x = 0; x <= 5; x++) {
+            helper.setBlock(new BlockPos(x, 0, 1), Blocks.STONE);
+            helper.setBlock(new BlockPos(x, 0, 0), Blocks.STONE);
+        }
+        BlockPos source = new BlockPos(0, 1, 1);
+        BlockPos dustA = new BlockPos(1, 1, 1);
+        BlockPos dustB = new BlockPos(2, 1, 1);           // in front of the bottom wall piece
+        BlockPos loopDust = new BlockPos(4, 1, 0);        // touches the pillar the wall wire powers
+        for (int y = 1; y <= 3; y++) {
+            helper.setBlock(new BlockPos(4, y, 1), Blocks.STONE);
+            helper.setBlock(new BlockPos(3, y, 1), wallRedstone(Direction.WEST));
+        }
+        helper.setBlock(dustA, Blocks.REDSTONE_WIRE);
+        helper.setBlock(dustB, Blocks.REDSTONE_WIRE);
+        helper.setBlock(loopDust, Blocks.REDSTONE_WIRE);
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(source, Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> {
+                    helper.assertBlockProperty(dustB, RedStoneWireBlock.POWER, 14);
+                    assertWallPower(helper, new BlockPos(3, 1, 1), 13);
+                    assertWallPower(helper, new BlockPos(3, 3, 1), 11);
+                    int loop = helper.getBlockState(loopDust).getValue(RedStoneWireBlock.POWER);
+                    if (loop == 0) throw new GameTestAssertException("Dust next to the powered pillar should be on");
+                })
+                .thenExecute(() -> helper.setBlock(source, Blocks.AIR))
+                .thenWaitUntil(() -> {
+                    helper.assertBlockProperty(dustA, RedStoneWireBlock.POWER, 0);
+                    helper.assertBlockProperty(dustB, RedStoneWireBlock.POWER, 0);
+                    helper.assertBlockProperty(loopDust, RedStoneWireBlock.POWER, 0);
+                    for (int y = 1; y <= 3; y++) {
+                        assertWallPower(helper, new BlockPos(3, y, 1), 0);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /** Like dust on a floor, Wall Redstone powers the block it's on, so a lamp behind the wall lights. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void wallRedstonePowersTheBlockItIsOn(GameTestHelper helper) {
+        BlockPos wire = new BlockPos(3, 1, 1);
+        BlockPos wall = wire.east();
+        BlockPos lamp = wall.east();
+        BlockPos source = wire.west();
+        helper.setBlock(wall, Blocks.STONE);
+        helper.setBlock(wire, wallRedstone(Direction.WEST));
+        helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(source, Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true))
+                .thenExecute(() -> helper.setBlock(source, Blocks.AIR))
+                .thenWaitUntil(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, false))
+                .thenSucceed();
+    }
+
+    /** Removing the wall knocks the Wall Redstone off and drops it. */
+    @GameTest(template = PLATFORM)
+    public static void wallRedstonePopsOff(GameTestHelper helper) {
+        BlockPos wall = new BlockPos(3, 1, 1);
+        BlockPos wire = wall.west();
+        helper.setBlock(wall, Blocks.STONE);
+        helper.setBlock(wire, wallRedstone(Direction.WEST));
+        helper.setBlock(wall, Blocks.AIR);
+
+        helper.succeedWhen(() -> {
+            helper.assertBlockNotPresent(ModRegistry.WALL_REDSTONE.get(), wire);
+            helper.assertItemEntityPresent(ModRegistry.WALL_REDSTONE_ITEM.get(), wire, 2.0);
+        });
     }
 }

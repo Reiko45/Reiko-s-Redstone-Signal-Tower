@@ -13,8 +13,11 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
+| **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
+
+![Wall Redstone running up and across a wall, fed by a lever and by normal dust](docs/images/wall-redstone.png)
 
 ## How to use it
 
@@ -75,6 +78,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
+**Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
+
 ## Building and running
 
 You need **Java 21**. If Gradle can't find it, it downloads one automatically.
@@ -104,6 +109,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioReceiverBlock.java          redstone output
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
+  block/WallRedstoneBlock.java           redstone dust for walls
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
@@ -139,7 +145,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 6. the tuner tunes a block on right-click and copies a block's frequency on sneak + right-click;
 7. a broken transmitter drops an item that keeps its frequency;
 8. a compact receiver on a wall powers that wall block, lighting a lamp on the far side;
-9. removing the wall knocks the compact receiver off, and its dropped item keeps its frequency.
+9. removing the wall knocks the compact receiver off, and its dropped item keeps its frequency;
+10. Wall Redstone climbing a pillar goes 15, 14, 13 … and lights a lamp at the top, then turns fully off;
+11. Wall Redstone and normal dust power each other, and both turn fully off when the source is removed (no stuck-on loops);
+12. Wall Redstone powers the block it's on, lighting a lamp behind the wall;
+13. removing the wall knocks Wall Redstone off and drops it.
 
 ## License
 

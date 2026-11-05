@@ -152,6 +152,34 @@ write(models / "compact_radio_receiver_inventory.json", {
 })
 
 
+# Wall Redstone, built from vanilla's own "dust running up a wall" textures and tinted by power.
+# The base models sit on the north wall of their block space (facing south), like vanilla's
+# redstone_dust_up model; the blockstate turns them to face other ways.
+def wall_dust_plane(frm, to, uv, rotation=0):
+    face = {"uv": uv, "texture": "#line", "tintindex": 0}
+    if rotation:
+        face["rotation"] = rotation
+    return {"from": frm, "to": to, "shade": False, "faces": {"south": face}}
+
+
+def wall_dust_model(element, line="minecraft:block/redstone_dust_line0"):
+    return {
+        "ambientocclusion": False,
+        "render_type": "minecraft:cutout",
+        "textures": {"particle": "minecraft:block/redstone_dust_dot", "line": line},
+        "elements": [element],
+    }
+
+
+write(models / "wall_redstone_dot.json", wall_dust_model(
+    wall_dust_plane([0, 0, 0.25], [16, 16, 0.25], [0, 0, 16, 16]), "minecraft:block/redstone_dust_dot"))
+write(models / "wall_redstone_up.json", wall_dust_model(wall_dust_plane([0, 8, 0.3], [16, 16, 0.3], [0, 0, 16, 8])))
+write(models / "wall_redstone_down.json", wall_dust_model(wall_dust_plane([0, 0, 0.3], [16, 8, 0.3], [0, 8, 16, 16])))
+# Sideways arms: the vertical line texture turned 90 degrees.
+write(models / "wall_redstone_right.json", wall_dust_model(wall_dust_plane([8, 0, 0.3], [16, 16, 0.3], [0, 0, 16, 8], 90)))
+write(models / "wall_redstone_left.json", wall_dust_model(wall_dust_plane([0, 0, 0.3], [8, 16, 0.3], [0, 8, 16, 16], 90)))
+
+
 def post(x, z):
     return {"from": [x, 0, z], "to": [x + 2, 16, z + 2],
             "faces": {f: {"texture": "#post"} for f in SIDES + ["up", "down"]}}
@@ -190,6 +218,10 @@ items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
+write(items / "wall_redstone.json", {
+    "parent": "minecraft:item/generated",
+    "textures": {"layer0": tex("wall_redstone", "item")},
+})
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -218,6 +250,18 @@ for (face, facing), rot in BUTTON_ROTATIONS.items():
         variant = {"model": f"{MOD}:block/compact_radio_receiver" + ("_on" if p > 0 else ""), **rot}
         compact_variants[f"face={face},facing={facing},power={p}"] = variant
 write(states / "compact_radio_receiver.json", {"variants": compact_variants})
+WALL_ROTATION = {"south": 0, "west": 90, "north": 180, "east": 270}
+wall_parts = []
+for facing, y in WALL_ROTATION.items():
+    def part(when, model):
+        apply = {"model": f"{MOD}:block/{model}"}
+        if y:
+            apply["y"] = y
+        wall_parts.append({"when": {"facing": facing, **when}, "apply": apply})
+    part({}, "wall_redstone_dot")
+    for arm in ("up", "down", "left", "right"):
+        part({arm: "true"}, f"wall_redstone_{arm}")
+write(states / "wall_redstone.json", {"multipart": wall_parts})
 write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radio_mast"}}})
 
 # ---------------------------------------------------------------- lang
@@ -229,6 +273,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
     f"block.{MOD}.compact_radio_receiver": "Compact Radio Receiver",
     f"block.{MOD}.compact_radio_receiver.tooltip": "A button-sized receiver. Sticks to walls, floors and ceilings, and powers the block it's on.",
+    f"block.{MOD}.wall_redstone": "Wall Redstone",
     f"block.{MOD}.radio_mast": "Radio Mast",
     f"block.{MOD}.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
     f"item.{MOD}.frequency_tuner": "Frequency Tuner",
@@ -296,6 +341,17 @@ def shapeless(ingredient, result):
     }
 
 
+def shapeless_any(ingredient, result):
+    return {
+        "type": "minecraft:crafting_shapeless",
+        "category": "redstone",
+        "ingredients": [{"item": ingredient}],
+        "result": {"count": 1, "id": result},
+    }
+
+
+recipes["wall_redstone"] = (shapeless_any("minecraft:redstone", f"{MOD}:wall_redstone"), "minecraft:redstone")
+recipes["redstone_from_wall_redstone"] = (shapeless_any(f"{MOD}:wall_redstone", "minecraft:redstone"), f"{MOD}:wall_redstone")
 recipes["compact_radio_receiver"] = (shapeless("radio_receiver", "compact_radio_receiver"), f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_compact"] = (shapeless("compact_radio_receiver", "radio_receiver"), f"{MOD}:compact_radio_receiver")
 
@@ -316,9 +372,9 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "compact_radio_receiver", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "compact_radio_receiver", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
-    if name != "radio_mast":
+    if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",

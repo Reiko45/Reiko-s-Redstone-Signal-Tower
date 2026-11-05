@@ -47,6 +47,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
+            event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
