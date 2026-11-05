@@ -1,6 +1,7 @@
 package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.item.RemoteButtons;
+import com.reiko.signaltower.network.RemoteScanResultPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -20,6 +21,13 @@ public final class ClientHooks {
     public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title,
                                            @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks));
+    }
+
+    /** A locator answer arrived: hand it to the open remote screen, if there is one. */
+    public static void onRemoteScan(RemoteScanResultPayload result) {
+        if (Minecraft.getInstance().screen instanceof RemoteScanListener listener) {
+            listener.onRemoteScan(result);
+        }
     }
 
     public static void openMultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {

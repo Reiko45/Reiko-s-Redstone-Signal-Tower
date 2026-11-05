@@ -45,6 +45,11 @@
 - **Button names:**
   - Each `RemoteButtons.Button` has a `name` (optional in saved data, so older remotes load unnamed). The record constructor cleans it with `StringUtil.filterText`, strips spaces and cuts it to 24 characters, on the server and the client alike.
   - `Button.label(index)` gives the name, or "Button N", and every message and tooltip uses it.
+- **Locator:**
+  - An open remote screen sends `RemoteScanRequestPayload` (up to 4 frequencies) every 20 ticks, or sooner after typing. The server only answers players holding a remote.
+  - It uses the receiver tracking (`SignalNetwork.scanReceivers`): count within reach, and nearest within 2× reach, with distance and 8-way compass direction.
+  - It replies with `RemoteScanResultPayload`, the mod's only server-to-client packet. That goes to `ClientHooks.onRemoteScan`, and from there to the open screen.
+  - Nothing is transmitted, and receivers beyond 2× reach are never revealed.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -62,7 +67,7 @@
 
 ## Verified
 
-- 31 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 35 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -71,6 +76,7 @@
 
 ## History
 
+- **v0.10.0:** remote locator.
 - **v0.9.0:** button names on the Multi-Button Remote.
 - **v0.8.0:** signal light on both remotes.
 - **v0.7.0:** pulse length setting for both remotes.

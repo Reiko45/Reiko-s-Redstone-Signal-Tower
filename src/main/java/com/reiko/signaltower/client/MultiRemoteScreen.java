@@ -5,6 +5,8 @@ import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
+import com.reiko.signaltower.network.RemoteScanRequestPayload;
+import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -21,15 +23,20 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * (click for longer, sneak-click for shorter), or press it right now. Pressing also saves the settings. Done saves
  * and closes, Cancel throws away unsaved edits.
  */
-public class MultiRemoteScreen extends Screen {
+public class MultiRemoteScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".multi_remote";
     private static final int COLUMNS_WIDTH = 348;
+    /** Each row is a line of controls plus a line of locator text underneath. */
+    private static final int ROW_HEIGHT = 32;
 
     private final InteractionHand hand;
     private RemoteButtons buttons;
     private final Button[] selectButtons = new Button[RemoteButtons.COUNT];
     private final Button[] modeButtons = new Button[RemoteButtons.COUNT];
     private final Button[] lengthButtons = new Button[RemoteButtons.COUNT];
+    private final RemoteScanResultPayload.Entry[] scans = new RemoteScanResultPayload.Entry[RemoteButtons.COUNT];
+    private int scanReach;
+    private int scanTimer;
 
     public MultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
         super(title);
@@ -40,13 +47,13 @@ public class MultiRemoteScreen extends Screen {
     @Override
     protected void init() {
         int centerX = width / 2;
-        int top = height / 2 - 46;
+        int top = height / 2 - 70;
 
         // Columns: [#] [name] [frequency] [mode] [pulse length] [Press], 348 wide in total.
         int left = centerX - COLUMNS_WIDTH / 2;
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
             final int index = i;
-            int y = top + i * 24;
+            int y = top + i * ROW_HEIGHT;
 
             selectButtons[i] = addRenderableWidget(Button.builder(selectLabel(i), b -> {
                 buttons = buttons.withSelected(index);
@@ -69,6 +76,8 @@ public class MultiRemoteScreen extends Screen {
                     long value = Long.parseLong(text);
                     if (value >= Frequency.MIN && value <= Frequency.MAX) {
                         buttons = buttons.withButton(index, buttons.button(index).withFrequency((int) value));
+                        scans[index] = null; // "checking" until the new frequency's answer arrives
+                        scanTimer = Math.min(scanTimer, 5);
                     }
                 }
             });
@@ -91,7 +100,7 @@ public class MultiRemoteScreen extends Screen {
         }
         refreshLabels();
 
-        int bottom = top + RemoteButtons.COUNT * 24 + 6;
+        int bottom = top + RemoteButtons.COUNT * ROW_HEIGHT + 2;
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> {
             send(-1);
             onClose();
@@ -121,10 +130,34 @@ public class MultiRemoteScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        if (--scanTimer <= 0) {
+            scanTimer = 20;
+            java.util.List<Integer> frequencies = new java.util.ArrayList<>();
+            for (int i = 0; i < RemoteButtons.COUNT; i++) {
+                frequencies.add(buttons.button(i).frequency());
+            }
+            PacketDistributor.sendToServer(new RemoteScanRequestPayload(frequencies));
+        }
+    }
+
+    @Override
+    public void onRemoteScan(RemoteScanResultPayload result) {
+        scanReach = result.reach();
+        for (int i = 0; i < RemoteButtons.COUNT && i < result.entries().size(); i++) {
+            RemoteScanResultPayload.Entry entry = result.entries().get(i);
+            if (entry.frequency() == buttons.button(i).frequency()) {
+                scans[i] = entry;
+            }
+        }
+    }
+
+    @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         int centerX = width / 2;
-        int top = height / 2 - 46;
+        int top = height / 2 - 70;
         graphics.drawCenteredString(font, title, centerX, top - 42, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.translatable(KEY + ".hint"), centerX, top - 28, 0xA0A0A0);
         // Column headings
@@ -134,6 +167,10 @@ public class MultiRemoteScreen extends Screen {
         graphics.drawString(font, Component.translatable(KEY + ".heading_frequency"), left + 130, headingY, 0xC0C0C0);
         graphics.drawString(font, Component.translatable(KEY + ".heading_mode"), left + 198, headingY, 0xC0C0C0);
         graphics.drawString(font, Component.translatable(KEY + ".heading_length"), left + 254, headingY, 0xC0C0C0);
+        // Locator: who is listening on each button's frequency
+        for (int i = 0; i < RemoteButtons.COUNT; i++) {
+            graphics.drawString(font, LocatorText.describe(scans[i], scanReach), left + 30, top + i * ROW_HEIGHT + 22, 0xFFFFFF);
+        }
     }
 
     @Override

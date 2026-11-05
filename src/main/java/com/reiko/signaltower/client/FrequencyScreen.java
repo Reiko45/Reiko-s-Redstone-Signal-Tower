@@ -3,6 +3,8 @@ package com.reiko.signaltower.client;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
+import com.reiko.signaltower.network.RemoteScanRequestPayload;
+import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -19,7 +21,7 @@ import org.lwjgl.glfw.GLFW;
  * Type a frequency for the Frequency Tuner or Remote Control (plus the remote's mode).
  * Enter or Done saves it, Escape cancels.
  */
-public class FrequencyScreen extends Screen {
+public class FrequencyScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".tuner";
 
     private final InteractionHand hand;
@@ -28,6 +30,10 @@ public class FrequencyScreen extends Screen {
     private @Nullable Boolean toggleMode;
     private int pulseTicks;
     private @Nullable Button lengthButton;
+    /** Locator (remotes only): the latest answer, and ticks until the next question. */
+    private @Nullable RemoteScanResultPayload.Entry scan;
+    private int scanReach;
+    private int scanTimer;
     private EditBox input;
     private Button doneButton;
 
@@ -49,7 +55,11 @@ public class FrequencyScreen extends Screen {
         input.setMaxLength(Frequency.MAX_DIGITS);
         input.setFilter(text -> text.chars().allMatch(Character::isDigit));
         input.setValue(Integer.toString(initialFrequency));
-        input.setResponder(text -> updateDoneButton());
+        input.setResponder(text -> {
+            updateDoneButton();
+            scan = null;     // show "checking" until the new frequency's answer arrives
+            scanTimer = 5;
+        });
         addRenderableWidget(input);
 
         addRenderableWidget(nudgeButton(-100, centerX - 112, 32));
@@ -57,8 +67,8 @@ public class FrequencyScreen extends Screen {
         addRenderableWidget(nudgeButton(1, centerX + 54, 22));
         addRenderableWidget(nudgeButton(100, centerX + 80, 32));
 
-        // The remote's mode button sits between the frequency row and Done/Cancel.
-        int buttonsY = centerY + 22;
+        // The remote's mode button sits between the frequency row and Done/Cancel, under the locator line.
+        int buttonsY = toggleMode != null ? centerY + 30 : centerY + 22;
         if (toggleMode != null) {
             addRenderableWidget(Button.builder(modeLabel(), button -> {
                 toggleMode = !toggleMode;
@@ -135,6 +145,24 @@ public class FrequencyScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        if (toggleMode != null && --scanTimer <= 0) {
+            scanTimer = 20;
+            PacketDistributor.sendToServer(new RemoteScanRequestPayload(
+                    java.util.List.of(parsed().orElse(initialFrequency))));
+        }
+    }
+
+    @Override
+    public void onRemoteScan(RemoteScanResultPayload result) {
+        if (!result.entries().isEmpty() && result.entries().get(0).frequency() == parsed().orElse(-1)) {
+            scan = result.entries().get(0);
+            scanReach = result.reach();
+        }
+    }
+
+    @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
             save();
@@ -151,6 +179,9 @@ public class FrequencyScreen extends Screen {
         graphics.drawCenteredString(font, title, centerX, centerY - 44, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.translatable(KEY + ".range", Frequency.MIN, Frequency.MAX),
                 centerX, centerY - 28, 0xA0A0A0);
+        if (toggleMode != null) {
+            graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach), centerX, centerY + 16, 0xFFFFFF);
+        }
     }
 
     @Override

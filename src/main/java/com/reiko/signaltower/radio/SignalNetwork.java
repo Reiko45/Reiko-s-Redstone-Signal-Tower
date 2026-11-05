@@ -193,6 +193,56 @@ public final class SignalNetwork extends SavedData {
         return count;
     }
 
+    /**
+     * What the remotes' locator shows for one frequency: how many loaded receivers are within
+     * {@code reach} of {@code origin}, and where the nearest one is. The nearest one is only
+     * reported if it's within twice the reach, so the locator can't find receivers far away.
+     *
+     * @param nearestDistance horizontal distance in blocks, or -1 if none is near enough
+     * @param direction 0-7 for N, NE, E, SE, S, SW, W, NW, or -1 if right here or none
+     */
+    public record ReceiverScan(int inRange, int nearestDistance, int direction, boolean nearestInRange) {}
+
+    public ReceiverScan scanReceivers(int frequency, BlockPos origin, int reach) {
+        Set<BlockPos> onFrequency = receiversByFrequency.get(frequency);
+        if (onFrequency == null) {
+            return new ReceiverScan(0, -1, -1, false);
+        }
+        long reachSq = (long) reach * reach;
+        long hintSq = 4L * reachSq;
+        int inRange = 0;
+        long bestSq = Long.MAX_VALUE;
+        long bestDx = 0;
+        long bestDz = 0;
+        for (BlockPos pos : onFrequency) {
+            long dx = pos.getX() - origin.getX();
+            long dz = pos.getZ() - origin.getZ();
+            long distSq = dx * dx + dz * dz;
+            if (distSq <= reachSq) {
+                inRange++;
+            }
+            if (distSq <= hintSq && distSq < bestSq) {
+                bestSq = distSq;
+                bestDx = dx;
+                bestDz = dz;
+            }
+        }
+        if (bestSq == Long.MAX_VALUE) {
+            return new ReceiverScan(inRange, -1, -1, false);
+        }
+        int distance = (int) Math.round(Math.sqrt(bestSq));
+        return new ReceiverScan(inRange, distance, compassDirection(bestDx, bestDz), bestSq <= reachSq);
+    }
+
+    /** 0-7 for N, NE, E, SE, S, SW, W, NW (north is -Z), or -1 when there's no offset. */
+    public static int compassDirection(long dx, long dz) {
+        if (dx == 0 && dz == 0) {
+            return -1;
+        }
+        double degrees = Math.toDegrees(Math.atan2(dx, -dz)); // 0 = north, clockwise
+        return Math.floorMod((int) Math.round(degrees / 45.0), 8);
+    }
+
     // ---- Receivers ----
 
     /**

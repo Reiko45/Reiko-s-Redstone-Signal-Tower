@@ -48,6 +48,10 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ![The remote's light: off, green after a press a receiver heard, red after a press nobody heard, then off again](docs/images/remote-light.png)
 
+- **Locator:** while a remote's screen is open, each frequency shows who's listening, without sending anything. For example "2 receivers in range, nearest 14 blocks north-east", or "None in range. Nearest is 120 blocks south (your reach: 88)". It updates about once a second, follows what you type, and only sees receivers in loaded chunks within twice your reach.
+
+![The keypad's locator lines](docs/images/remote-locator.png)
+
 ![The Remote Control screen](docs/images/remote-screen.png)
 
 **Multi-Button Remote:**
@@ -155,6 +159,9 @@ src/main/java/com/reiko/signaltower/
   item/RemoteButtons.java                the 4 buttons' settings (data component)
   item/PulseLength.java                  pulse length presets, limits and labels
   item/RemoteLight.java                  the remotes' green/red status light after a press
+  network/RemoteScanRequestPayload.java  remote screen -> server: who's listening? (locator)
+  network/RemoteScanResultPayload.java   server -> remote screen: the answer
+  client/LocatorText.java                turns a locator answer into a line of text
   network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
   network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
@@ -211,7 +218,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 28. button names lose colour codes, control characters and extra spaces, and are cut to 24 characters;
 29. named buttons are labelled with their name, unnamed ones as "Button N";
 30. names survive saving and network sync, and remotes saved before names existed still load;
-31. copying a frequency into a named button keeps its name.
+31. copying a frequency into a named button keeps its name;
+32. the locator counts receivers in range and points at the nearest one;
+33. with nothing in range, it says where the nearest one just out of range is;
+34. receivers more than twice the reach away stay hidden;
+35. the eight compass directions come out right.
 
 ## License
 

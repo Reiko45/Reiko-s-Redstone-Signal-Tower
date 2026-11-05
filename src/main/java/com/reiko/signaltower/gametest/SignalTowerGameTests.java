@@ -12,6 +12,7 @@ import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.RadioHelper;
+import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -810,6 +811,78 @@ public final class SignalTowerGameTests {
         RemoteButtons.Button button = MultiRemoteItem.getButtons(player.getMainHandItem()).button(1);
         check(button.frequency() == 888, "Frequency should be copied, got " + button.frequency());
         check(button.name().equals("Garage"), "The name should be kept, got '" + button.name() + "'");
+        helper.succeed();
+    }
+
+    // ---- Remote locator ----
+
+    private static SignalNetwork.ReceiverScan scanFrom(GameTestHelper helper, BlockPos relativeOrigin, int frequency) {
+        BlockPos origin = helper.absolutePos(relativeOrigin);
+        return SignalNetwork.get(helper.getLevel())
+                .scanReceivers(frequency, origin, RadioHelper.reachAt(helper.getLevel(), origin));
+    }
+
+    /** Counts receivers in range and points at the nearest one. */
+    @GameTest(template = PLATFORM)
+    public static void locatorCountsAndPointsToNearest(GameTestHelper helper) {
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        place(helper, new BlockPos(11, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 701);         // 10 east
+        place(helper, new BlockPos(4, 1, 0), ModRegistry.RADIO_RECEIVER.get(), 701);          // ~3 east (and 1 north)
+        place(helper, new BlockPos(2, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 799);          // other frequency
+        helper.startSequence()
+                .thenIdle(3) // receivers check in on their first tick
+                .thenExecute(() -> {
+                    SignalNetwork.ReceiverScan scan = scanFrom(helper, standAt, 701);
+                    check(scan.inRange() == 2, "Expected 2 receivers in range, got " + scan.inRange());
+                    check(scan.nearestDistance() == 3, "Nearest should be 3 blocks away, got " + scan.nearestDistance());
+                    check(scan.direction() == 2, "Nearest should be east (2), got " + scan.direction());
+                    check(scan.nearestInRange(), "Nearest should be in range");
+                })
+                .thenSucceed();
+    }
+
+    /** Nothing in range, but one a little too far: the locator says where it is. */
+    @GameTest(template = PLATFORM)
+    public static void locatorHintsWhenJustOutOfRange(GameTestHelper helper) {
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(helper.getLevel(), helper.absolutePos(standAt));
+        if (standAt.getX() + reach + 3 > 128) {
+            throw new GameTestAssertException("Reach " + reach + " is too big for the test platform");
+        }
+        place(helper, new BlockPos(standAt.getX() + reach + 3, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 702);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    SignalNetwork.ReceiverScan scan = scanFrom(helper, standAt, 702);
+                    check(scan.inRange() == 0, "Nothing should be in range, got " + scan.inRange());
+                    check(scan.nearestDistance() == reach + 3, "Nearest should be " + (reach + 3) + " away, got " + scan.nearestDistance());
+                    check(!scan.nearestInRange(), "Nearest should be marked as out of range");
+                })
+                .thenSucceed();
+    }
+
+    /** Receivers more than twice the reach away aren't revealed. */
+    @GameTest(template = PLATFORM)
+    public static void locatorIgnoresFarReceivers(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(new BlockPos(1, 1, 1));
+        int reach = RadioHelper.reachAt(helper.getLevel(), origin);
+        SignalNetwork network = SignalNetwork.get(helper.getLevel());
+        BlockPos far = origin.east(reach * 2 + 5);
+        network.trackReceiver(far, 703);
+        SignalNetwork.ReceiverScan scan = network.scanReceivers(703, origin, reach);
+        network.untrackReceiver(far);
+        check(scan.inRange() == 0 && scan.nearestDistance() == -1, "A receiver that far away should stay hidden");
+        helper.succeed();
+    }
+
+    /** The eight compass points, north being -Z. */
+    @GameTest(template = PLATFORM)
+    public static void locatorCompassDirections(GameTestHelper helper) {
+        int[][] cases = {{0, -5, 0}, {5, -5, 1}, {5, 0, 2}, {5, 5, 3}, {0, 5, 4}, {-5, 5, 5}, {-5, 0, 6}, {-5, -5, 7}, {0, 0, -1}};
+        for (int[] c : cases) {
+            int got = SignalNetwork.compassDirection(c[0], c[1]);
+            check(got == c[2], "Offset (" + c[0] + ", " + c[1] + ") should be direction " + c[2] + ", got " + got);
+        }
         helper.succeed();
     }
 }

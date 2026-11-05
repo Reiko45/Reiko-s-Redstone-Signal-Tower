@@ -4,6 +4,8 @@ import com.mojang.logging.LogUtils;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
+import com.reiko.signaltower.network.RemoteScanRequestPayload;
+import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.server.level.ServerLevel;
@@ -50,6 +52,10 @@ public final class SignalTower {
                 ConfigureMultiRemotePayload::handle);
         registrar.playToServer(SelectRemoteButtonPayload.TYPE, SelectRemoteButtonPayload.STREAM_CODEC,
                 SelectRemoteButtonPayload::handle);
+        registrar.playToServer(RemoteScanRequestPayload.TYPE, RemoteScanRequestPayload.STREAM_CODEC,
+                RemoteScanRequestPayload::handle);
+        registrar.playToClient(RemoteScanResultPayload.TYPE, RemoteScanResultPayload.STREAM_CODEC,
+                RemoteScanResultPayload::handle);
     }
 
     /** Ends Remote Control pulses on time. */
