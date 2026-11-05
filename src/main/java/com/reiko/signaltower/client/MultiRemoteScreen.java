@@ -2,6 +2,7 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.radio.Frequency;
@@ -16,8 +17,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * The Multi-Button Remote's keypad. Each row is one button: click its number to make it the one
- * right-click presses, type its frequency, switch its mode, or press it right now. Pressing also
- * saves the settings. Done saves and closes, Cancel throws away unsaved edits.
+ * right-click presses, type its frequency, switch its mode, set its pulse length (click for longer,
+ * sneak-click for shorter), or press it right now. Pressing also saves the settings. Done saves
+ * and closes, Cancel throws away unsaved edits.
  */
 public class MultiRemoteScreen extends Screen {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".multi_remote";
@@ -26,6 +28,7 @@ public class MultiRemoteScreen extends Screen {
     private RemoteButtons buttons;
     private final Button[] selectButtons = new Button[RemoteButtons.COUNT];
     private final Button[] modeButtons = new Button[RemoteButtons.COUNT];
+    private final Button[] lengthButtons = new Button[RemoteButtons.COUNT];
 
     public MultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
         super(title);
@@ -38,6 +41,8 @@ public class MultiRemoteScreen extends Screen {
         int centerX = width / 2;
         int top = height / 2 - 46;
 
+        // Columns: [#] [frequency] [mode] [pulse length] [Press], 274 wide in total.
+        int left = centerX - 137;
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
             final int index = i;
             int y = top + i * 24;
@@ -45,9 +50,9 @@ public class MultiRemoteScreen extends Screen {
             selectButtons[i] = addRenderableWidget(Button.builder(selectLabel(i), b -> {
                 buttons = buttons.withSelected(index);
                 refreshLabels();
-            }).bounds(centerX - 132, y, 28, 20).build());
+            }).bounds(left, y, 24, 20).build());
 
-            EditBox box = new EditBox(font, centerX - 100, y, 80, 20, Component.translatable(KEY + ".frequency", i + 1));
+            EditBox box = new EditBox(font, left + 28, y, 70, 20, Component.translatable(KEY + ".frequency", i + 1));
             box.setMaxLength(Frequency.MAX_DIGITS);
             box.setFilter(text -> text.chars().allMatch(Character::isDigit));
             box.setValue(Integer.toString(buttons.button(i).frequency()));
@@ -55,22 +60,28 @@ public class MultiRemoteScreen extends Screen {
                 if (!text.isEmpty()) {
                     long value = Long.parseLong(text);
                     if (value >= Frequency.MIN && value <= Frequency.MAX) {
-                        RemoteButtons.Button old = buttons.button(index);
-                        buttons = buttons.withButton(index, new RemoteButtons.Button((int) value, old.toggle()));
+                        buttons = buttons.withButton(index, buttons.button(index).withFrequency((int) value));
                     }
                 }
             });
             addRenderableWidget(box);
 
-            modeButtons[i] = addRenderableWidget(Button.builder(MultiRemoteItem.modeName(buttons.button(i).toggle()), b -> {
+            modeButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> {
                 RemoteButtons.Button old = buttons.button(index);
-                buttons = buttons.withButton(index, new RemoteButtons.Button(old.frequency(), !old.toggle()));
+                buttons = buttons.withButton(index, old.withToggle(!old.toggle()));
                 refreshLabels();
-            }).bounds(centerX - 16, y, 64, 20).build());
+            }).bounds(left + 102, y, 56, 20).build());
+
+            lengthButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> {
+                RemoteButtons.Button old = buttons.button(index);
+                buttons = buttons.withButton(index, old.withPulseTicks(PulseLength.next(old.pulseTicks(), Screen.hasShiftDown())));
+                refreshLabels();
+            }).bounds(left + 162, y, 52, 20).build());
 
             addRenderableWidget(Button.builder(Component.translatable(KEY + ".press"), b -> send(index))
-                    .bounds(centerX + 52, y, 80, 20).build());
+                    .bounds(left + 218, y, 56, 20).build());
         }
+        refreshLabels();
 
         int bottom = top + RemoteButtons.COUNT * 24 + 6;
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> {
@@ -88,8 +99,11 @@ public class MultiRemoteScreen extends Screen {
 
     private void refreshLabels() {
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
+            RemoteButtons.Button button = buttons.button(i);
             selectButtons[i].setMessage(selectLabel(i));
-            modeButtons[i].setMessage(MultiRemoteItem.modeName(buttons.button(i).toggle()));
+            modeButtons[i].setMessage(MultiRemoteItem.modeName(button.toggle()));
+            lengthButtons[i].setMessage(Component.literal(PulseLength.format(button.pulseTicks())));
+            lengthButtons[i].active = !button.toggle(); // length only matters for pulses
         }
     }
 

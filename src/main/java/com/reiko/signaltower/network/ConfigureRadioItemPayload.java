@@ -15,9 +15,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Sent by the frequency screen: "set the tuner or remote in my main/off hand to this frequency"
- * (and, for a remote, this mode).
+ * (and, for a remote, this mode and pulse length).
  */
-public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean toggleMode) implements CustomPacketPayload {
+public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean toggleMode, int pulseTicks) implements CustomPacketPayload {
     public static final Type<ConfigureRadioItemPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "configure_radio_item"));
 
@@ -25,6 +25,7 @@ public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean 
             ByteBufCodecs.BOOL, ConfigureRadioItemPayload::offhand,
             ByteBufCodecs.VAR_INT, ConfigureRadioItemPayload::frequency,
             ByteBufCodecs.BOOL, ConfigureRadioItemPayload::toggleMode,
+            ByteBufCodecs.VAR_INT, ConfigureRadioItemPayload::pulseTicks,
             ConfigureRadioItemPayload::new);
 
     @Override
@@ -41,6 +42,7 @@ public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean 
         } else if (stack.getItem() instanceof RemoteControlItem) {
             FrequencyTunerItem.setFrequency(stack, payload.frequency());
             RemoteControlItem.setToggleMode(stack, payload.toggleMode());
+            RemoteControlItem.setPulseTicks(stack, payload.pulseTicks());
         }
     }
 }

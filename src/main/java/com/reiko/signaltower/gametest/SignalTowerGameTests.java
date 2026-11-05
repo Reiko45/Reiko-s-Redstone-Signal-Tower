@@ -7,6 +7,7 @@ import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.RadioHelper;
@@ -597,5 +598,66 @@ public final class SignalTowerGameTests {
         if (odd.button(1).frequency() != 999_999_999) throw new GameTestAssertException("Huge frequency should clamp");
         if (RemoteButtons.DEFAULT.withSelected(-1).selected() != 3) throw new GameTestAssertException("Scrolling back from 1 should wrap to 4");
         helper.succeed();
+    }
+
+    // ---- Pulse length ----
+
+    /** A Remote Control set to a 5-second pulse is still on after 3 seconds, then turns itself off. */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void remoteLongPulseLastsLonger(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 501);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 501, false);
+        RemoteControlItem.setPulseTicks(player.getMainHandItem(), 100);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(60)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    /** A Multi-Button Remote button set to a 0.25-second pulse is off again well before a normal 1-second pulse would be. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void multiRemoteShortPulseEndsSooner(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 502);
+        Player player = playerWithMultiRemote(helper,
+                RemoteButtons.DEFAULT.withButton(0, new RemoteButtons.Button(502, false, 5)));
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(12)
+                .thenExecute(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    /** Presets step and wrap correctly, lengths are kept in range, and labels read nicely. */
+    @GameTest(template = PLATFORM)
+    public static void pulseLengthPresetsAndLimits(GameTestHelper helper) {
+        check(PulseLength.next(20, false) == 30, "1s should step up to 1.5s");
+        check(PulseLength.next(20, true) == 10, "1s should step down to 0.5s");
+        check(PulseLength.next(200, false) == 2, "10s should wrap up to 0.1s");
+        check(PulseLength.next(2, true) == 200, "0.1s should wrap down to 10s");
+        check(PulseLength.next(7, false) == 10, "An odd length should step to the next preset");
+        check(PulseLength.clamp(0) == PulseLength.MIN_TICKS, "Too short should clamp");
+        check(PulseLength.clamp(999) == PulseLength.MAX_TICKS, "Too long should clamp");
+        check(PulseLength.format(5).equals("0.25s"), "5 ticks should read 0.25s, got " + PulseLength.format(5));
+        check(PulseLength.format(20).equals("1s"), "20 ticks should read 1s, got " + PulseLength.format(20));
+        check(PulseLength.format(30).equals("1.5s"), "30 ticks should read 1.5s, got " + PulseLength.format(30));
+        check(new RemoteButtons.Button(1, false, 0).pulseTicks() == PulseLength.MIN_TICKS, "Button pulse should clamp");
+        check(new RemoteButtons.Button(1, false).pulseTicks() == PulseLength.DEFAULT_TICKS, "Default should be 1s");
+        helper.succeed();
+    }
+
+    private static void check(boolean condition, String message) {
+        if (!condition) {
+            throw new GameTestAssertException(message);
+        }
     }
 }

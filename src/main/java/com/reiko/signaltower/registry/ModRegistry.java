@@ -11,6 +11,7 @@ import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.Frequency;
@@ -51,6 +52,12 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("remote_toggle_mode", builder -> builder
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
+
+    /** How long a Remote Control's pulse lasts, in ticks. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> REMOTE_PULSE_TICKS =
+            DATA_COMPONENTS.registerComponentType("remote_pulse_ticks", builder -> builder
+                    .persistent(Codec.intRange(PulseLength.MIN_TICKS, PulseLength.MAX_TICKS))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
 
     /** The four buttons of a Multi-Button Remote, and which one is selected. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<RemoteButtons>> REMOTE_BUTTONS =

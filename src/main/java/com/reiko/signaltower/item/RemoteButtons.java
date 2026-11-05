@@ -17,20 +17,43 @@ import java.util.List;
 public record RemoteButtons(List<Button> buttons, int selected) {
     public static final int COUNT = 4;
 
-    /** One button: a frequency, and whether it toggles (true) or pulses (false). */
-    public record Button(int frequency, boolean toggle) {
+    /**
+     * One button: a frequency, whether it toggles (true) or pulses (false), and how long its pulse
+     * lasts in ticks.
+     */
+    public record Button(int frequency, boolean toggle, int pulseTicks) {
         public static final Codec<Button> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.intRange(Frequency.MIN, Frequency.MAX).fieldOf("frequency").forGetter(Button::frequency),
-                Codec.BOOL.optionalFieldOf("toggle", false).forGetter(Button::toggle)
+                Codec.BOOL.optionalFieldOf("toggle", false).forGetter(Button::toggle),
+                Codec.INT.optionalFieldOf("pulse_ticks", PulseLength.DEFAULT_TICKS).forGetter(Button::pulseTicks)
         ).apply(instance, Button::new));
 
         public static final StreamCodec<ByteBuf, Button> STREAM_CODEC = StreamCodec.composite(
                 ByteBufCodecs.VAR_INT, Button::frequency,
                 ByteBufCodecs.BOOL, Button::toggle,
+                ByteBufCodecs.VAR_INT, Button::pulseTicks,
                 Button::new);
 
         public Button {
             frequency = Frequency.clamp(frequency);
+            pulseTicks = PulseLength.clamp(pulseTicks);
+        }
+
+        /** A button with the default 1-second pulse. */
+        public Button(int frequency, boolean toggle) {
+            this(frequency, toggle, PulseLength.DEFAULT_TICKS);
+        }
+
+        public Button withFrequency(int newFrequency) {
+            return new Button(newFrequency, toggle, pulseTicks);
+        }
+
+        public Button withToggle(boolean newToggle) {
+            return new Button(frequency, newToggle, pulseTicks);
+        }
+
+        public Button withPulseTicks(int newPulseTicks) {
+            return new Button(frequency, toggle, newPulseTicks);
         }
     }
 

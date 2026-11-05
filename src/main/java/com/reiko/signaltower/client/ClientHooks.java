@@ -13,9 +13,13 @@ import org.jetbrains.annotations.Nullable;
 public final class ClientHooks {
     private ClientHooks() {}
 
-    /** Opens the frequency screen. {@code toggleMode} is null for items without a mode (the tuner). */
-    public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title, @Nullable Boolean toggleMode) {
-        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode));
+    /**
+     * Opens the frequency screen. {@code toggleMode} and {@code pulseTicks} are null for items without
+     * a mode (the tuner).
+     */
+    public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title,
+                                           @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
+        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks));
     }
 
     public static void openMultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {

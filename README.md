@@ -40,7 +40,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 **Remote Control:**
 - Right-click: press the button.
-- Sneak + right-click the air: change its frequency and switch between **Pulse** (1 second, like a stone button) and **Toggle** (on until you press it again).
+- Sneak + right-click the air: change its frequency, switch between **Pulse** and **Toggle** (on until you press it again), and set the **pulse length**. Click the length button for longer or sneak-click for shorter: 0.1s, 0.25s, 0.5s, 1s (the default, like a stone button), 1.5s, 2s, 3s, 5s or 10s.
 - Sneak + right-click a transmitter or receiver: copy its frequency.
 - Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
 - Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
@@ -50,7 +50,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Multi-Button Remote:**
 - Right-click: press the **selected** button.
 - Sneak + scroll: choose the selected button. Your hotbar slot doesn't move.
-- Sneak + right-click the air: open the keypad. From there you can press any button, set each button's frequency and Pulse/Toggle mode, and click a button's number to make it the selected one.
+- Sneak + right-click the air: open the keypad. From there you can press any button, set each button's frequency, Pulse/Toggle mode and pulse length, and click a button's number to make it the selected one.
 - Sneak + right-click a transmitter or receiver: copy its frequency into the selected button.
 - The tooltip lists all 4 buttons, with the selected one marked ».
 
@@ -147,6 +147,7 @@ src/main/java/com/reiko/signaltower/
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
   item/RemoteButtons.java                the 4 buttons' settings (data component)
+  item/PulseLength.java                  pulse length presets, limits and labels
   network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
   network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
@@ -192,7 +193,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 17. sneak + right-clicking a transmitter copies its frequency into the remote;
 18. a Multi-Button Remote's buttons each drive their own frequency and mode;
 19. sneak + right-click copies a frequency into the selected button only;
-20. remote button settings are always tidied up (4 buttons, valid selection and frequencies).
+20. remote button settings are always tidied up (4 buttons, valid selection and frequencies);
+21. a Remote Control set to a 5-second pulse is still on after 3 seconds, then turns off;
+22. a Multi-Button Remote button set to 0.25 seconds turns off well before a normal 1-second pulse would;
+23. pulse length presets step and wrap correctly and stay within 0.1–10 seconds.
 
 ## License
 

@@ -32,6 +32,11 @@
   - Pressing reuses `RemoteControlItem.sendSignal`.
   - Sneak + scroll is caught client-side by the cancellable `InputEvent.MouseScrollingEvent` (so the hotbar doesn't move) and sent as `SelectRemoteButtonPayload`.
   - The keypad sends `ConfigureMultiRemotePayload` (settings, plus an optional button to press). The server checks the item and has a short cooldown.
+- **Pulse length:**
+  - Stored in ticks, 2–200 (0.1–10s, default 20).
+  - The single remote keeps it in its own `remote_pulse_ticks` component. Each Multi-Button Remote button has a `pulse_ticks` field, optional in saved data, so older remotes load as 1s.
+  - The screens step through the presets in `PulseLength`. Sneak-click steps down.
+  - `RemoteControlItem.sendSignal` takes the length and clamps it.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -49,7 +54,7 @@
 
 ## Verified
 
-- 20 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 23 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -58,6 +63,7 @@
 
 ## History
 
+- **v0.7.0:** pulse length setting for both remotes.
 - **v0.6.0:** added the Multi-Button Remote.
 - **v0.5.0:** added the Remote Control.
 - **v0.4.0:** added Wall Redstone.

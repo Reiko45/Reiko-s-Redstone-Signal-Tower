@@ -37,8 +37,8 @@ import java.util.List;
  * pressing it from up high reaches farther.
  */
 public class RemoteControlItem extends Item {
-    /** How long a pulse lasts: 20 ticks, the same as a stone button. */
-    public static final int PULSE_TICKS = 20;
+    /** Default pulse length: 20 ticks, the same as a stone button. */
+    public static final int PULSE_TICKS = PulseLength.DEFAULT_TICKS;
     /** Stops held right-click from flickering a toggle on and off. */
     private static final int COOLDOWN_TICKS = 10;
 
@@ -52,6 +52,22 @@ public class RemoteControlItem extends Item {
 
     public static void setToggleMode(ItemStack stack, boolean toggle) {
         stack.set(ModRegistry.REMOTE_TOGGLE_MODE.get(), toggle);
+    }
+
+    public static int getPulseTicks(ItemStack stack) {
+        return stack.getOrDefault(ModRegistry.REMOTE_PULSE_TICKS.get(), PulseLength.DEFAULT_TICKS);
+    }
+
+    public static void setPulseTicks(ItemStack stack, int ticks) {
+        stack.set(ModRegistry.REMOTE_PULSE_TICKS.get(), PulseLength.clamp(ticks));
+    }
+
+    /** "Toggle", or "Pulse 0.5s". */
+    public static Component describeMode(boolean toggle, int pulseTicks) {
+        String prefix = "tooltip." + SignalTower.MOD_ID + ".";
+        return toggle
+                ? Component.translatable(prefix + "remote_mode_toggle")
+                : Component.translatable(prefix + "remote_mode_pulse_length", PulseLength.format(pulseTicks));
     }
 
     @Override
@@ -78,7 +94,7 @@ public class RemoteControlItem extends Item {
         if (player.isSecondaryUseActive()) {
             if (level.isClientSide) {
                 ClientHooks.openFrequencyScreen(hand, FrequencyTunerItem.getFrequency(stack),
-                        stack.getHoverName(), isToggleMode(stack));
+                        stack.getHoverName(), isToggleMode(stack), getPulseTicks(stack));
             }
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
@@ -92,14 +108,14 @@ public class RemoteControlItem extends Item {
     /** Presses the button: sends a pulse or flips the toggle, from where the player is. */
     public static void press(ServerLevel level, Player player, ItemStack stack) {
         player.displayClientMessage(
-                sendSignal(level, player, FrequencyTunerItem.getFrequency(stack), isToggleMode(stack)), true);
+                sendSignal(level, player, FrequencyTunerItem.getFrequency(stack), isToggleMode(stack), getPulseTicks(stack)), true);
     }
 
     /**
      * Sends a remote signal on {@code frequency} from where the player is standing, plays the click,
      * and returns a short description of what happened. Shared with the Multi-Button Remote.
      */
-    public static Component sendSignal(ServerLevel level, Player player, int frequency, boolean toggle) {
+    public static Component sendSignal(ServerLevel level, Player player, int frequency, boolean toggle, int pulseTicks) {
         BlockPos origin = player.blockPosition();
         int reach = RadioHelper.reachAt(level, origin);
         SignalNetwork network = SignalNetwork.get(level);
@@ -112,9 +128,10 @@ public class RemoteControlItem extends Item {
                     ? Component.translatable(key + "on", frequency, reach).withStyle(ChatFormatting.GREEN)
                     : Component.translatable(key + "off", frequency).withStyle(ChatFormatting.RED);
         }
-        network.pulse(frequency, origin, reach, level.getGameTime() + PULSE_TICKS);
+        int ticks = PulseLength.clamp(pulseTicks);
+        network.pulse(frequency, origin, reach, level.getGameTime() + ticks);
         level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
-        return Component.translatable(key + "pulse", frequency, reach);
+        return Component.translatable(key + "pulse", PulseLength.format(ticks), frequency, reach);
     }
 
     @Override
@@ -122,8 +139,7 @@ public class RemoteControlItem extends Item {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
         tooltip.add(Component.translatable(prefix + "frequency", FrequencyTunerItem.getFrequency(stack))
                 .withStyle(ChatFormatting.AQUA));
-        tooltip.add(Component.translatable(prefix + "remote_mode",
-                        Component.translatable(prefix + (isToggleMode(stack) ? "remote_mode_toggle" : "remote_mode_pulse")))
+        tooltip.add(Component.translatable(prefix + "remote_mode", describeMode(isToggleMode(stack), getPulseTicks(stack)))
                 .withStyle(ChatFormatting.AQUA));
         tooltip.add(Component.translatable(prefix + "remote_use").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "remote_configure").withStyle(ChatFormatting.GRAY));

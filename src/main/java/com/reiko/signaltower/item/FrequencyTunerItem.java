@@ -75,7 +75,7 @@ public class FrequencyTunerItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
             // Only runs on the client, so the screen class is never loaded on a dedicated server.
-            ClientHooks.openFrequencyScreen(hand, getFrequency(stack), stack.getHoverName(), null);
+            ClientHooks.openFrequencyScreen(hand, getFrequency(stack), stack.getHoverName(), null, null);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }

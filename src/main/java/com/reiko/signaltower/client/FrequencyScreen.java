@@ -1,6 +1,7 @@
 package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,14 +26,18 @@ public class FrequencyScreen extends Screen {
     private final int initialFrequency;
     /** Null for the tuner, which has no mode. */
     private @Nullable Boolean toggleMode;
+    private int pulseTicks;
+    private @Nullable Button lengthButton;
     private EditBox input;
     private Button doneButton;
 
-    public FrequencyScreen(InteractionHand hand, int frequency, Component title, @Nullable Boolean toggleMode) {
+    public FrequencyScreen(InteractionHand hand, int frequency, Component title,
+                           @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
         super(title);
         this.hand = hand;
         this.initialFrequency = frequency;
         this.toggleMode = toggleMode;
+        this.pulseTicks = pulseTicks == null ? PulseLength.DEFAULT_TICKS : pulseTicks;
     }
 
     @Override
@@ -58,7 +63,14 @@ public class FrequencyScreen extends Screen {
             addRenderableWidget(Button.builder(modeLabel(), button -> {
                 toggleMode = !toggleMode;
                 button.setMessage(modeLabel());
-            }).bounds(centerX - 102, buttonsY, 204, 20).build());
+                updateLengthButton();
+            }).bounds(centerX - 102, buttonsY, 100, 20).build());
+            // Click for a longer pulse, sneak-click for a shorter one. Only used in pulse mode.
+            lengthButton = addRenderableWidget(Button.builder(lengthLabel(), button -> {
+                pulseTicks = PulseLength.next(pulseTicks, Screen.hasShiftDown());
+                updateLengthButton();
+            }).bounds(centerX + 2, buttonsY, 100, 20).build());
+            updateLengthButton();
             buttonsY += 24;
         }
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> save())
@@ -74,6 +86,17 @@ public class FrequencyScreen extends Screen {
         String mode = Boolean.TRUE.equals(toggleMode) ? "remote_mode_toggle" : "remote_mode_pulse";
         return Component.translatable("tooltip." + SignalTower.MOD_ID + ".remote_mode",
                 Component.translatable("tooltip." + SignalTower.MOD_ID + "." + mode));
+    }
+
+    private Component lengthLabel() {
+        return Component.translatable(KEY + ".pulse_length", PulseLength.format(pulseTicks));
+    }
+
+    private void updateLengthButton() {
+        if (lengthButton != null) {
+            lengthButton.setMessage(lengthLabel());
+            lengthButton.active = !Boolean.TRUE.equals(toggleMode);
+        }
     }
 
     private Button nudgeButton(int amount, int x, int buttonWidth) {
@@ -106,7 +129,7 @@ public class FrequencyScreen extends Screen {
     private void save() {
         parsed().ifPresent(frequency -> {
             PacketDistributor.sendToServer(new ConfigureRadioItemPayload(
-                    hand == InteractionHand.OFF_HAND, frequency, Boolean.TRUE.equals(toggleMode)));
+                    hand == InteractionHand.OFF_HAND, frequency, Boolean.TRUE.equals(toggleMode), pulseTicks));
             onClose();
         });
     }
