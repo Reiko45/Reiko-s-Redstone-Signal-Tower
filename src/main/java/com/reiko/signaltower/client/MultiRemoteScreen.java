@@ -36,6 +36,8 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
     private final Button[] lengthButtons = new Button[RemoteButtons.COUNT];
     private final RemoteScanResultPayload.Entry[] scans = new RemoteScanResultPayload.Entry[RemoteButtons.COUNT];
     private int scanReach;
+    private int scanTowers;
+    private boolean scanned;
     private int scanTimer;
 
     public MultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
@@ -145,6 +147,8 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
     @Override
     public void onRemoteScan(RemoteScanResultPayload result) {
         scanReach = result.reach();
+        scanTowers = result.towers();
+        scanned = true;
         for (int i = 0; i < RemoteButtons.COUNT && i < result.entries().size(); i++) {
             RemoteScanResultPayload.Entry entry = result.entries().get(i);
             if (entry.frequency() == buttons.button(i).frequency()) {
@@ -169,8 +173,10 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         graphics.drawString(font, Component.translatable(KEY + ".heading_length"), left + 254, headingY, 0xC0C0C0);
         // Locator: who is listening on each button's frequency
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
-            graphics.drawString(font, LocatorText.describe(scans[i], scanReach), left + 30, top + i * ROW_HEIGHT + 22, 0xFFFFFF);
+            graphics.drawString(font, LocatorText.describe(scans[i], scanReach, scanTowers), left + 30, top + i * ROW_HEIGHT + 22, 0xFFFFFF);
         }
+        int bottom = top + RemoteButtons.COUNT * ROW_HEIGHT + 2;
+        graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, bottom + 26, 0xFFFFFF);
     }
 
     @Override

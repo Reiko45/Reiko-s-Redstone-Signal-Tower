@@ -50,6 +50,13 @@
   - It uses the receiver tracking (`SignalNetwork.scanReceivers`): count within reach, and nearest within 2× reach, with distance and 8-way compass direction.
   - It replies with `RemoteScanResultPayload`, the mod's only server-to-client packet. That goes to `ClientHooks.onRemoteScan`, and from there to the open screen.
   - Nothing is transmitted, and receivers beyond 2× reach are never revealed.
+- **Tower relay:**
+  - A remote signal covers a list of `SignalNetwork.Coverage` areas (origin, reach, tower flag). The first is the player's own; `remoteCoverage` adds one for every transmitter within the player's reach (horizontally, any frequency), with that transmitter's stored reach. One hop only: towers don't relay to each other.
+  - `RemoteControlItem.coverageFor` reads the `towersRelayRemotes` server config (default on). Presses, the "Heard by" count, the light and the locator all use the same coverage.
+  - Pressing again during a pulse merges the new areas into it. A latch keeps the areas it was switched on with. A tower area only counts while its transmitter is still there (if its chunk is loaded), so breaking a tower cuts off a latch it was carrying within a second.
+  - Latches save a `coverage` list, plus the old `pos`/`reach` keys (the player's own area) so older versions can still read them. Old saves without `coverage` load as just the player's area.
+  - The locator's "nearest" hint covers receivers within 2× the player's own reach or inside any relayed area. `RemoteScanResultPayload` also carries the tower count for the screens' reach line.
+  - Two older GameTests that check a far receiver hears nothing press with relays left out, because the GameTest grid puts other tests' transmitters within reach.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -67,15 +74,17 @@
 
 ## Verified
 
-- 35 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 42 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
-  - the status readout shows the right values.
+  - the status readout shows the right values;
+  - standing at the foot of a 30-mast tower, the remote screen counts a receiver 150 blocks away as in range ("plus 1 tower relaying"), and a toggle press lights its lamp.
 
 ## History
 
+- **v0.11.0:** Radio Transmitters relay remote presses (remote range boost).
 - **v0.10.0:** remote locator.
 - **v0.9.0:** button names on the Multi-Button Remote.
 - **v0.8.0:** signal light on both remotes.

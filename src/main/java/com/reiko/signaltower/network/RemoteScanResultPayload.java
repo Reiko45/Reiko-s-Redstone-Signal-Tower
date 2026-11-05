@@ -12,8 +12,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
 
-/** The server's answer to {@link RemoteScanRequestPayload}: one entry per frequency asked about. */
-public record RemoteScanResultPayload(int reach, List<Entry> entries) implements CustomPacketPayload {
+/**
+ * The server's answer to {@link RemoteScanRequestPayload}: the player's own reach, how many towers
+ * are relaying for them, and one entry per frequency asked about.
+ */
+public record RemoteScanResultPayload(int reach, int towers, List<Entry> entries) implements CustomPacketPayload {
     /** See {@link com.reiko.signaltower.radio.SignalNetwork.ReceiverScan}. */
     public record Entry(int frequency, int inRange, int nearestDistance, int direction, boolean nearestInRange) {
         public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
@@ -30,6 +33,7 @@ public record RemoteScanResultPayload(int reach, List<Entry> entries) implements
 
     public static final StreamCodec<ByteBuf, RemoteScanResultPayload> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, RemoteScanResultPayload::reach,
+            ByteBufCodecs.VAR_INT, RemoteScanResultPayload::towers,
             Entry.STREAM_CODEC.apply(ByteBufCodecs.list(RemoteButtons.COUNT)), RemoteScanResultPayload::entries,
             RemoteScanResultPayload::new);
 

@@ -1,5 +1,6 @@
 package com.reiko.signaltower.item;
 
+import com.reiko.signaltower.Config;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
@@ -34,7 +35,9 @@ import java.util.List;
  *   <li>Sneak + right-click a transmitter or receiver: copy its frequency.</li>
  * </ul>
  * Reach uses the same rule as a Radio Transmitter, measured from where the player is standing, so
- * pressing it from up high reaches farther.
+ * pressing it from up high reaches farther. Every Radio Transmitter within that reach also relays
+ * the press with its own reach (unless the server config turns that off), so a tall tower nearby
+ * carries the remote as far as the tower reaches.
  */
 public class RemoteControlItem extends Item {
     /** Default pulse length: 20 ticks, the same as a stone button. */
@@ -112,19 +115,44 @@ public class RemoteControlItem extends Item {
     }
 
     /**
-     * Sends a remote signal on {@code frequency} from where the player is standing, plays the click,
-     * lights the remote's status light (green if a receiver heard it, red if not), and returns a
-     * short description of what happened. Shared with the Multi-Button Remote.
+     * Where a remote used by {@code player} right now reaches: the player's own reach, plus every
+     * Radio Transmitter in that reach if the server config lets towers relay remotes.
+     */
+    public static List<SignalNetwork.Coverage> coverageFor(ServerLevel level, Player player) {
+        BlockPos origin = player.blockPosition();
+        return SignalNetwork.get(level).remoteCoverage(level, origin, RadioHelper.reachAt(level, origin),
+                Config.TOWERS_RELAY_REMOTES.get());
+    }
+
+    /** "32 blocks", "32 blocks + 1 tower" or "32 blocks + 3 towers". */
+    public static Component describeReach(int reach, int towers) {
+        String key = "message." + SignalTower.MOD_ID + ".reach_";
+        return towers == 0 ? Component.translatable(key + "blocks", reach)
+                : towers == 1 ? Component.translatable(key + "one_tower", reach)
+                : Component.translatable(key + "towers", reach, towers);
+    }
+
+    /**
+     * Sends a remote signal on {@code frequency} from where the player is standing (and from every
+     * tower relaying it), plays the click, lights the remote's status light (green if a receiver
+     * heard it, red if not), and returns a short description of what happened. Shared with the
+     * Multi-Button Remote.
      */
     public static Component sendSignal(ServerLevel level, Player player, ItemStack remote, int frequency,
                                        boolean toggle, int pulseTicks) {
-        BlockPos origin = player.blockPosition();
-        int reach = RadioHelper.reachAt(level, origin);
+        return sendSignal(level, player, remote, frequency, toggle, pulseTicks, coverageFor(level, player));
+    }
+
+    /** {@link #sendSignal} with the coverage already worked out. The first area is the player's own. */
+    public static Component sendSignal(ServerLevel level, Player player, ItemStack remote, int frequency,
+                                       boolean toggle, int pulseTicks, List<SignalNetwork.Coverage> coverage) {
+        BlockPos origin = coverage.get(0).origin();
+        Component reach = describeReach(coverage.get(0).reach(), coverage.size() - 1);
         SignalNetwork network = SignalNetwork.get(level);
         String key = "message." + SignalTower.MOD_ID + ".remote_";
         Component result;
         if (toggle) {
-            boolean on = network.toggleLatch(frequency, origin, reach);
+            boolean on = network.toggleLatch(frequency, coverage);
             level.playSound(null, origin, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                     SoundSource.PLAYERS, 0.6F, on ? 1.3F : 1.0F);
             result = on
@@ -132,12 +160,12 @@ public class RemoteControlItem extends Item {
                     : Component.translatable(key + "off", frequency).withStyle(ChatFormatting.RED);
         } else {
             int ticks = PulseLength.clamp(pulseTicks);
-            network.pulse(frequency, origin, reach, level.getGameTime() + ticks);
+            network.pulse(frequency, coverage, level.getGameTime() + ticks);
             level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
             result = Component.translatable(key + "pulse", PulseLength.format(ticks), frequency, reach);
         }
 
-        int heardBy = network.countReceivers(frequency, origin, reach);
+        int heardBy = network.countReceivers(frequency, coverage);
         remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(heardBy > 0, level.getGameTime() + RemoteLight.SHOW_TICKS));
         Component heard = heardBy == 0
                 ? Component.translatable(key + "not_heard").withStyle(ChatFormatting.RED)

@@ -16,6 +16,10 @@ import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -41,6 +45,7 @@ import java.util.List;
 
 import com.mojang.serialization.JsonOps;
 import io.netty.buffer.Unpooled;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 
 /**
@@ -455,6 +460,18 @@ public final class SignalTowerGameTests {
         player.getMainHandItem().getItem().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
     }
 
+    /**
+     * Presses the remote with tower relays left out. Tests that check a far receiver hears nothing
+     * use this: all tests run side by side, so a neighbouring test's transmitter would relay the press.
+     */
+    private static void pressWithoutRelays(GameTestHelper helper, Player player) {
+        ItemStack remote = player.getMainHandItem();
+        BlockPos origin = player.blockPosition();
+        RemoteControlItem.sendSignal(helper.getLevel(), player, remote, FrequencyTunerItem.getFrequency(remote),
+                RemoteControlItem.isToggleMode(remote), RemoteControlItem.getPulseTicks(remote),
+                SignalNetwork.ownCoverage(origin, RadioHelper.reachAt(helper.getLevel(), origin)));
+    }
+
     /** Pulse mode: one press turns the receiver on for about a second, then it turns itself off. */
     @GameTest(template = PLATFORM, timeoutTicks = 200)
     public static void remotePulseFlashesReceiver(GameTestHelper helper) {
@@ -490,7 +507,7 @@ public final class SignalTowerGameTests {
                 .thenSucceed();
     }
 
-    /** The remote's reach follows the tower rule: a receiver just past it hears nothing. */
+    /** The remote's own reach follows the tower rule: a receiver just past it hears nothing (no relays). */
     @GameTest(template = PLATFORM, timeoutTicks = 200)
     public static void remoteRespectsReach(GameTestHelper helper) {
         BlockPos standAt = new BlockPos(1, 1, 1);
@@ -506,11 +523,11 @@ public final class SignalTowerGameTests {
 
         helper.startSequence()
                 .thenIdle(3)
-                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> pressWithoutRelays(helper, player))
                 .thenWaitUntil(() -> assertOutput(helper, near, 15))
                 .thenIdle(5)
                 .thenExecute(() -> assertOutput(helper, far, 0))
-                .thenExecute(() -> pressRemote(helper, player)) // switch it back off
+                .thenExecute(() -> pressWithoutRelays(helper, player)) // switch it back off
                 .thenWaitUntil(() -> assertOutput(helper, near, 0))
                 .thenSucceed();
     }
@@ -707,7 +724,7 @@ public final class SignalTowerGameTests {
         Player player = playerWithRemote(helper, standAt, 602, false);
         helper.startSequence()
                 .thenIdle(3)
-                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> pressWithoutRelays(helper, player))
                 .thenExecute(() -> assertLight(helper, player, false))
                 .thenSucceed();
     }
@@ -883,6 +900,201 @@ public final class SignalTowerGameTests {
             int got = SignalNetwork.compassDirection(c[0], c[1]);
             check(got == c[2], "Offset (" + c[0] + ", " + c[1] + ") should be direction " + c[2] + ", got " + got);
         }
+        helper.succeed();
+    }
+
+    // ---- Tower relays ----
+
+    /**
+     * A Radio Transmitter on a 4-mast tower next to the player relays a remote press, on another
+     * frequency and with no redstone input, to a receiver beyond the player's own reach. The light
+     * goes green and the message counts the tower.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void towerRelaysRemotePress(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        BlockPos base = new BlockPos(3, 1, 1);
+        BlockPos tower = base.above(4);
+        int ownReach = RadioHelper.reachAt(level, helper.absolutePos(standAt));
+        int towerReach = RadioHelper.reachAt(level, helper.absolutePos(tower));
+        BlockPos rx = new BlockPos(standAt.getX() + ownReach + 3, 1, 1);
+        if (ownReach < 3 || rx.getX() > 128 || rx.getX() - tower.getX() > towerReach) {
+            throw new GameTestAssertException("Reach " + ownReach + " / " + towerReach + " doesn't fit the test platform");
+        }
+        for (int y = 0; y < 4; y++) {
+            helper.setBlock(base.above(y), ModRegistry.RADIO_MAST.get());
+        }
+        place(helper, tower, ModRegistry.RADIO_TRANSMITTER.get(), 902);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 901);
+        Player player = playerWithRemote(helper, standAt, 901, false);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    BlockPos towerAbs = helper.absolutePos(tower);
+                    check(RemoteControlItem.coverageFor(level, player).stream()
+                            .anyMatch(area -> area.tower() && area.origin().equals(towerAbs)), "The tower should relay the remote");
+                })
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, true))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0)) // still a pulse: it ends by itself
+                .thenExecute(() -> {
+                    var message = (TranslatableContents) RemoteControlItem.sendSignal(level, player,
+                            player.getMainHandItem(), 901, false, PulseLength.MIN_TICKS).getContents();
+                    var result = (TranslatableContents) ((Component) message.getArgs()[0]).getContents();
+                    var reach = (TranslatableContents) ((Component) result.getArgs()[2]).getContents();
+                    check(!reach.getKey().endsWith("reach_blocks"), "The message should count the tower, got " + reach.getKey());
+                })
+                .thenSucceed();
+    }
+
+    /** A tower farther away than the player's own reach doesn't hear the press, so it doesn't relay it. */
+    @GameTest(template = PLATFORM)
+    public static void farTowerDoesNotRelay(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(new BlockPos(1, 1, 1));
+        int reach = RadioHelper.reachAt(level, origin);
+        BlockPos near = new BlockPos(4, 1, 1);
+        BlockPos far = new BlockPos(1 + reach + 3, 1, 1);
+        if (far.getX() > 128) {
+            throw new GameTestAssertException("Reach " + reach + " is too big for the test platform");
+        }
+        place(helper, near, ModRegistry.RADIO_TRANSMITTER.get(), 903);
+        place(helper, far, ModRegistry.RADIO_TRANSMITTER.get(), 904);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    List<SignalNetwork.Coverage> coverage = SignalNetwork.get(level).remoteCoverage(level, origin, reach, true);
+                    check(coverage.get(0).origin().equals(origin) && !coverage.get(0).tower(), "The player's own area comes first");
+                    check(coverage.stream().anyMatch(area -> area.origin().equals(helper.absolutePos(near))), "The near tower should relay");
+                    check(coverage.stream().noneMatch(area -> area.origin().equals(helper.absolutePos(far))), "The far tower shouldn't relay");
+                })
+                .thenSucceed();
+    }
+
+    /** With relaying switched off in the config, only the player's own reach counts. */
+    @GameTest(template = PLATFORM)
+    public static void relayCanBeSwitchedOff(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(new BlockPos(1, 1, 1));
+        int reach = RadioHelper.reachAt(level, origin);
+        place(helper, new BlockPos(3, 1, 1), ModRegistry.RADIO_TRANSMITTER.get(), 910);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    check(network.remoteCoverage(level, origin, reach, true).size() > 1, "With relays on, the tower should relay");
+                    List<SignalNetwork.Coverage> off = network.remoteCoverage(level, origin, reach, false);
+                    check(off.equals(SignalNetwork.ownCoverage(origin, reach)), "With relays off, only the player's own area counts");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A toggle switched on through a tower stays on while the tower stands, and the far receiver
+     * goes off when the tower is broken. (The coverage is given directly so neighbouring tests'
+     * transmitters can't relay it.)
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void brokenTowerStopsRelayedToggle(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        BlockPos base = new BlockPos(3, 1, 1);
+        BlockPos tower = base.above(4);
+        BlockPos origin = helper.absolutePos(standAt);
+        int ownReach = RadioHelper.reachAt(level, origin);
+        int towerReach = RadioHelper.reachAt(level, helper.absolutePos(tower));
+        BlockPos rx = new BlockPos(standAt.getX() + ownReach + 3, 1, 1);
+        if (ownReach < 3 || rx.getX() > 128 || rx.getX() - tower.getX() > towerReach) {
+            throw new GameTestAssertException("Reach " + ownReach + " / " + towerReach + " doesn't fit the test platform");
+        }
+        for (int y = 0; y < 4; y++) {
+            helper.setBlock(base.above(y), ModRegistry.RADIO_MAST.get());
+        }
+        place(helper, tower, ModRegistry.RADIO_TRANSMITTER.get(), 906);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 905);
+        List<SignalNetwork.Coverage> coverage = List.of(
+                new SignalNetwork.Coverage(origin, ownReach, false),
+                new SignalNetwork.Coverage(helper.absolutePos(tower), towerReach, true));
+        SignalNetwork network = SignalNetwork.get(level);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> check(network.toggleLatch(905, coverage), "The toggle should switch on"))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(RemoteControlItem.PULSE_TICKS * 2)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> helper.setBlock(tower, Blocks.AIR))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> check(!network.toggleLatch(905, coverage), "The toggle should switch off"))
+                .thenSucceed();
+    }
+
+    /** A toggle's tower areas are saved with the world, along with the old pos/reach keys. */
+    @GameTest(template = PLATFORM)
+    public static void relayedToggleSurvivesSaveAndLoad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos far = new BlockPos(5_000_000, 64, 5_000_000); // unloaded, so the tower counts as standing
+        SignalNetwork network = new SignalNetwork();
+        network.toggleLatch(907, List.of(
+                new SignalNetwork.Coverage(far, 10, false),
+                new SignalNetwork.Coverage(far.east(100), 30, true)));
+        CompoundTag tag = network.save(new CompoundTag(), level.registryAccess());
+        CompoundTag entry = tag.getList("remote_latches", Tag.TAG_COMPOUND).getCompound(0);
+        check(entry.getLong("pos") == far.asLong() && entry.getInt("reach") == 10,
+                "The player's own area should also be saved the old way, for older versions");
+
+        SignalNetwork loaded = SignalNetwork.load(tag, level.registryAccess());
+        check(loaded.listen(level, 907, far.east(5)).power() == 15, "The player's area should survive loading");
+        check(loaded.listen(level, 907, far.east(120)).power() == 15, "The tower's area should survive loading");
+        check(loaded.listen(level, 907, far.east(60)).power() == 0, "The gap between them should stay quiet");
+        helper.succeed();
+    }
+
+    /** Toggles saved by version 0.10.0 and older (one pos and reach) still load. */
+    @GameTest(template = PLATFORM)
+    public static void oldToggleSavesStillLoad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos far = new BlockPos(-5_000_000, 64, 5_000_000);
+        CompoundTag entry = new CompoundTag();
+        entry.putInt("frequency", 908);
+        entry.putLong("pos", far.asLong());
+        entry.putInt("reach", 20);
+        ListTag latches = new ListTag();
+        latches.add(entry);
+        CompoundTag tag = new CompoundTag();
+        tag.put("transmitters", new ListTag());
+        tag.put("remote_latches", latches);
+
+        SignalNetwork loaded = SignalNetwork.load(tag, level.registryAccess());
+        check(loaded.listen(level, 908, far.east(10)).power() == 15, "An old toggle should still be on after loading");
+        check(loaded.listen(level, 908, far.east(30)).power() == 0, "An old toggle should keep its reach");
+        helper.succeed();
+    }
+
+    /** Receivers a tower reaches count as in range for the locator, however far away they are. */
+    @GameTest(template = PLATFORM)
+    public static void locatorCountsRelayedReceivers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(new BlockPos(1, 1, 1));
+        int reach = RadioHelper.reachAt(level, origin);
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos rx = origin.east(reach * 3);
+        network.trackReceiver(rx, 909);
+        List<SignalNetwork.Coverage> withTower = List.of(
+                new SignalNetwork.Coverage(origin, reach, false),
+                new SignalNetwork.Coverage(rx.west(10), 20, true));
+        SignalNetwork.ReceiverScan alone = network.scanReceivers(909, origin, reach, SignalNetwork.ownCoverage(origin, reach));
+        SignalNetwork.ReceiverScan relayed = network.scanReceivers(909, origin, reach, withTower);
+        int heard = network.countReceivers(909, withTower);
+        network.untrackReceiver(rx);
+        check(alone.inRange() == 0 && alone.nearestDistance() == -1, "Without the tower it's too far to show");
+        check(relayed.inRange() == 1, "The tower should put it in range, got " + relayed.inRange());
+        check(relayed.nearestDistance() == reach * 3, "Distance should be " + reach * 3 + ", got " + relayed.nearestDistance());
+        check(relayed.direction() == 2 && relayed.nearestInRange(), "It should be east and in range");
+        check(heard == 1, "The light should count it, got " + heard);
         helper.succeed();
     }
 }

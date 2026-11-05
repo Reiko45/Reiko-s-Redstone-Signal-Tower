@@ -8,7 +8,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 | | What it does |
 |---|---|
-| **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. |
+| **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
@@ -43,12 +43,15 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Sneak + right-click the air: change its frequency, switch between **Pulse** and **Toggle** (on until you press it again), and set the **pulse length**. Click the length button for longer or sneak-click for shorter: 0.1s, 0.25s, 0.5s, 1s (the default, like a stone button), 1.5s, 2s, 3s, 5s or 10s.
 - Sneak + right-click a transmitter or receiver: copy its frequency.
 - Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
+- **Tower relay:** every Radio Transmitter within your remote's reach relays your press. The signal goes out again from the top of that tower, with the tower's reach. So you can stand at the foot of a tall tower, press, and reach as far as the tower does. It works on any frequency (the tower doesn't need to be on the remote's frequency, or powered), so one tall tower at your base boosts every button. The message shows how many towers relayed it ("reach 56 blocks + 1 tower"), and the signal light and "Heard by" count include them. A toggle switched on through a tower goes off if that tower is broken. Server owners can turn relaying off in the config (`towersRelayRemotes`).
+
+![Toggling a lamp 150 blocks away through a tower: the screen counts the receiver as in range, the message counts the tower, and the lamp lights](docs/images/tower-relay.png)
 - Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
 - **Signal light:** after each press, the light on the remote shows **green** for 2 seconds if at least one receiver on that frequency was in range, or **red** if none was. The message also says how many receivers heard it. This works on both remotes.
 
 ![The remote's light: off, green after a press a receiver heard, red after a press nobody heard, then off again](docs/images/remote-light.png)
 
-- **Locator:** while a remote's screen is open, each frequency shows who's listening, without sending anything. For example "2 receivers in range, nearest 14 blocks north-east", or "None in range. Nearest is 120 blocks south (your reach: 88)". It updates about once a second, follows what you type, and only sees receivers in loaded chunks within twice your reach.
+- **Locator:** while a remote's screen is open, each frequency shows who's listening, without sending anything. For example "2 receivers in range, nearest 14 blocks north-east", or "None in range. Nearest is 120 blocks south". A line underneath shows your reach and how many towers are relaying for you ("Your reach: 56 blocks, plus 1 tower relaying"). It updates about once a second, follows what you type, and only sees receivers in loaded chunks: within twice your own reach, or anywhere a relaying tower reaches.
 
 ![The keypad's locator lines](docs/images/remote-locator.png)
 
@@ -92,7 +95,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config.
+All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters relay remote presses.
 
 ### Recipes
 
@@ -142,7 +145,7 @@ To play it in your own instance, copy the jar from `build/libs/` into the instan
 ```
 src/main/java/com/reiko/signaltower/
   SignalTower.java                       mod entry point: registration, creative tabs, packets
-  Config.java                            server config (reach settings)
+  Config.java                            server config (reach settings, tower relay switch)
   registry/ModRegistry.java              blocks, items, block entities, the frequency data component
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
@@ -165,7 +168,7 @@ src/main/java/com/reiko/signaltower/
   network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
   network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
-  radio/SignalNetwork.java               per-dimension list of transmitters, saved with the world
+  radio/SignalNetwork.java               per-dimension list of transmitters and remote signals (with relay coverage), saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
@@ -222,7 +225,14 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 32. the locator counts receivers in range and points at the nearest one;
 33. with nothing in range, it says where the nearest one just out of range is;
 34. receivers more than twice the reach away stay hidden;
-35. the eight compass directions come out right.
+35. the eight compass directions come out right;
+36. a transmitter on a tower next to the player relays a remote press (on another frequency, unpowered) to a receiver beyond the player's own reach, and the light and message count it;
+37. a tower farther away than the player's reach doesn't relay;
+38. with relaying switched off, only the player's own reach counts;
+39. a toggle switched on through a tower turns off when the tower is broken;
+40. a toggle's tower areas survive saving and loading, and the old save keys are still written for older versions;
+41. toggles saved by version 0.10.0 still load;
+42. the locator and the light count receivers that only a tower reaches.
 
 ## License
 

@@ -287,7 +287,7 @@ write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radi
 
 write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_transmitter": "Radio Transmitter",
-    f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches.",
+    f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
     f"block.{MOD}.radio_receiver": "Radio Receiver",
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
     f"block.{MOD}.compact_radio_receiver": "Compact Radio Receiver",
@@ -321,8 +321,12 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.locator.distance": "%s blocks %s",
     f"screen.{MOD}.locator.in_range_one": "1 receiver in range, %s",
     f"screen.{MOD}.locator.in_range_many": "%s receivers in range, nearest %s",
-    f"screen.{MOD}.locator.out_of_range": "None in range. Nearest is %s (your reach: %s)",
+    f"screen.{MOD}.locator.out_of_range": "None in range. Nearest is %s",
     f"screen.{MOD}.locator.none": "No receivers within %s blocks",
+    f"screen.{MOD}.locator.none_towers": "No receivers within %s blocks or in tower range",
+    f"screen.{MOD}.locator.reach": "Your reach: %s blocks",
+    f"screen.{MOD}.locator.reach_one_tower": "Your reach: %s blocks, plus 1 tower relaying",
+    f"screen.{MOD}.locator.reach_towers": "Your reach: %s blocks, plus %s towers relaying",
     f"screen.{MOD}.locator.dir_n": "north",
     f"screen.{MOD}.locator.dir_ne": "north-east",
     f"screen.{MOD}.locator.dir_e": "east",
@@ -340,8 +344,11 @@ write(ASSETS / "lang" / "en_us.json", {
     f"tooltip.{MOD}.remote_configure": "Sneak + right-click the air to change frequency and mode",
     f"tooltip.{MOD}.remote_copy": "Sneak + right-click a transmitter or receiver to copy its frequency",
     f"message.{MOD}.frequency_copied_remote": "Copied frequency %s to the remote",
-    f"message.{MOD}.remote_pulse": "%s pulse sent on frequency %s (reach %s blocks)",
-    f"message.{MOD}.remote_on": "Frequency %s switched ON (reach %s blocks)",
+    f"message.{MOD}.remote_pulse": "%s pulse sent on frequency %s (reach %s)",
+    f"message.{MOD}.remote_on": "Frequency %s switched ON (reach %s)",
+    f"message.{MOD}.reach_blocks": "%s blocks",
+    f"message.{MOD}.reach_one_tower": "%s blocks + 1 tower",
+    f"message.{MOD}.reach_towers": "%s blocks + %s towers",
     f"message.{MOD}.remote_off": "Frequency %s switched OFF",
     f"message.{MOD}.remote_result": "%s | %s",
     f"message.{MOD}.remote_heard_one": "Heard by 1 receiver",
@@ -371,6 +378,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"{MOD}.configuration.baseReach": "Base reach",
     f"{MOD}.configuration.reachPerBlockOfHeight": "Reach per block of height",
     f"{MOD}.configuration.maxReach": "Max reach (0 = no limit)",
+    f"{MOD}.configuration.towersRelayRemotes": "Transmitters relay remote presses",
 })
 
 # ---------------------------------------------------------------- recipes

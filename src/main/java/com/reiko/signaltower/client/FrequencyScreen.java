@@ -33,6 +33,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** Locator (remotes only): the latest answer, and ticks until the next question. */
     private @Nullable RemoteScanResultPayload.Entry scan;
     private int scanReach;
+    private int scanTowers;
+    private boolean scanned;
     private int scanTimer;
     private EditBox input;
     private Button doneButton;
@@ -67,8 +69,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         addRenderableWidget(nudgeButton(1, centerX + 54, 22));
         addRenderableWidget(nudgeButton(100, centerX + 80, 32));
 
-        // The remote's mode button sits between the frequency row and Done/Cancel, under the locator line.
-        int buttonsY = toggleMode != null ? centerY + 30 : centerY + 22;
+        // The remote's mode button sits between the frequency row and Done/Cancel, under the locator and reach lines.
+        int buttonsY = toggleMode != null ? centerY + 42 : centerY + 22;
         if (toggleMode != null) {
             addRenderableWidget(Button.builder(modeLabel(), button -> {
                 toggleMode = !toggleMode;
@@ -159,6 +161,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         if (!result.entries().isEmpty() && result.entries().get(0).frequency() == parsed().orElse(-1)) {
             scan = result.entries().get(0);
             scanReach = result.reach();
+            scanTowers = result.towers();
+            scanned = true;
         }
     }
 
@@ -180,7 +184,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         graphics.drawCenteredString(font, Component.translatable(KEY + ".range", Frequency.MIN, Frequency.MAX),
                 centerX, centerY - 28, 0xA0A0A0);
         if (toggleMode != null) {
-            graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach), centerX, centerY + 16, 0xFFFFFF);
+            graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, centerY + 16, 0xFFFFFF);
+            graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, centerY + 28, 0xFFFFFF);
         }
     }
 

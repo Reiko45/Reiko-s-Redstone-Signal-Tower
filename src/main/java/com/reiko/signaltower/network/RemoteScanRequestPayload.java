@@ -5,7 +5,6 @@ import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.Frequency;
-import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
@@ -49,16 +48,17 @@ public record RemoteScanRequestPayload(List<Integer> frequencies) implements Cus
         if (!holdingRemote || !(player.level() instanceof ServerLevel level) || !(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
-        BlockPos origin = player.blockPosition();
-        int reach = RadioHelper.reachAt(level, origin);
+        List<SignalNetwork.Coverage> coverage = RemoteControlItem.coverageFor(level, player);
+        BlockPos origin = coverage.get(0).origin();
+        int reach = coverage.get(0).reach();
         SignalNetwork network = SignalNetwork.get(level);
         List<RemoteScanResultPayload.Entry> results = new ArrayList<>();
         for (int frequency : payload.frequencies()) {
             int clamped = Frequency.clamp(frequency);
-            SignalNetwork.ReceiverScan scan = network.scanReceivers(clamped, origin, reach);
+            SignalNetwork.ReceiverScan scan = network.scanReceivers(clamped, origin, reach, coverage);
             results.add(new RemoteScanResultPayload.Entry(clamped, scan.inRange(), scan.nearestDistance(),
                     scan.direction(), scan.nearestInRange()));
         }
-        PacketDistributor.sendToPlayer(serverPlayer, new RemoteScanResultPayload(reach, results));
+        PacketDistributor.sendToPlayer(serverPlayer, new RemoteScanResultPayload(reach, coverage.size() - 1, results));
     }
 }

@@ -1,6 +1,6 @@
 {
   "block.reikos_signal_tower.radio_transmitter": "Radio Transmitter",
-  "block.reikos_signal_tower.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches.",
+  "block.reikos_signal_tower.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
   "block.reikos_signal_tower.radio_receiver": "Radio Receiver",
   "block.reikos_signal_tower.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
   "block.reikos_signal_tower.compact_radio_receiver": "Compact Radio Receiver",
@@ -34,8 +34,12 @@
   "screen.reikos_signal_tower.locator.distance": "%s blocks %s",
   "screen.reikos_signal_tower.locator.in_range_one": "1 receiver in range, %s",
   "screen.reikos_signal_tower.locator.in_range_many": "%s receivers in range, nearest %s",
-  "screen.reikos_signal_tower.locator.out_of_range": "None in range. Nearest is %s (your reach: %s)",
+  "screen.reikos_signal_tower.locator.out_of_range": "None in range. Nearest is %s",
   "screen.reikos_signal_tower.locator.none": "No receivers within %s blocks",
+  "screen.reikos_signal_tower.locator.none_towers": "No receivers within %s blocks or in tower range",
+  "screen.reikos_signal_tower.locator.reach": "Your reach: %s blocks",
+  "screen.reikos_signal_tower.locator.reach_one_tower": "Your reach: %s blocks, plus 1 tower relaying",
+  "screen.reikos_signal_tower.locator.reach_towers": "Your reach: %s blocks, plus %s towers relaying",
   "screen.reikos_signal_tower.locator.dir_n": "north",
   "screen.reikos_signal_tower.locator.dir_ne": "north-east",
   "screen.reikos_signal_tower.locator.dir_e": "east",
@@ -53,8 +57,11 @@
   "tooltip.reikos_signal_tower.remote_configure": "Sneak + right-click the air to change frequency and mode",
   "tooltip.reikos_signal_tower.remote_copy": "Sneak + right-click a transmitter or receiver to copy its frequency",
   "message.reikos_signal_tower.frequency_copied_remote": "Copied frequency %s to the remote",
-  "message.reikos_signal_tower.remote_pulse": "%s pulse sent on frequency %s (reach %s blocks)",
-  "message.reikos_signal_tower.remote_on": "Frequency %s switched ON (reach %s blocks)",
+  "message.reikos_signal_tower.remote_pulse": "%s pulse sent on frequency %s (reach %s)",
+  "message.reikos_signal_tower.remote_on": "Frequency %s switched ON (reach %s)",
+  "message.reikos_signal_tower.reach_blocks": "%s blocks",
+  "message.reikos_signal_tower.reach_one_tower": "%s blocks + 1 tower",
+  "message.reikos_signal_tower.reach_towers": "%s blocks + %s towers",
   "message.reikos_signal_tower.remote_off": "Frequency %s switched OFF",
   "message.reikos_signal_tower.remote_result": "%s | %s",
   "message.reikos_signal_tower.remote_heard_one": "Heard by 1 receiver",
@@ -79,5 +86,6 @@
   "reikos_signal_tower.configuration.section.reikos_signal_tower.server.toml.title": "Server settings",
   "reikos_signal_tower.configuration.baseReach": "Base reach",
   "reikos_signal_tower.configuration.reachPerBlockOfHeight": "Reach per block of height",
-  "reikos_signal_tower.configuration.maxReach": "Max reach (0 = no limit)"
+  "reikos_signal_tower.configuration.maxReach": "Max reach (0 = no limit)",
+  "reikos_signal_tower.configuration.towersRelayRemotes": "Transmitters relay remote presses"
 }
