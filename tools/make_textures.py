@@ -318,6 +318,25 @@ def remote_item():
     return img
 
 
+def multi_remote_item():
+    """Like the remote, but with four colored buttons in a 2x2 grid."""
+    img = remote_item()
+    px = img.load()
+    body = (58, 62, 72, 255)
+    for y in range(6, 14):
+        for x in range(6, 11):
+            px[x, y] = body
+    colors = [((220, 36, 26, 255), (255, 120, 100, 255)), ((40, 180, 60, 255), (140, 240, 140, 255)),
+              ((40, 90, 220, 255), (130, 170, 255, 255)), ((230, 190, 30, 255), (255, 240, 140, 255))]
+    for i, (x, y) in enumerate([(6, 7), (9, 7), (6, 10), (9, 10)]):
+        base, light = colors[i]
+        for dx in range(2):
+            for dy in range(2):
+                px[x + dx, y + dy] = base
+        px[x, y] = light
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -335,7 +354,8 @@ blocks = {
     "antenna_tip": antenna_tip(False),
     "antenna_tip_on": antenna_tip(True),
 }
-items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item()}
+items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
+         "multi_remote": multi_remote_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

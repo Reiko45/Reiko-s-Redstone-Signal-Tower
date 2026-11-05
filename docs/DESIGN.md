@@ -27,6 +27,11 @@
     - a **latch**: saved; any remote on that frequency toggles it.
   - Both send full strength from where the player stood, with that spot's height-based reach, and bump the frequency's revision so receivers react within a tick.
   - The item stores `frequency` and `remote_toggle_mode` data components. A 10-tick cooldown stops held right-click from flickering a toggle.
+- **Multi-Button Remote:**
+  - Stores a `remote_buttons` component: exactly 4 `(frequency, toggle)` buttons plus a selected index. The record constructor normalizes size, selection and frequencies, so bad packets or commands can't break it.
+  - Pressing reuses `RemoteControlItem.sendSignal`.
+  - Sneak + scroll is caught client-side by the cancellable `InputEvent.MouseScrollingEvent` (so the hotbar doesn't move) and sent as `SelectRemoteButtonPayload`.
+  - The keypad sends `ConfigureMultiRemotePayload` (settings, plus an optional button to press). The server checks the item and has a short cooldown.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -44,7 +49,7 @@
 
 ## Verified
 
-- 17 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 20 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -53,6 +58,7 @@
 
 ## History
 
+- **v0.6.0:** added the Multi-Button Remote.
 - **v0.5.0:** added the Remote Control.
 - **v0.4.0:** added Wall Redstone.
 - **v0.3.0:** added the Compact Radio Receiver (button-sized).

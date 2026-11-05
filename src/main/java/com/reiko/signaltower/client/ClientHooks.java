@@ -1,5 +1,6 @@
 package com.reiko.signaltower.client;
 
+import com.reiko.signaltower.item.RemoteButtons;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -15,5 +16,9 @@ public final class ClientHooks {
     /** Opens the frequency screen. {@code toggleMode} is null for items without a mode (the tuner). */
     public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title, @Nullable Boolean toggleMode) {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode));
+    }
+
+    public static void openMultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
+        Minecraft.getInstance().setScreen(new MultiRemoteScreen(hand, buttons, title));
     }
 }

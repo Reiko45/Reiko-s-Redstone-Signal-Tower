@@ -14,6 +14,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
+| **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency and mode. One remote can run your door, lights and farm. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
@@ -45,6 +46,15 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
 
 ![The Remote Control screen](docs/images/remote-screen.png)
+
+**Multi-Button Remote:**
+- Right-click: press the **selected** button.
+- Sneak + scroll: choose the selected button. Your hotbar slot doesn't move.
+- Sneak + right-click the air: open the keypad. From there you can press any button, set each button's frequency and Pulse/Toggle mode, and click a button's number to make it the selected one.
+- Sneak + right-click a transmitter or receiver: copy its frequency into the selected button.
+- The tooltip lists all 4 buttons, with the selected one marked ».
+
+![The Multi-Button Remote keypad](docs/images/multi-remote-keypad.png)
 
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
@@ -96,6 +106,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
   I  E  I
 ```
 
+**Multi-Button Remote:** a Remote Control plus 3 Stone Buttons, in any arrangement in the crafting grid.
+
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
 
 ## Building and running
@@ -133,11 +145,16 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioReceiverBlockEntity.java
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
+  item/MultiRemoteItem.java              4-button remote
+  item/RemoteButtons.java                the 4 buttons' settings (data component)
+  network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
+  network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
   radio/SignalNetwork.java               per-dimension list of transmitters, saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
+  client/MultiRemoteScreen.java          the Multi-Button Remote keypad
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
@@ -172,7 +189,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 14. a Remote Control pulse turns a receiver on for about a second, then off;
 15. a Remote Control in toggle mode stays on until pressed again;
 16. a Remote Control can't reach a receiver beyond its reach;
-17. sneak + right-clicking a transmitter copies its frequency into the remote.
+17. sneak + right-clicking a transmitter copies its frequency into the remote;
+18. a Multi-Button Remote's buttons each drive their own frequency and mode;
+19. sneak + right-click copies a frequency into the selected button only;
+20. remote button settings are always tidied up (4 buttons, valid selection and frequencies).
 
 ## License
 

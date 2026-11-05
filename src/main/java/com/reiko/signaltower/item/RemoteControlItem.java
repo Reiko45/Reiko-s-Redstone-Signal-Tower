@@ -91,25 +91,30 @@ public class RemoteControlItem extends Item {
 
     /** Presses the button: sends a pulse or flips the toggle, from where the player is. */
     public static void press(ServerLevel level, Player player, ItemStack stack) {
-        int frequency = FrequencyTunerItem.getFrequency(stack);
+        player.displayClientMessage(
+                sendSignal(level, player, FrequencyTunerItem.getFrequency(stack), isToggleMode(stack)), true);
+    }
+
+    /**
+     * Sends a remote signal on {@code frequency} from where the player is standing, plays the click,
+     * and returns a short description of what happened. Shared with the Multi-Button Remote.
+     */
+    public static Component sendSignal(ServerLevel level, Player player, int frequency, boolean toggle) {
         BlockPos origin = player.blockPosition();
         int reach = RadioHelper.reachAt(level, origin);
         SignalNetwork network = SignalNetwork.get(level);
         String key = "message." + SignalTower.MOD_ID + ".remote_";
-        Component message;
-        if (isToggleMode(stack)) {
+        if (toggle) {
             boolean on = network.toggleLatch(frequency, origin, reach);
-            message = on
-                    ? Component.translatable(key + "on", frequency, reach).withStyle(ChatFormatting.GREEN)
-                    : Component.translatable(key + "off", frequency).withStyle(ChatFormatting.RED);
             level.playSound(null, origin, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                     SoundSource.PLAYERS, 0.6F, on ? 1.3F : 1.0F);
-        } else {
-            network.pulse(frequency, origin, reach, level.getGameTime() + PULSE_TICKS);
-            message = Component.translatable(key + "pulse", frequency, reach);
-            level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
+            return on
+                    ? Component.translatable(key + "on", frequency, reach).withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(key + "off", frequency).withStyle(ChatFormatting.RED);
         }
-        player.displayClientMessage(message, true);
+        network.pulse(frequency, origin, reach, level.getGameTime() + PULSE_TICKS);
+        level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
+        return Component.translatable(key + "pulse", frequency, reach);
     }
 
     @Override

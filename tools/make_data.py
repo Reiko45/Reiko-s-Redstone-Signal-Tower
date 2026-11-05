@@ -226,6 +226,10 @@ write(items / "remote_control.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("remote_control", "item")},
 })
+write(items / "multi_remote.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("multi_remote", "item")},
+})
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -282,6 +286,19 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
     f"item.{MOD}.frequency_tuner": "Frequency Tuner",
     f"item.{MOD}.remote_control": "Remote Control",
+    f"item.{MOD}.multi_remote": "Multi-Button Remote",
+    f"tooltip.{MOD}.remote_button_line": "Button %s: frequency %s, %s",
+    f"tooltip.{MOD}.remote_button_line_selected": "\u00bb Button %s: frequency %s, %s",
+    f"tooltip.{MOD}.multi_remote_use": "Right-click to press the selected button",
+    f"tooltip.{MOD}.multi_remote_select": "Sneak + scroll to choose the selected button",
+    f"tooltip.{MOD}.multi_remote_configure": "Sneak + right-click the air to open the keypad",
+    f"tooltip.{MOD}.multi_remote_copy": "Sneak + right-click a transmitter or receiver to copy its frequency into the selected button",
+    f"message.{MOD}.remote_button": "Button %s: %s",
+    f"message.{MOD}.remote_button_selected": "Button %s selected (frequency %s, %s)",
+    f"message.{MOD}.frequency_copied_button": "Copied frequency %s to button %s",
+    f"screen.{MOD}.multi_remote.frequency": "Button %s frequency",
+    f"screen.{MOD}.multi_remote.press": "Press",
+    f"screen.{MOD}.multi_remote.hint": "Click a number to choose which button right-click presses",
     f"tooltip.{MOD}.remote_mode": "Mode: %s",
     f"tooltip.{MOD}.remote_mode_pulse": "Pulse",
     f"tooltip.{MOD}.remote_mode_toggle": "Toggle",
@@ -374,6 +391,13 @@ recipes["remote_control"] = (shaped([" T ", "IBI", "IEI"], {
     "T": "minecraft:redstone_torch", "I": "minecraft:iron_ingot",
     "B": "minecraft:stone_button", "E": "minecraft:ender_pearl"}, "remote_control", category="equipment"),
     "minecraft:ender_pearl")
+
+recipes["multi_remote"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "equipment",
+    "ingredients": [{"item": f"{MOD}:remote_control"}] + [{"item": "minecraft:stone_button"}] * 3,
+    "result": {"count": 1, "id": f"{MOD}:multi_remote"},
+}, f"{MOD}:remote_control")
 
 for name, (recipe, trigger) in recipes.items():
     write(DATA / "recipe" / f"{name}.json", recipe)

@@ -6,6 +6,8 @@ import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -31,6 +33,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+
+import java.util.List;
 
 /**
  * Automated in-game tests. Run them with {@code ./gradlew runGameTestServer}.
@@ -517,6 +521,81 @@ public final class SignalTowerGameTests {
         if (copied != 404) {
             throw new GameTestAssertException("Remote copied " + copied + ", expected 404");
         }
+        helper.succeed();
+    }
+
+    // ---- Multi-Button Remote ----
+
+    private static Player playerWithMultiRemote(GameTestHelper helper, RemoteButtons buttons) {
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(new BlockPos(1, 1, 1)));
+        player.moveTo(feet.x, feet.y, feet.z);
+        ItemStack remote = new ItemStack(ModRegistry.MULTI_REMOTE.get());
+        MultiRemoteItem.setButtons(remote, buttons);
+        player.setItemInHand(InteractionHand.MAIN_HAND, remote);
+        return player;
+    }
+
+    /**
+     * Each button drives its own frequency with its own mode: button 1 pulses one receiver, then
+     * sneak-scrolling to button 2 toggles the other one on and off, without touching the first.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void multiRemoteButtonsAreSeparate(GameTestHelper helper) {
+        BlockPos rxPulse = new BlockPos(5, 1, 1);
+        BlockPos rxToggle = new BlockPos(8, 1, 1);
+        place(helper, rxPulse, ModRegistry.RADIO_RECEIVER.get(), 301);
+        place(helper, rxToggle, ModRegistry.RADIO_RECEIVER.get(), 302);
+        Player player = playerWithMultiRemote(helper, new RemoteButtons(List.of(
+                new RemoteButtons.Button(301, false), new RemoteButtons.Button(302, true),
+                new RemoteButtons.Button(3, false), new RemoteButtons.Button(4, false)), 0));
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))          // button 1: pulse
+                .thenWaitUntil(() -> assertOutput(helper, rxPulse, 15))
+                .thenExecute(() -> assertOutput(helper, rxToggle, 0))
+                .thenExecute(() -> MultiRemoteItem.cycleSelection(player, player.getMainHandItem(), 1))
+                .thenExecute(() -> pressRemote(helper, player))          // button 2: toggle on
+                .thenWaitUntil(() -> assertOutput(helper, rxToggle, 15))
+                .thenWaitUntil(() -> assertOutput(helper, rxPulse, 0))   // the pulse ended by itself
+                .thenIdle(RemoteControlItem.PULSE_TICKS * 2)
+                .thenExecute(() -> assertOutput(helper, rxToggle, 15))   // the toggle didn't
+                .thenExecute(() -> pressRemote(helper, player))          // button 2: toggle off
+                .thenWaitUntil(() -> assertOutput(helper, rxToggle, 0))
+                .thenExecute(() -> assertOutput(helper, rxPulse, 0))
+                .thenSucceed();
+    }
+
+    /** Sneak + right-click copies a block's frequency into the selected button only. */
+    @GameTest(template = PLATFORM)
+    public static void multiRemoteCopiesIntoSelectedButton(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(3, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 777);
+        Player player = playerWithMultiRemote(helper, RemoteButtons.DEFAULT.withSelected(2));
+        player.setShiftKeyDown(true);
+        useTunerOn(helper, player, tx);
+
+        RemoteButtons buttons = MultiRemoteItem.getButtons(player.getMainHandItem());
+        int[] expected = {1, 2, 777, 4};
+        for (int i = 0; i < RemoteButtons.COUNT; i++) {
+            if (buttons.button(i).frequency() != expected[i]) {
+                throw new GameTestAssertException("Button " + (i + 1) + " is " + buttons.button(i).frequency()
+                        + ", expected " + expected[i]);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** Settings from a packet or command are tidied up: always 4 buttons, a valid selection, valid frequencies. */
+    @GameTest(template = PLATFORM)
+    public static void remoteButtonsAreAlwaysValid(GameTestHelper helper) {
+        RemoteButtons odd = new RemoteButtons(List.of(new RemoteButtons.Button(0, true), new RemoteButtons.Button(2_000_000_000, false)), 7);
+        if (odd.buttons().size() != RemoteButtons.COUNT) throw new GameTestAssertException("Expected 4 buttons");
+        if (odd.selected() != 3) throw new GameTestAssertException("Selection 7 should wrap to 3, got " + odd.selected());
+        if (odd.button(0).frequency() != 1) throw new GameTestAssertException("Frequency 0 should clamp to 1");
+        if (odd.button(1).frequency() != 999_999_999) throw new GameTestAssertException("Huge frequency should clamp");
+        if (RemoteButtons.DEFAULT.withSelected(-1).selected() != 3) throw new GameTestAssertException("Scrolling back from 1 should wrap to 4");
         helper.succeed();
     }
 }

@@ -1,7 +1,9 @@
 package com.reiko.signaltower;
 
 import com.mojang.logging.LogUtils;
+import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
+import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.server.level.ServerLevel;
@@ -44,6 +46,10 @@ public final class SignalTower {
         PayloadRegistrar registrar = event.registrar("1");
         registrar.playToServer(ConfigureRadioItemPayload.TYPE, ConfigureRadioItemPayload.STREAM_CODEC,
                 ConfigureRadioItemPayload::handle);
+        registrar.playToServer(ConfigureMultiRemotePayload.TYPE, ConfigureMultiRemotePayload.STREAM_CODEC,
+                ConfigureMultiRemotePayload::handle);
+        registrar.playToServer(SelectRemoteButtonPayload.TYPE, SelectRemoteButtonPayload.STREAM_CODEC,
+                SelectRemoteButtonPayload::handle);
     }
 
     /** Ends Remote Control pulses on time. */
@@ -62,9 +68,11 @@ public final class SignalTower {
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
+            event.accept(ModRegistry.MULTI_REMOTE.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
+            event.accept(ModRegistry.MULTI_REMOTE.get());
         }
     }
 }
