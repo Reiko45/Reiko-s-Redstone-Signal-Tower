@@ -42,6 +42,9 @@
   - On a press, `sendSignal` counts receivers within reach and sets a `remote_light` component (heard + show-until time). It's synced but never saved.
   - The client registers an item property `reikos_signal_tower:light` (0 off, 0.5 green, 1 red), and the item models' overrides pick the matching texture.
   - Both remotes override `shouldCauseReequipAnimation`, so the light changing doesn't replay the pull-out animation.
+- **Button names:**
+  - Each `RemoteButtons.Button` has a `name` (optional in saved data, so older remotes load unnamed). The record constructor cleans it with `StringUtil.filterText`, strips spaces and cuts it to 24 characters, on the server and the client alike.
+  - `Button.label(index)` gives the name, or "Button N", and every message and tooltip uses it.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -59,7 +62,7 @@
 
 ## Verified
 
-- 27 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 31 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -68,6 +71,7 @@
 
 ## History
 
+- **v0.9.0:** button names on the Multi-Button Remote.
 - **v0.8.0:** signal light on both remotes.
 - **v0.7.0:** pulse length setting for both remotes.
 - **v0.6.0:** added the Multi-Button Remote.

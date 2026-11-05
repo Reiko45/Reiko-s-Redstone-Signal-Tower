@@ -38,6 +38,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
 
+import com.mojang.serialization.JsonOps;
+import io.netty.buffer.Unpooled;
+import net.minecraft.network.chat.contents.TranslatableContents;
+
 /**
  * Automated in-game tests. Run them with {@code ./gradlew runGameTestServer}.
  * They only load in dev runs, where {@code neoforge.enabledGameTestNamespaces} includes this mod.
@@ -738,5 +742,74 @@ public final class SignalTowerGameTests {
                 .thenExecute(() -> pressRemote(helper, player))
                 .thenExecute(() -> assertLight(helper, player, false))
                 .thenSucceed();
+    }
+
+    // ---- Button names ----
+
+    /** Names lose colour codes, control characters and surrounding spaces, and are cut to 24 characters. */
+    @GameTest(template = PLATFORM)
+    public static void buttonNamesAreCleaned(GameTestHelper helper) {
+        String cleaned = RemoteButtons.cleanName("  \u00a7cFront\tDoor  ");
+        check(!cleaned.contains("\u00a7"), "Colour codes should be removed, got '" + cleaned + "'");
+        check(!cleaned.contains("\t"), "Control characters should be removed, got '" + cleaned + "'");
+        check(!cleaned.startsWith(" ") && !cleaned.endsWith(" "), "Spaces around the name should go, got '" + cleaned + "'");
+        check(RemoteButtons.cleanName("A very long name for a remote button indeed").length() <= RemoteButtons.MAX_NAME_LENGTH,
+                "Names should be cut to " + RemoteButtons.MAX_NAME_LENGTH + " characters");
+        check(RemoteButtons.cleanName(null).isEmpty(), "A missing name should become empty");
+        check(new RemoteButtons.Button(1, false, 20, "   ").name().isEmpty(), "A blank name means unnamed");
+        helper.succeed();
+    }
+
+    /** A named button shows its name; an unnamed one shows "Button N". */
+    @GameTest(template = PLATFORM)
+    public static void buttonLabelsUseNames(GameTestHelper helper) {
+        check(new RemoteButtons.Button(1, false, 20, "Front Door").label(0).getString().equals("Front Door"),
+                "A named button should be labelled with its name");
+        var unnamed = new RemoteButtons.Button(1, false).label(1);
+        check(unnamed.getContents() instanceof TranslatableContents t
+                        && t.getKey().endsWith(".remote_button_default_name") && Integer.valueOf(2).equals(t.getArgs()[0]),
+                "An unnamed second button should be labelled 'Button 2'");
+        helper.succeed();
+    }
+
+    /** Names survive saving and network sync, and remotes saved before names existed still load. */
+    @GameTest(template = PLATFORM)
+    public static void buttonNamesSurviveSaveAndSync(GameTestHelper helper) {
+        RemoteButtons original = RemoteButtons.DEFAULT
+                .withButton(0, new RemoteButtons.Button(101, false, 10, "Front Door"))
+                .withButton(3, new RemoteButtons.Button(404, true, 20, "Farm Lights"))
+                .withSelected(3);
+
+        var saved = RemoteButtons.CODEC.encodeStart(JsonOps.INSTANCE, original).getOrThrow();
+        RemoteButtons loaded = RemoteButtons.CODEC.parse(JsonOps.INSTANCE, saved).getOrThrow();
+        check(loaded.equals(original), "Saving and loading changed the buttons: " + loaded);
+
+        var buffer = Unpooled.buffer();
+        RemoteButtons.STREAM_CODEC.encode(buffer, original);
+        RemoteButtons synced = RemoteButtons.STREAM_CODEC.decode(buffer);
+        check(synced.equals(original), "Network sync changed the buttons: " + synced);
+
+        var oldFormat = com.google.gson.JsonParser.parseString(
+                "{\"buttons\":[{\"frequency\":7},{\"frequency\":8,\"toggle\":true}],\"selected\":1}");
+        RemoteButtons old = RemoteButtons.CODEC.parse(JsonOps.INSTANCE, oldFormat).getOrThrow();
+        check(old.button(0).frequency() == 7 && old.button(0).name().isEmpty(), "Old remotes should load with unnamed buttons");
+        check(old.button(1).toggle() && old.selected() == 1, "Old remotes should keep their settings");
+        helper.succeed();
+    }
+
+    /** Copying a frequency into a named button keeps its name. */
+    @GameTest(template = PLATFORM)
+    public static void copyingFrequencyKeepsButtonName(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(3, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 888);
+        Player player = playerWithMultiRemote(helper, RemoteButtons.DEFAULT
+                .withButton(1, new RemoteButtons.Button(2, false, 20, "Garage")).withSelected(1));
+        player.setShiftKeyDown(true);
+        useTunerOn(helper, player, tx);
+
+        RemoteButtons.Button button = MultiRemoteItem.getButtons(player.getMainHandItem()).button(1);
+        check(button.frequency() == 888, "Frequency should be copied, got " + button.frequency());
+        check(button.name().equals("Garage"), "The name should be kept, got '" + button.name() + "'");
+        helper.succeed();
     }
 }

@@ -51,7 +51,7 @@ public class MultiRemoteItem extends Item {
     public static void pressButton(ServerLevel level, Player player, ItemStack stack, int index) {
         RemoteButtons.Button button = getButtons(stack).button(index);
         Component result = RemoteControlItem.sendSignal(level, player, stack, button.frequency(), button.toggle(), button.pulseTicks());
-        player.displayClientMessage(Component.translatable(KEY + "remote_button", index + 1, result), true);
+        player.displayClientMessage(Component.translatable(KEY + "remote_button", button.label(index), result), true);
     }
 
     /** Moves the selection by {@code delta} buttons (wrapping around) and says which one is picked. */
@@ -64,7 +64,7 @@ public class MultiRemoteItem extends Item {
 
     private static Component describeSelected(RemoteButtons buttons) {
         RemoteButtons.Button button = buttons.selectedButton();
-        return Component.translatable(KEY + "remote_button_selected", buttons.selected() + 1, button.frequency(),
+        return Component.translatable(KEY + "remote_button_selected", button.label(buttons.selected()), button.frequency(),
                 RemoteControlItem.describeMode(button.toggle(), button.pulseTicks())).withStyle(ChatFormatting.AQUA);
     }
 
@@ -90,7 +90,7 @@ public class MultiRemoteItem extends Item {
                 RemoteButtons.Button old = buttons.selectedButton();
                 setButtons(stack, buttons.withButton(buttons.selected(), old.withFrequency(radio.getFrequency())));
                 player.displayClientMessage(Component.translatable(KEY + "frequency_copied_button",
-                        radio.getFrequency(), buttons.selected() + 1), true);
+                        radio.getFrequency(), old.label(buttons.selected())), true);
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -122,7 +122,7 @@ public class MultiRemoteItem extends Item {
             RemoteButtons.Button button = buttons.button(i);
             boolean selected = i == buttons.selected();
             tooltip.add(Component.translatable(prefix + (selected ? "remote_button_line_selected" : "remote_button_line"),
-                    i + 1, button.frequency(), RemoteControlItem.describeMode(button.toggle(), button.pulseTicks()))
+                    button.label(i), button.frequency(), RemoteControlItem.describeMode(button.toggle(), button.pulseTicks()))
                     .withStyle(selected ? ChatFormatting.AQUA : ChatFormatting.DARK_AQUA));
         }
         tooltip.add(Component.translatable(prefix + "multi_remote_use").withStyle(ChatFormatting.GRAY));

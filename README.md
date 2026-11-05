@@ -53,11 +53,14 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Multi-Button Remote:**
 - Right-click: press the **selected** button.
 - Sneak + scroll: choose the selected button. Your hotbar slot doesn't move.
-- Sneak + right-click the air: open the keypad. From there you can press any button, set each button's frequency, Pulse/Toggle mode and pulse length, and click a button's number to make it the selected one.
+- Sneak + right-click the air: open the keypad. From there you can press any button, give each button a **name** (like "Front Door"), set its frequency, Pulse/Toggle mode and pulse length, and click a button's number to make it the selected one.
+- Names show up everywhere: the tooltip, the press message ("Front Door: 1s pulse sent…") and the selection message ("Farm Lights selected…"). Unnamed buttons show as "Button 1" to "Button 4". Names can be up to 24 characters.
 - Sneak + right-click a transmitter or receiver: copy its frequency into the selected button.
 - The tooltip lists all 4 buttons, with the selected one marked ».
 
 ![The Multi-Button Remote keypad](docs/images/multi-remote-keypad.png)
+
+![The Multi-Button Remote's tooltip with named buttons](docs/images/multi-remote-tooltip.png)
 
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
@@ -204,7 +207,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 24. a remote's light goes green when a receiver in range heard the press;
 25. it goes red when receivers are only out of range or on another frequency;
 26. a re-tuned receiver stops counting for its old frequency;
-27. a broken receiver stops counting straight away.
+27. a broken receiver stops counting straight away;
+28. button names lose colour codes, control characters and extra spaces, and are cut to 24 characters;
+29. named buttons are labelled with their name, unnamed ones as "Button N";
+30. names survive saving and network sync, and remotes saved before names existed still load;
+31. copying a frequency into a named button keeps its name.
 
 ## License
 
