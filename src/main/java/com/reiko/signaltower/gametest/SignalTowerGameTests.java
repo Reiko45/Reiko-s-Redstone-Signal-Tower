@@ -27,6 +27,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
@@ -1095,6 +1096,83 @@ public final class SignalTowerGameTests {
         check(relayed.nearestDistance() == reach * 3, "Distance should be " + reach * 3 + ", got " + relayed.nearestDistance());
         check(relayed.direction() == 2 && relayed.nearestInRange(), "It should be east and in range");
         check(heard == 1, "The light should count it, got " + heard);
+        helper.succeed();
+    }
+
+    // ---- Button colors ----
+
+    /** New remotes, old remotes and loose buttons get red, lime, blue and yellow; colors cycle through all 16 dyes. */
+    @GameTest(template = PLATFORM)
+    public static void buttonColorsHaveDefaults(GameTestHelper helper) {
+        DyeColor[] expected = {DyeColor.RED, DyeColor.LIME, DyeColor.BLUE, DyeColor.YELLOW};
+        RemoteButtons fromLooseButtons = new RemoteButtons(List.of(
+                new RemoteButtons.Button(1, false), new RemoteButtons.Button(2, false)), 0);
+        for (int i = 0; i < RemoteButtons.COUNT; i++) {
+            check(RemoteButtons.DEFAULT.button(i).color() == expected[i], "New remote button " + (i + 1) + " should be " + expected[i]);
+            check(fromLooseButtons.button(i).color() == expected[i], "Button " + (i + 1) + " should get its slot's default color");
+        }
+        check(new RemoteButtons.Button(1, false).colorOr(2) == DyeColor.BLUE, "A loose button uses its slot's default");
+        check(RemoteButtons.DEFAULT.withButton(1, RemoteButtons.DEFAULT.button(1).withColor(DyeColor.PURPLE))
+                .button(1).color() == DyeColor.PURPLE, "A chosen color should stick");
+
+        DyeColor color = DyeColor.WHITE;
+        java.util.Set<DyeColor> seen = java.util.EnumSet.noneOf(DyeColor.class);
+        for (int i = 0; i < 16; i++) {
+            seen.add(color);
+            color = RemoteButtons.nextColor(color, false);
+        }
+        check(seen.size() == 16 && color == DyeColor.WHITE, "Clicking should go through all 16 colors and back to white");
+        check(RemoteButtons.nextColor(DyeColor.WHITE, true) == DyeColor.BLACK, "Sneak-clicking white should go back to black");
+        helper.succeed();
+    }
+
+    /** Colors survive saving and network sync, and remotes saved before colors existed load with the defaults. */
+    @GameTest(template = PLATFORM)
+    public static void buttonColorsSurviveSaveAndSync(GameTestHelper helper) {
+        RemoteButtons original = RemoteButtons.DEFAULT
+                .withButton(0, new RemoteButtons.Button(101, false, 20, "Front Door", DyeColor.PURPLE))
+                .withButton(3, new RemoteButtons.Button(404, true, 20, "", DyeColor.CYAN));
+
+        var saved = RemoteButtons.CODEC.encodeStart(JsonOps.INSTANCE, original).getOrThrow();
+        RemoteButtons loaded = RemoteButtons.CODEC.parse(JsonOps.INSTANCE, saved).getOrThrow();
+        check(loaded.equals(original), "Saving and loading changed the colors: " + loaded);
+
+        var buffer = Unpooled.buffer();
+        RemoteButtons.STREAM_CODEC.encode(buffer, original);
+        RemoteButtons synced = RemoteButtons.STREAM_CODEC.decode(buffer);
+        check(synced.equals(original), "Network sync changed the colors: " + synced);
+
+        var oldFormat = com.google.gson.JsonParser.parseString(
+                "{\"buttons\":[{\"frequency\":7,\"name\":\"Gate\"},{\"frequency\":8}],\"selected\":0}");
+        RemoteButtons old = RemoteButtons.CODEC.parse(JsonOps.INSTANCE, oldFormat).getOrThrow();
+        check(old.button(0).color() == DyeColor.RED && old.button(1).color() == DyeColor.LIME,
+                "Old remotes should load with red, lime, blue and yellow buttons");
+        check(old.button(0).name().equals("Gate"), "Old remotes should keep their names");
+        helper.succeed();
+    }
+
+    /** The item's button layers are tinted with each button's color, and labels are drawn in it. */
+    @GameTest(template = PLATFORM)
+    public static void remoteShowsButtonColors(GameTestHelper helper) {
+        ItemStack remote = new ItemStack(ModRegistry.MULTI_REMOTE.get());
+        MultiRemoteItem.setButtons(remote, RemoteButtons.DEFAULT
+                .withButton(1, RemoteButtons.DEFAULT.button(1).withColor(DyeColor.PURPLE)));
+        int purple = 0xFF000000 | DyeColor.PURPLE.getTextureDiffuseColor();
+        int red = 0xFF000000 | DyeColor.RED.getTextureDiffuseColor();
+        check(MultiRemoteItem.tintColor(remote, 2) == purple, "Layer 2 (button 2) should be purple");
+        check(MultiRemoteItem.tintColor(remote, 1) == red, "Layer 1 (button 1) should keep its default red");
+        check(MultiRemoteItem.tintColor(remote, 0) == -1 && MultiRemoteItem.tintColor(remote, 5) == -1,
+                "The body and anything else shouldn't be tinted");
+
+        var label = MultiRemoteItem.getButtons(remote).button(1).label(1);
+        check(label.getStyle().getColor() != null
+                        && label.getStyle().getColor().getValue() == RemoteButtons.textColor(DyeColor.PURPLE),
+                "The button's label should be drawn in its color");
+        for (DyeColor dye : DyeColor.values()) {
+            int rgb = RemoteButtons.textColor(dye);
+            double brightness = (0.299 * ((rgb >> 16) & 0xFF) + 0.587 * ((rgb >> 8) & 0xFF) + 0.114 * (rgb & 0xFF)) / 255.0;
+            check(brightness >= 0.39, dye + " labels would be too dark to read on a tooltip");
+        }
         helper.succeed();
     }
 }

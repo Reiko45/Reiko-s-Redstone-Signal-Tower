@@ -328,22 +328,34 @@ def remote_item(light="idle"):
     return img
 
 
+MULTI_BUTTONS = [(6, 7), (9, 7), (6, 10), (9, 10)]  # top-left pixel of each 2x2 button
+
+
 def multi_remote_item(light="idle"):
-    """Like the remote, but with four colored buttons in a 2x2 grid."""
+    """Like the remote, but with room for four buttons in a 2x2 grid. The buttons themselves are
+    separate layers (see multi_remote_button) so the game can color each one."""
     img = remote_item(light)
     px = img.load()
-    body = (58, 62, 72, 255)
+    body, socket = (58, 62, 72, 255), (36, 38, 46, 255)
     for y in range(6, 14):
         for x in range(6, 11):
             px[x, y] = body
-    colors = [((220, 36, 26, 255), (255, 120, 100, 255)), ((40, 180, 60, 255), (140, 240, 140, 255)),
-              ((40, 90, 220, 255), (130, 170, 255, 255)), ((230, 190, 30, 255), (255, 240, 140, 255))]
-    for i, (x, y) in enumerate([(6, 7), (9, 7), (6, 10), (9, 10)]):
-        base, light = colors[i]
-        for dx in range(2):
-            for dy in range(2):
-                px[x + dx, y + dy] = base
-        px[x, y] = light
+    # A dark socket under each button, showing at its bottom-right edge
+    for (x, y) in MULTI_BUTTONS:
+        for (dx, dy) in [(2, 1), (1, 2), (2, 2)]:
+            px[x + dx, y + dy] = socket
+    return img
+
+
+def multi_remote_button(index):
+    """Button `index` (1-4) in white and greys: the game multiplies it by the button's dye color,
+    so the top-left pixel shows the full color and the rest is shaded a little darker."""
+    img = blank()
+    px = img.load()
+    x, y = MULTI_BUTTONS[index - 1]
+    shades = {(0, 0): 255, (1, 0): 225, (0, 1): 225, (1, 1): 180}
+    for (dx, dy), v in shades.items():
+        px[x + dx, y + dy] = (v, v, v, 255)
     return img
 
 
@@ -367,7 +379,8 @@ blocks = {
 items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
          "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),
          "multi_remote": multi_remote_item(),
-         "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed")}
+         "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
+         **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)}}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

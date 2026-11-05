@@ -1,7 +1,11 @@
 {
   "parent": "minecraft:item/handheld",
   "textures": {
-    "layer0": "reikos_signal_tower:item/multi_remote"
+    "layer0": "reikos_signal_tower:item/multi_remote",
+    "layer1": "reikos_signal_tower:item/multi_remote_button_1",
+    "layer2": "reikos_signal_tower:item/multi_remote_button_2",
+    "layer3": "reikos_signal_tower:item/multi_remote_button_3",
+    "layer4": "reikos_signal_tower:item/multi_remote_button_4"
   },
   "overrides": [
     {

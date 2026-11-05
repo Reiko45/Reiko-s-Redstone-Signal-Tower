@@ -45,6 +45,11 @@
 - **Button names:**
   - Each `RemoteButtons.Button` has a `name` (optional in saved data, so older remotes load unnamed). The record constructor cleans it with `StringUtil.filterText`, strips spaces and cuts it to 24 characters, on the server and the client alike.
   - `Button.label(index)` gives the name, or "Button N", and every message and tooltip uses it.
+- **Button colors:**
+  - Each `RemoteButtons.Button` has a `DyeColor color` (optional in saved data; null only on a button that isn't on a remote yet). The `RemoteButtons` constructor fills in its slot's default: red, lime, blue, yellow.
+  - The item model has 5 layers (the vanilla maximum): the body (with the status light) and one white-and-grey button per layer 1-4. `MultiRemoteItem.tintColor` (registered in `RegisterColorHandlersEvent.Item`) multiplies each with its button's dye color, so the shading is baked into the greys. The green/red light models use the same button layers.
+  - `Button.label` draws the name in `RemoteButtons.textColor`: the dye's color, lightened just enough for dark dyes to stay readable on tooltips.
+  - The keypad has a color column: a button with the colored square drawn over it in `render`, click for the next dye, sneak-click for the previous one, and a tooltip naming the color.
 - **Locator:**
   - An open remote screen sends `RemoteScanRequestPayload` (up to 4 frequencies) every 20 ticks, or sooner after typing. The server only answers players holding a remote.
   - It uses the receiver tracking (`SignalNetwork.scanReceivers`): count within reach, and nearest within 2× reach, with distance and 8-way compass direction.
@@ -74,16 +79,18 @@
 
 ## Verified
 
-- 42 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 45 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - colored buttons show on the remote in hand and in the hotbar, change as soon as the keypad saves, and keep working with the status light; names show in their colors in the tooltip and press message;
   - standing at the foot of a 30-mast tower, the remote screen counts a receiver 150 blocks away as in range ("plus 1 tower relaying"), and a toggle press lights its lamp.
 
 ## History
 
+- **v0.12.0:** button colors on the Multi-Button Remote.
 - **v0.11.0:** Radio Transmitters relay remote presses (remote range boost).
 - **v0.10.0:** remote locator.
 - **v0.9.0:** button names on the Multi-Button Remote.

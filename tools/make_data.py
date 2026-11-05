@@ -240,7 +240,28 @@ def remote_models(name):
 
 
 remote_models("remote_control")
-remote_models("multi_remote")
+
+
+def multi_remote_models():
+    """Like remote_models, but the four buttons are separate white layers (1-4) that the game tints
+    with each button's color. (Item models allow 5 layers at most: layer0 to layer4.)"""
+    buttons = {f"layer{i}": tex(f"multi_remote_button_{i}", "item") for i in range(1, 5)}
+    for variant in ("heard", "missed"):
+        write(items / f"multi_remote_{variant}.json", {
+            "parent": "minecraft:item/handheld",
+            "textures": {"layer0": tex(f"multi_remote_{variant}", "item"), **buttons},
+        })
+    write(items / "multi_remote.json", {
+        "parent": "minecraft:item/handheld",
+        "textures": {"layer0": tex("multi_remote", "item"), **buttons},
+        "overrides": [
+            {"predicate": {f"{MOD}:light": 0.5}, "model": f"{MOD}:item/multi_remote_heard"},
+            {"predicate": {f"{MOD}:light": 1.0}, "model": f"{MOD}:item/multi_remote_missed"},
+        ],
+    })
+
+
+multi_remote_models()
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -310,7 +331,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.frequency_copied_button": "Copied frequency %s to %s",
     f"screen.{MOD}.multi_remote.frequency": "Button %s frequency",
     f"screen.{MOD}.multi_remote.press": "Press",
-    f"screen.{MOD}.multi_remote.hint": "Click a number to pick the button right-click presses. Sneak-click a length to shorten it.",
+    f"screen.{MOD}.multi_remote.hint": "Click a number to pick the right-click button. Sneak-click a color or length to go back.",
+    f"screen.{MOD}.multi_remote.color": "Color: %s",
     f"screen.{MOD}.multi_remote.name": "Button %s name",
     f"screen.{MOD}.multi_remote.heading_name": "Name",
     f"screen.{MOD}.multi_remote.heading_frequency": "Frequency",

@@ -47,6 +47,18 @@ public class MultiRemoteItem extends Item {
         stack.set(ModRegistry.REMOTE_BUTTONS.get(), buttons);
     }
 
+    /**
+     * The tint for layer {@code tintIndex} of the item model. Layers 1-4 are the four buttons, drawn
+     * white and colored here with each button's dye color. Every other layer is left as drawn.
+     */
+    public static int tintColor(ItemStack stack, int tintIndex) {
+        if (tintIndex < 1 || tintIndex > RemoteButtons.COUNT) {
+            return -1;
+        }
+        int index = tintIndex - 1;
+        return 0xFF000000 | getButtons(stack).button(index).colorOr(index).getTextureDiffuseColor();
+    }
+
     /** Presses button {@code index} (0-3) from where the player is standing. */
     public static void pressButton(ServerLevel level, Player player, ItemStack stack, int index) {
         RemoteButtons.Button button = getButtons(stack).button(index);

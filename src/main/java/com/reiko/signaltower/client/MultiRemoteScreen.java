@@ -11,27 +11,31 @@ import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.DyeColor;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * The Multi-Button Remote's keypad. Each row is one button: click its number to make it the one
- * right-click presses, give it a name, type its frequency, switch its mode, set its pulse length
- * (click for longer, sneak-click for shorter), or press it right now. Pressing also saves the settings. Done saves
+ * right-click presses, pick its color (click for the next one, sneak-click for the previous one),
+ * give it a name, type its frequency, switch its mode, set its pulse length (click for longer,
+ * sneak-click for shorter), or press it right now. Pressing also saves the settings. Done saves
  * and closes, Cancel throws away unsaved edits.
  */
 public class MultiRemoteScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".multi_remote";
-    private static final int COLUMNS_WIDTH = 348;
+    private static final int COLUMNS_WIDTH = 372;
     /** Each row is a line of controls plus a line of locator text underneath. */
     private static final int ROW_HEIGHT = 32;
 
     private final InteractionHand hand;
     private RemoteButtons buttons;
     private final Button[] selectButtons = new Button[RemoteButtons.COUNT];
+    private final Button[] colorButtons = new Button[RemoteButtons.COUNT];
     private final Button[] modeButtons = new Button[RemoteButtons.COUNT];
     private final Button[] lengthButtons = new Button[RemoteButtons.COUNT];
     private final RemoteScanResultPayload.Entry[] scans = new RemoteScanResultPayload.Entry[RemoteButtons.COUNT];
@@ -51,7 +55,7 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         int centerX = width / 2;
         int top = height / 2 - 70;
 
-        // Columns: [#] [name] [frequency] [mode] [pulse length] [Press], 348 wide in total.
+        // Columns: [#] [color] [name] [frequency] [mode] [pulse length] [Press], 372 wide in total.
         int left = centerX - COLUMNS_WIDTH / 2;
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
             final int index = i;
@@ -62,14 +66,21 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
                 refreshLabels();
             }).bounds(left, y, 24, 20).build());
 
-            EditBox nameBox = new EditBox(font, left + 28, y, 96, 20, Component.translatable(KEY + ".name", i + 1));
+            // The colored square itself is drawn in render(), on top of this button.
+            colorButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> {
+                RemoteButtons.Button old = buttons.button(index);
+                buttons = buttons.withButton(index, old.withColor(RemoteButtons.nextColor(old.colorOr(index), Screen.hasShiftDown())));
+                refreshLabels();
+            }).bounds(left + 28, y, 20, 20).build());
+
+            EditBox nameBox = new EditBox(font, left + 52, y, 96, 20, Component.translatable(KEY + ".name", i + 1));
             nameBox.setMaxLength(RemoteButtons.MAX_NAME_LENGTH);
             nameBox.setValue(buttons.button(i).name());
             nameBox.setHint(buttons.button(i).withName("").label(i).copy().withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
             nameBox.setResponder(text -> buttons = buttons.withButton(index, buttons.button(index).withName(text)));
             addRenderableWidget(nameBox);
 
-            EditBox box = new EditBox(font, left + 128, y, 64, 20, Component.translatable(KEY + ".frequency", i + 1));
+            EditBox box = new EditBox(font, left + 152, y, 64, 20, Component.translatable(KEY + ".frequency", i + 1));
             box.setMaxLength(Frequency.MAX_DIGITS);
             box.setFilter(text -> text.chars().allMatch(Character::isDigit));
             box.setValue(Integer.toString(buttons.button(i).frequency()));
@@ -89,16 +100,16 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
                 RemoteButtons.Button old = buttons.button(index);
                 buttons = buttons.withButton(index, old.withToggle(!old.toggle()));
                 refreshLabels();
-            }).bounds(left + 196, y, 52, 20).build());
+            }).bounds(left + 220, y, 52, 20).build());
 
             lengthButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> {
                 RemoteButtons.Button old = buttons.button(index);
                 buttons = buttons.withButton(index, old.withPulseTicks(PulseLength.next(old.pulseTicks(), Screen.hasShiftDown())));
                 refreshLabels();
-            }).bounds(left + 252, y, 44, 20).build());
+            }).bounds(left + 276, y, 44, 20).build());
 
             addRenderableWidget(Button.builder(Component.translatable(KEY + ".press"), b -> send(index))
-                    .bounds(left + 300, y, 48, 20).build());
+                    .bounds(left + 324, y, 48, 20).build());
         }
         refreshLabels();
 
@@ -120,6 +131,9 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
             RemoteButtons.Button button = buttons.button(i);
             selectButtons[i].setMessage(selectLabel(i));
+            DyeColor color = button.colorOr(i);
+            colorButtons[i].setTooltip(Tooltip.create(Component.translatable(KEY + ".color",
+                    Component.translatable("color.minecraft." + color.getName()))));
             modeButtons[i].setMessage(MultiRemoteItem.modeName(button.toggle()));
             lengthButtons[i].setMessage(Component.literal(PulseLength.format(button.pulseTicks())));
             lengthButtons[i].active = !button.toggle(); // length only matters for pulses
@@ -167,13 +181,21 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         // Column headings
         int left = centerX - COLUMNS_WIDTH / 2;
         int headingY = top - 11;
-        graphics.drawString(font, Component.translatable(KEY + ".heading_name"), left + 30, headingY, 0xC0C0C0);
-        graphics.drawString(font, Component.translatable(KEY + ".heading_frequency"), left + 130, headingY, 0xC0C0C0);
-        graphics.drawString(font, Component.translatable(KEY + ".heading_mode"), left + 198, headingY, 0xC0C0C0);
-        graphics.drawString(font, Component.translatable(KEY + ".heading_length"), left + 254, headingY, 0xC0C0C0);
+        graphics.drawString(font, Component.translatable(KEY + ".heading_name"), left + 54, headingY, 0xC0C0C0);
+        graphics.drawString(font, Component.translatable(KEY + ".heading_frequency"), left + 154, headingY, 0xC0C0C0);
+        graphics.drawString(font, Component.translatable(KEY + ".heading_mode"), left + 222, headingY, 0xC0C0C0);
+        graphics.drawString(font, Component.translatable(KEY + ".heading_length"), left + 278, headingY, 0xC0C0C0);
+        // Each button's color, as a square inside its color button
+        for (int i = 0; i < RemoteButtons.COUNT; i++) {
+            int x = left + 28;
+            int y = top + i * ROW_HEIGHT;
+            int rgb = buttons.button(i).colorOr(i).getTextureDiffuseColor() & 0xFFFFFF;
+            graphics.fill(x + 4, y + 4, x + 16, y + 16, 0xFF101010);
+            graphics.fill(x + 5, y + 5, x + 15, y + 15, 0xFF000000 | rgb);
+        }
         // Locator: who is listening on each button's frequency
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
-            graphics.drawString(font, LocatorText.describe(scans[i], scanReach, scanTowers), left + 30, top + i * ROW_HEIGHT + 22, 0xFFFFFF);
+            graphics.drawString(font, LocatorText.describe(scans[i], scanReach, scanTowers), left + 54, top + i * ROW_HEIGHT + 22, 0xFFFFFF);
         }
         int bottom = top + RemoteButtons.COUNT * ROW_HEIGHT + 2;
         graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, bottom + 26, 0xFFFFFF);

@@ -34,6 +34,7 @@ public final class SignalTowerClient {
         // Adds a "Config" button for this mod in the Mods list.
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modEventBus.addListener(SignalTowerClient::registerBlockColors);
+        modEventBus.addListener(SignalTowerClient::registerItemColors);
         modEventBus.addListener(SignalTowerClient::clientSetup);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
     }
@@ -80,6 +81,11 @@ public final class SignalTowerClient {
     }
 
     /** Wall Redstone glows brighter red the stronger its signal, exactly like normal dust. */
+    /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */
+    private static void registerItemColors(RegisterColorHandlersEvent.Item event) {
+        event.register(MultiRemoteItem::tintColor, ModRegistry.MULTI_REMOTE.get());
+    }
+
     private static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
         event.register((state, level, pos, tintIndex) ->
                         tintIndex == 0 ? RedStoneWireBlock.getColorForPower(state.getValue(WallRedstoneBlock.POWER)) : -1,

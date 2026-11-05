@@ -14,7 +14,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
-| **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency and mode. One remote can run your door, lights and farm. |
+| **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
@@ -60,14 +60,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Multi-Button Remote:**
 - Right-click: press the **selected** button.
 - Sneak + scroll: choose the selected button. Your hotbar slot doesn't move.
-- Sneak + right-click the air: open the keypad. From there you can press any button, give each button a **name** (like "Front Door"), set its frequency, Pulse/Toggle mode and pulse length, and click a button's number to make it the selected one.
+- Sneak + right-click the air: open the keypad. From there you can press any button, give each button a **name** (like "Front Door") and a **color**, set its frequency, Pulse/Toggle mode and pulse length, and click a button's number to make it the selected one.
+- **Button colors:** click a button's color square in the keypad for the next of the 16 dye colors, or sneak-click for the previous one. The four buttons on the remote itself (in your hand, hotbar and inventory) change to match, and each button's name shows in its color in the tooltip and press messages. New remotes, and remotes made before this version, start red, green, blue and yellow.
 - Names show up everywhere: the tooltip, the press message ("Front Door: 1s pulse sent…") and the selection message ("Farm Lights selected…"). Unnamed buttons show as "Button 1" to "Button 4". Names can be up to 24 characters.
 - Sneak + right-click a transmitter or receiver: copy its frequency into the selected button.
 - The tooltip lists all 4 buttons, with the selected one marked ».
 
-![The Multi-Button Remote keypad](docs/images/multi-remote-keypad.png)
+![The Multi-Button Remote keypad, with a color square next to each button's number](docs/images/multi-remote-keypad.png)
 
-![The Multi-Button Remote's tooltip with named buttons](docs/images/multi-remote-tooltip.png)
+![A remote with purple, orange, cyan and white buttons next to one with the default red, green, blue and yellow](docs/images/button-colors.png)
+
+![The Multi-Button Remote's tooltip, with each named button in its color](docs/images/multi-remote-tooltip.png)
 
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
@@ -159,7 +162,7 @@ src/main/java/com/reiko/signaltower/
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
-  item/RemoteButtons.java                the 4 buttons' settings (data component)
+  item/RemoteButtons.java                the 4 buttons' settings (data component), colors
   item/PulseLength.java                  pulse length presets, limits and labels
   item/RemoteLight.java                  the remotes' green/red status light after a press
   network/RemoteScanRequestPayload.java  remote screen -> server: who's listening? (locator)
@@ -232,7 +235,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 39. a toggle switched on through a tower turns off when the tower is broken;
 40. a toggle's tower areas survive saving and loading, and the old save keys are still written for older versions;
 41. toggles saved by version 0.10.0 still load;
-42. the locator and the light count receivers that only a tower reaches.
+42. the locator and the light count receivers that only a tower reaches;
+43. buttons default to red, lime, blue and yellow, and clicking goes through all 16 dye colors both ways;
+44. button colors survive saving and network sync, and remotes saved before colors existed load with the defaults;
+45. the item's button layers are tinted with each button's color, labels use it, and every color stays readable on a tooltip.
 
 ## License
 
