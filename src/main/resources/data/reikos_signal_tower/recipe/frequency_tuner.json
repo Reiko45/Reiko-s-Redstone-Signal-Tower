@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "T": {
+      "item": "minecraft:redstone_torch"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    " T ",
+    "IGI",
+    "IRI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:frequency_tuner"
+  }
+}

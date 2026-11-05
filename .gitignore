@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Run folders created by runClient/runServer/runGameTestServer
+run/
+runs/

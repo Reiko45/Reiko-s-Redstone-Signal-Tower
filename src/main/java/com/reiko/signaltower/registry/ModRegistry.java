@@ -1,0 +1,98 @@
+package com.reiko.signaltower.registry;
+
+import com.mojang.serialization.Codec;
+import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioMastBlock;
+import com.reiko.signaltower.block.RadioReceiverBlock;
+import com.reiko.signaltower.block.RadioTransmitterBlock;
+import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
+import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
+import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.radio.Frequency;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.MapColor;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredBlock;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+public final class ModRegistry {
+    public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(SignalTower.MOD_ID);
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(SignalTower.MOD_ID);
+    public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, SignalTower.MOD_ID);
+    public static final DeferredRegister.DataComponents DATA_COMPONENTS =
+            DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, SignalTower.MOD_ID);
+
+    // ---- Data components ----
+
+    /** The frequency stored on a Frequency Tuner, or on a transmitter/receiver item that was broken. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> FREQUENCY =
+            DATA_COMPONENTS.registerComponentType("frequency", builder -> builder
+                    .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    // ---- Blocks ----
+
+    public static final DeferredBlock<RadioTransmitterBlock> RADIO_TRANSMITTER = BLOCKS.register("radio_transmitter",
+            () -> new RadioTransmitterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+
+    public static final DeferredBlock<RadioReceiverBlock> RADIO_RECEIVER = BLOCKS.register("radio_receiver",
+            () -> new RadioReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
+    public static final DeferredBlock<RadioMastBlock> RADIO_MAST = BLOCKS.register("radio_mast",
+            () -> new RadioMastBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.CHAIN)
+                    .noOcclusion()));
+
+    // ---- Items ----
+
+    public static final DeferredItem<BlockItem> RADIO_TRANSMITTER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_transmitter", RADIO_TRANSMITTER);
+    public static final DeferredItem<BlockItem> RADIO_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_mast", RADIO_MAST);
+    public static final DeferredItem<FrequencyTunerItem> FREQUENCY_TUNER =
+            ITEMS.register("frequency_tuner", () -> new FrequencyTunerItem(new Item.Properties().stacksTo(1)));
+
+    // ---- Block entities ----
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioTransmitterBlockEntity>> RADIO_TRANSMITTER_BE =
+            BLOCK_ENTITIES.register("radio_transmitter",
+                    () -> BlockEntityType.Builder.of(RadioTransmitterBlockEntity::new, RADIO_TRANSMITTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER_BE =
+            BLOCK_ENTITIES.register("radio_receiver",
+                    () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new, RADIO_RECEIVER.get()).build(null));
+
+    public static void register(IEventBus modEventBus) {
+        DATA_COMPONENTS.register(modEventBus);
+        BLOCKS.register(modEventBus);
+        ITEMS.register(modEventBus);
+        BLOCK_ENTITIES.register(modEventBus);
+    }
+
+    private ModRegistry() {}
+}

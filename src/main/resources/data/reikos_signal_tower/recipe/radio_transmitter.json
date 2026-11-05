@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "L": {
+      "item": "minecraft:lightning_rod"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "E": {
+      "item": "minecraft:ender_pearl"
+    },
+    "T": {
+      "item": "minecraft:redstone_torch"
+    }
+  },
+  "pattern": [
+    " L ",
+    "IEI",
+    "ITI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:radio_transmitter"
+  }
+}

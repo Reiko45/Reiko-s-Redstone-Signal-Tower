@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "B": {
+      "item": "minecraft:iron_bars"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    }
+  },
+  "pattern": [
+    "B B",
+    "BIB",
+    "B B"
+  ],
+  "result": {
+    "count": 6,
+    "id": "reikos_signal_tower:radio_mast"
+  }
+}

@@ -1,0 +1,48 @@
+# Design notes
+
+**Target:** Minecraft 1.21.1 · NeoForge 21.1.265 · ModDevGradle 2.0.148 · Java 21 · Parchment 2024.11.17
+**Mod id:** `reikos_signal_tower` · **Package:** `com.reiko.signaltower`
+
+## Rules
+
+- **Frequencies** are whole numbers from 1 to 999,999,999, stored in each transmitter and receiver's block entity (NBT key `frequency`). New blocks start on 1.
+- **Reach** belongs to the transmitter only: `baseReach + reachPerBlockOfHeight × max(0, y − seaLevel)`, capped by `maxReach` if that's above 0. Defaults are 32 and 8, with no cap.
+- **Links:** a receiver hears a transmitter on its frequency if their *horizontal* distance is at most the transmitter's reach. Height difference doesn't matter.
+- **Sea level** comes from the dimension's chunk generator (`ServerLevel.getChunkSource().getGenerator().getSeaLevel()`), because `Level.getSeaLevel()` is hard-coded to 63 in 1.21.1.
+- **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
+
+## How it works
+
+- `SignalNetwork` is `SavedData`, one per dimension. It maps transmitter position → (frequency, power, reach), indexed by frequency, with a revision counter per frequency (not saved).
+- **Transmitters** update their entry when:
+  - a neighbor changes,
+  - a mast in their column reports a change (masts walk up their column on neighbor change, placement and removal),
+  - their frequency changes,
+  - and once a second in their block entity tick, which also catches config changes and world edits.
+- **Receivers** re-scan only when their frequency's revision changes or their own frequency changes, plus a once-a-second fallback. Changes arrive within one tick.
+- **Cleanup:** entries whose transmitter block is gone are removed the next time a receiver in range scans.
+- **Dropped items:** the frequency rides on the item as the `reikos_signal_tower:frequency` data component. The block entity's `collectImplicitComponents` adds it, and the loot table's `copy_components` copies it onto the drop. `applyImplicitComponents` reads it back when the block is placed.
+- **Tuner:** the screen sends `SetTunerFrequencyPayload` (hand + value). The server checks the player is holding a tuner and clamps the value. Tuning and copying happen in `FrequencyTunerItem.useOn` on the server. Radio blocks return `SKIP_DEFAULT_BLOCK_INTERACTION` for any held item so the tuner's `useOn` runs, and so masts can be placed against them.
+
+## Verified
+
+- 7 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- In the real client:
+  - models, the glowing warning light and items render correctly;
+  - typing a frequency into the Tuner screen updates the held tuner on the server;
+  - tuning a receiver links it and lights its lamps;
+  - the status readout shows the right values.
+
+## History
+
+- **v0.1.0:** dye-colored channels (16), reach from stacked masts on both ends. Replaced in v0.2.0 at Reiko's request.
+
+## Ideas for later
+
+- Show the frequency on the block (floating text, or a Jade/WTHIT plugin)
+- Named frequencies ("Base Door") as aliases for numbers
+- Receivers that also gain range with height, or terrain blocking the signal
+- Links between dimensions
+- A blinking warning light, or a separate light block for the top of tall towers
+- Strong-power option on receivers; an inverted receiver
+- Signal falloff at the edge of reach

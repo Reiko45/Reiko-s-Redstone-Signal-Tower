@@ -1,0 +1,305 @@
+"""Writes models, blockstates, lang, recipes, loot tables, tags, advancements and the test structure
+for Reiko's Redstone Signal Tower.
+
+Usage: python3 tools/make_data.py
+Writes into src/main/resources. Re-running overwrites those files, so either keep editing this
+script, or edit the JSON files directly and stop using it.
+"""
+import gzip
+import json
+import struct
+from pathlib import Path
+
+RES = Path(__file__).resolve().parent.parent / "src/main/resources"
+MOD = "reikos_signal_tower"
+ASSETS = RES / "assets" / MOD
+DATA = RES / "data" / MOD
+
+
+def write(path: Path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
+
+
+def tex(name, folder="block"):
+    return f"{MOD}:{folder}/{name}"
+
+
+SIDES = ["north", "south", "east", "west"]
+GLOW = {"block_light": 15, "sky_light": 15}
+
+# ---------------------------------------------------------------- block models
+
+models = ASSETS / "models" / "block"
+
+
+def casing_faces():
+    faces = {f: {"texture": "#side", "cullface": f} for f in SIDES}
+    faces["up"] = {"texture": "#top", "cullface": "up"}
+    faces["down"] = {"texture": "#bottom", "cullface": "down"}
+    return faces
+
+
+def box(frm, to, texture, uv_sides, uv_ends, glow=False):
+    faces = {f: {"texture": texture, "uv": uv_sides} for f in SIDES}
+    faces["up"] = {"texture": texture, "uv": uv_ends}
+    faces["down"] = {"texture": texture, "uv": uv_ends}
+    element = {"from": frm, "to": to, "faces": faces}
+    if glow:
+        element["neoforge_data"] = GLOW
+        element["shade"] = False
+    return element
+
+
+def transmitter_model(lit):
+    """Steel cabinet with a dipole antenna and a warning light that glows while broadcasting."""
+    suffix = "_on" if lit else ""
+    return {
+        "parent": "minecraft:block/block",
+        "render_type": "minecraft:cutout",
+        "textures": {
+            "particle": tex(f"radio_transmitter_side{suffix}"),
+            "side": tex(f"radio_transmitter_side{suffix}"),
+            "top": tex(f"radio_transmitter_top{suffix}"),
+            "bottom": tex("radio_bottom"),
+            "rod": tex("radio_mast_post"),
+            "tip": tex(f"antenna_tip{suffix}"),
+        },
+        "elements": [
+            {"from": [0, 0, 0], "to": [16, 16, 16], "faces": casing_faces()},
+            # Mast rod
+            box([7, 16, 7], [9, 28, 9], "#rod", [6, 0, 8, 12], [6, 6, 8, 8]),
+            # Dipole arms
+            box([3, 22, 7.5], [13, 23, 8.5], "#rod", [3, 4, 13, 5], [3, 4, 13, 5]),
+            box([7.5, 19, 3], [8.5, 20, 13], "#rod", [3, 12, 13, 13], [3, 12, 13, 13]),
+            # Warning light
+            box([6.5, 28, 6.5], [9.5, 31, 9.5], "#tip", [4, 4, 12, 12], [4, 4, 12, 12], glow=lit),
+        ],
+        "display": {
+            # The antenna makes the model twice as tall as a block, so shrink it in inventories.
+            "gui": {"rotation": [30, 225, 0], "translation": [0, -2.5, 0], "scale": [0.42, 0.42, 0.42]},
+            "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.2, 0.2, 0.2]},
+            "fixed": {"rotation": [0, 0, 0], "translation": [0, -2, 0], "scale": [0.38, 0.38, 0.38]},
+        },
+    }
+
+
+def receiver_model(lit):
+    suffix = "_on" if lit else ""
+    return {
+        "parent": "minecraft:block/cube",
+        "textures": {
+            "particle": tex(f"radio_receiver_side{suffix}"),
+            "north": tex(f"radio_receiver_side{suffix}"),
+            "south": tex(f"radio_receiver_side{suffix}"),
+            "east": tex(f"radio_receiver_side{suffix}"),
+            "west": tex(f"radio_receiver_side{suffix}"),
+            "up": tex(f"radio_receiver_top{suffix}"),
+            "down": tex("radio_bottom"),
+        },
+    }
+
+
+for lit in (False, True):
+    suffix = "_on" if lit else ""
+    write(models / f"radio_transmitter{suffix}.json", transmitter_model(lit))
+    write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
+
+
+def post(x, z):
+    return {"from": [x, 0, z], "to": [x + 2, 16, z + 2],
+            "faces": {f: {"texture": "#post"} for f in SIDES + ["up", "down"]}}
+
+
+def panel_ns(z):
+    uv = [5, 0, 11, 16]
+    return {"from": [5, 0, z], "to": [11, 16, z],
+            "faces": {"north": {"uv": uv, "texture": "#lattice"}, "south": {"uv": uv, "texture": "#lattice"}}}
+
+
+def panel_ew(x):
+    uv = [5, 0, 11, 16]
+    return {"from": [x, 0, 5], "to": [x, 16, 11],
+            "faces": {"east": {"uv": uv, "texture": "#lattice"}, "west": {"uv": uv, "texture": "#lattice"}}}
+
+
+write(models / "radio_mast.json", {
+    "parent": "minecraft:block/block",
+    "render_type": "minecraft:cutout",
+    "ambientocclusion": False,
+    "textures": {
+        "particle": tex("radio_mast_post"),
+        "post": tex("radio_mast_post"),
+        "lattice": tex("radio_mast_lattice"),
+    },
+    "elements": [
+        post(3, 3), post(11, 3), post(3, 11), post(11, 11),
+        panel_ns(4), panel_ns(12), panel_ew(4), panel_ew(12),
+    ],
+})
+
+# ---------------------------------------------------------------- item models
+
+items = ASSETS / "models" / "item"
+for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
+    write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
+write(items / "frequency_tuner.json", {
+    "parent": "minecraft:item/generated",
+    "textures": {"layer0": tex("frequency_tuner", "item")},
+})
+
+# ---------------------------------------------------------------- blockstates
+
+states = ASSETS / "blockstates"
+write(states / "radio_transmitter.json", {"variants": {
+    "powered=false": {"model": f"{MOD}:block/radio_transmitter"},
+    "powered=true": {"model": f"{MOD}:block/radio_transmitter_on"},
+}})
+write(states / "radio_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
+write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radio_mast"}}})
+
+# ---------------------------------------------------------------- lang
+
+write(ASSETS / "lang" / "en_us.json", {
+    f"block.{MOD}.radio_transmitter": "Radio Transmitter",
+    f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches.",
+    f"block.{MOD}.radio_receiver": "Radio Receiver",
+    f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
+    f"block.{MOD}.radio_mast": "Radio Mast",
+    f"block.{MOD}.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
+    f"item.{MOD}.frequency_tuner": "Frequency Tuner",
+
+    f"tooltip.{MOD}.frequency": "Frequency: %s",
+    f"tooltip.{MOD}.tune_hint": "Use a Frequency Tuner to change its frequency.",
+    f"tooltip.{MOD}.tuner_use_air": "Right-click the air to type a frequency",
+    f"tooltip.{MOD}.tuner_use_block": "Right-click a transmitter or receiver to tune it",
+    f"tooltip.{MOD}.tuner_copy": "Sneak + right-click one to copy its frequency",
+
+    f"message.{MOD}.frequency_set": "Tuned to frequency %s",
+    f"message.{MOD}.frequency_copied": "Copied frequency %s to the tuner",
+    f"message.{MOD}.transmitter_status": "Transmitter | Frequency %s | Sending %s | %s | Reach %s blocks",
+    f"message.{MOD}.receiver_status": "Receiver | Frequency %s | Output %s | Transmitters in range: %s",
+    f"message.{MOD}.height_above": "%s blocks above sea level",
+    f"message.{MOD}.height_below": "At or below sea level",
+
+    f"screen.{MOD}.tuner.title": "Frequency Tuner",
+    f"screen.{MOD}.tuner.input": "Frequency",
+    f"screen.{MOD}.tuner.range": "Any whole number from %s to %s",
+
+    f"{MOD}.configuration.title": "Reiko's Redstone Signal Tower",
+    f"{MOD}.configuration.section.{MOD}.server.toml": "Server settings",
+    f"{MOD}.configuration.section.{MOD}.server.toml.title": "Server settings",
+    f"{MOD}.configuration.baseReach": "Base reach",
+    f"{MOD}.configuration.reachPerBlockOfHeight": "Reach per block of height",
+    f"{MOD}.configuration.maxReach": "Max reach (0 = no limit)",
+})
+
+# ---------------------------------------------------------------- recipes
+
+def shaped(pattern, key, result, count=1, category="redstone"):
+    return {
+        "type": "minecraft:crafting_shaped",
+        "category": category,
+        "key": {k: {"item": v} for k, v in key.items()},
+        "pattern": pattern,
+        "result": {"count": count, "id": f"{MOD}:{result}"},
+    }
+
+
+recipes = {
+    "radio_transmitter": (shaped([" L ", "IEI", "ITI"], {
+        "L": "minecraft:lightning_rod", "I": "minecraft:iron_ingot",
+        "E": "minecraft:ender_pearl", "T": "minecraft:redstone_torch"}, "radio_transmitter"),
+        "minecraft:ender_pearl"),
+    "radio_receiver": (shaped([" L ", "IEI", "IPI"], {
+        "L": "minecraft:lightning_rod", "I": "minecraft:iron_ingot",
+        "E": "minecraft:ender_pearl", "P": "minecraft:repeater"}, "radio_receiver"),
+        "minecraft:ender_pearl"),
+    "radio_mast": (shaped(["B B", "BIB", "B B"], {
+        "B": "minecraft:iron_bars", "I": "minecraft:iron_ingot"}, "radio_mast", count=6),
+        "minecraft:iron_bars"),
+    "frequency_tuner": (shaped([" T ", "IGI", "IRI"], {
+        "T": "minecraft:redstone_torch", "I": "minecraft:iron_ingot",
+        "G": "minecraft:glass_pane", "R": "minecraft:redstone"}, "frequency_tuner", category="equipment"),
+        "minecraft:redstone"),
+}
+for name, (recipe, trigger) in recipes.items():
+    write(DATA / "recipe" / f"{name}.json", recipe)
+    # Unlocks the recipe in the recipe book once the player picks up the trigger item.
+    write(DATA / "advancement" / "recipes" / "redstone" / f"{name}.json", {
+        "parent": "minecraft:recipes/root",
+        "criteria": {
+            "has_item": {"trigger": "minecraft:inventory_changed",
+                         "conditions": {"items": [{"items": trigger}]}},
+            "has_the_recipe": {"trigger": "minecraft:recipe_unlocked",
+                               "conditions": {"recipe": f"{MOD}:{name}"}},
+        },
+        "requirements": [["has_the_recipe", "has_item"]],
+        "rewards": {"recipes": [f"{MOD}:{name}"]},
+    })
+
+# ---------------------------------------------------------------- loot tables
+
+for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
+    entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
+    if name != "radio_mast":
+        # Copy the block's frequency onto the dropped item so it keeps its tuning.
+        entry["functions"] = [{
+            "function": "minecraft:copy_components",
+            "source": "block_entity",
+            "include": [f"{MOD}:frequency"],
+        }]
+    write(DATA / "loot_table" / "blocks" / f"{name}.json", {
+        "type": "minecraft:block",
+        "pools": [{
+            "bonus_rolls": 0.0,
+            "rolls": 1.0,
+            "entries": [entry],
+            "conditions": [{"condition": "minecraft:survives_explosion"}],
+        }],
+        "random_sequence": f"{MOD}:blocks/{name}",
+    })
+
+# ---------------------------------------------------------------- tags
+
+write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_mast"]
+})
+
+# ---------------------------------------------------------------- game test structure (NBT)
+
+def nbt_string(s):
+    b = s.encode("utf-8")
+    return struct.pack(">H", len(b)) + b
+
+
+def tag(type_id, name, payload):
+    return bytes([type_id]) + nbt_string(name) + payload
+
+
+def int_list(values):
+    return bytes([3]) + struct.pack(">i", len(values)) + b"".join(struct.pack(">i", v) for v in values)
+
+
+def compound_list(items):
+    if not items:
+        return bytes([0]) + struct.pack(">i", 0)
+    return bytes([10]) + struct.pack(">i", len(items)) + b"".join(items)
+
+
+# An empty box: the game test framework clears it to air. Tests place any support blocks they need.
+SIZE = [130, 14, 3]
+root = (
+    tag(3, "DataVersion", struct.pack(">i", 3955))  # 1.21.1
+    + tag(9, "size", int_list(SIZE))
+    + tag(9, "palette", compound_list([tag(8, "Name", nbt_string("minecraft:air")) + b"\x00"]))
+    + tag(9, "blocks", compound_list([]))
+    + tag(9, "entities", compound_list([]))
+)
+structure = DATA / "structure" / "test_platform.nbt"
+structure.parent.mkdir(parents=True, exist_ok=True)
+structure.write_bytes(gzip.compress(bytes([10]) + nbt_string("") + root + b"\x00", mtime=0))
+
+print("data written to", RES)

@@ -1,0 +1,268 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "reikos_signal_tower:block/radio_mast_post",
+    "post": "reikos_signal_tower:block/radio_mast_post",
+    "lattice": "reikos_signal_tower:block/radio_mast_lattice"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        0,
+        3
+      ],
+      "to": [
+        5,
+        16,
+        5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post"
+        },
+        "south": {
+          "texture": "#post"
+        },
+        "east": {
+          "texture": "#post"
+        },
+        "west": {
+          "texture": "#post"
+        },
+        "up": {
+          "texture": "#post"
+        },
+        "down": {
+          "texture": "#post"
+        }
+      }
+    },
+    {
+      "from": [
+        11,
+        0,
+        3
+      ],
+      "to": [
+        13,
+        16,
+        5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post"
+        },
+        "south": {
+          "texture": "#post"
+        },
+        "east": {
+          "texture": "#post"
+        },
+        "west": {
+          "texture": "#post"
+        },
+        "up": {
+          "texture": "#post"
+        },
+        "down": {
+          "texture": "#post"
+        }
+      }
+    },
+    {
+      "from": [
+        3,
+        0,
+        11
+      ],
+      "to": [
+        5,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post"
+        },
+        "south": {
+          "texture": "#post"
+        },
+        "east": {
+          "texture": "#post"
+        },
+        "west": {
+          "texture": "#post"
+        },
+        "up": {
+          "texture": "#post"
+        },
+        "down": {
+          "texture": "#post"
+        }
+      }
+    },
+    {
+      "from": [
+        11,
+        0,
+        11
+      ],
+      "to": [
+        13,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#post"
+        },
+        "south": {
+          "texture": "#post"
+        },
+        "east": {
+          "texture": "#post"
+        },
+        "west": {
+          "texture": "#post"
+        },
+        "up": {
+          "texture": "#post"
+        },
+        "down": {
+          "texture": "#post"
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        0,
+        4
+      ],
+      "to": [
+        11,
+        16,
+        4
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        },
+        "south": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        0,
+        12
+      ],
+      "to": [
+        11,
+        16,
+        12
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        },
+        "south": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        0,
+        5
+      ],
+      "to": [
+        4,
+        16,
+        11
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        },
+        "west": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        }
+      }
+    },
+    {
+      "from": [
+        12,
+        0,
+        5
+      ],
+      "to": [
+        12,
+        16,
+        11
+      ],
+      "faces": {
+        "east": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        },
+        "west": {
+          "uv": [
+            5,
+            0,
+            11,
+            16
+          ],
+          "texture": "#lattice"
+        }
+      }
+    }
+  ]
+}
