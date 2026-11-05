@@ -3,9 +3,15 @@ package com.reiko.signaltower.client;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.item.ItemProperties;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.block.RedStoneWireBlock;
@@ -13,6 +19,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
@@ -27,7 +34,29 @@ public final class SignalTowerClient {
         // Adds a "Config" button for this mod in the Mods list.
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         modEventBus.addListener(SignalTowerClient::registerBlockColors);
+        modEventBus.addListener(SignalTowerClient::clientSetup);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
+    }
+
+    /**
+     * The remotes' item models switch on a "light" property: 0 = idle, 0.5 = green (heard), 1 = red
+     * (nobody heard). See the overrides in models/item/remote_control.json and multi_remote.json.
+     */
+    private static void clientSetup(FMLClientSetupEvent event) {
+        ResourceLocation light = ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "light");
+        event.enqueueWork(() -> {
+            ItemProperties.register(ModRegistry.REMOTE_CONTROL.get(), light, SignalTowerClient::remoteLight);
+            ItemProperties.register(ModRegistry.MULTI_REMOTE.get(), light, SignalTowerClient::remoteLight);
+        });
+    }
+
+    private static float remoteLight(ItemStack stack, ClientLevel level, LivingEntity entity, int seed) {
+        RemoteLight light = stack.get(ModRegistry.REMOTE_LIGHT.get());
+        ClientLevel clock = level != null ? level : Minecraft.getInstance().level;
+        if (light == null || clock == null || clock.getGameTime() >= light.untilGameTime()) {
+            return 0.0F;
+        }
+        return light.heard() ? 0.5F : 1.0F;
     }
 
     /** Sneak + scroll while holding a Multi-Button Remote picks its button instead of the hotbar slot. */

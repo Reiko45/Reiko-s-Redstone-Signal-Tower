@@ -222,14 +222,25 @@ write(items / "wall_redstone.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("wall_redstone", "item")},
 })
-write(items / "remote_control.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("remote_control", "item")},
-})
-write(items / "multi_remote.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("multi_remote", "item")},
-})
+def remote_models(name):
+    """Base model plus green/red versions, picked by the remote's "light" property after a press."""
+    for variant in ("heard", "missed"):
+        write(items / f"{name}_{variant}.json", {
+            "parent": "minecraft:item/handheld",
+            "textures": {"layer0": tex(f"{name}_{variant}", "item")},
+        })
+    write(items / f"{name}.json", {
+        "parent": "minecraft:item/handheld",
+        "textures": {"layer0": tex(name, "item")},
+        "overrides": [
+            {"predicate": {f"{MOD}:light": 0.5}, "model": f"{MOD}:item/{name}_heard"},
+            {"predicate": {f"{MOD}:light": 1.0}, "model": f"{MOD}:item/{name}_missed"},
+        ],
+    })
+
+
+remote_models("remote_control")
+remote_models("multi_remote")
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -311,6 +322,10 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.remote_pulse": "%s pulse sent on frequency %s (reach %s blocks)",
     f"message.{MOD}.remote_on": "Frequency %s switched ON (reach %s blocks)",
     f"message.{MOD}.remote_off": "Frequency %s switched OFF",
+    f"message.{MOD}.remote_result": "%s | %s",
+    f"message.{MOD}.remote_heard_one": "Heard by 1 receiver",
+    f"message.{MOD}.remote_heard_many": "Heard by %s receivers",
+    f"message.{MOD}.remote_not_heard": "No receiver in range",
 
     f"tooltip.{MOD}.frequency": "Frequency: %s",
     f"tooltip.{MOD}.tune_hint": "Use a Frequency Tuner to change its frequency.",

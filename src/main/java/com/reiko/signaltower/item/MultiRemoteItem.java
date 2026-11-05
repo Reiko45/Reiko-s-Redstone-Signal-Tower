@@ -50,7 +50,7 @@ public class MultiRemoteItem extends Item {
     /** Presses button {@code index} (0-3) from where the player is standing. */
     public static void pressButton(ServerLevel level, Player player, ItemStack stack, int index) {
         RemoteButtons.Button button = getButtons(stack).button(index);
-        Component result = RemoteControlItem.sendSignal(level, player, button.frequency(), button.toggle(), button.pulseTicks());
+        Component result = RemoteControlItem.sendSignal(level, player, stack, button.frequency(), button.toggle(), button.pulseTicks());
         player.displayClientMessage(Component.translatable(KEY + "remote_button", index + 1, result), true);
     }
 
@@ -70,6 +70,12 @@ public class MultiRemoteItem extends Item {
 
     public static Component modeName(boolean toggle) {
         return Component.translatable("tooltip." + SignalTower.MOD_ID + "." + (toggle ? "remote_mode_toggle" : "remote_mode_pulse"));
+    }
+
+    /** Lighting the status light or changing buttons changes the item; don't replay the "pull out" animation. */
+    @Override
+    public boolean shouldCauseReequipAnimation(ItemStack oldStack, ItemStack newStack, boolean slotChanged) {
+        return slotChanged || !ItemStack.isSameItem(oldStack, newStack);
     }
 
     @Override

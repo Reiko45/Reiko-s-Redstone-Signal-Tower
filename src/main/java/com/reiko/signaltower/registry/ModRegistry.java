@@ -13,6 +13,7 @@ import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
+import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.core.component.DataComponentType;
@@ -58,6 +59,11 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("remote_pulse_ticks", builder -> builder
                     .persistent(Codec.intRange(PulseLength.MIN_TICKS, PulseLength.MAX_TICKS))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A remote's status light after a press. Synced to the client so the model can change; never saved. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<RemoteLight>> REMOTE_LIGHT =
+            DATA_COMPONENTS.registerComponentType("remote_light", builder -> builder
+                    .networkSynchronized(RemoteLight.STREAM_CODEC));
 
     /** The four buttons of a Multi-Button Remote, and which one is selected. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<RemoteButtons>> REMOTE_BUTTONS =

@@ -12,8 +12,10 @@ import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Every transmitter in one dimension, saved with the world.
@@ -25,6 +27,9 @@ import java.util.Map;
  * Remote Controls aren't blocks, so their signals are kept separately: a short <b>pulse</b> per
  * frequency (not saved, it only lasts a second) and a <b>latch</b> per frequency for toggle mode
  * (saved, stays on until any remote on that frequency switches it off).
+ * <p>
+ * Loaded receivers are also tracked (not saved; each one checks in on its first tick), so a remote
+ * can tell its player how many receivers heard a press.
  */
 public final class SignalNetwork extends SavedData {
     private static final String DATA_NAME = SignalTower.MOD_ID + "_network";
@@ -52,6 +57,8 @@ public final class SignalNetwork extends SavedData {
     private final Map<Integer, Long> revisions = new HashMap<>();
     private final Map<Integer, RemoteSignal> pulses = new HashMap<>();
     private final Map<Integer, RemoteSignal> latches = new HashMap<>();
+    private final Map<BlockPos, Integer> receivers = new HashMap<>();
+    private final Map<Integer, Set<BlockPos>> receiversByFrequency = new HashMap<>();
 
     public static SignalNetwork get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
@@ -138,6 +145,52 @@ public final class SignalNetwork extends SavedData {
                 bump(entry.getKey());
             }
         }
+    }
+
+    // ---- Receiver tracking (for the remotes' signal light) ----
+
+    /** A loaded receiver says which frequency it's on. Called on its first tick and when re-tuned. */
+    public void trackReceiver(BlockPos pos, int frequency) {
+        BlockPos key = pos.immutable();
+        Integer previous = receivers.put(key, frequency);
+        if (previous != null && previous != frequency) {
+            removeReceiverFromIndex(key, previous);
+        }
+        receiversByFrequency.computeIfAbsent(frequency, f -> new HashSet<>()).add(key);
+    }
+
+    /** A receiver was broken or its chunk unloaded. */
+    public void untrackReceiver(BlockPos pos) {
+        Integer previous = receivers.remove(pos);
+        if (previous != null) {
+            removeReceiverFromIndex(pos, previous);
+        }
+    }
+
+    private void removeReceiverFromIndex(BlockPos pos, int frequency) {
+        Set<BlockPos> onFrequency = receiversByFrequency.get(frequency);
+        if (onFrequency != null) {
+            onFrequency.remove(pos);
+            if (onFrequency.isEmpty()) {
+                receiversByFrequency.remove(frequency);
+            }
+        }
+    }
+
+    /** How many loaded receivers on {@code frequency} are within {@code reach} (horizontally) of {@code origin}. */
+    public int countReceivers(int frequency, BlockPos origin, int reach) {
+        Set<BlockPos> onFrequency = receiversByFrequency.get(frequency);
+        if (onFrequency == null) {
+            return 0;
+        }
+        RemoteSignal area = new RemoteSignal(origin, reach, 0);
+        int count = 0;
+        for (BlockPos pos : onFrequency) {
+            if (area.reaches(pos)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     // ---- Receivers ----

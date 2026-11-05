@@ -2,5 +2,19 @@
   "parent": "minecraft:item/handheld",
   "textures": {
     "layer0": "reikos_signal_tower:item/remote_control"
-  }
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "reikos_signal_tower:light": 0.5
+      },
+      "model": "reikos_signal_tower:item/remote_control_heard"
+    },
+    {
+      "predicate": {
+        "reikos_signal_tower:light": 1.0
+      },
+      "model": "reikos_signal_tower:item/remote_control_missed"
+    }
+  ]
 }

@@ -44,6 +44,9 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Sneak + right-click a transmitter or receiver: copy its frequency.
 - Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
 - Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
+- **Signal light:** after each press, the light on the remote shows **green** for 2 seconds if at least one receiver on that frequency was in range, or **red** if none was. The message also says how many receivers heard it. This works on both remotes.
+
+![The remote's light: off, green after a press a receiver heard, red after a press nobody heard, then off again](docs/images/remote-light.png)
 
 ![The Remote Control screen](docs/images/remote-screen.png)
 
@@ -148,6 +151,7 @@ src/main/java/com/reiko/signaltower/
   item/MultiRemoteItem.java              4-button remote
   item/RemoteButtons.java                the 4 buttons' settings (data component)
   item/PulseLength.java                  pulse length presets, limits and labels
+  item/RemoteLight.java                  the remotes' green/red status light after a press
   network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
   network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
@@ -196,7 +200,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 20. remote button settings are always tidied up (4 buttons, valid selection and frequencies);
 21. a Remote Control set to a 5-second pulse is still on after 3 seconds, then turns off;
 22. a Multi-Button Remote button set to 0.25 seconds turns off well before a normal 1-second pulse would;
-23. pulse length presets step and wrap correctly and stay within 0.1–10 seconds.
+23. pulse length presets step and wrap correctly and stay within 0.1–10 seconds;
+24. a remote's light goes green when a receiver in range heard the press;
+25. it goes red when receivers are only out of range or on another frequency;
+26. a re-tuned receiver stops counting for its old frequency;
+27. a broken receiver stops counting straight away.
 
 ## License
 

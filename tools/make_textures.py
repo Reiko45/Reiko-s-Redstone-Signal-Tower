@@ -280,7 +280,14 @@ def wall_redstone_item():
     return img
 
 
-def remote_item():
+LIGHTS = {
+    "idle": ((34, 52, 38, 255), (50, 74, 54, 255)),       # unlit
+    "heard": ((70, 210, 70, 255), (190, 255, 170, 255)),  # green: a receiver heard the press
+    "missed": ((200, 30, 20, 255), (255, 140, 120, 255)), # red: nobody in range
+}
+
+
+def remote_item(light="idle"):
     """A garage-door style remote: dark fob, one big red button, a status light and a key ring."""
     img = blank()
     px = img.load()
@@ -300,8 +307,11 @@ def remote_item():
         px[5, y] = body_l
     for x in range(5, 11):
         px[x, 4] = body_l
-    # Status light
-    px[10, 5] = (120, 230, 110, 255)
+    # Status light (2x2, top right)
+    base, shine = LIGHTS[light]
+    for (x, y) in [(9, 4), (10, 4), (9, 5), (10, 5)]:
+        px[x, y] = base
+    px[9, 4] = shine
     # Big round red button
     red_d, red, red_l = (140, 18, 14, 255), (220, 36, 26, 255), (255, 120, 100, 255)
     for (x, y) in [(7, 6), (8, 6), (6, 7), (7, 7), (8, 7), (9, 7), (6, 8), (7, 8), (8, 8), (9, 8), (7, 9), (8, 9)]:
@@ -318,9 +328,9 @@ def remote_item():
     return img
 
 
-def multi_remote_item():
+def multi_remote_item(light="idle"):
     """Like the remote, but with four colored buttons in a 2x2 grid."""
-    img = remote_item()
+    img = remote_item(light)
     px = img.load()
     body = (58, 62, 72, 255)
     for y in range(6, 14):
@@ -355,7 +365,9 @@ blocks = {
     "antenna_tip_on": antenna_tip(True),
 }
 items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
-         "multi_remote": multi_remote_item()}
+         "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),
+         "multi_remote": multi_remote_item(),
+         "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed")}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

@@ -29,6 +29,15 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         seenRevision = -1;
     }
 
+    /** Broken, or its chunk unloaded: stop counting it as a listener. */
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        if (level instanceof ServerLevel serverLevel) {
+            SignalNetwork.get(serverLevel).untrackReceiver(worldPosition);
+        }
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadioReceiverBlockEntity be) {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
@@ -43,6 +52,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         }
         be.timer = RECHECK_INTERVAL;
         be.seenRevision = revision;
+        if (frequency != be.seenFrequency) {
+            network.trackReceiver(pos, frequency); // first tick after loading, or just re-tuned
+        }
         be.seenFrequency = frequency;
 
         int power = network.listen(serverLevel, frequency, pos).power();

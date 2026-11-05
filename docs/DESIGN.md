@@ -37,6 +37,11 @@
   - The single remote keeps it in its own `remote_pulse_ticks` component. Each Multi-Button Remote button has a `pulse_ticks` field, optional in saved data, so older remotes load as 1s.
   - The screens step through the presets in `PulseLength`. Sneak-click steps down.
   - `RemoteControlItem.sendSignal` takes the length and clamps it.
+- **Signal light:**
+  - `SignalNetwork` also tracks loaded receivers by frequency (not saved). A receiver checks in on its first tick and when re-tuned, and checks out in `setRemoved`, which covers both breaking and chunk unload.
+  - On a press, `sendSignal` counts receivers within reach and sets a `remote_light` component (heard + show-until time). It's synced but never saved.
+  - The client registers an item property `reikos_signal_tower:light` (0 off, 0.5 green, 1 red), and the item models' overrides pick the matching texture.
+  - Both remotes override `shouldCauseReequipAnimation`, so the light changing doesn't replay the pull-out animation.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -54,7 +59,7 @@
 
 ## Verified
 
-- 23 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 27 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -63,6 +68,7 @@
 
 ## History
 
+- **v0.8.0:** signal light on both remotes.
 - **v0.7.0:** pulse length setting for both remotes.
 - **v0.6.0:** added the Multi-Button Remote.
 - **v0.5.0:** added the Remote Control.

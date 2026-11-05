@@ -9,6 +9,7 @@ import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
+import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -659,5 +660,83 @@ public final class SignalTowerGameTests {
         if (!condition) {
             throw new GameTestAssertException(message);
         }
+    }
+
+    // ---- Remote signal light ----
+
+    private static void assertLight(GameTestHelper helper, Player player, boolean expectedHeard) {
+        RemoteLight light = player.getMainHandItem().get(ModRegistry.REMOTE_LIGHT.get());
+        if (light == null) {
+            throw new GameTestAssertException("The remote's light didn't turn on after a press");
+        }
+        if (light.heard() != expectedHeard) {
+            throw new GameTestAssertException("Light should be " + (expectedHeard ? "green" : "red"));
+        }
+        if (light.untilGameTime() <= helper.getLevel().getGameTime()) {
+            throw new GameTestAssertException("Light should still be showing right after the press");
+        }
+    }
+
+    /** A receiver in range on the same frequency turns the light green. */
+    @GameTest(template = PLATFORM)
+    public static void remoteLightGreenWhenHeard(GameTestHelper helper) {
+        place(helper, new BlockPos(6, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 601);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 601, false);
+        helper.startSequence()
+                .thenIdle(3) // receivers check in on their first tick
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, true))
+                .thenSucceed();
+    }
+
+    /** Receivers out of reach, or on another frequency, don't count: the light goes red. */
+    @GameTest(template = PLATFORM)
+    public static void remoteLightRedWhenNobodyHears(GameTestHelper helper) {
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(helper.getLevel(), helper.absolutePos(standAt));
+        if (standAt.getX() + reach + 3 > 128) {
+            throw new GameTestAssertException("Reach " + reach + " is too big for the test platform");
+        }
+        place(helper, new BlockPos(standAt.getX() + reach + 3, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 602); // too far
+        place(helper, new BlockPos(5, 1, 1), ModRegistry.RADIO_RECEIVER.get(), 603); // close, but the wrong frequency
+        Player player = playerWithRemote(helper, standAt, 602, false);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, false))
+                .thenSucceed();
+    }
+
+    /** A receiver re-tuned to another frequency stops counting for the old one. */
+    @GameTest(template = PLATFORM)
+    public static void retunedReceiverStopsCounting(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 604);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 604, false);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, true))
+                .thenExecute(() -> setFrequency(helper, rx, 605))
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, false))
+                .thenSucceed();
+    }
+
+    /** A broken receiver stops counting straight away. */
+    @GameTest(template = PLATFORM)
+    public static void brokenReceiverStopsCounting(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 606);
+        Player player = playerWithMultiRemote(helper, RemoteButtons.DEFAULT.withButton(0, new RemoteButtons.Button(606, false)));
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, true))
+                .thenExecute(() -> helper.destroyBlock(rx))
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenExecute(() -> assertLight(helper, player, false))
+                .thenSucceed();
     }
 }
