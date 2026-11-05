@@ -2,6 +2,7 @@ package com.reiko.signaltower.registry;
 
 import com.mojang.serialization.Codec;
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
@@ -18,6 +19,7 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -58,6 +60,17 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** Button-sized receiver. Breaks quickly like a button and gets knocked off by pistons. */
+    public static final DeferredBlock<CompactRadioReceiverBlock> COMPACT_RADIO_RECEIVER = BLOCKS.register("compact_radio_receiver",
+            () -> new CompactRadioReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(0.5F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 3 : 0)));
+
     public static final DeferredBlock<RadioMastBlock> RADIO_MAST = BLOCKS.register("radio_mast",
             () -> new RadioMastBlock(BlockBehaviour.Properties.of()
                     .mapColor(MapColor.METAL)
@@ -72,6 +85,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_transmitter", RADIO_TRANSMITTER);
     public static final DeferredItem<BlockItem> RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> COMPACT_RADIO_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
             ITEMS.registerSimpleBlockItem("radio_mast", RADIO_MAST);
     public static final DeferredItem<FrequencyTunerItem> FREQUENCY_TUNER =
@@ -85,7 +100,8 @@ public final class ModRegistry {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER_BE =
             BLOCK_ENTITIES.register("radio_receiver",
-                    () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new, RADIO_RECEIVER.get()).build(null));
+                    () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
+                            RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get()).build(null));
 
     public static void register(IEventBus modEventBus) {
         DATA_COMPONENTS.register(modEventBus);

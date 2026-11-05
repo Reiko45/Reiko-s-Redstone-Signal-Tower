@@ -48,7 +48,11 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         int power = network.listen(serverLevel, frequency, pos).power();
         if (state.getValue(RadioReceiverBlock.POWER) != power) {
             // UPDATE_ALL also notifies neighbors, so wires and lamps next to us react right away.
-            serverLevel.setBlock(pos, state.setValue(RadioReceiverBlock.POWER, power), Block.UPDATE_ALL);
+            BlockState newState = state.setValue(RadioReceiverBlock.POWER, power);
+            serverLevel.setBlock(pos, newState, Block.UPDATE_ALL);
+            if (newState.getBlock() instanceof RadioReceiverBlock receiver) {
+                receiver.afterOutputChanged(serverLevel, pos, newState);
+            }
         }
     }
 }

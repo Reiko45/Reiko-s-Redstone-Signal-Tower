@@ -1,0 +1,852 @@
+{
+  "variants": {
+    "face=floor,facing=north,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver"
+    },
+    "face=floor,facing=north,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=north,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on"
+    },
+    "face=floor,facing=east,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "y": 90
+    },
+    "face=floor,facing=east,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=east,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 90
+    },
+    "face=floor,facing=south,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "y": 180
+    },
+    "face=floor,facing=south,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=south,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 180
+    },
+    "face=floor,facing=west,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "y": 270
+    },
+    "face=floor,facing=west,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=floor,facing=west,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "y": 270
+    },
+    "face=wall,facing=north,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 90
+    },
+    "face=wall,facing=north,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=north,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90
+    },
+    "face=wall,facing=east,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=south,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=west,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 90,
+      "y": 270
+    },
+    "face=ceiling,facing=north,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=north,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 180
+    },
+    "face=ceiling,facing=east,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=east,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 270
+    },
+    "face=ceiling,facing=south,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=south,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180
+    },
+    "face=ceiling,facing=west,power=0": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=1": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=2": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=3": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=4": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=5": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=6": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=7": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=8": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=9": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=10": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=11": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=12": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=13": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=14": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    },
+    "face=ceiling,facing=west,power=15": {
+      "model": "reikos_signal_tower:block/compact_radio_receiver_on",
+      "x": 180,
+      "y": 90
+    }
+  }
+}

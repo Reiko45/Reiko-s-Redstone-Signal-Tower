@@ -58,6 +58,12 @@ public class RadioReceiverBlock extends RadioBlock {
         return state.getValue(POWER);
     }
 
+    /**
+     * Called on the server right after the output power changed (neighbours next to this block have
+     * already been told). Lets the compact receiver also update the block it is attached to.
+     */
+    public void afterOutputChanged(Level level, BlockPos pos, BlockState state) {}
+
     @Override
     protected Component describe(ServerLevel level, BlockPos pos, BlockState state) {
         int frequency = level.getBlockEntity(pos) instanceof RadioReceiverBlockEntity rx ? rx.getFrequency() : 0;

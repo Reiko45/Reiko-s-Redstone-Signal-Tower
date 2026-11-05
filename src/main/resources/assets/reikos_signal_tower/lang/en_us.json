@@ -3,6 +3,8 @@
   "block.reikos_signal_tower.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches.",
   "block.reikos_signal_tower.radio_receiver": "Radio Receiver",
   "block.reikos_signal_tower.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
+  "block.reikos_signal_tower.compact_radio_receiver": "Compact Radio Receiver",
+  "block.reikos_signal_tower.compact_radio_receiver.tooltip": "A button-sized receiver. Sticks to walls, floors and ceilings, and powers the block it's on.",
   "block.reikos_signal_tower.radio_mast": "Radio Mast",
   "block.reikos_signal_tower.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
   "item.reikos_signal_tower.frequency_tuner": "Frequency Tuner",

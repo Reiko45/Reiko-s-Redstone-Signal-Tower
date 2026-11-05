@@ -106,6 +106,52 @@ for lit in (False, True):
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
 
 
+def compact_receiver_model(lit):
+    """Same shape and UV layout as a vanilla button (lying on the floor, front facing up)."""
+    t = "#texture"
+    return {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": tex("radio_receiver_side"), "texture": tex("compact_radio_receiver" + ("_on" if lit else ""))},
+        "elements": [{
+            "from": [5, 0, 6], "to": [11, 2, 10],
+            "faces": {
+                "down": {"uv": [5, 6, 11, 10], "texture": t, "cullface": "down"},
+                "up": {"uv": [5, 6, 11, 10], "texture": t},
+                "north": {"uv": [5, 14, 11, 16], "texture": t},
+                "south": {"uv": [5, 14, 11, 16], "texture": t},
+                "west": {"uv": [6, 14, 10, 16], "texture": t},
+                "east": {"uv": [6, 14, 10, 16], "texture": t},
+            },
+        }],
+    }
+
+
+for lit in (False, True):
+    write(models / ("compact_radio_receiver" + ("_on" if lit else "") + ".json"), compact_receiver_model(lit))
+
+# Inventory version: stood up on its edge so the front shows, like a wall-mounted one.
+write(models / "compact_radio_receiver_inventory.json", {
+    "parent": "minecraft:block/block",
+    "display": {
+        # It's tiny, so draw it bigger than a normal block in inventories and item frames.
+        "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [1.2, 1.2, 1.2]},
+        "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]},
+    },
+    "textures": {"particle": tex("radio_receiver_side"), "texture": tex("compact_radio_receiver")},
+    "elements": [{
+        "from": [5, 6, 7], "to": [11, 10, 9],
+        "faces": {
+            "north": {"uv": [5, 6, 11, 10], "texture": "#texture"},
+            "south": {"uv": [5, 6, 11, 10], "texture": "#texture"},
+            "up": {"uv": [5, 14, 11, 16], "texture": "#texture"},
+            "down": {"uv": [5, 14, 11, 16], "texture": "#texture"},
+            "west": {"uv": [6, 14, 8, 16], "texture": "#texture", "rotation": 90},
+            "east": {"uv": [6, 14, 8, 16], "texture": "#texture", "rotation": 90},
+        },
+    }],
+})
+
+
 def post(x, z):
     return {"from": [x, 0, z], "to": [x + 2, 16, z + 2],
             "faces": {f: {"texture": "#post"} for f in SIDES + ["up", "down"]}}
@@ -143,6 +189,7 @@ write(models / "radio_mast.json", {
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
+write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -158,6 +205,19 @@ write(states / "radio_transmitter.json", {"variants": {
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+BUTTON_ROTATIONS = {
+    ("floor", "north"): {}, ("floor", "east"): {"y": 90}, ("floor", "south"): {"y": 180}, ("floor", "west"): {"y": 270},
+    ("wall", "north"): {"x": 90}, ("wall", "east"): {"x": 90, "y": 90},
+    ("wall", "south"): {"x": 90, "y": 180}, ("wall", "west"): {"x": 90, "y": 270},
+    ("ceiling", "north"): {"x": 180, "y": 180}, ("ceiling", "east"): {"x": 180, "y": 270},
+    ("ceiling", "south"): {"x": 180}, ("ceiling", "west"): {"x": 180, "y": 90},
+}
+compact_variants = {}
+for (face, facing), rot in BUTTON_ROTATIONS.items():
+    for p in range(16):
+        variant = {"model": f"{MOD}:block/compact_radio_receiver" + ("_on" if p > 0 else ""), **rot}
+        compact_variants[f"face={face},facing={facing},power={p}"] = variant
+write(states / "compact_radio_receiver.json", {"variants": compact_variants})
 write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radio_mast"}}})
 
 # ---------------------------------------------------------------- lang
@@ -167,6 +227,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches.",
     f"block.{MOD}.radio_receiver": "Radio Receiver",
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
+    f"block.{MOD}.compact_radio_receiver": "Compact Radio Receiver",
+    f"block.{MOD}.compact_radio_receiver.tooltip": "A button-sized receiver. Sticks to walls, floors and ceilings, and powers the block it's on.",
     f"block.{MOD}.radio_mast": "Radio Mast",
     f"block.{MOD}.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
     f"item.{MOD}.frequency_tuner": "Frequency Tuner",
@@ -225,6 +287,18 @@ recipes = {
         "G": "minecraft:glass_pane", "R": "minecraft:redstone"}, "frequency_tuner", category="equipment"),
         "minecraft:redstone"),
 }
+def shapeless(ingredient, result):
+    return {
+        "type": "minecraft:crafting_shapeless",
+        "category": "redstone",
+        "ingredients": [{"item": f"{MOD}:{ingredient}"}],
+        "result": {"count": 1, "id": f"{MOD}:{result}"},
+    }
+
+
+recipes["compact_radio_receiver"] = (shapeless("radio_receiver", "compact_radio_receiver"), f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_compact"] = (shapeless("compact_radio_receiver", "radio_receiver"), f"{MOD}:compact_radio_receiver")
+
 for name, (recipe, trigger) in recipes.items():
     write(DATA / "recipe" / f"{name}.json", recipe)
     # Unlocks the recipe in the recipe book once the player picks up the trigger item.
@@ -242,7 +316,7 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "compact_radio_receiver", "radio_mast"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name != "radio_mast":
         # Copy the block's frequency onto the dropped item so it keeps its tuning.
@@ -265,7 +339,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_mast"]
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

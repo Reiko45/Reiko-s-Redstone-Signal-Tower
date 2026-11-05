@@ -10,8 +10,11 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 |---|---|
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
+| **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
+
+![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
 
 ## How to use it
 
@@ -31,6 +34,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Sneak + right-click a transmitter or receiver: copy its frequency into the tuner.
 
 **Other details:**
+- Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
 - Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach.
 - Breaking a transmitter or receiver keeps its frequency on the dropped item, so you can move it without re-tuning.
 - One transmitter can feed any number of receivers. A receiver that hears several transmitters on its frequency outputs the strongest.
@@ -69,6 +73,8 @@ L = Lightning Rod   E = Ender Pearl   T = Redstone Torch   P = Redstone Repeater
 I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 ```
 
+**Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
+
 ## Building and running
 
 You need **Java 21**. If Gradle can't find it, it downloads one automatically.
@@ -96,6 +102,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
+  block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
@@ -130,7 +137,9 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 4. a receiver just out of reach goes live once the transmitter is raised 4 blocks on masts;
 5. masts carry the signal up from any point in the column, and a gap in the column cuts it;
 6. the tuner tunes a block on right-click and copies a block's frequency on sneak + right-click;
-7. a broken transmitter drops an item that keeps its frequency.
+7. a broken transmitter drops an item that keeps its frequency;
+8. a compact receiver on a wall powers that wall block, lighting a lamp on the far side;
+9. removing the wall knocks the compact receiver off, and its dropped item keeps its frequency.
 
 ## License
 

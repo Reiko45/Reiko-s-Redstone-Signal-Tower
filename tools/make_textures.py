@@ -230,7 +230,38 @@ def tuner_item():
     return img
 
 
+def compact_receiver(lit):
+    """Button-sized receiver. The model reads the front from uv 5..11 x 6..10 and the edges from
+    rows 14-15, the same layout as vanilla button textures."""
+    r = ON if lit else OFF
+    # Fill the whole texture so no face can ever sample a transparent (black) pixel.
+    img = blank(M)
+    px = img.load()
+    for x in range(5, 11):
+        px[x, 6] = H
+        px[x, 9] = D
+    for y in range(6, 10):
+        px[5, y] = L
+        px[10, y] = O
+    px[5, 6] = H
+    px[10, 9] = O
+    # Indicator light and a little signal-strength bar graph
+    px[6, 7] = r[2]
+    px[6, 8] = r[1]
+    for (x, y) in [(8, 8), (9, 7), (9, 8)]:
+        px[x, y] = r[1] if lit else D
+    px[7, 7] = px[7, 8] = D
+    px[8, 7] = M2
+    # Edges
+    for x in range(0, 16):
+        px[x, 14] = L
+        px[x, 15] = D
+    return img
+
+
 blocks = {
+    "compact_radio_receiver": compact_receiver(False),
+    "compact_radio_receiver_on": compact_receiver(True),
     "radio_transmitter_side": transmitter_side(False),
     "radio_transmitter_side_on": transmitter_side(True),
     "radio_transmitter_top": top(False, receiver=False),

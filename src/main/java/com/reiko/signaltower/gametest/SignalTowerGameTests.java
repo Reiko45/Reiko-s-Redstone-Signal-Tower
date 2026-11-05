@@ -1,6 +1,7 @@
 package com.reiko.signaltower.gametest;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
@@ -20,6 +21,9 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RedstoneLampBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -248,5 +252,58 @@ public final class SignalTowerGameTests {
                 throw new GameTestAssertException("No dropped transmitter with frequency 31337");
             }
         });
+    }
+
+    /** A compact receiver stuck on a wall powers that wall block, which lights a lamp on the far side. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void compactReceiverPowersThroughItsWall(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos wall = new BlockPos(6, 1, 1);
+        BlockPos compact = wall.west();  // on the west face of the wall, pointing west
+        BlockPos lamp = wall.east();     // touching the wall only, not the receiver
+        helper.setBlock(tx, ModRegistry.RADIO_TRANSMITTER.get());
+        setFrequency(helper, tx, 110);
+        helper.setBlock(wall, Blocks.STONE);
+        helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
+        helper.setBlock(compact, compactOnWall(Direction.WEST));
+        setFrequency(helper, compact, 110);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, false))
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, compact, 15))
+                .thenWaitUntil(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, true))
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.AIR))
+                .thenWaitUntil(() -> helper.assertBlockProperty(lamp, RedstoneLampBlock.LIT, false))
+                .thenSucceed();
+    }
+
+    /** Removing the wall knocks the compact receiver off, and the dropped item keeps its frequency. */
+    @GameTest(template = PLATFORM)
+    public static void compactReceiverPopsOffAndKeepsFrequency(GameTestHelper helper) {
+        BlockPos wall = new BlockPos(3, 1, 1);
+        BlockPos compact = wall.west();
+        helper.setBlock(wall, Blocks.STONE);
+        helper.setBlock(compact, compactOnWall(Direction.WEST));
+        setFrequency(helper, compact, 24680);
+        helper.setBlock(wall, Blocks.AIR);
+
+        helper.succeedWhen(() -> {
+            helper.assertBlockNotPresent(ModRegistry.COMPACT_RADIO_RECEIVER.get(), compact);
+            boolean found = helper.getEntities(EntityType.ITEM).stream()
+                    .map(ItemEntity::getItem)
+                    .anyMatch(stack -> stack.is(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get())
+                            && Integer.valueOf(24680).equals(stack.get(ModRegistry.FREQUENCY.get())));
+            if (!found) {
+                throw new GameTestAssertException("No dropped compact receiver with frequency 24680");
+            }
+        });
+    }
+
+    private static BlockState compactOnWall(Direction pointing) {
+        return ModRegistry.COMPACT_RADIO_RECEIVER.get().defaultBlockState()
+                .setValue(CompactRadioReceiverBlock.FACE, AttachFace.WALL)
+                .setValue(CompactRadioReceiverBlock.FACING, pointing);
     }
 }
