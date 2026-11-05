@@ -2,6 +2,7 @@ package com.reiko.signaltower.network;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.RemoteControlItem;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -43,6 +44,8 @@ public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean 
             FrequencyTunerItem.setFrequency(stack, payload.frequency());
             RemoteControlItem.setToggleMode(stack, payload.toggleMode());
             RemoteControlItem.setPulseTicks(stack, payload.pulseTicks());
+        } else if (stack.getItem() instanceof PagerItem) {
+            PagerItem.setFrequency(stack, payload.frequency());
         }
     }
 }

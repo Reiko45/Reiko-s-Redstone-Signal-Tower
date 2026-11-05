@@ -359,6 +359,43 @@ def multi_remote_button(index):
     return img
 
 
+def pager_item(on=False):
+    """A pocket pager: black body, a stubby antenna, a belt-clip ridge, a small LCD (lit green with
+    a message while its frequency is on) and three keys."""
+    img = blank()
+    px = img.load()
+    o, body, body_l = (20, 22, 26, 255), (44, 47, 54, 255), (74, 79, 90, 255)
+    # Antenna stub, top left
+    for y in (2, 3, 4):
+        px[3, y] = (110, 114, 124, 255)
+    px[3, 2] = (150, 154, 164, 255)
+    # Body with rounded corners
+    for y in range(5, 14):
+        for x in range(2, 14):
+            if (y in (5, 13)) and x in (2, 13):
+                continue
+            px[x, y] = o if (x in (2, 13) or y in (5, 13)) else body
+    for x in range(3, 13):
+        px[x, 6] = body_l
+    # LCD, 8x3
+    lcd_bg = (130, 225, 115, 255) if on else (46, 64, 48, 255)
+    lcd_px = (24, 60, 26, 255) if on else (40, 54, 42, 255)
+    for y in range(7, 10):
+        for x in range(4, 12):
+            px[x, y] = lcd_bg
+    if on:
+        # One short line of "text" across the middle of the screen
+        for x in (5, 6, 8, 9, 10):
+            px[x, 8] = lcd_px
+    # Status LED, right of the LCD
+    px[12, 7] = (255, 90, 60, 255) if on else (70, 40, 38, 255)
+    # Three keys
+    for x in (4, 5, 7, 8, 10, 11):
+        px[x, 11] = (150, 156, 168, 255)
+        px[x, 12] = (96, 100, 110, 255)
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -380,7 +417,8 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),
          "multi_remote": multi_remote_item(),
          "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
-         **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)}}
+         **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
+         "pager": pager_item(), "pager_on": pager_item(True)}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

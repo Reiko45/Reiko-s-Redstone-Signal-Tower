@@ -75,10 +75,12 @@ public final class SignalTower {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
+            event.accept(ModRegistry.PAGER.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
+            event.accept(ModRegistry.PAGER.get());
         }
     }
 }

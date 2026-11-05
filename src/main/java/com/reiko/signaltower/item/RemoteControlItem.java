@@ -165,7 +165,8 @@ public class RemoteControlItem extends Item {
             result = Component.translatable(key + "pulse", PulseLength.format(ticks), frequency, reach);
         }
 
-        int heardBy = network.countReceivers(frequency, coverage);
+        // Pagers in players' pockets count as receivers too.
+        int heardBy = network.countReceivers(frequency, coverage) + PagerItem.countPagers(level, frequency, coverage);
         remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(heardBy > 0, level.getGameTime() + RemoteLight.SHOW_TICKS));
         Component heard = heardBy == 0
                 ? Component.translatable(key + "not_heard").withStyle(ChatFormatting.RED)

@@ -3,6 +3,7 @@ package com.reiko.signaltower.client;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -48,6 +49,9 @@ public final class SignalTowerClient {
         event.enqueueWork(() -> {
             ItemProperties.register(ModRegistry.REMOTE_CONTROL.get(), light, SignalTowerClient::remoteLight);
             ItemProperties.register(ModRegistry.MULTI_REMOTE.get(), light, SignalTowerClient::remoteLight);
+            // The pager's screen lights up while its frequency is on.
+            ItemProperties.register(ModRegistry.PAGER.get(), ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "pager_on"),
+                    (stack, level, entity, seed) -> PagerItem.lastSignal(stack) > 0 ? 1.0F : 0.0F);
         });
     }
 

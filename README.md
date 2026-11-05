@@ -15,6 +15,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
+| **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
@@ -72,6 +73,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ![The Multi-Button Remote's tooltip, with each named button in its color](docs/images/multi-remote-tooltip.png)
 
+**Radio Pager:**
+- Keep it anywhere in your inventory (hotbar, backpack slots or off-hand). When its frequency turns on where you are, it beeps three times and shows "Radio Pager: frequency 5 is ON (strength 15)". "Where you are" means inside the reach of a transmitter on that frequency, or of a remote press (including towers relaying it).
+- It alerts once each time the signal turns on, not again while it stays on. Its little screen glows green while the signal is on, and the tooltip shows the live status.
+- Rename it in an anvil and the alert uses that name: "Front Door: frequency 5 is ON".
+- Right-click: switch the sound on or off. With the sound off it still shows the message.
+- Sneak + right-click the air: change its frequency. Sneak + right-click a transmitter or receiver: copy its frequency.
+- Pagers count toward a remote's "Heard by" number and signal light, so a doorbell press shows green when only your pager hears it. The locator never shows pagers, so it can't be used to find players.
+- The beep is only heard by the pager's owner.
+
+![Two pagers going off: one from a remote press, one renamed "Tower Alarm" from a tower, with its tooltip](docs/images/pager.png)
+
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
 - Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach.
@@ -124,6 +136,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Multi-Button Remote:** a Remote Control plus 3 Stone Buttons, in any arrangement in the crafting grid.
 
+**Radio Pager:** a Compact Radio Receiver, a Note Block and an Iron Ingot, in any arrangement in the crafting grid.
+
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
 
 ## Building and running
@@ -162,6 +176,7 @@ src/main/java/com/reiko/signaltower/
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
+  item/PagerItem.java                    pocket receiver that beeps when its frequency turns on
   item/RemoteButtons.java                the 4 buttons' settings (data component), colors
   item/PulseLength.java                  pulse length presets, limits and labels
   item/RemoteLight.java                  the remotes' green/red status light after a press
@@ -238,7 +253,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 42. the locator and the light count receivers that only a tower reaches;
 43. buttons default to red, lime, blue and yellow, and clicking goes through all 16 dye colors both ways;
 44. button colors survive saving and network sync, and remotes saved before colors existed load with the defaults;
-45. the item's button layers are tinted with each button's color, labels use it, and every color stays readable on a tooltip.
+45. the item's button layers are tinted with each button's color, labels use it, and every color stays readable on a tooltip;
+46. a pager in the inventory alerts once when a transmitter in reach turns on (frequency and strength in the message), starts beeping, goes quiet, and alerts again next time;
+47. a pager hears a Remote Control press made near its owner;
+48. a powered transmitter out of reach leaves the pager quiet;
+49. a renamed pager uses its name in the alert, and a silenced one shows the message without beeping;
+50. pagers count toward a remote's "Heard by" only when in range and on that frequency, and re-tuning re-arms the alert.
 
 ## License
 

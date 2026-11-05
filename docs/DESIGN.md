@@ -50,6 +50,12 @@
   - The item model has 5 layers (the vanilla maximum): the body (with the status light) and one white-and-grey button per layer 1-4. `MultiRemoteItem.tintColor` (registered in `RegisterColorHandlersEvent.Item`) multiplies each with its button's dye color, so the shading is baked into the greys. The green/red light models use the same button layers.
   - `Button.label` draws the name in `RemoteButtons.textColor`: the dye's color, lightened just enough for dark dyes to stay readable on tooltips.
   - The keypad has a color column: a button with the colored square drawn over it in `render`, click for the next dye, sneak-click for the previous one, and a tooltip naming the color.
+- **Radio Pager:**
+  - `PagerItem.inventoryTick` runs every tick on the server for each pager in a player's inventory (including off-hand and armor slots) and calls `checkSignal`: `SignalNetwork.listen` at the player's block position, the same rule as a receiver there. Every tick, so even a 0.1s remote pulse is caught.
+  - The last strength is kept in a `pager_signal` component (saved, so reloading with the signal on doesn't re-alert; synced, so the client's `pager_on` item property can light the screen). Only a change from 0 to more than 0 alerts.
+  - An alert shows an action-bar message (the anvil name if it has one) and plays `NOTE_BLOCK_BIT` with `ServerPlayer.playNotifySound`, so only the owner hears it. The other two beeps come from a `pager_beeps` component (synced, never saved), one every 4 ticks. `pager_silent` turns the beeps off.
+  - Re-tuning (`PagerItem.setFrequency`, used by the screen packet and by copying) clears the stored signal, so the new frequency alerts if it's already on.
+  - `RemoteControlItem.sendSignal` adds `PagerItem.countPagers` (pagers on that frequency carried by players inside the coverage) to "Heard by". The locator doesn't include pagers, so it can't track players.
 - **Locator:**
   - An open remote screen sends `RemoteScanRequestPayload` (up to 4 frequencies) every 20 ticks, or sooner after typing. The server only answers players holding a remote.
   - It uses the receiver tracking (`SignalNetwork.scanReceivers`): count within reach, and nearest within 2× reach, with distance and 8-way compass direction.
@@ -79,17 +85,19 @@
 
 ## Verified
 
-- 45 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 50 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - a pager in the hotbar goes off from a Multi-Button Remote press (the remote's light goes green from the pager alone) and a renamed one when the tower next to the player is powered; each screen lights while its signal is on; the sound switch and frequency screen work;
   - colored buttons show on the remote in hand and in the hotbar, change as soon as the keypad saves, and keep working with the status light; names show in their colors in the tooltip and press message;
   - standing at the foot of a 30-mast tower, the remote screen counts a receiver 150 blocks away as in range ("plus 1 tower relaying"), and a toggle press lights its lamp.
 
 ## History
 
+- **v0.13.0:** added the Radio Pager.
 - **v0.12.0:** button colors on the Multi-Button Remote.
 - **v0.11.0:** Radio Transmitters relay remote presses (remote range boost).
 - **v0.10.0:** remote locator.

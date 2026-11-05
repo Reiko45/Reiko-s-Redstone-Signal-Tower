@@ -7,6 +7,7 @@ import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
@@ -16,6 +17,7 @@ import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -43,6 +45,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.mojang.serialization.JsonOps;
 import io.netty.buffer.Unpooled;
@@ -1173,6 +1176,142 @@ public final class SignalTowerGameTests {
             double brightness = (0.299 * ((rgb >> 16) & 0xFF) + 0.587 * ((rgb >> 8) & 0xFF) + 0.114 * (rgb & 0xFF)) / 255.0;
             check(brightness >= 0.39, dye + " labels would be too dark to read on a tooltip");
         }
+        helper.succeed();
+    }
+
+    // ---- Radio Pager ----
+
+    private static Player mockPlayerAt(GameTestHelper helper, BlockPos standAt) {
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(standAt));
+        player.moveTo(feet.x, feet.y, feet.z);
+        return player;
+    }
+
+    /** Puts a pager on {@code frequency} in the player's inventory (not their hand) and returns it. */
+    private static ItemStack pagerFor(Player player, int frequency) {
+        ItemStack pager = new ItemStack(ModRegistry.PAGER.get());
+        PagerItem.setFrequency(pager, frequency);
+        player.getInventory().setItem(5, pager);
+        return player.getInventory().getItem(5);
+    }
+
+    /**
+     * A pager in the inventory alerts once when a transmitter in reach turns on, says which frequency
+     * and how strong, starts beeping, goes quiet when the signal stops, and alerts again next time.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void pagerAlertsWhenSignalTurnsOn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(4, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 950);
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 1));
+        ItemStack pager = pagerFor(player, 950);
+        AtomicReference<Component> alert = new AtomicReference<>();
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> check(PagerItem.checkSignal(level, player, pager) == null && PagerItem.lastSignal(pager) == 0,
+                        "The pager should be quiet before the transmitter is powered"))
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> {
+                    Component got = PagerItem.checkSignal(level, player, pager);
+                    if (got != null) alert.set(got);
+                    check(alert.get() != null, "No alert yet");
+                })
+                .thenExecute(() -> {
+                    check(PagerItem.lastSignal(pager) == 15, "The pager should remember strength 15");
+                    check(pager.getOrDefault(ModRegistry.PAGER_BEEPS.get(), 0) == PagerItem.BEEPS - 1, "The pager should start beeping");
+                    var message = (TranslatableContents) alert.get().getContents();
+                    check(message.getKey().endsWith("pager_alert") && Integer.valueOf(950).equals(message.getArgs()[1])
+                            && Integer.valueOf(15).equals(message.getArgs()[2]), "The alert should name the frequency and strength");
+                    check(PagerItem.checkSignal(level, player, pager) == null, "It should only alert once while the signal stays on");
+                })
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.AIR))
+                .thenWaitUntil(() -> {
+                    PagerItem.checkSignal(level, player, pager);
+                    check(PagerItem.lastSignal(pager) == 0, "The pager should go quiet");
+                })
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> check(PagerItem.checkSignal(level, player, pager) != null, "It should alert again next time"))
+                .thenSucceed();
+    }
+
+    /** A pager hears a Remote Control press made near its owner. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void pagerHearsRemotePress(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Player presser = playerWithRemote(helper, new BlockPos(1, 1, 1), 951, false);
+        Player holder = mockPlayerAt(helper, new BlockPos(6, 1, 1));
+        ItemStack pager = pagerFor(holder, 951);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, presser))
+                .thenWaitUntil(() -> check(PagerItem.checkSignal(level, holder, pager) != null, "The pager should alert"))
+                .thenSucceed();
+    }
+
+    /** A powered transmitter whose reach doesn't cover the player leaves the pager quiet. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void pagerOutOfReachStaysQuiet(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(level, helper.absolutePos(standAt));
+        BlockPos tx = new BlockPos(standAt.getX() + reach + 3, 1, 1);
+        if (tx.getX() > 128) {
+            throw new GameTestAssertException("Reach " + reach + " is too big for the test platform");
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 952);
+        helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK);
+        Player player = mockPlayerAt(helper, standAt);
+        ItemStack pager = pagerFor(player, 952);
+        helper.startSequence()
+                .thenIdle(10)
+                .thenExecute(() -> check(PagerItem.checkSignal(level, player, pager) == null && PagerItem.lastSignal(pager) == 0,
+                        "A transmitter out of reach shouldn't set the pager off"))
+                .thenSucceed();
+    }
+
+    /** A pager renamed in an anvil uses its name in the alert, and in silent mode it shows the message without beeping. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void pagerUsesItsNameAndCanBeSilenced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(4, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 953);
+        helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK);
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 1));
+        ItemStack pager = pagerFor(player, 953);
+        pager.set(DataComponents.CUSTOM_NAME, Component.literal("Front Door"));
+        PagerItem.setSilent(pager, true);
+        AtomicReference<Component> alert = new AtomicReference<>();
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    Component got = PagerItem.checkSignal(level, player, pager);
+                    if (got != null) alert.set(got);
+                    check(alert.get() != null, "No alert yet");
+                })
+                .thenExecute(() -> {
+                    var message = (TranslatableContents) alert.get().getContents();
+                    check(((Component) message.getArgs()[0]).getString().equals("Front Door"), "The alert should use the pager's name");
+                    check(!pager.has(ModRegistry.PAGER_BEEPS.get()), "A silent pager shouldn't beep");
+                })
+                .thenSucceed();
+    }
+
+    /** Pagers count toward a remote's "Heard by" when their owner is in range, and re-tuning re-arms the alert. */
+    @GameTest(template = PLATFORM)
+    public static void pagerCountsAsListenerAndRetuneReArms(GameTestHelper helper) {
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 1));
+        ItemStack pager = pagerFor(player, 954);
+        BlockPos origin = player.blockPosition();
+        check(PagerItem.pagersHeard(player, 954, SignalNetwork.ownCoverage(origin, 10)) == 1, "A pager in range should count");
+        check(PagerItem.pagersHeard(player, 955, SignalNetwork.ownCoverage(origin, 10)) == 0, "Another frequency shouldn't count");
+        check(PagerItem.pagersHeard(player, 954, SignalNetwork.ownCoverage(origin.east(100), 10)) == 0,
+                "A pager out of range shouldn't count");
+        pager.set(ModRegistry.PAGER_SIGNAL.get(), 15);
+        PagerItem.setFrequency(pager, 956);
+        check(PagerItem.lastSignal(pager) == 0 && FrequencyTunerItem.getFrequency(pager) == 956,
+                "Re-tuning should forget the old signal, so the new frequency alerts if it's already on");
         helper.succeed();
     }
 }

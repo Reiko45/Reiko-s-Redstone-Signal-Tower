@@ -262,6 +262,15 @@ def multi_remote_models():
 
 
 multi_remote_models()
+write(items / "pager_on.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("pager_on", "item")},
+})
+write(items / "pager.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("pager", "item")},
+    "overrides": [{"predicate": {f"{MOD}:pager_on": 1.0}, "model": f"{MOD}:item/pager_on"}],
+})
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -319,6 +328,19 @@ write(ASSETS / "lang" / "en_us.json", {
     f"item.{MOD}.frequency_tuner": "Frequency Tuner",
     f"item.{MOD}.remote_control": "Remote Control",
     f"item.{MOD}.multi_remote": "Multi-Button Remote",
+    f"item.{MOD}.pager": "Radio Pager",
+    f"message.{MOD}.pager_alert": "%s: frequency %s is ON (strength %s)",
+    f"message.{MOD}.pager_sound_on": "Pager sound ON",
+    f"message.{MOD}.pager_sound_off": "Pager sound OFF (messages only)",
+    f"message.{MOD}.frequency_copied_pager": "Pager tuned to frequency %s",
+    f"tooltip.{MOD}.pager_status_on": "Signal: ON (strength %s)",
+    f"tooltip.{MOD}.pager_status_quiet": "Signal: quiet",
+    f"tooltip.{MOD}.pager_beeping": "Sound: on",
+    f"tooltip.{MOD}.pager_silent": "Sound: off (messages only)",
+    f"tooltip.{MOD}.pager_use": "Beeps when its frequency turns on near you, from anywhere in your inventory",
+    f"tooltip.{MOD}.pager_toggle": "Right-click to switch the sound on or off",
+    f"tooltip.{MOD}.pager_configure": "Sneak + right-click the air to change its frequency",
+    f"tooltip.{MOD}.pager_copy": "Sneak + right-click a transmitter or receiver to copy its frequency",
     f"tooltip.{MOD}.remote_button_line": "%s: frequency %s, %s",
     f"tooltip.{MOD}.remote_button_line_selected": "\u00bb %s: frequency %s, %s",
     f"tooltip.{MOD}.remote_button_default_name": "Button %s",
@@ -466,6 +488,14 @@ recipes["multi_remote"] = ({
     "ingredients": [{"item": f"{MOD}:remote_control"}] + [{"item": "minecraft:stone_button"}] * 3,
     "result": {"count": 1, "id": f"{MOD}:multi_remote"},
 }, f"{MOD}:remote_control")
+
+recipes["pager"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "equipment",
+    "ingredients": [{"item": f"{MOD}:compact_radio_receiver"}, {"item": "minecraft:note_block"},
+                    {"item": "minecraft:iron_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:pager"},
+}, f"{MOD}:compact_radio_receiver")
 
 for name, (recipe, trigger) in recipes.items():
     write(DATA / "recipe" / f"{name}.json", recipe)

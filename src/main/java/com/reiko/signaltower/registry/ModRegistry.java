@@ -11,6 +11,7 @@ import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
+import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
@@ -70,6 +71,23 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("remote_buttons", builder -> builder
                     .persistent(RemoteButtons.CODEC)
                     .networkSynchronized(RemoteButtons.STREAM_CODEC));
+
+    /** The signal strength a Radio Pager heard last (absent means quiet). Saved, so reloading doesn't re-alert. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> PAGER_SIGNAL =
+            DATA_COMPONENTS.registerComponentType("pager_signal", builder -> builder
+                    .persistent(Codec.intRange(0, 15))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** Beeps left in a Radio Pager's current alert. Never saved. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> PAGER_BEEPS =
+            DATA_COMPONENTS.registerComponentType("pager_beeps", builder -> builder
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** True if a Radio Pager only shows messages, without beeping. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> PAGER_SILENT =
+            DATA_COMPONENTS.registerComponentType("pager_silent", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
 
     // ---- Blocks ----
 
@@ -134,6 +152,8 @@ public final class ModRegistry {
             ITEMS.register("remote_control", () -> new RemoteControlItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<MultiRemoteItem> MULTI_REMOTE =
             ITEMS.register("multi_remote", () -> new MultiRemoteItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<PagerItem> PAGER =
+            ITEMS.register("pager", () -> new PagerItem(new Item.Properties().stacksTo(1)));
 
     // ---- Block entities ----
 
