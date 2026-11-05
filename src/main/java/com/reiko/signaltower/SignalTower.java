@@ -1,14 +1,18 @@
 package com.reiko.signaltower;
 
 import com.mojang.logging.LogUtils;
-import com.reiko.signaltower.network.SetTunerFrequencyPayload;
+import com.reiko.signaltower.network.ConfigureRadioItemPayload;
+import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
@@ -30,6 +34,7 @@ public final class SignalTower {
         ModRegistry.register(modEventBus);
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
+        NeoForge.EVENT_BUS.addListener(SignalTower::onLevelTick);
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -37,8 +42,15 @@ public final class SignalTower {
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(SetTunerFrequencyPayload.TYPE, SetTunerFrequencyPayload.STREAM_CODEC,
-                SetTunerFrequencyPayload::handle);
+        registrar.playToServer(ConfigureRadioItemPayload.TYPE, ConfigureRadioItemPayload.STREAM_CODEC,
+                ConfigureRadioItemPayload::handle);
+    }
+
+    /** Ends Remote Control pulses on time. */
+    private static void onLevelTick(LevelTickEvent.Post event) {
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            SignalNetwork.get(serverLevel).tick(serverLevel.getGameTime());
+        }
     }
 
     private static void addToCreativeTabs(BuildCreativeModeTabContentsEvent event) {
@@ -49,8 +61,10 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
+            event.accept(ModRegistry.REMOTE_CONTROL.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
+            event.accept(ModRegistry.REMOTE_CONTROL.get());
         }
     }
 }

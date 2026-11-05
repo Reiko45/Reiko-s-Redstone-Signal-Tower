@@ -13,6 +13,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
+| **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
@@ -35,6 +36,15 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Right-click the air: type a new frequency.
 - Right-click a transmitter or receiver: tune it to the tuner's frequency.
 - Sneak + right-click a transmitter or receiver: copy its frequency into the tuner.
+
+**Remote Control:**
+- Right-click: press the button.
+- Sneak + right-click the air: change its frequency and switch between **Pulse** (1 second, like a stone button) and **Toggle** (on until you press it again).
+- Sneak + right-click a transmitter or receiver: copy its frequency.
+- Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
+- Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
+
+![The Remote Control screen](docs/images/remote-screen.png)
 
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
@@ -78,6 +88,14 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
+**Remote Control:**
+
+```
+  .  T  .        T = Redstone Torch   B = Stone Button
+  I  B  I        I = Iron Ingot       E = Ender Pearl
+  I  E  I
+```
+
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
 
 ## Building and running
@@ -113,12 +131,13 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
-  item/FrequencyTunerItem.java           tune, copy, open the tuner screen
-  network/SetTunerFrequencyPayload.java  tuner screen -> server packet
+  item/FrequencyTunerItem.java           tune, copy, open the frequency screen
+  item/RemoteControlItem.java            handheld transmitter: pulse or toggle
+  network/ConfigureRadioItemPayload.java frequency screen -> server packet
   radio/SignalNetwork.java               per-dimension list of transmitters, saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
-  client/TunerScreen.java                the frequency entry screen
+  client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
@@ -149,7 +168,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 10. Wall Redstone climbing a pillar goes 15, 14, 13 … and lights a lamp at the top, then turns fully off;
 11. Wall Redstone and normal dust power each other, and both turn fully off when the source is removed (no stuck-on loops);
 12. Wall Redstone powers the block it's on, lighting a lamp behind the wall;
-13. removing the wall knocks Wall Redstone off and drops it.
+13. removing the wall knocks Wall Redstone off and drops it;
+14. a Remote Control pulse turns a receiver on for about a second, then off;
+15. a Remote Control in toggle mode stays on until pressed again;
+16. a Remote Control can't reach a receiver beyond its reach;
+17. sneak + right-clicking a transmitter copies its frequency into the remote.
 
 ## License
 

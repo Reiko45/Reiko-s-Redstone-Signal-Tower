@@ -280,6 +280,44 @@ def wall_redstone_item():
     return img
 
 
+def remote_item():
+    """A garage-door style remote: dark fob, one big red button, a status light and a key ring."""
+    img = blank()
+    px = img.load()
+    o, body, body_l = (26, 28, 34, 255), (58, 62, 72, 255), (92, 98, 112, 255)
+    # Key ring loop at the top
+    for (x, y) in [(7, 0), (8, 0), (6, 1), (9, 1), (6, 2), (9, 2)]:
+        px[x, y] = (170, 176, 188, 255)
+    # Body with rounded corners
+    for y in range(3, 16):
+        for x in range(4, 12):
+            corner = (y in (3, 15)) and x in (4, 11)
+            if corner:
+                continue
+            edge = x in (4, 11) or y in (3, 15)
+            px[x, y] = o if edge else body
+    for y in range(4, 15):
+        px[5, y] = body_l
+    for x in range(5, 11):
+        px[x, 4] = body_l
+    # Status light
+    px[10, 5] = (120, 230, 110, 255)
+    # Big round red button
+    red_d, red, red_l = (140, 18, 14, 255), (220, 36, 26, 255), (255, 120, 100, 255)
+    for (x, y) in [(7, 6), (8, 6), (6, 7), (7, 7), (8, 7), (9, 7), (6, 8), (7, 8), (8, 8), (9, 8), (7, 9), (8, 9)]:
+        px[x, y] = red
+    px[7, 7] = red_l
+    px[7, 6] = red_l
+    px[9, 8] = red_d
+    px[8, 9] = red_d
+    # Two small grey buttons
+    for (x, y) in [(6, 12), (7, 12), (9, 12), (10, 12)]:
+        px[x, y] = (140, 146, 158, 255)
+    for (x, y) in [(6, 13), (7, 13), (9, 13), (10, 13)]:
+        px[x, y] = (90, 94, 104, 255)
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -297,7 +335,7 @@ blocks = {
     "antenna_tip": antenna_tip(False),
     "antenna_tip_on": antenna_tip(True),
 }
-items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item()}
+items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

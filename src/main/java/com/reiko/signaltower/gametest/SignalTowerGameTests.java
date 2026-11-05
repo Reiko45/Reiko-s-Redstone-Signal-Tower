@@ -6,6 +6,7 @@ import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
@@ -424,5 +425,98 @@ public final class SignalTowerGameTests {
             helper.assertBlockNotPresent(ModRegistry.WALL_REDSTONE.get(), wire);
             helper.assertItemEntityPresent(ModRegistry.WALL_REDSTONE_ITEM.get(), wire, 2.0);
         });
+    }
+
+    // ---- Remote Control ----
+
+    private static Player playerWithRemote(GameTestHelper helper, BlockPos standAt, int frequency, boolean toggle) {
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(standAt));
+        player.moveTo(feet.x, feet.y, feet.z);
+        ItemStack remote = new ItemStack(ModRegistry.REMOTE_CONTROL.get());
+        FrequencyTunerItem.setFrequency(remote, frequency);
+        RemoteControlItem.setToggleMode(remote, toggle);
+        player.setItemInHand(InteractionHand.MAIN_HAND, remote);
+        return player;
+    }
+
+    private static void pressRemote(GameTestHelper helper, Player player) {
+        player.getMainHandItem().getItem().use(helper.getLevel(), player, InteractionHand.MAIN_HAND);
+    }
+
+    /** Pulse mode: one press turns the receiver on for about a second, then it turns itself off. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void remotePulseFlashesReceiver(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 201);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 201, false);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(RemoteControlItem.PULSE_TICKS / 2)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    /** Toggle mode: on until the next press, however long that takes. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void remoteToggleStaysOnUntilPressedAgain(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 202);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 202, true);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(RemoteControlItem.PULSE_TICKS * 3)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    /** The remote's reach follows the tower rule: a receiver just past it hears nothing. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void remoteRespectsReach(GameTestHelper helper) {
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(helper.getLevel(), helper.absolutePos(standAt));
+        if (standAt.getX() + reach + 3 > 128) {
+            throw new GameTestAssertException("Reach " + reach + " is too big for the test platform");
+        }
+        BlockPos near = new BlockPos(4, 1, 1);
+        BlockPos far = new BlockPos(standAt.getX() + reach + 3, 1, 1);
+        place(helper, near, ModRegistry.RADIO_RECEIVER.get(), 203);
+        place(helper, far, ModRegistry.RADIO_RECEIVER.get(), 203);
+        Player player = playerWithRemote(helper, standAt, 203, true);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressRemote(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, near, 15))
+                .thenIdle(5)
+                .thenExecute(() -> assertOutput(helper, far, 0))
+                .thenExecute(() -> pressRemote(helper, player)) // switch it back off
+                .thenWaitUntil(() -> assertOutput(helper, near, 0))
+                .thenSucceed();
+    }
+
+    /** Sneak + right-click on a transmitter copies its frequency into the remote. */
+    @GameTest(template = PLATFORM)
+    public static void remoteCopiesFrequency(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(3, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 404);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 1, false);
+        player.setShiftKeyDown(true);
+        useTunerOn(helper, player, tx);
+
+        int copied = FrequencyTunerItem.getFrequency(player.getMainHandItem());
+        if (copied != 404) {
+            throw new GameTestAssertException("Remote copied " + copied + ", expected 404");
+        }
+        helper.succeed();
     }
 }

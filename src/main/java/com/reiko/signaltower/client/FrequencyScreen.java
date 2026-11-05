@@ -1,7 +1,7 @@
 package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
-import com.reiko.signaltower.network.SetTunerFrequencyPayload;
+import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -11,21 +11,28 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
-/** Type a frequency for the Frequency Tuner. Enter or Done saves it, Escape cancels. */
-public class TunerScreen extends Screen {
+/**
+ * Type a frequency for the Frequency Tuner or Remote Control (plus the remote's mode).
+ * Enter or Done saves it, Escape cancels.
+ */
+public class FrequencyScreen extends Screen {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".tuner";
 
     private final InteractionHand hand;
     private final int initialFrequency;
+    /** Null for the tuner, which has no mode. */
+    private @Nullable Boolean toggleMode;
     private EditBox input;
     private Button doneButton;
 
-    public TunerScreen(InteractionHand hand, int frequency) {
-        super(Component.translatable(KEY + ".title"));
+    public FrequencyScreen(InteractionHand hand, int frequency, Component title, @Nullable Boolean toggleMode) {
+        super(title);
         this.hand = hand;
         this.initialFrequency = frequency;
+        this.toggleMode = toggleMode;
     }
 
     @Override
@@ -45,13 +52,28 @@ public class TunerScreen extends Screen {
         addRenderableWidget(nudgeButton(1, centerX + 54, 22));
         addRenderableWidget(nudgeButton(100, centerX + 80, 32));
 
+        // The remote's mode button sits between the frequency row and Done/Cancel.
+        int buttonsY = centerY + 22;
+        if (toggleMode != null) {
+            addRenderableWidget(Button.builder(modeLabel(), button -> {
+                toggleMode = !toggleMode;
+                button.setMessage(modeLabel());
+            }).bounds(centerX - 102, buttonsY, 204, 20).build());
+            buttonsY += 24;
+        }
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> save())
-                .bounds(centerX - 102, centerY + 22, 100, 20).build());
+                .bounds(centerX - 102, buttonsY, 100, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> onClose())
-                .bounds(centerX + 2, centerY + 22, 100, 20).build());
+                .bounds(centerX + 2, buttonsY, 100, 20).build());
 
         setInitialFocus(input);
         updateDoneButton();
+    }
+
+    private Component modeLabel() {
+        String mode = Boolean.TRUE.equals(toggleMode) ? "remote_mode_toggle" : "remote_mode_pulse";
+        return Component.translatable("tooltip." + SignalTower.MOD_ID + ".remote_mode",
+                Component.translatable("tooltip." + SignalTower.MOD_ID + "." + mode));
     }
 
     private Button nudgeButton(int amount, int x, int buttonWidth) {
@@ -83,7 +105,8 @@ public class TunerScreen extends Screen {
 
     private void save() {
         parsed().ifPresent(frequency -> {
-            PacketDistributor.sendToServer(new SetTunerFrequencyPayload(hand == InteractionHand.OFF_HAND, frequency));
+            PacketDistributor.sendToServer(new ConfigureRadioItemPayload(
+                    hand == InteractionHand.OFF_HAND, frequency, Boolean.TRUE.equals(toggleMode)));
             onClose();
         });
     }

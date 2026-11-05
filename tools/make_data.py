@@ -222,6 +222,10 @@ write(items / "wall_redstone.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("wall_redstone", "item")},
 })
+write(items / "remote_control.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("remote_control", "item")},
+})
 write(items / "frequency_tuner.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("frequency_tuner", "item")},
@@ -277,6 +281,17 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_mast": "Radio Mast",
     f"block.{MOD}.radio_mast.tooltip": "Tower segment. Carries a redstone signal up to the transmitter on top.",
     f"item.{MOD}.frequency_tuner": "Frequency Tuner",
+    f"item.{MOD}.remote_control": "Remote Control",
+    f"tooltip.{MOD}.remote_mode": "Mode: %s",
+    f"tooltip.{MOD}.remote_mode_pulse": "Pulse",
+    f"tooltip.{MOD}.remote_mode_toggle": "Toggle",
+    f"tooltip.{MOD}.remote_use": "Right-click to press the button",
+    f"tooltip.{MOD}.remote_configure": "Sneak + right-click the air to change frequency and mode",
+    f"tooltip.{MOD}.remote_copy": "Sneak + right-click a transmitter or receiver to copy its frequency",
+    f"message.{MOD}.frequency_copied_remote": "Copied frequency %s to the remote",
+    f"message.{MOD}.remote_pulse": "Pulse sent on frequency %s (reach %s blocks)",
+    f"message.{MOD}.remote_on": "Frequency %s switched ON (reach %s blocks)",
+    f"message.{MOD}.remote_off": "Frequency %s switched OFF",
 
     f"tooltip.{MOD}.frequency": "Frequency: %s",
     f"tooltip.{MOD}.tune_hint": "Use a Frequency Tuner to change its frequency.",
@@ -354,6 +369,11 @@ recipes["wall_redstone"] = (shapeless_any("minecraft:redstone", f"{MOD}:wall_red
 recipes["redstone_from_wall_redstone"] = (shapeless_any(f"{MOD}:wall_redstone", "minecraft:redstone"), f"{MOD}:wall_redstone")
 recipes["compact_radio_receiver"] = (shapeless("radio_receiver", "compact_radio_receiver"), f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_compact"] = (shapeless("compact_radio_receiver", "radio_receiver"), f"{MOD}:compact_radio_receiver")
+
+recipes["remote_control"] = (shaped([" T ", "IBI", "IEI"], {
+    "T": "minecraft:redstone_torch", "I": "minecraft:iron_ingot",
+    "B": "minecraft:stone_button", "E": "minecraft:ender_pearl"}, "remote_control", category="equipment"),
+    "minecraft:ender_pearl")
 
 for name, (recipe, trigger) in recipes.items():
     write(DATA / "recipe" / f"{name}.json", recipe)

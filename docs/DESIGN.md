@@ -21,6 +21,12 @@
     - it takes the best non-wire signal from all 6 neighbors, or the strongest neighboring wire (its own or vanilla dust) minus 1.
   - **Vanilla dust has its own private switch**, so plain neighbors would latch each other on. To stop that, Wall Redstone hands vanilla dust 1 less, and strongly powers its wall block at 1 less. Mixed loops then always fade to 0 (covered by a GameTest).
   - It re-works its connections in `onPlace`, so `/fill` and `/setblock` give correct lines.
+- **Remote Control:**
+  - It isn't a block, so `SignalNetwork` keeps remote signals separately, per frequency:
+    - a **pulse**: not saved; it ends on time via `LevelTickEvent.Post`;
+    - a **latch**: saved; any remote on that frequency toggles it.
+  - Both send full strength from where the player stood, with that spot's height-based reach, and bump the frequency's revision so receivers react within a tick.
+  - The item stores `frequency` and `remote_toggle_mode` data components. A 10-tick cooldown stops held right-click from flickering a toggle.
 - **Input:** a transmitter's input is the strongest of `getBestNeighborSignal` at the transmitter and at every mast in the unbroken column directly below it.
 
 ## How it works
@@ -38,7 +44,7 @@
 
 ## Verified
 
-- 13 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 17 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
@@ -47,6 +53,7 @@
 
 ## History
 
+- **v0.5.0:** added the Remote Control.
 - **v0.4.0:** added Wall Redstone.
 - **v0.3.0:** added the Compact Radio Receiver (button-sized).
 - **v0.1.0:** dye-colored channels (16), reach from stacked masts on both ends. Replaced in v0.2.0 at Reiko's request.

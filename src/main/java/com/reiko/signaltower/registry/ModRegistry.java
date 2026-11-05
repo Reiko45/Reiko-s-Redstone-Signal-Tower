@@ -10,6 +10,7 @@ import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -42,6 +43,12 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("frequency", builder -> builder
                     .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** Whether a Remote Control is in toggle mode (true) or pulse mode (false, the default). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> REMOTE_TOGGLE_MODE =
+            DATA_COMPONENTS.registerComponentType("remote_toggle_mode", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
 
     // ---- Blocks ----
 
@@ -102,6 +109,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("wall_redstone", WALL_REDSTONE);
     public static final DeferredItem<FrequencyTunerItem> FREQUENCY_TUNER =
             ITEMS.register("frequency_tuner", () -> new FrequencyTunerItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<RemoteControlItem> REMOTE_CONTROL =
+            ITEMS.register("remote_control", () -> new RemoteControlItem(new Item.Properties().stacksTo(1)));
 
     // ---- Block entities ----
 
