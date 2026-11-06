@@ -2,12 +2,14 @@ package com.reiko.signaltower;
 
 import com.mojang.logging.LogUtils;
 import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.network.ConfigureConverterPayload;
 import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
+import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.network.ScrollFrequencyPayload;
@@ -77,6 +79,10 @@ public final class SignalTower {
                 TrackTransmitterPayload::handle);
         registrar.playToServer(ScannerRequestPayload.TYPE, ScannerRequestPayload.STREAM_CODEC,
                 ScannerRequestPayload::handle);
+        registrar.playToServer(ConfigureConverterPayload.TYPE, ConfigureConverterPayload.STREAM_CODEC,
+                ConfigureConverterPayload::handle);
+        registrar.playToClient(OpenConverterScreenPayload.TYPE, OpenConverterScreenPayload.STREAM_CODEC,
+                OpenConverterScreenPayload::handle);
         registrar.playToClient(ScannerResultPayload.TYPE, ScannerResultPayload.STREAM_CODEC,
                 ScannerResultPayload::handle);
         registrar.playToClient(RemoteScanResultPayload.TYPE, RemoteScanResultPayload.STREAM_CODEC,
@@ -109,6 +115,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
+            event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());

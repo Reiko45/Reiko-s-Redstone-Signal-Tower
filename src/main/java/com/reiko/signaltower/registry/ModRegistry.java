@@ -3,6 +3,7 @@ package com.reiko.signaltower.registry;
 import com.mojang.serialization.Codec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
+import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
@@ -51,6 +52,12 @@ public final class ModRegistry {
     /** The frequency stored on a Frequency Tuner, or on a transmitter/receiver item that was broken. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> FREQUENCY =
             DATA_COMPONENTS.registerComponentType("frequency", builder -> builder
+                    .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** The frequency a Radio Converter sends on, kept on the item when it's broken. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OUTPUT_FREQUENCY =
+            DATA_COMPONENTS.registerComponentType("output_frequency", builder -> builder
                     .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
@@ -145,6 +152,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioRepeaterBlock.LIT) ? 7 : 0)));
 
+    /** A repeater that sends what it hears on another frequency. */
+    public static final DeferredBlock<RadioConverterBlock> RADIO_CONVERTER = BLOCKS.register("radio_converter",
+            () -> new RadioConverterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioRepeaterBlock.LIT) ? 7 : 0)));
+
     /** Button-sized receiver. Breaks quickly like a button and gets knocked off by pistons. */
     public static final DeferredBlock<CompactRadioReceiverBlock> COMPACT_RADIO_RECEIVER = BLOCKS.register("compact_radio_receiver",
             () -> new CompactRadioReceiverBlock(BlockBehaviour.Properties.of()
@@ -180,6 +196,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
+    public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_converter", RADIO_CONVERTER);
     public static final DeferredItem<BlockItem> COMPACT_RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
@@ -210,7 +228,7 @@ public final class ModRegistry {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",
-                    () -> BlockEntityType.Builder.of(RadioRepeaterBlockEntity::new, RADIO_REPEATER.get()).build(null));
+                    () -> BlockEntityType.Builder.of(RadioRepeaterBlockEntity::new, RADIO_REPEATER.get(), RADIO_CONVERTER.get()).build(null));
 
     public static void register(IEventBus modEventBus) {
         DATA_COMPONENTS.register(modEventBus);

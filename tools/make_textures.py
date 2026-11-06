@@ -28,6 +28,10 @@ ON = [(170, 14, 10, 255), (236, 44, 30, 255), (255, 150, 120, 255)]
 AMBER_OFF = [(84, 52, 8, 255), (124, 80, 14, 255), (156, 104, 24, 255)]
 AMBER_ON = [(204, 122, 10, 255), (255, 178, 40, 255), (255, 226, 140, 255)]
 
+# Converter teal, off and on
+TEAL_OFF = [(10, 66, 70, 255), (18, 98, 104, 255), (28, 128, 134, 255)]
+TEAL_ON = [(12, 160, 170, 255), (44, 222, 232, 255), (176, 250, 255, 255)]
+
 CLEAR = (0, 0, 0, 0)
 
 
@@ -114,10 +118,11 @@ def receiver_side(lit):
     return img
 
 
-def repeater_side(lit):
-    """An amber mast with arcs passing through it: picked up on the left, sent on to the right."""
-    r = AMBER_ON if lit else AMBER_OFF
-    img = casing(6)
+def repeater_side(lit, palette=None):
+    """An amber mast with arcs passing through it: picked up on the left, sent on to the right.
+    The converter uses the same picture in teal (palette = (off, on))."""
+    r = (palette[1] if lit else palette[0]) if palette else (AMBER_ON if lit else AMBER_OFF)
+    img = casing(7 if palette else 6)
     px = img.load()
     vents(img)
     for y in range(3, 10):
@@ -207,11 +212,15 @@ def mast_lattice():
     return img
 
 
-def antenna_tip(lit, amber=False):
-    """Warning light at the top of the antenna: red on a transmitter, amber on a repeater."""
+def antenna_tip(lit, amber=False, teal=False):
+    """Warning light at the top of the antenna: red on a transmitter, amber on a repeater, teal on a converter."""
     img = blank()
     px = img.load()
-    if amber and lit:
+    if teal and lit:
+        core, mid, rim = (200, 255, 255, 255), (60, 226, 236, 255), (12, 150, 160, 255)
+    elif teal:
+        core, mid, rim = (40, 120, 126, 255), (18, 84, 90, 255), (8, 52, 56, 255)
+    elif amber and lit:
         core, mid, rim = (255, 238, 176, 255), (255, 182, 40, 255), (212, 122, 10, 255)
     elif amber:
         core, mid, rim = (152, 104, 32, 255), (112, 72, 14, 255), (72, 46, 8, 255)
@@ -519,6 +528,12 @@ blocks = {
     "radio_repeater_top_on": top(True, receiver=False, palette=AMBER_ON),
     "repeater_tip": antenna_tip(False, amber=True),
     "repeater_tip_on": antenna_tip(True, amber=True),
+    "radio_converter_side": repeater_side(False, palette=(TEAL_OFF, TEAL_ON)),
+    "radio_converter_side_on": repeater_side(True, palette=(TEAL_OFF, TEAL_ON)),
+    "radio_converter_top": top(False, receiver=False, palette=TEAL_OFF),
+    "radio_converter_top_on": top(True, receiver=False, palette=TEAL_ON),
+    "converter_tip": antenna_tip(False, teal=True),
+    "converter_tip_on": antenna_tip(True, teal=True),
 }
 items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
          "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),

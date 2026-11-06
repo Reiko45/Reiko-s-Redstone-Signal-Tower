@@ -105,6 +105,7 @@ for lit in (False, True):
     suffix = "_on" if lit else ""
     write(models / f"radio_transmitter{suffix}.json", transmitter_model(lit))
     write(models / f"radio_repeater{suffix}.json", transmitter_model(lit, "radio_repeater", "repeater_tip"))
+    write(models / f"radio_converter{suffix}.json", transmitter_model(lit, "radio_converter", "converter_tip"))
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
 
 
@@ -217,7 +218,7 @@ write(models / "radio_mast.json", {
 # ---------------------------------------------------------------- item models
 
 items = ASSETS / "models" / "item"
-for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "wall_redstone.json", {
@@ -293,6 +294,10 @@ write(states / "radio_repeater.json", {"variants": {
     "lit=false": {"model": f"{MOD}:block/radio_repeater"},
     "lit=true": {"model": f"{MOD}:block/radio_repeater_on"},
 }})
+write(states / "radio_converter.json", {"variants": {
+    "lit=false": {"model": f"{MOD}:block/radio_converter"},
+    "lit=true": {"model": f"{MOD}:block/radio_converter_on"},
+}})
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -332,6 +337,21 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
     f"block.{MOD}.radio_repeater": "Radio Repeater",
     f"block.{MOD}.radio_repeater.tooltip": "Picks up its frequency and broadcasts it again from its own height, to chain towers across long distances. Needs no redstone.",
+    f"block.{MOD}.radio_converter": "Radio Converter",
+    f"block.{MOD}.radio_converter.tooltip": "Picks up one frequency and broadcasts it on another, from its own height. Needs no redstone.",
+    f"tooltip.{MOD}.converter_listens": "Listens on: %s",
+    f"tooltip.{MOD}.converter_sends": "Sends on: %s",
+    f"tooltip.{MOD}.converter_hint": "Right-click it with an empty hand to set both frequencies. The tuner sets the one it listens on",
+    f"screen.{MOD}.converter.listens": "Listens on",
+    f"screen.{MOD}.converter.sends": "Sends on",
+    f"screen.{MOD}.converter.range": "Frequencies %s to %s",
+    f"screen.{MOD}.converter.converting": "Hearing %s on %s, sending it on %s",
+    f"screen.{MOD}.converter.quiet": "Nothing to convert: %s is quiet here",
+    f"screen.{MOD}.converter.reach": "Reach: %s blocks",
+    f"message.{MOD}.converter_set": "Radio Converter: listens on %s, sends on %s",
+    f"message.{MOD}.converter_status": "Converter | Listens on %s | Sends on %s | %s | Reach %s blocks",
+    f"message.{MOD}.converter_converting": "Converting %s",
+    f"message.{MOD}.converter_quiet": "Nothing to convert",
     f"block.{MOD}.compact_radio_receiver": "Compact Radio Receiver",
     f"block.{MOD}.compact_radio_receiver.tooltip": "A button-sized receiver. Sticks to walls, floors and ceilings, and powers the block it's on.",
     f"block.{MOD}.wall_redstone": "Wall Redstone",
@@ -366,6 +386,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.scanner.transmitters": "Transmitter, %s (+%s more)",
     f"screen.{MOD}.scanner.repeater": "Repeater, %s",
     f"screen.{MOD}.scanner.repeaters": "Repeater, %s (+%s more)",
+    f"screen.{MOD}.scanner.converter": "Converter, %s",
+    f"screen.{MOD}.scanner.converters": "Converter, %s (+%s more)",
     f"screen.{MOD}.scanner.remote_pulse": "Remote pulse",
     f"screen.{MOD}.scanner.remote_toggle": "Remote toggle",
     f"screen.{MOD}.scanner.plus_one": "%s, plus 1 tower",
@@ -375,7 +397,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.scanner.tune_tooltip": "Set %s to frequency %s",
     f"screen.{MOD}.scanner.tuned": "%s tuned to frequency %s",
     f"screen.{MOD}.scanner.more": "Showing %s-%s of %s, scroll for more",
-    f"screen.{MOD}.scanner.track_hint": "Click a transmitter or repeater row to track it with an arrow",
+    f"screen.{MOD}.scanner.track_hint": "Click a transmitter, repeater or converter row to track it with an arrow",
     f"screen.{MOD}.scanner.tracking": "Tracking frequency %s. Click its row again to stop",
     f"screen.{MOD}.scanner.row_track": "Click to track this tower with an arrow on screen",
     f"screen.{MOD}.scanner.row_stop": "Click to stop tracking",
@@ -383,14 +405,14 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.scanner_tracking": "Tracking frequency %s",
     f"message.{MOD}.scanner_stopped": "Stopped tracking",
     f"message.{MOD}.scanner_lost": "Lost track of frequency %s: its tower is gone",
-    f"message.{MOD}.scanner_cant_track": "No transmitter or repeater on frequency %s reaches you here",
+    f"message.{MOD}.scanner_cant_track": "No transmitter, repeater or converter on frequency %s reaches you here",
     f"hud.{MOD}.scanner_distance": "Frequency %s: %s blocks",
     f"hud.{MOD}.scanner_distance_up": "Frequency %s: %s blocks, %s up",
     f"hud.{MOD}.scanner_distance_down": "Frequency %s: %s blocks, %s down",
     f"hud.{MOD}.scanner_here": "Frequency %s: you're there",
     f"hud.{MOD}.scanner_other_dimension": "Frequency %s: in another dimension",
     f"tooltip.{MOD}.scanner_tracking": "Tracking frequency %s",
-    f"tooltip.{MOD}.scanner_track": "Click a transmitter or repeater row to track it with an arrow while you hold the scanner",
+    f"tooltip.{MOD}.scanner_track": "Click a transmitter, repeater or converter row to track it with an arrow while you hold the scanner",
     f"message.{MOD}.pager_alert": "%s: frequency %s is ON (strength %s)",
     f"message.{MOD}.pager_sound_on": "Pager sound ON",
     f"message.{MOD}.pager_sound_off": "Pager sound OFF (messages only)",
@@ -468,6 +490,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.reach_towers": "%s blocks + %s towers",
     f"message.{MOD}.reach_plus_one_repeater": "%s + 1 repeater",
     f"message.{MOD}.reach_plus_repeaters": "%s + %s repeaters",
+    f"message.{MOD}.reach_plus_one_converter": "%s + 1 converter",
+    f"message.{MOD}.reach_plus_converters": "%s + %s converters",
     f"message.{MOD}.remote_off": "Frequency %s switched OFF",
     f"message.{MOD}.remote_result": "%s | %s",
     f"message.{MOD}.remote_heard_one": "Heard by 1 receiver",
@@ -515,7 +539,12 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.towers": "Towers in range: %s",
     f"jade.{MOD}.reach": "Reach: %s blocks",
     f"jade.{MOD}.mast_top": "Top: %s, %s blocks up",
-    f"jade.{MOD}.mast_no_top": "No transmitter or repeater on top",
+    f"jade.{MOD}.mast_no_top": "No transmitter, repeater or converter on top",
+    f"jade.{MOD}.listens": "Listens on: %s",
+    f"jade.{MOD}.sends": "Sends on: %s",
+    f"jade.{MOD}.converting": "Converting: %s",
+    f"jade.{MOD}.converting_on": "Converting",
+    f"jade.{MOD}.converting_nothing": "Nothing to convert",
 })
 
 # ---------------------------------------------------------------- recipes
@@ -589,6 +618,13 @@ recipes["radio_repeater"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_repeater"},
 }, f"{MOD}:radio_transmitter")
 
+recipes["radio_converter"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_repeater"}, {"item": "minecraft:comparator"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_converter"},
+}, f"{MOD}:radio_repeater")
+
 recipes["signal_scanner"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -622,14 +658,14 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "compact_radio_receiver", "radio_mast", "wall_redstone"):
+for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_converter", "compact_radio_receiver", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
-        # Copy the block's frequency onto the dropped item so it keeps its tuning.
+        # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
             "source": "block_entity",
-            "include": [f"{MOD}:frequency"],
+            "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency"] if name == "radio_converter" else []),
         }]
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
         "type": "minecraft:block",
@@ -645,7 +681,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "compact_r
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_repeater", f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+               f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

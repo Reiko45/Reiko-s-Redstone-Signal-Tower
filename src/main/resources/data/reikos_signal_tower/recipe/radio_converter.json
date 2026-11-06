@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "reikos_signal_tower:radio_repeater"
+    },
+    {
+      "item": "minecraft:comparator"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:radio_converter"
+  }
+}

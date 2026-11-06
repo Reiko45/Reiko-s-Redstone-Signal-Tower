@@ -2,6 +2,7 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.TunerPresets;
+import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import net.minecraft.client.Minecraft;
@@ -51,5 +52,10 @@ public final class ClientHooks {
 
     public static void openMultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
         Minecraft.getInstance().setScreen(new MultiRemoteScreen(hand, buttons, title));
+    }
+
+    /** Opens a Radio Converter's screen (sent by the server when the block is right-clicked). */
+    public static void openConverterScreen(OpenConverterScreenPayload state) {
+        Minecraft.getInstance().setScreen(new ConverterScreen(state));
     }
 }

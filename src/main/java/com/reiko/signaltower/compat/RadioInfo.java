@@ -1,11 +1,13 @@
 package com.reiko.signaltower.compat;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
+import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
@@ -51,9 +53,13 @@ public final class RadioInfo {
             Block top = level.getBlockState(cursor).getBlock();
             if ((top instanceof RadioTransmitterBlock || top instanceof RadioRepeaterBlock)
                     && level.getBlockEntity(cursor) instanceof RadioBlockEntity radio) {
-                tag.putString("top", top instanceof RadioRepeaterBlock ? "repeater" : "transmitter");
+                tag.putString("top", top instanceof RadioConverterBlock ? "converter"
+                        : top instanceof RadioRepeaterBlock ? "repeater" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 tag.putInt("frequency", radio.getFrequency());
+                if (top instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
+                    tag.putInt("output", converter.getOutputFrequency());
+                }
             }
             return tag;
         }
@@ -68,6 +74,9 @@ public final class RadioInfo {
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            if (block instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
+                tag.putInt("output", converter.getOutputFrequency());
+            }
         } else if (block instanceof RadioReceiverBlock) {
             SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
             tag.putInt("power", state.getValue(RadioReceiverBlock.POWER));
@@ -94,10 +103,29 @@ public final class RadioInfo {
             }
             Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
-            lines.add(frequencyLine(data.getInt("frequency")));
+            if (data.contains("output")) {
+                lines.add(Component.translatable(LANG + "listens", number(data.getInt("frequency"))));
+                lines.add(Component.translatable(LANG + "sends", number(data.getInt("output"))));
+            } else {
+                lines.add(frequencyLine(data.getInt("frequency")));
+            }
             return lines;
         }
         if (!(block instanceof RadioTransmitterBlock || block instanceof RadioRepeaterBlock || block instanceof RadioReceiverBlock)) {
+            return lines;
+        }
+        if (block instanceof RadioConverterBlock) {
+            boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioRepeaterBlock.LIT);
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "listens", number(data.getInt("frequency"))));
+                lines.add(Component.translatable(LANG + "sends", number(data.getInt("output"))));
+            }
+            lines.add(!on ? Component.translatable(LANG + "converting_nothing").withStyle(ChatFormatting.GRAY)
+                    : hasData ? Component.translatable(LANG + "converting", value(data.getInt("power")))
+                    : Component.translatable(LANG + "converting_on").withStyle(ChatFormatting.GREEN));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
             return lines;
         }
         if (hasData) {
@@ -131,8 +159,11 @@ public final class RadioInfo {
     }
 
     private static Component frequencyLine(int frequency) {
-        return Component.translatable(LANG + "frequency",
-                Component.literal(Integer.toString(frequency)).withStyle(ChatFormatting.AQUA));
+        return Component.translatable(LANG + "frequency", number(frequency));
+    }
+
+    private static Component number(int frequency) {
+        return Component.literal(Integer.toString(frequency)).withStyle(ChatFormatting.AQUA);
     }
 
     private static Component value(int power) {

@@ -2244,4 +2244,216 @@ public final class SignalTowerGameTests {
         check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(Blocks.STONE.defaultBlockState(), data)).isEmpty(), "Not a radio block");
         helper.succeed();
     }
+
+    // ---- Radio Converter ----
+
+    /**
+     * A converter hears one frequency and sends it on another, at the same strength. It isn't
+     * heard on the frequency it listens on, and receivers on its output frequency re-scan as soon
+     * as its input changes (their revision goes up too).
+     */
+    @GameTest(template = PLATFORM)
+    public static void converterChangesFrequency(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(8_000_000, 64, 8_000_000);
+        network.updateTransmitter(tx, 1501, 9, 50);
+        network.updateRepeater(tx.east(40), 1501, 1502, 60);
+        check(network.listen(level, 1502, tx.east(90)).power() == 9, "90 blocks east should hear 9 on 1502");
+        check(network.listen(level, 1502, tx.east(20)).power() == 9, "Anywhere in the converter's reach");
+        check(network.listen(level, 1501, tx.east(90)).power() == 0, "It doesn't send on the frequency it listens on");
+        SignalNetwork.Repeater converter = network.repeaterAt(tx.east(40));
+        check(converter != null && converter.converts() && converter.output() == 1502, "Stored as a converter: " + converter);
+        check(network.repeaterFrequencyAt(tx.east(40)).getAsInt() == 1501 && network.towerFrequencyAt(tx.east(40)).getAsInt() == 1502,
+                "Listens on 1501, sends on 1502");
+        long before = network.revision(1502);
+        network.updateTransmitter(tx, 1501, 0, 50);
+        check(network.revision(1502) > before, "A change on 1501 should bump 1502, so receivers there re-scan");
+        check(network.listen(level, 1502, tx.east(90)).power() == 0 && network.repeaterPower(level, tx.east(40)) == 0,
+                "Source off: nothing to convert");
+        network.updateRepeater(tx.east(40), 1501, 1501, 60); // turned back into a repeater
+        network.updateTransmitter(tx, 1501, 9, 50);
+        check(network.listen(level, 1501, tx.east(90)).power() == 9 && network.listen(level, 1502, tx.east(90)).power() == 0,
+                "Re-set to send on its own frequency it repeats instead");
+        helper.succeed();
+    }
+
+    /**
+     * Two converters feeding each other (1503 to 1504 and back) only stay on while a real source
+     * feeds them, and a repeater in the chain passes the converted signal on.
+     */
+    @GameTest(template = PLATFORM)
+    public static void converterLoopsCantLatch(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos a = new BlockPos(-8_000_000, 64, 8_000_000);
+        BlockPos b = a.east(50);
+        network.updateRepeater(a, 1503, 1504, 60);
+        network.updateRepeater(b, 1504, 1503, 60);
+        network.updateRepeater(b.east(5), 1504, 60); // a repeater on 1504, in A's reach (B sends on 1503)
+        network.updateTransmitter(a.west(30), 1503, 15, 40); // reaches A only
+        check(network.repeaterPower(level, a) == 15 && network.repeaterPower(level, b) == 15, "Source to A (1503), A to B (1504)");
+        check(network.listen(level, 1503, b.east(40)).power() == 15, "B sends it back on 1503");
+        check(network.listen(level, 1504, b.east(60)).power() == 15, "The repeater carries 1504 further");
+        network.updateTransmitter(a.west(30), 1503, 0, 40);
+        check(network.repeaterPower(level, a) == 0 && network.repeaterPower(level, b) == 0
+                        && network.repeaterPower(level, b.east(5)) == 0,
+                "With the source quiet, the loop must not keep itself on");
+        check(network.listen(level, 1503, b.east(40)).power() == 0 && network.listen(level, 1504, b.east(60)).power() == 0,
+                "Nothing heard anywhere");
+        helper.succeed();
+    }
+
+    /** A remote press is carried across a converter: its receivers on the other frequency count, and the message names it. */
+    @GameTest(template = PLATFORM)
+    public static void remoteReachesThroughConverters(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(8_000_000, 64, -8_000_000);
+        List<SignalNetwork.Coverage> own = SignalNetwork.ownCoverage(here, 30);
+        network.updateRepeater(here.east(20), 1507, 1508, 50);
+        network.updateRepeater(here.east(65), 1508, 50); // repeats 1508
+        network.trackReceiver(here.east(110), 1508);
+        network.trackReceiver(here.east(10), 1507);
+        SignalNetwork.Carried carried = network.carried(level, 1507, own);
+        check(carried.converters() == 1 && carried.repeaters() == 1, "1 converter and 1 repeater, got " + carried);
+        check(carried.on(1507).equals(own), "Nothing extra on 1507");
+        check(carried.on(1508).size() == 2, "The converter's and the repeater's areas on 1508: " + carried.on(1508));
+        check(network.countReceivers(1508, carried.on(1508)) == 1 && network.countReceivers(1507, carried.on(1507)) == 1,
+                "One receiver on each frequency");
+        check(network.withRepeaters(level, 1507, own).equals(own), "withRepeaters stays on its own frequency");
+        check(keyOf(RemoteControlItem.describeReach(30, 0, 0, 1)).endsWith("reach_plus_one_converter")
+                && keyOf(RemoteControlItem.describeReach(30, 0, 1, 2)).endsWith("reach_plus_converters"), "Reach wording");
+        helper.succeed();
+    }
+
+    /** A turn-on carried across a converter is remembered on the converted frequency too, for the pager catch-up. */
+    @GameTest(template = PLATFORM)
+    public static void turnOnsReachThroughConverters(GameTestHelper helper) {
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(-8_000_000, 64, -8_000_000);
+        network.updateRepeater(here.south(20), 1509, 1510, 60);
+        network.pulse(1509, SignalNetwork.ownCoverage(here, 30), 100);
+        check(network.turnOnsSince(1509, -1, here).size() == 1, "Remembered on 1509");
+        check(network.turnOnsSince(1510, -1, here.south(70)).size() == 1, "And on 1510, where the converter sent it");
+        check(network.turnOnsSince(1510, -1, here.south(90)).isEmpty(), "Not past the converter's reach");
+        helper.succeed();
+    }
+
+    /** The scanner lists a converter under the frequency it sends on, as "Converter", and can track it. */
+    @GameTest(template = PLATFORM)
+    public static void scannerShowsConverters(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(9_000_000, 64, 9_000_000);
+        network.updateTransmitter(tx, 1511, 12, 50);
+        network.updateRepeater(tx.east(40), 1511, 1512, 60);
+        BlockPos here = tx.east(90);
+        List<SignalNetwork.HeardFrequency> heard = network.scanAt(level, here);
+        check(heard.size() == 1, "Only 1512 is heard here, got " + heard);
+        SignalNetwork.HeardFrequency entry = heard.get(0);
+        check(entry.frequency() == 1512 && entry.source() == SignalNetwork.Source.CONVERTER && entry.power() == 12
+                && entry.distance() == 50 && entry.direction() == 6, "Should point 50 blocks west to the converter, got " + entry);
+        check(network.strongestTransmitter(level, here, 1512).equals(java.util.Optional.of(tx.east(40))), "It can be tracked");
+        helper.succeed();
+    }
+
+    /** Converters are saved with their output frequency; repeaters saved by 0.20.0 (no output) still load as repeaters. */
+    @GameTest(template = PLATFORM)
+    public static void convertersSurviveSaveAndLoad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(-9_000_000, 64, 9_000_000);
+        network.updateTransmitter(tx, 1516, 11, 40);
+        network.updateRepeater(tx.north(30), 1516, 1517, 70);
+        CompoundTag saved = network.save(new CompoundTag(), level.registryAccess());
+        SignalNetwork loaded = SignalNetwork.load(saved, level.registryAccess());
+        check(loaded.towerFrequencyAt(tx.north(30)).getAsInt() == 1517, "The output frequency should be loaded back");
+        check(loaded.listen(level, 1517, tx.north(95)).power() == 11, "And still convert after loading");
+
+        CompoundTag old = new CompoundTag();
+        ListTag list = new ListTag();
+        CompoundTag entry = new CompoundTag();
+        entry.putLong("pos", tx.south(30).asLong());
+        entry.putInt("frequency", 1516);
+        entry.putInt("reach", 70);
+        list.add(entry);
+        old.put("repeaters", list);
+        SignalNetwork fromOld = SignalNetwork.load(old, level.registryAccess());
+        SignalNetwork.Repeater repeater = fromOld.repeaterAt(tx.south(30));
+        check(repeater != null && !repeater.converts() && repeater.output() == 1516, "A 0.20.0 repeater loads as a repeater: " + repeater);
+        helper.succeed();
+    }
+
+    /**
+     * A placed Radio Converter on a mast: set from its screen's packet (only by a player who can
+     * reach it), it lights a receiver on its output frequency, shows in Jade (and on the mast
+     * under it), and keeps both frequencies on the dropped item and when placed again.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void converterBlockConverts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos mast = new BlockPos(5, 1, 1);
+        BlockPos converter = mast.above();
+        BlockPos rx = new BlockPos(9, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1513);
+        helper.setBlock(mast, ModRegistry.RADIO_MAST.get());
+        place(helper, converter, ModRegistry.RADIO_CONVERTER.get(), 1513);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1514);
+        helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK);
+        BlockPos converterAbs = helper.absolutePos(converter);
+        Player near = mockPlayerAt(helper, converter.west(2).below());
+        Player far = mockPlayerAt(helper, new BlockPos(120, 1, 1));
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, rx, 0); // a new converter sends on its default frequency
+                    check(!com.reiko.signaltower.network.ConfigureConverterPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureConverterPayload(converterAbs, 1513, 1514)), "Too far away to set it");
+                    check(com.reiko.signaltower.network.ConfigureConverterPayload.apply(near,
+                            new com.reiko.signaltower.network.ConfigureConverterPayload(converterAbs, 1513, 1514)), "Set from nearby");
+                    check(!com.reiko.signaltower.network.ConfigureConverterPayload.apply(near,
+                            new com.reiko.signaltower.network.ConfigureConverterPayload(helper.absolutePos(rx), 1513, 1514)),
+                            "Only a converter can be set this way");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> helper.assertBlockProperty(converter, com.reiko.signaltower.block.RadioRepeaterBlock.LIT, true))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, converterAbs);
+                    check(info != null && info.getInt("frequency") == 1513 && info.getInt("output") == 1514 && info.getInt("power") == 15,
+                            "Converter data: " + info);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(converter), info))
+                            .equals(List.of("listens", "sends", "converting", "reach")), "Converter lines");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(converter), null))
+                            .equals(List.of("converting_on")), "Converter without server data");
+                    CompoundTag mastInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(mast));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(mast), mastInfo))
+                            .equals(List.of("mast_top", "listens", "sends")) && mastInfo.getString("top").equals("converter"),
+                            "Mast under a converter: " + mastInfo);
+                })
+                .thenExecute(() -> com.reiko.signaltower.network.ConfigureConverterPayload.apply(near,
+                        new com.reiko.signaltower.network.ConfigureConverterPayload(converterAbs, 1513, 1515)))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> level.destroyBlock(converterAbs, true))
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_CONVERTER_ITEM.get())
+                                && Integer.valueOf(1513).equals(stack.get(ModRegistry.FREQUENCY.get()))
+                                && Integer.valueOf(1515).equals(stack.get(ModRegistry.OUTPUT_FREQUENCY.get()))),
+                        "The dropped converter should keep 1513 and 1515"))
+                .thenExecute(() -> {
+                    ItemStack dropped = helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                            .filter(stack -> stack.is(ModRegistry.RADIO_CONVERTER_ITEM.get())).findFirst().orElseThrow();
+                    BlockPos again = new BlockPos(12, 1, 1);
+                    helper.setBlock(again, ModRegistry.RADIO_CONVERTER.get());
+                    com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity be = helper.getBlockEntity(again);
+                    be.applyComponentsFromItemStack(dropped);
+                    check(be.getFrequency() == 1513 && be.getOutputFrequency() == 1515 && be.getSendFrequency() == 1515,
+                            "Placed again, it keeps both frequencies");
+                    com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity plain = helper.getBlockEntity(new BlockPos(12, 1, 1));
+                    check(plain.isConverter(), "It's a converter");
+                })
+                .thenSucceed();
+    }
 }

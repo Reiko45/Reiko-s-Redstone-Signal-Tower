@@ -93,14 +93,19 @@ public class RadioRepeaterBlock extends RadioBlock {
 
     // ---- Visuals ----
 
-    /** Amber sparks from the antenna tip while repeating. */
+    /** The sparks' color: amber for a repeater. */
+    protected DustParticleOptions sparks() {
+        return AMBER;
+    }
+
+    /** Sparks from the antenna tip while repeating. */
     @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
         if (state.getValue(LIT) && random.nextInt(3) == 0) {
             double x = pos.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.2;
             double y = pos.getY() + 1.95 + random.nextDouble() * 0.2;
             double z = pos.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.2;
-            level.addParticle(AMBER, x, y, z, 0.0, 0.0, 0.0);
+            level.addParticle(sparks(), x, y, z, 0.0, 0.0, 0.0);
         }
     }
 }

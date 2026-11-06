@@ -190,12 +190,16 @@ public class ScannerScreen extends Screen {
                         : entry.transmitters() == 1 ? Component.translatable(KEY + "plus_one", remote)
                         : Component.translatable(KEY + "plus_many", remote, entry.transmitters());
             }
-            case TRANSMITTER, REPEATER -> {
+            case TRANSMITTER, REPEATER, CONVERTER -> {
                 Component where = entry.distance() <= 0 || entry.direction() < 0
                         ? Component.translatable(LOCATOR + "here")
                         : Component.translatable(LOCATOR + "distance", format(entry.distance()),
                                 Component.translatable(LOCATOR + "dir_" + DIRECTIONS[entry.direction() & 7]));
-                String kind = entry.sourceType() == SignalNetwork.Source.REPEATER ? "repeater" : "transmitter";
+                String kind = switch (entry.sourceType()) {
+                    case REPEATER -> "repeater";
+                    case CONVERTER -> "converter";
+                    default -> "transmitter";
+                };
                 yield entry.transmitters() <= 1 ? Component.translatable(KEY + kind, where)
                         : Component.translatable(KEY + kind + "s", where, entry.transmitters() - 1);
             }

@@ -11,6 +11,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
+| **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
@@ -112,7 +113,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Signal Scanner:**
 - Right-click to open it. It shows a live list (updated every second) of everything a receiver where you're standing would hear: every frequency, its strength ("ON 15", or "off" for a transmitter that's silent right now), and its strongest source.
 - For a transmitter, the source is its distance and direction: "Transmitter, 27 blocks south". If several transmitters on that frequency reach you, it points to the strongest one (the nearest, if they're equally strong) and says how many more there are ("+1 more").
-- For a repeater it says "Repeater, 78 blocks west" in the same way, and a repeater with nothing to repeat is listed as "off".
+- For a repeater it says "Repeater, 78 blocks west" in the same way, and a repeater with nothing to repeat is listed as "off". A converter is listed under the frequency it sends on ("Converter, 52 blocks west").
 - For a remote press it just says "Remote pulse" or "Remote toggle", with no distance or direction, so it can't be used to find players.
 - Strongest signals come first. Scroll the mouse wheel if there are more than 6.
 - **Track with an arrow:** click a transmitter's (or repeater's) row to track it. While you hold the scanner (either hand), an arrow at the top of the screen points to that transmitter as you walk and turn, with the distance underneath and how far up or down it is: "Frequency 77: 3 blocks, 30 up". The tracked row shows in green with a "»". Click it again to stop. If the transmitter is broken or re-tuned to another frequency, the scanner says it lost track. With several transmitters on one frequency, it tracks the one the row points to. Remote presses can't be tracked, so it still never points at players.
@@ -126,6 +127,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - If you have [Jade](https://modrinth.com/mod/jade) installed, just look at a block to see its details in Jade's info box, with no clicking:
   - **Radio Transmitter:** frequency, what it's sending ("Sending: 15" or "Sending: nothing") and its reach.
   - **Radio Repeater:** frequency, what it's repeating ("Repeating: 15" or "Nothing to repeat") and its reach.
+  - **Radio Converter:** both frequencies ("Listens on: 2026", "Sends on: 3001"), what it's converting and its reach.
   - **Radio Receiver** and **Compact Radio Receiver:** frequency, output ("Output: 15" or "Output: off") and how many transmitters and repeaters reach it ("Towers in range: 2").
   - **Radio Mast:** what's on top of its column and how far up ("Top: Radio Repeater, 3 blocks up"), and that tower's frequency. Handy at the foot of a tall tower.
 - Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
@@ -156,6 +158,19 @@ One transmitter only reaches so far. To go farther, put a **Radio Repeater** par
 - The pager, the Signal Scanner ("Repeater, 78 blocks west"), the remote's locator and the pager catch-up all take repeaters into account.
 
 ![A repeater on a mast tower repeating frequency 2026; the lamp 130 blocks from the transmitter lit through it; the scanner pointing to the repeater; and a remote press carried on by a second repeater](docs/images/repeater-tower.png)
+
+### Converters
+
+A **Radio Converter** works like a repeater, but it sends on a **different** frequency than it listens on. It hears frequency 2026 where it stands, say, and broadcasts it on 3001, at the same strength, with its own reach. That lets one lever or remote button drive things on a second frequency too, or link two separate networks.
+
+- **Setting it up:** right-click it with an empty hand to open its screen, with a **Listens on** box and a **Sends on** box (Tab moves between them, Enter saves). The screen also shows what it's converting right now and its reach. The Frequency Tuner sets (and copies) the frequency it listens on, like any radio block.
+- **Height, chains and towers:** it follows the same rules as a repeater. Reach grows with height, it needs no redstone, and it chains with repeaters and other converters (a repeater listening on 3001 carries the converted signal further). Like other towers, it relays remote presses on any frequency.
+- **No loops:** even two converters feeding each other (2026 to 3001 and 3001 back to 2026) go quiet as soon as the real source does.
+- **Remote presses:** a press on 2026 that reaches the converter is carried over to 3001. The message counts it ("reach 56 blocks + 2 towers + 1 repeater + 1 converter"), and "Heard by" and the signal light include the receivers on 3001.
+- **Everything else:** pagers on 3001 go off from it, the Signal Scanner lists it under the frequency it sends on ("Converter, 52 blocks west"), and the pager catch-up remembers turn-ons it carried. Jade shows both frequencies.
+- Breaking it keeps both frequencies on the dropped item.
+
+![The converter's screen being set to listen on 2026 and send on 3001; Jade showing it converting; the scanner hearing both frequencies; and the receiver on 3001 lit](docs/images/radio-converter.png)
 
 ### Reach
 
@@ -190,6 +205,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 ```
 
 **Radio Repeater:** a Radio Receiver and a Radio Transmitter, in any arrangement in the crafting grid.
+
+**Radio Converter:** a Radio Repeater and a Redstone Comparator, in any arrangement in the crafting grid.
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
@@ -239,13 +256,14 @@ src/main/java/com/reiko/signaltower/
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
   block/RadioRepeaterBlock.java          picks up its frequency and broadcasts it again
+  block/RadioConverterBlock.java         a repeater that sends on another frequency; opens its screen
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
   block/WallRedstoneBlock.java           redstone dust for walls
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
-  blockentity/RadioRepeaterBlockEntity.java  checks the repeater in with the network, drives its light
+  blockentity/RadioRepeaterBlockEntity.java  repeater and converter: checks in with the network, drives the light, a converter's output frequency
   item/TunerPresets.java                 5 favorite frequencies (data component)
   item/RadioFavorites.java               sneak + scroll and favorites for the tuner, remote and pager
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
@@ -271,6 +289,8 @@ src/main/java/com/reiko/signaltower/
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/MultiRemoteScreen.java          the Multi-Button Remote keypad
+  client/ConverterScreen.java            the Radio Converter's two frequencies
+  network/OpenConverterScreenPayload.java, ConfigureConverterPayload.java  converter screen <-> server
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
@@ -369,9 +389,16 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 78. a placed repeater checks in, lights up while repeating, reaches a receiver the transmitter can't, relays remote presses as a tower, stops when re-tuned or broken, and drops with its frequency;
 79. a remote press with no towers relaying is carried by a repeater on its frequency to a far receiver, and the message and light count it;
 80. the Jade info: the server reads each transmitter's, receiver's and repeater's frequency, signal, reach and towers in range, and what's on top of a mast column; the lines come out in the right order; without server data only what the block state shows is listed;
-81. quiet blocks say "Sending: nothing", "Output: off" and "Nothing to repeat", the compact receiver matches the full one, and other blocks get nothing.
+81. quiet blocks say "Sending: nothing", "Output: off" and "Nothing to repeat", the compact receiver matches the full one, and other blocks get nothing;
+82. a converter sends what it hears on another frequency at the same strength, isn't heard on the one it listens on, bumps its output frequency's revision when its input changes, and turns back into a repeater when set to the same frequency;
+83. two converters feeding each other (A to B and back) only stay on while a real source feeds them, and a repeater carries the converted frequency further;
+84. a remote press is carried across a converter: receivers on the other frequency count, and the message names it;
+85. a turn-on carried across a converter is remembered on the converted frequency too;
+86. the scanner lists a converter under the frequency it sends on, as "Converter", and can track it;
+87. converters are saved with their output frequency, and repeaters saved by 0.20.0 still load as repeaters;
+88. a placed converter is set from its screen's packet (only from within reach), lights a receiver on its output frequency, shows in Jade (and on the mast under it), and keeps both frequencies on the dropped item and when placed again.
 
-All 81 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 88 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
