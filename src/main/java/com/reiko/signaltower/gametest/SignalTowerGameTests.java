@@ -10,6 +10,7 @@ import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.RadioFavorites;
+import com.reiko.signaltower.item.ScannerTarget;
 import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
@@ -40,6 +41,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RedStoneWireBlock;
@@ -1674,5 +1676,103 @@ public final class SignalTowerGameTests {
         List<Component> lines = new java.util.ArrayList<>();
         stack.getItem().appendHoverText(stack, Item.TooltipContext.EMPTY, lines, net.minecraft.world.item.TooltipFlag.NORMAL);
         return lines.stream().map(SignalTowerGameTests::keyOf).toList();
+    }
+
+    // ---- Scanner tracking arrow ----
+
+    /** The scanner tracks the same transmitter it points to: the strongest reaching you, then the nearest. */
+    @GameTest(template = PLATFORM)
+    public static void scannerPicksTransmitterToTrack(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        network.updateTransmitter(here.south(40), 984, 15, 100);
+        network.updateTransmitter(here.west(5), 984, 7, 100);
+        network.updateTransmitter(here.east(20), 984, 15, 100);
+        network.updateTransmitter(here.north(90), 985, 15, 50); // doesn't reach
+        check(network.strongestTransmitter(level, here, 984).equals(java.util.Optional.of(here.east(20))),
+                "Should pick the strongest, nearest one (20 blocks east)");
+        check(network.strongestTransmitter(level, here, 985).isEmpty(), "One whose reach doesn't cover you can't be tracked");
+        check(network.strongestTransmitter(level, here, 986).isEmpty(), "Nothing on that frequency");
+        check(network.transmitterFrequencyAt(here.west(5)).getAsInt() == 984 && network.transmitterFrequencyAt(here).isEmpty(),
+                "Looking up a transmitter's frequency by position");
+        helper.succeed();
+    }
+
+    /**
+     * Tracking a placed transmitter stores where it is; re-tuning it to another frequency or
+     * breaking it loses the track. Remote-only signals and empty frequencies can't be tracked.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void scannerTracksAndLosesTransmitter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(4, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 980);
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 1));
+        ItemStack scanner = new ItemStack(ModRegistry.SIGNAL_SCANNER.get());
+        player.setItemInHand(InteractionHand.MAIN_HAND, scanner);
+        SignalNetwork network = SignalNetwork.get(level);
+        List<SignalNetwork.Coverage> remoteOnly = SignalNetwork.ownCoverage(player.blockPosition(), 10);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(keyOf(SignalScannerItem.track(level, player, scanner, 980)).endsWith("scanner_tracking"), "Should start tracking");
+                    ScannerTarget target = SignalScannerItem.getTarget(scanner);
+                    check(target != null && target.pos().equals(helper.absolutePos(tx)) && target.frequency() == 980
+                            && target.dimension().equals(level.dimension()), "Should remember the transmitter's position: " + target);
+                    check(SignalScannerItem.checkTarget(level, scanner) == null, "It's still there");
+                })
+                .thenExecute(() -> setFrequency(helper, tx, 981))
+                .thenWaitUntil(() -> check(SignalScannerItem.checkTarget(level, scanner) != null, "Re-tuning it should lose the track"))
+                .thenExecute(() -> {
+                    check(SignalScannerItem.getTarget(scanner) == null, "The target should be gone");
+                    SignalScannerItem.track(level, player, scanner, 981);
+                    check(SignalScannerItem.getTarget(scanner) != null, "Tracking the new frequency");
+                    helper.setBlock(tx, Blocks.AIR);
+                    Component lost = SignalScannerItem.checkTarget(level, scanner);
+                    check(lost != null && keyOf(lost).endsWith("scanner_lost") && SignalScannerItem.getTarget(scanner) == null,
+                            "Breaking it should lose the track");
+
+                    network.toggleLatch(983, remoteOnly);
+                    check(keyOf(SignalScannerItem.track(level, player, scanner, 983)).endsWith("scanner_cant_track")
+                            && SignalScannerItem.getTarget(scanner) == null, "A remote toggle has nothing to track");
+                    network.toggleLatch(983, remoteOnly);
+                    check(keyOf(SignalScannerItem.track(level, player, scanner, 982)).endsWith("scanner_cant_track"),
+                            "An empty frequency has nothing to track");
+
+                    scanner.set(ModRegistry.SCANNER_TARGET.get(), new ScannerTarget(1, helper.absolutePos(tx), level.dimension()));
+                    SignalScannerItem.stopTracking(scanner);
+                    check(SignalScannerItem.getTarget(scanner) == null, "Stopping should clear the target");
+                })
+                .thenSucceed();
+    }
+
+    /** The target survives saving and sync, and the arrow points the right way for each facing. */
+    @GameTest(template = PLATFORM)
+    public static void scannerTargetSavesAndArrowPoints(GameTestHelper helper) {
+        ScannerTarget original = new ScannerTarget(42, new BlockPos(-120, 70, 3000), Level.NETHER);
+        var saved = ScannerTarget.CODEC.encodeStart(JsonOps.INSTANCE, original).getOrThrow();
+        check(ScannerTarget.CODEC.parse(JsonOps.INSTANCE, saved).getOrThrow().equals(original), "Saving changed the target");
+        var buffer = Unpooled.buffer();
+        ScannerTarget.STREAM_CODEC.encode(buffer, original);
+        check(ScannerTarget.STREAM_CODEC.decode(buffer).equals(original), "Sync changed the target");
+
+        // Standing at block (0, 0), facing south (yaw 0) unless noted.
+        Object[][] cases = {
+                {new BlockPos(0, 64, 10), 0F, 0F, "south while facing south: straight ahead"},
+                {new BlockPos(10, 64, 0), 0F, -90F, "east while facing south: to the left"},
+                {new BlockPos(-10, 64, 0), 0F, 90F, "west while facing south: to the right"},
+                {new BlockPos(10, 64, 0), -90F, 0F, "east while facing east: straight ahead"},
+                {new BlockPos(10, 64, 0), 270F, 0F, "east while facing east (yaw 270): straight ahead"},
+                {new BlockPos(0, 64, 10), 90F, -90F, "south while facing west: to the left"},
+        };
+        for (Object[] c : cases) {
+            float angle = ScannerTarget.relativeAngle(0.5, 0.5, (Float) c[1], (BlockPos) c[0]);
+            check(Math.abs(angle - (Float) c[2]) < 0.5F, c[3] + ": expected " + c[2] + ", got " + angle);
+        }
+        float behind = ScannerTarget.relativeAngle(0.5, 0.5, 0F, new BlockPos(0, 64, -10));
+        check(Math.abs(Math.abs(behind) - 180F) < 0.5F, "north while facing south: behind, got " + behind);
+        helper.succeed();
     }
 }

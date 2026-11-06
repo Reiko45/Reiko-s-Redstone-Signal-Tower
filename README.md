@@ -110,6 +110,9 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - For a transmitter, the source is its distance and direction: "Transmitter, 27 blocks south". If several transmitters on that frequency reach you, it points to the strongest one (the nearest, if they're equally strong) and says how many more there are ("+1 more").
 - For a remote press it just says "Remote pulse" or "Remote toggle", with no distance or direction, so it can't be used to find players.
 - Strongest signals come first. Scroll the mouse wheel if there are more than 6.
+- **Track with an arrow:** click a transmitter's row to track it. While you hold the scanner (either hand), an arrow at the top of the screen points to that transmitter as you walk and turn, with the distance underneath and how far up or down it is: "Frequency 77: 3 blocks, 30 up". The tracked row shows in green with a "»". Click it again to stop. If the transmitter is broken or re-tuned to another frequency, the scanner says it lost track. With several transmitters on one frequency, it tracks the one the row points to. Remote presses can't be tracked, so it still never points at players.
+
+  ![Tracking frequency 42 in the scanner, then the arrow pointing to it facing north, south and east, and to the tower 30 blocks up](docs/images/scanner-arrow.png)
 - **Tune:** hold a Frequency Tuner, Remote Control, Multi-Button Remote or Radio Pager in your other hand, and each row's Tune button sets that frequency on it. A remote keeps its mode and pulse length, and a Multi-Button Remote changes only its selected button.
 
 ![The Signal Scanner listing five frequencies, after tuning the Remote Control in the off-hand to 42](docs/images/signal-scanner.png)
@@ -211,7 +214,9 @@ src/main/java/com/reiko/signaltower/
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
   item/PagerItem.java                    pocket receiver that beeps when its frequency turns on
-  item/SignalScannerItem.java            handheld that lists every frequency heard where you stand
+  item/SignalScannerItem.java            handheld that lists every frequency heard where you stand, and tracks one
+  item/ScannerTarget.java                the transmitter a scanner is tracking (data component), arrow angle
+  client/ScannerHud.java                 the tracking arrow at the top of the screen
   item/RemoteButtons.java                the 4 buttons' settings (data component), colors
   item/PulseLength.java                  pulse length presets, limits and labels
   item/RemoteLight.java                  the remotes' green/red status light after a press
@@ -307,7 +312,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 61. the remote's, pager's and tuner's tooltips list their favorites right under the frequency and explain scrolling;
 62. a pager posts its alert in chat (day and time, then the alert) as well as above the hotbar, and one with its chat log off only shows it above the hotbar;
 63. the chat line's day and time come from the world's day time, with days starting at midnight;
-64. the chat log is on by default, can be switched off and on, and the tooltip says which.
+64. the chat log is on by default, can be switched off and on, and the tooltip says which;
+65. the scanner tracks the same transmitter its row points to (strongest, then nearest), and can't track one whose reach doesn't cover you;
+66. tracking a placed transmitter stores where it is; re-tuning or breaking it loses the track; remote-only and empty frequencies can't be tracked; stopping clears it;
+67. the target survives saving and sync, and the arrow points ahead, left, right or behind correctly for each facing.
 
 ## License
 

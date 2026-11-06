@@ -9,6 +9,7 @@ import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
 import com.reiko.signaltower.network.ScrollFrequencyPayload;
+import com.reiko.signaltower.network.TrackTransmitterPayload;
 import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -65,6 +66,8 @@ public final class SignalTower {
                 ScrollFrequencyPayload::handle);
         registrar.playToServer(ConfigureFavoritesPayload.TYPE, ConfigureFavoritesPayload.STREAM_CODEC,
                 ConfigureFavoritesPayload::handle);
+        registrar.playToServer(TrackTransmitterPayload.TYPE, TrackTransmitterPayload.STREAM_CODEC,
+                TrackTransmitterPayload::handle);
         registrar.playToServer(ScannerRequestPayload.TYPE, ScannerRequestPayload.STREAM_CODEC,
                 ScannerRequestPayload::handle);
         registrar.playToClient(ScannerResultPayload.TYPE, ScannerResultPayload.STREAM_CODEC,

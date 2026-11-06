@@ -435,6 +435,36 @@ def scanner_item():
     return img
 
 
+def scanner_arrow():
+    """The Signal Scanner's on-screen arrow (pointing up; the game rotates it): bright green with
+    a dark outline so it shows against sky and ground alike."""
+    img = blank()
+    px = img.load()
+    fill, light, edge = (120, 240, 110, 255), (200, 255, 190, 255), (16, 40, 18, 255)
+    shape = set()
+    # Head: a triangle from row 1 (tip) to row 8, then a shaft down to row 14
+    for y in range(1, 9):
+        half = y - 1
+        for x in range(8 - half - 1, 8 + half + 1):
+            if 0 <= x < 16:
+                shape.add((x, y))
+    for y in range(9, 15):
+        for x in range(6, 10):
+            shape.add((x, y))
+    for (x, y) in shape:
+        px[x, y] = fill
+    for (x, y) in list(shape):
+        if x <= 7 and (x + 1, y) in shape and (x - 1, y) not in shape:
+            px[x, y] = light  # a shine down the left edge
+    for y in range(16):
+        for x in range(16):
+            if (x, y) in shape:
+                continue
+            if any((x + dx, y + dy) in shape for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                px[x, y] = edge
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -463,4 +493,7 @@ for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)
     for name, img in textures.items():
         img.save(folder / f"{name}.png")
+GUI = ITEM.parent / "gui"
+GUI.mkdir(parents=True, exist_ok=True)
+scanner_arrow().save(GUI / "scanner_arrow.png")
 print(f"wrote {len(blocks)} block and {len(items)} item textures to {ROOT}")

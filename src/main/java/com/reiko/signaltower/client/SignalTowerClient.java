@@ -26,6 +26,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
@@ -42,6 +44,7 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::registerBlockColors);
         modEventBus.addListener(SignalTowerClient::registerItemColors);
         modEventBus.addListener(SignalTowerClient::clientSetup);
+        modEventBus.addListener(SignalTowerClient::registerGuiLayers);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
     }
 
@@ -96,6 +99,11 @@ public final class SignalTowerClient {
     }
 
     /** Wall Redstone glows brighter red the stronger its signal, exactly like normal dust. */
+    /** The Signal Scanner's tracking arrow, drawn just above the boss bars' layer. */
+    private static void registerGuiLayers(RegisterGuiLayersEvent event) {
+        event.registerAbove(VanillaGuiLayers.BOSS_OVERLAY, ScannerHud.LAYER_ID, ScannerHud::render);
+    }
+
     /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */
     private static void registerItemColors(RegisterColorHandlersEvent.Item event) {
         event.register(MultiRemoteItem::tintColor, ModRegistry.MULTI_REMOTE.get());

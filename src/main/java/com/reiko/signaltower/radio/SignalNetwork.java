@@ -380,14 +380,11 @@ public final class SignalNetwork extends SavedData {
     /** The most frequencies one scan reports. */
     public static final int MAX_SCAN_RESULTS = 64;
 
-    /**
-     * Everything a receiver at {@code pos} could hear: every frequency with a transmitter whose
-     * reach covers it (including silent ones, with power 0) or a remote signal covering it.
-     * Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
-     */
-    public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos) {
-        record Best(int power, long distSq, BlockPos at, int count) {}
-        Map<Integer, Best> best = new HashMap<>();
+    /** Per frequency, the strongest transmitter reaching a spot (the nearest among equally strong ones), and how many reach it. */
+    private record BestTransmitter(int power, long distSq, BlockPos at, int count) {}
+
+    private Map<Integer, BestTransmitter> bestTransmitters(ServerLevel level, BlockPos pos) {
+        Map<Integer, BestTransmitter> best = new HashMap<>();
         List<BlockPos> stale = null;
         for (Map.Entry<BlockPos, Transmitter> entry : transmitters.entrySet()) {
             BlockPos at = entry.getKey();
@@ -403,18 +400,43 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            Best old = best.get(tx.frequency());
+            BestTransmitter old = best.get(tx.frequency());
             if (old == null) {
-                best.put(tx.frequency(), new Best(tx.power(), distSq, at, 1));
+                best.put(tx.frequency(), new BestTransmitter(tx.power(), distSq, at, 1));
             } else if (tx.power() > old.power() || (tx.power() == old.power() && distSq < old.distSq())) {
-                best.put(tx.frequency(), new Best(tx.power(), distSq, at, old.count() + 1));
+                best.put(tx.frequency(), new BestTransmitter(tx.power(), distSq, at, old.count() + 1));
             } else {
-                best.put(tx.frequency(), new Best(old.power(), old.distSq(), old.at(), old.count() + 1));
+                best.put(tx.frequency(), new BestTransmitter(old.power(), old.distSq(), old.at(), old.count() + 1));
             }
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
         }
+        return best;
+    }
+
+    /**
+     * The transmitter the Signal Scanner points to for {@code frequency} at {@code pos}: the
+     * strongest one whose reach covers it, the nearest among equally strong ones. Empty if none does.
+     */
+    public java.util.Optional<BlockPos> strongestTransmitter(ServerLevel level, BlockPos pos, int frequency) {
+        BestTransmitter best = bestTransmitters(level, pos).get(frequency);
+        return best == null ? java.util.Optional.empty() : java.util.Optional.of(best.at());
+    }
+
+    /** The frequency of the transmitter at {@code pos}, or empty if there's none in the network there. */
+    public java.util.OptionalInt transmitterFrequencyAt(BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        return tx == null ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(tx.frequency());
+    }
+
+    /**
+     * Everything a receiver at {@code pos} could hear: every frequency with a transmitter whose
+     * reach covers it (including silent ones, with power 0) or a remote signal covering it.
+     * Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
+     */
+    public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos) {
+        Map<Integer, BestTransmitter> best = bestTransmitters(level, pos);
 
         Map<Integer, Source> remotes = new HashMap<>();
         pulses.forEach((frequency, pulse) -> {
@@ -428,7 +450,7 @@ public final class SignalNetwork extends SavedData {
         frequencies.addAll(remotes.keySet());
         List<HeardFrequency> heard = new ArrayList<>();
         for (int frequency : frequencies) {
-            Best tx = best.get(frequency);
+            BestTransmitter tx = best.get(frequency);
             int count = tx == null ? 0 : tx.count();
             Source remote = remotes.get(frequency);
             if (remote != null) {

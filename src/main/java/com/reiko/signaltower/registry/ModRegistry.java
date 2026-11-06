@@ -12,6 +12,7 @@ import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.item.ScannerTarget;
 import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
@@ -96,6 +97,12 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("pager_chat_log", builder -> builder
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
+
+    /** The transmitter a Signal Scanner is tracking with its on-screen arrow. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ScannerTarget>> SCANNER_TARGET =
+            DATA_COMPONENTS.registerComponentType("scanner_target", builder -> builder
+                    .persistent(ScannerTarget.CODEC)
+                    .networkSynchronized(ScannerTarget.STREAM_CODEC));
 
     /** The Frequency Tuner's favorite frequencies. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<TunerPresets>> TUNER_PRESETS =

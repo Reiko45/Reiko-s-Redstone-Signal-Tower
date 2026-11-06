@@ -61,6 +61,8 @@
   - `SignalNetwork.scanAt(level, pos)` goes through every transmitter in the dimension and keeps, per frequency, the strongest one whose reach covers `pos` (the nearest, among equally strong ones), plus a count. Pulses and latches covering `pos` make a frequency strength 15 with source `REMOTE_PULSE`/`REMOTE_TOGGLE`, and no distance or direction, so it can't locate players. Sorted strongest first, then by frequency; at most 64. Stale transmitter entries are dropped, as in `listen`.
   - `ScannerScreen` (not a pause screen, so it stays live in singleplayer) sends `ScannerRequestPayload` every 20 ticks. The server answers only players holding a scanner, with `ScannerResultPayload`.
   - Tune reuses the existing packets: `ConfigureRadioItemPayload` for the tuner, Remote Control (sending its current mode and pulse length back unchanged) and pager; `ConfigureMultiRemotePayload` with the selected button re-tuned (`SignalScannerItem.retuneSelected`) for the Multi-Button Remote.
+  - Tracking: clicking a row (with a transmitter in it) sends `TrackTransmitterPayload`. The server stores the transmitter from `SignalNetwork.strongestTransmitter` (the same pick as the row, shared through `bestTransmitters`) in the scanner's `scanner_target` component (frequency, position, dimension; synced). `SignalScannerItem.inventoryTick` checks once a second that it's still a transmitter on that frequency (`transmitterFrequencyAt`), and drops it with a "lost track" message if not.
+  - `ScannerHud` is a GUI layer registered above `VanillaGuiLayers.BOSS_OVERLAY`. While a scanner with a target is held (main hand, then off-hand), it draws `textures/gui/scanner_arrow.png` at the top center, rotated by `ScannerTarget.relativeAngle` (0 = ahead, clockwise; from the interpolated position and view yaw), and the distance (plus "N up/down" when 3 or more). In another dimension it just says so; within a block it says "you're there".
 - **Favorites and scrolling (tuner, Remote Control, pager):**
   - `RadioFavorites` holds the shared logic. `isScrollable` is true for the tuner, the Remote Control and the pager; the Multi-Button Remote keeps sneak + scroll for picking its button.
   - Favorites live in the `tuner_presets` component (the name dates from v0.15.0, when only the tuner had them; kept so saved favorites still load). It's a `TunerPresets` record that always has 5 slots, 0 meaning empty, removed entirely when every slot is empty.
@@ -96,12 +98,13 @@
 
 ## Verified
 
-- 64 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 67 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - the scanner tracked frequency 42 (row in green with "»"); the arrow pointed behind-left facing north, ahead facing south and right facing east, matching the target a little west of due south, 27 blocks away; tracking the tower showed "3 blocks, 30 up"; breaking its transmitter showed "Lost track of frequency 77" and removed the arrow;
   - three remote presses put three "[Day 1, 12:00] Radio Pager: frequency 12 is ON (strength 15)" lines in chat; after `/time set 74500` and `/time add 15700` the stamps read Day 4, 08:30 and Day 5, 00:12; a pager with its chat log switched off in its screen only showed the alert above the hotbar;
   - sneak + scroll took a Remote Control from 9 to 10 and a pager from 5 to 4; favorites saved in the remote's screen (which fits the locator lines, favorites, Mode/Length and Done); Ctrl-scrolling wrapped from 42 to favorite 1; a tuner kept the favorites it saved in v0.15.0;
   - sneak + scroll took the tuner from 40 to 42 without moving the hotbar; favorites saved, cleared and used in the screen; Sneak + Ctrl + scroll went 42 → 77 → 5 → 42 (skipping the empty slot); favorites were still there after reloading the world and show in the tooltip;
@@ -112,6 +115,7 @@
 
 ## History
 
+- **v0.18.0:** scanner tracking arrow.
 - **v0.17.0:** pager chat log.
 - **v0.16.0:** scroll and favorites for the Remote Control and Radio Pager.
 - **v0.15.0:** tuner scroll and favorites.
