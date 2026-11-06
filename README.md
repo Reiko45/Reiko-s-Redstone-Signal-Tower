@@ -12,7 +12,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
-| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. |
+| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
@@ -29,7 +29,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 2. **Power it from the ground.** Put a lever, redstone wire, or any other signal next to any mast in the column, or next to the transmitter itself.
 3. **Tune it.** Right-click the air with a Frequency Tuner and type a frequency (any whole number from 1 to 999,999,999). Then right-click the transmitter with the tuner.
 
-   ![The Frequency Tuner screen](docs/images/tuner-screen.png)
+   ![The Frequency Tuner screen, with its row of favorites](docs/images/tuner-screen.png)
 
 4. **Set up the far end.** Put a Radio Receiver where you want the signal and right-click it with the same tuner. It outputs whatever the transmitter is sending.
 
@@ -39,6 +39,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Right-click the air: type a new frequency.
 - Right-click a transmitter or receiver: tune it to the tuner's frequency.
 - Sneak + right-click a transmitter or receiver: copy its frequency into the tuner.
+- Sneak + scroll: step the tuner's frequency up or down by 1. The new number shows above your hotbar, and your hotbar slot doesn't move.
+- Sneak + Ctrl + scroll: jump to the next favorite (scroll down) or the previous one (scroll up).
+- **Favorites:** the tuner's screen has 5 favorite slots under the frequency.
+  - Click an empty slot to save the frequency above it.
+  - Click a saved one to put its frequency in the box.
+  - Sneak-click a saved one to replace it with the frequency above.
+  - Right-click a saved one to clear it.
+
+  Favorites are saved straight away (even if you then press Cancel), stay on the tuner, and are listed in its tooltip. The slot matching the frequency in the box shows in green.
+
+  ![Saving favorites in the tuner's screen, then jumping between them with Sneak + Ctrl + scroll](docs/images/tuner-favorites.png)
 
 **Remote Control:**
 - Right-click: press the button.
@@ -185,6 +196,7 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
+  item/TunerPresets.java                 the tuner's 5 favorites (data component)
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
@@ -276,7 +288,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 52. with several transmitters on one frequency, it points to the strongest, then the nearest, and counts them all;
 53. remote signals show as "remote" with no distance or direction, and remotes that don't cover you aren't listed;
 54. a real placed transmitter shows up in a scan of the world;
-55. the Tune buttons work on the tuner, both remotes and the pager, and change only the Multi-Button Remote's selected button's frequency.
+55. the Tune buttons work on the tuner, both remotes and the pager, and change only the Multi-Button Remote's selected button's frequency;
+56. tuner favorites always have 5 slots, empty bad numbers, cap huge ones, and can be saved and cleared;
+57. jumping between favorites goes in slot order, skips empty slots and wraps around, both ways;
+58. favorites survive saving and network sync, and a tuner without any has no extra data;
+59. sneak + scroll steps by 1 and stops at 1 and 999,999,999; with Ctrl it jumps between favorites, and says so when there are none.
 
 ## License
 

@@ -1,6 +1,7 @@
 package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.item.RemoteButtons;
+import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import net.minecraft.client.Minecraft;
@@ -22,6 +23,11 @@ public final class ClientHooks {
     public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title,
                                            @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks));
+    }
+
+    /** Opens the tuner's frequency screen, with its row of favorites. */
+    public static void openTunerScreen(InteractionHand hand, int frequency, Component title, TunerPresets presets) {
+        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, null, null, presets));
     }
 
     /** A locator answer arrived: hand it to the open remote screen, if there is one. */

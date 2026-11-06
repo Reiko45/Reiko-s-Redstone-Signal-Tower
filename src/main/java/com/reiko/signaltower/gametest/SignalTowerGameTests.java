@@ -9,10 +9,12 @@ import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.SignalScannerItem;
+import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
 import com.reiko.signaltower.item.RemoteControlItem;
+import com.reiko.signaltower.radio.Frequency;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -1415,6 +1417,91 @@ public final class SignalTowerGameTests {
         check(tuned.button(2).equals(new RemoteButtons.Button(978, true, 40, "Gate", DyeColor.PINK)),
                 "Only the selected button's frequency should change, got " + tuned.button(2));
         check(tuned.button(0).equals(buttons.button(0)), "Other buttons shouldn't change");
+        helper.succeed();
+    }
+
+    // ---- Tuner favorites and scrolling ----
+
+    /** Favorites always have exactly 5 slots; 0 means empty, and bad numbers are fixed. */
+    @GameTest(template = PLATFORM)
+    public static void tunerFavoritesKeepFiveSlots(GameTestHelper helper) {
+        check(TunerPresets.EMPTY.slots().equals(List.of(0, 0, 0, 0, 0)) && !TunerPresets.EMPTY.hasAny(), "Empty favorites");
+        TunerPresets messy = new TunerPresets(List.of(42, -7, Integer.MAX_VALUE, 0, 5, 99, 100));
+        check(messy.slots().equals(List.of(42, 0, Frequency.MAX, 0, 5)),
+                "Should keep 5 slots, empty the bad one and cap the huge one, got " + messy.slots());
+        TunerPresets short1 = new TunerPresets(List.of(8));
+        check(short1.slots().equals(List.of(8, 0, 0, 0, 0)), "Missing slots should be empty, got " + short1.slots());
+        TunerPresets edited = TunerPresets.EMPTY.with(2, 77).with(4, 5).cleared(4);
+        check(edited.slots().equals(List.of(0, 0, 77, 0, 0)) && edited.indexOf(77) == 2 && edited.indexOf(5) == -1,
+                "Saving and clearing slots, got " + edited.slots());
+        helper.succeed();
+    }
+
+    /** Jumping between favorites goes in slot order, skips empty slots and wraps around, both ways. */
+    @GameTest(template = PLATFORM)
+    public static void tunerFavoritesCycle(GameTestHelper helper) {
+        TunerPresets presets = new TunerPresets(List.of(0, 42, 0, 7, 300));
+        check(presets.next(42, false).getAsInt() == 7, "After 42 comes 7");
+        check(presets.next(7, false).getAsInt() == 300, "After 7 comes 300");
+        check(presets.next(300, false).getAsInt() == 42, "After 300 it wraps to 42");
+        check(presets.next(42, true).getAsInt() == 300, "Before 42 (backwards) is 300");
+        check(presets.next(1234, false).getAsInt() == 42, "From a frequency that isn't a favorite, down goes to the first");
+        check(presets.next(1234, true).getAsInt() == 300, "From a frequency that isn't a favorite, up goes to the last");
+        check(TunerPresets.EMPTY.next(42, false).isEmpty(), "No favorites, nowhere to jump");
+        helper.succeed();
+    }
+
+    /** Favorites survive saving and network sync, and a tuner with none saved has no extra data. */
+    @GameTest(template = PLATFORM)
+    public static void tunerFavoritesSurviveSaveAndSync(GameTestHelper helper) {
+        TunerPresets original = new TunerPresets(List.of(5, 0, 1_200_000, 0, 42));
+        var saved = TunerPresets.CODEC.encodeStart(JsonOps.INSTANCE, original).getOrThrow();
+        check(TunerPresets.CODEC.parse(JsonOps.INSTANCE, saved).getOrThrow().equals(original), "Saving changed the favorites");
+        var buffer = Unpooled.buffer();
+        TunerPresets.STREAM_CODEC.encode(buffer, original);
+        check(TunerPresets.STREAM_CODEC.decode(buffer).equals(original), "Network sync changed the favorites");
+
+        ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+        check(FrequencyTunerItem.getPresets(tuner).equals(TunerPresets.EMPTY), "A new tuner has no favorites");
+        FrequencyTunerItem.setPresets(tuner, original);
+        check(FrequencyTunerItem.getPresets(tuner).equals(original), "The tuner should keep its favorites");
+        FrequencyTunerItem.setPresets(tuner, TunerPresets.EMPTY);
+        check(!tuner.has(ModRegistry.TUNER_PRESETS.get()), "Clearing every favorite should remove the data");
+        helper.succeed();
+    }
+
+    /** Sneak + scroll steps by 1 and stops at the ends; with Ctrl it jumps between favorites. */
+    @GameTest(template = PLATFORM)
+    public static void tunerScrollStepsAndJumps(GameTestHelper helper) {
+        ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+        FrequencyTunerItem.setFrequency(tuner, 41);
+        FrequencyTunerItem.scroll(tuner, true, false);
+        check(FrequencyTunerItem.getFrequency(tuner) == 42, "Scrolling up should go to 42");
+        FrequencyTunerItem.scroll(tuner, false, false);
+        FrequencyTunerItem.scroll(tuner, false, false);
+        check(FrequencyTunerItem.getFrequency(tuner) == 40, "Scrolling down twice should go to 40");
+        FrequencyTunerItem.setFrequency(tuner, Frequency.MIN);
+        FrequencyTunerItem.scroll(tuner, false, false);
+        check(FrequencyTunerItem.getFrequency(tuner) == Frequency.MIN, "It shouldn't go below " + Frequency.MIN);
+        FrequencyTunerItem.setFrequency(tuner, Frequency.MAX);
+        FrequencyTunerItem.scroll(tuner, true, false);
+        check(FrequencyTunerItem.getFrequency(tuner) == Frequency.MAX, "It shouldn't go above " + Frequency.MAX);
+
+        var none = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, true).getContents();
+        check(none.getKey().endsWith("tuner_no_favorites") && FrequencyTunerItem.getFrequency(tuner) == Frequency.MAX,
+                "With no favorites, Ctrl-scrolling should say so and change nothing");
+
+        FrequencyTunerItem.setPresets(tuner, new TunerPresets(List.of(5, 0, 77)));
+        var jumped = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, true).getContents();
+        check(FrequencyTunerItem.getFrequency(tuner) == 5, "Ctrl-scrolling down should jump to the first favorite");
+        check(jumped.getKey().endsWith("tuner_scrolled_favorite") && Integer.valueOf(1).equals(jumped.getArgs()[1]),
+                "The message should say it's favorite 1");
+        FrequencyTunerItem.scroll(tuner, false, true);
+        check(FrequencyTunerItem.getFrequency(tuner) == 77, "Next favorite after 5 is 77");
+        FrequencyTunerItem.scroll(tuner, true, false);
+        var stepped = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, false).getContents();
+        check(FrequencyTunerItem.getFrequency(tuner) == 77 && stepped.getKey().endsWith("tuner_scrolled_favorite"),
+                "Stepping back onto a favorite should say so");
         helper.succeed();
     }
 }

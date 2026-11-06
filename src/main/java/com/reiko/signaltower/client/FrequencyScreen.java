@@ -1,7 +1,10 @@
 package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
+import net.minecraft.ChatFormatting;
 import com.reiko.signaltower.item.PulseLength;
+import com.reiko.signaltower.item.TunerPresets;
+import com.reiko.signaltower.network.ConfigureTunerPresetsPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
@@ -9,6 +12,7 @@ import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -18,8 +22,10 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Type a frequency for the Frequency Tuner or Remote Control (plus the remote's mode).
- * Enter or Done saves it, Escape cancels.
+ * Type a frequency for the Frequency Tuner, Remote Control or Radio Pager (plus the remote's mode).
+ * Enter or Done saves it, Escape cancels. The tuner also gets a row of favorites: click an empty
+ * one to save the frequency above, click a saved one to use it, sneak-click to replace it,
+ * right-click to clear it. Favorites are saved straight away, even if you then press Cancel.
  */
 public class FrequencyScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".tuner";
@@ -38,6 +44,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     private int scanTimer;
     private EditBox input;
     private Button doneButton;
+    /** The tuner's favorites; null for the remote and pager. */
+    private @Nullable TunerPresets presets;
+    private final Button[] presetButtons = new Button[TunerPresets.COUNT];
 
     public FrequencyScreen(InteractionHand hand, int frequency, Component title,
                            @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
@@ -46,6 +55,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         this.initialFrequency = frequency;
         this.toggleMode = toggleMode;
         this.pulseTicks = pulseTicks == null ? PulseLength.DEFAULT_TICKS : pulseTicks;
+    }
+
+    /** The tuner's screen, with its favorites. */
+    public FrequencyScreen(InteractionHand hand, int frequency, Component title,
+                           @Nullable Boolean toggleMode, @Nullable Integer pulseTicks, @Nullable TunerPresets presets) {
+        this(hand, frequency, title, toggleMode, pulseTicks);
+        this.presets = presets;
     }
 
     @Override
@@ -59,6 +75,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         input.setValue(Integer.toString(initialFrequency));
         input.setResponder(text -> {
             updateDoneButton();
+            updatePresetButtons();
             scan = null;     // show "checking" until the new frequency's answer arrives
             scanTimer = 5;
         });
@@ -71,6 +88,17 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
 
         // The remote's mode button sits between the frequency row and Done/Cancel, under the locator and reach lines.
         int buttonsY = toggleMode != null ? centerY + 42 : centerY + 22;
+        if (presets != null) {
+            // Five favorites under the frequency row, with a "Favorites" heading drawn in render()
+            int rowX = centerX - (TunerPresets.COUNT * 64 - 4) / 2;
+            for (int i = 0; i < TunerPresets.COUNT; i++) {
+                int slot = i;
+                presetButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> pressPreset(slot))
+                        .bounds(rowX + i * 64, centerY + 26, 60, 20).build());
+            }
+            updatePresetButtons();
+            buttonsY = centerY + 52;
+        }
         if (toggleMode != null) {
             addRenderableWidget(Button.builder(modeLabel(), button -> {
                 toggleMode = !toggleMode;
@@ -92,6 +120,58 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
 
         setInitialFocus(input);
         updateDoneButton();
+    }
+
+    /** Click: use a saved favorite, or save the frequency above into an empty one. Sneak-click: replace. */
+    private void pressPreset(int slot) {
+        if (presets == null) {
+            return;
+        }
+        if (!presets.isEmpty(slot) && !Screen.hasShiftDown()) {
+            input.setValue(Integer.toString(presets.get(slot)));
+            return;
+        }
+        parsed().ifPresent(frequency -> setPresets(presets.with(slot, frequency)));
+    }
+
+    private void setPresets(TunerPresets newPresets) {
+        presets = newPresets;
+        PacketDistributor.sendToServer(new ConfigureTunerPresetsPayload(hand == InteractionHand.OFF_HAND, newPresets));
+        updatePresetButtons();
+    }
+
+    private void updatePresetButtons() {
+        if (presets == null || presetButtons[0] == null) {
+            return;
+        }
+        int current = parsed().orElse(-1);
+        for (int i = 0; i < TunerPresets.COUNT; i++) {
+            Button button = presetButtons[i];
+            if (presets.isEmpty(i)) {
+                button.setMessage(Component.literal("+").withStyle(ChatFormatting.GRAY));
+                button.setTooltip(Tooltip.create(Component.translatable(KEY + ".favorite_empty", i + 1)));
+            } else {
+                int frequency = presets.get(i);
+                Component label = Component.literal(Integer.toString(frequency));
+                button.setMessage(frequency == current ? label.copy().withStyle(ChatFormatting.GREEN) : label);
+                button.setTooltip(Tooltip.create(Component.translatable(KEY + ".favorite", i + 1, frequency)));
+            }
+        }
+    }
+
+    /** Right-click a saved favorite to clear it. */
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT && presets != null) {
+            for (int i = 0; i < TunerPresets.COUNT; i++) {
+                if (presetButtons[i] != null && presetButtons[i].isMouseOver(mouseX, mouseY) && !presets.isEmpty(i)) {
+                    presetButtons[i].playDownSound(minecraft.getSoundManager());
+                    setPresets(presets.cleared(i));
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private Component modeLabel() {
@@ -186,6 +266,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         if (toggleMode != null) {
             graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, centerY + 16, 0xFFFFFF);
             graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, centerY + 28, 0xFFFFFF);
+        }
+        if (presets != null) {
+            graphics.drawCenteredString(font, Component.translatable(KEY + ".favorites"), centerX, centerY + 15, 0xA0A0A0);
         }
     }
 

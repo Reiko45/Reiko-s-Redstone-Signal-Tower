@@ -7,6 +7,8 @@ import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
+import com.reiko.signaltower.network.ScrollTunerPayload;
+import com.reiko.signaltower.network.ConfigureTunerPresetsPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -56,6 +58,10 @@ public final class SignalTower {
                 SelectRemoteButtonPayload::handle);
         registrar.playToServer(RemoteScanRequestPayload.TYPE, RemoteScanRequestPayload.STREAM_CODEC,
                 RemoteScanRequestPayload::handle);
+        registrar.playToServer(ScrollTunerPayload.TYPE, ScrollTunerPayload.STREAM_CODEC,
+                ScrollTunerPayload::handle);
+        registrar.playToServer(ConfigureTunerPresetsPayload.TYPE, ConfigureTunerPresetsPayload.STREAM_CODEC,
+                ConfigureTunerPresetsPayload::handle);
         registrar.playToServer(ScannerRequestPayload.TYPE, ScannerRequestPayload.STREAM_CODEC,
                 ScannerRequestPayload::handle);
         registrar.playToClient(ScannerResultPayload.TYPE, ScannerResultPayload.STREAM_CODEC,

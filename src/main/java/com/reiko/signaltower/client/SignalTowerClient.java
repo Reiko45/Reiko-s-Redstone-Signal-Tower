@@ -2,19 +2,24 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.WallRedstoneBlock;
+import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.RemoteLight;
+import com.reiko.signaltower.network.ScrollTunerPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.registry.ModRegistry;
+
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.item.ItemProperties;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.RedStoneWireBlock;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -71,17 +76,23 @@ public final class SignalTowerClient {
         if (player == null || minecraft.screen != null || !player.isShiftKeyDown() || event.getScrollDeltaY() == 0) {
             return;
         }
-        InteractionHand hand;
-        if (player.getMainHandItem().getItem() instanceof MultiRemoteItem) {
-            hand = InteractionHand.MAIN_HAND;
-        } else if (player.getOffhandItem().getItem() instanceof MultiRemoteItem) {
-            hand = InteractionHand.OFF_HAND;
-        } else {
-            return;
+        // The main hand wins; then the off-hand.
+        for (InteractionHand hand : InteractionHand.values()) {
+            Item item = player.getItemInHand(hand).getItem();
+            boolean offhand = hand == InteractionHand.OFF_HAND;
+            if (item instanceof MultiRemoteItem) {
+                event.setCanceled(true);
+                // Scrolling down moves to the next button, the same way it moves to the next hotbar slot.
+                PacketDistributor.sendToServer(new SelectRemoteButtonPayload(offhand, event.getScrollDeltaY() < 0));
+                return;
+            }
+            if (item instanceof FrequencyTunerItem) {
+                event.setCanceled(true);
+                // Up raises the frequency by 1; with Ctrl it jumps between favorites (down = next).
+                PacketDistributor.sendToServer(new ScrollTunerPayload(offhand, event.getScrollDeltaY() > 0, Screen.hasControlDown()));
+                return;
+            }
         }
-        event.setCanceled(true);
-        // Scrolling down moves to the next button, the same way it moves to the next hotbar slot.
-        PacketDistributor.sendToServer(new SelectRemoteButtonPayload(hand == InteractionHand.OFF_HAND, event.getScrollDeltaY() < 0));
     }
 
     /** Wall Redstone glows brighter red the stronger its signal, exactly like normal dust. */

@@ -13,6 +13,7 @@ import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.SignalScannerItem;
+import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
@@ -89,6 +90,12 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("pager_silent", builder -> builder
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
+
+    /** The Frequency Tuner's favorite frequencies. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<TunerPresets>> TUNER_PRESETS =
+            DATA_COMPONENTS.registerComponentType("tuner_presets", builder -> builder
+                    .persistent(TunerPresets.CODEC)
+                    .networkSynchronized(TunerPresets.STREAM_CODEC));
 
     // ---- Blocks ----
 
