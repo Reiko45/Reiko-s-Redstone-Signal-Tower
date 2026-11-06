@@ -190,13 +190,14 @@ public class ScannerScreen extends Screen {
                         : entry.transmitters() == 1 ? Component.translatable(KEY + "plus_one", remote)
                         : Component.translatable(KEY + "plus_many", remote, entry.transmitters());
             }
-            case TRANSMITTER -> {
+            case TRANSMITTER, REPEATER -> {
                 Component where = entry.distance() <= 0 || entry.direction() < 0
                         ? Component.translatable(LOCATOR + "here")
                         : Component.translatable(LOCATOR + "distance", format(entry.distance()),
                                 Component.translatable(LOCATOR + "dir_" + DIRECTIONS[entry.direction() & 7]));
-                yield entry.transmitters() <= 1 ? Component.translatable(KEY + "transmitter", where)
-                        : Component.translatable(KEY + "transmitters", where, entry.transmitters() - 1);
+                String kind = entry.sourceType() == SignalNetwork.Source.REPEATER ? "repeater" : "transmitter";
+                yield entry.transmitters() <= 1 ? Component.translatable(KEY + kind, where)
+                        : Component.translatable(KEY + kind + "s", where, entry.transmitters() - 1);
             }
         };
     }

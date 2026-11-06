@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "reikos_signal_tower:block/radio_repeater"
+    },
+    "lit=true": {
+      "model": "reikos_signal_tower:block/radio_repeater_on"
+    }
+  }
+}

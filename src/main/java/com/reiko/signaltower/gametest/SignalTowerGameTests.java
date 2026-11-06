@@ -1903,4 +1903,244 @@ public final class SignalTowerGameTests {
         check(!tuner.has(ModRegistry.PAGER_AWAY_SINCE.get()), "Other items aren't touched");
         helper.succeed();
     }
+
+    // ---- Radio Repeater ----
+
+    /**
+     * A repeater in a transmitter's reach sends the signal on with its own reach, at the same
+     * strength; a second repeater carries it further. Only its own frequency is repeated.
+     */
+    @GameTest(template = PLATFORM)
+    public static void repeaterPassesSignalAlong(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(7_000_000, 64, 7_000_000); // far away and unloaded: entries count as standing
+        network.updateTransmitter(tx, 1301, 9, 50);
+        check(network.listen(level, 1301, tx.east(90)).power() == 0, "Too far for the transmitter alone");
+        network.updateRepeater(tx.east(40), 1301, 60);
+        check(network.repeaterPower(level, tx.east(40)) == 9, "The repeater should hear the transmitter");
+        SignalNetwork.Reception far = network.listen(level, 1301, tx.east(90));
+        check(far.power() == 9 && far.transmittersInReach() == 1, "90 blocks east should hear 9 through the repeater, got " + far);
+        check(network.listen(level, 1301, tx.east(130)).power() == 0, "Past the repeater's reach");
+        network.updateRepeater(tx.east(95), 1301, 60);
+        check(network.listen(level, 1301, tx.east(150)).power() == 9, "A second repeater carries it further");
+        network.updateRepeater(tx.east(200), 1301, 60);
+        check(network.repeaterPower(level, tx.east(200)) == 0, "A repeater nothing reaches stays quiet");
+        network.updateRepeater(tx.east(45), 1302, 500);
+        check(network.listen(level, 1302, tx.east(300)).power() == 0, "A repeater on another frequency doesn't pick it up");
+        network.updateTransmitter(tx, 1301, 15, 50);
+        check(network.listen(level, 1301, tx.east(150)).power() == 15, "A stronger signal is passed on as it is");
+        network.updateTransmitter(tx, 1301, 0, 50);
+        check(network.listen(level, 1301, tx.east(150)).power() == 0 && network.repeaterPower(level, tx.east(40)) == 0,
+                "Switching the transmitter off switches the chain off");
+        network.updateTransmitter(tx, 1301, 15, 50);
+        network.removeRepeater(tx.east(40));
+        check(network.listen(level, 1301, tx.east(150)).power() == 0, "Removing the first repeater breaks the chain");
+        check(network.repeaterFrequencyAt(tx.east(95)).getAsInt() == 1301 && network.repeaterFrequencyAt(tx.east(40)).isEmpty()
+                && network.towerFrequencyAt(tx).getAsInt() == 1301, "Looking up repeaters by position");
+        helper.succeed();
+    }
+
+    /**
+     * Two repeaters in each other's reach pass a signal back and forth only while a real source
+     * feeds them: when it goes quiet, both go quiet. Each repeats the strongest signal it gets.
+     */
+    @GameTest(template = PLATFORM)
+    public static void repeatersCantKeepEachOtherOn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos a = new BlockPos(-7_000_000, 64, 7_000_000);
+        BlockPos b = a.east(50);
+        network.updateRepeater(a, 1303, 60);
+        network.updateRepeater(b, 1303, 60);
+        check(network.repeaterPower(level, a) == 0 && network.repeaterPower(level, b) == 0, "Nothing to repeat yet");
+        network.updateTransmitter(a.west(30), 1303, 15, 40);
+        check(network.repeaterPower(level, a) == 15 && network.repeaterPower(level, b) == 15, "The source reaches A, A reaches B");
+        network.updateTransmitter(a.west(30), 1303, 0, 40);
+        check(network.repeaterPower(level, a) == 0 && network.repeaterPower(level, b) == 0,
+                "With the source quiet, the two must not keep each other on");
+
+        network.tick(100, 0);
+        network.pulse(1303, SignalNetwork.ownCoverage(b.east(20), 30), 104);
+        check(network.repeaterPower(level, a) == 15 && network.listen(level, 1303, a.west(55)).power() == 15,
+                "A remote pulse near B goes through B and A");
+        network.tick(104, 0);
+        check(network.repeaterPower(level, a) == 0 && network.repeaterPower(level, b) == 0, "When the pulse ends, so does the repeating");
+        check(network.toggleLatch(1303, SignalNetwork.ownCoverage(b.east(20), 30)), "Toggle on");
+        check(network.repeaterPower(level, a) == 15, "A toggle is repeated too");
+        check(!network.toggleLatch(1303, SignalNetwork.ownCoverage(b.east(20), 30)), "Toggle off");
+        check(network.repeaterPower(level, a) == 0, "And stops when switched off");
+
+        network.updateTransmitter(a.west(30), 1303, 5, 40);  // reaches A only
+        network.updateTransmitter(b.east(30), 1303, 12, 40); // reaches B only
+        check(network.repeaterPower(level, a) == 12 && network.repeaterPower(level, b) == 12,
+                "A gets the stronger 12 from B rather than its own 5");
+        helper.succeed();
+    }
+
+    /** Repeaters are saved with the world. */
+    @GameTest(template = PLATFORM)
+    public static void repeatersSurviveSaveAndLoad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(-7_000_000, 64, -7_000_000);
+        network.updateTransmitter(tx, 1304, 11, 40);
+        network.updateRepeater(tx.north(30), 1304, 70);
+        SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(loaded.repeaterFrequencyAt(tx.north(30)).getAsInt() == 1304, "The repeater should be loaded back");
+        check(loaded.listen(level, 1304, tx.north(95)).power() == 11, "And still repeat after loading");
+        helper.succeed();
+    }
+
+    /**
+     * A remote press counts the receivers that repeaters on its frequency carry it to, and the
+     * message names them. Repeaters on other frequencies, or already relaying as towers, aren't added.
+     */
+    @GameTest(template = PLATFORM)
+    public static void remoteReachesThroughRepeaters(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(7_000_000, 64, -7_000_000);
+        List<SignalNetwork.Coverage> own = SignalNetwork.ownCoverage(here, 30);
+        network.updateRepeater(here.east(20), 1305, 50);
+        network.updateRepeater(here.east(65), 1305, 50);
+        network.updateRepeater(here.west(20), 1306, 50);
+        network.trackReceiver(here.east(110), 1305);
+        check(network.countReceivers(1305, own) == 0, "Out of the remote's own reach");
+        List<SignalNetwork.Coverage> reached = network.withRepeaters(level, 1305, own);
+        check(reached.size() == 3, "Both repeaters on 1305 should be added, got " + reached);
+        check(network.countReceivers(1305, reached) == 1, "The far receiver hears it through two repeaters");
+        List<SignalNetwork.Coverage> asTower = List.of(own.get(0), new SignalNetwork.Coverage(here.east(20), 50, true));
+        check(network.withRepeaters(level, 1305, asTower).size() == 3, "A repeater already relaying as a tower isn't added twice");
+        check(network.withRepeaters(level, 1307, own) == own, "No repeaters on that frequency: unchanged");
+        check(keyOf(RemoteControlItem.describeReach(30, 1, 2)).endsWith("reach_plus_repeaters")
+                && keyOf(RemoteControlItem.describeReach(30, 0, 1)).endsWith("reach_plus_one_repeater")
+                && keyOf(RemoteControlItem.describeReach(30, 2, 0)).endsWith("reach_towers"), "Reach wording");
+        helper.succeed();
+    }
+
+    /** A turn-on is remembered over the repeaters it reached, so a pager there catches up on it. */
+    @GameTest(template = PLATFORM)
+    public static void turnOnsReachThroughRepeaters(GameTestHelper helper) {
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(6_000_000, 64, 6_000_000);
+        network.updateRepeater(tx.south(40), 1308, 60);
+        network.updateTransmitter(tx, 1308, 15, 50);
+        check(network.turnOnsSince(1308, -1, tx.south(90)).size() == 1, "90 blocks south heard it through the repeater");
+        check(network.turnOnsSince(1308, -1, tx.south(110)).isEmpty(), "Past the repeater it didn't");
+        helper.succeed();
+    }
+
+    /**
+     * The Signal Scanner names a repeater as the source, with its distance and direction, can
+     * track it, and lists a quiet repeater as off. An equally strong, equally near transmitter wins.
+     */
+    @GameTest(template = PLATFORM)
+    public static void scannerShowsRepeaters(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos tx = new BlockPos(6_000_000, 64, -6_000_000);
+        network.updateTransmitter(tx, 1309, 13, 50);
+        network.updateRepeater(tx.east(40), 1309, 60);
+        network.updateRepeater(tx.west(500), 1310, 60);
+        BlockPos here = tx.east(80);
+        List<SignalNetwork.HeardFrequency> heard = network.scanAt(level, here);
+        SignalNetwork.HeardFrequency entry = heard.stream().filter(h -> h.frequency() == 1309).findFirst().orElseThrow();
+        check(entry.source() == SignalNetwork.Source.REPEATER && entry.power() == 13 && entry.distance() == 40
+                && entry.direction() == 6 && entry.transmitters() == 1, "Should point 40 blocks west to the repeater, got " + entry);
+        check(network.strongestTransmitter(level, here, 1309).equals(java.util.Optional.of(tx.east(40))), "The repeater can be tracked");
+        SignalNetwork.HeardFrequency quiet = network.scanAt(level, tx.west(520)).stream()
+                .filter(h -> h.frequency() == 1310).findFirst().orElseThrow();
+        check(quiet.source() == SignalNetwork.Source.REPEATER && quiet.power() == 0, "A quiet repeater is listed as off");
+        network.updateTransmitter(tx.east(120), 1309, 13, 50); // as strong and as near as the repeater
+        check(network.strongestTransmitter(level, here, 1309).equals(java.util.Optional.of(tx.east(120))), "A transmitter wins a tie");
+        helper.succeed();
+    }
+
+    /**
+     * A placed Radio Repeater checks in with the network, lights up while it repeats, carries the
+     * signal to a receiver the transmitter can't reach, relays remote presses as a tower, and stops
+     * when re-tuned or broken.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void repeaterBlockRepeats(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(level, helper.absolutePos(tx));
+        BlockPos repeater = new BlockPos(tx.getX() + reach - 1, 1, 1);
+        BlockPos rx = new BlockPos(tx.getX() + reach + 3, 1, 1);
+        if (reach < 8 || rx.getX() > 128) {
+            throw new GameTestAssertException("Reach " + reach + " doesn't fit the test platform");
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1311);
+        place(helper, repeater, ModRegistry.RADIO_REPEATER.get(), 1311);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1311);
+        BlockPos repeaterAbs = helper.absolutePos(repeater);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    check(network.repeaterFrequencyAt(repeaterAbs).orElse(-1) == 1311, "The repeater should check in");
+                    helper.assertBlockProperty(repeater, com.reiko.signaltower.block.RadioRepeaterBlock.LIT, false);
+                    assertOutput(helper, rx, 0);
+                    BlockPos origin = helper.absolutePos(repeater.west(2));
+                    check(network.remoteCoverage(level, origin, 5, true).stream()
+                            .anyMatch(area -> area.tower() && area.origin().equals(repeaterAbs)), "A repeater relays remote presses like a tower");
+                })
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> helper.assertBlockProperty(repeater, com.reiko.signaltower.block.RadioRepeaterBlock.LIT, true))
+                .thenExecute(() -> setFrequency(helper, repeater, 1312))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenWaitUntil(() -> helper.assertBlockProperty(repeater, com.reiko.signaltower.block.RadioRepeaterBlock.LIT, false))
+                .thenExecute(() -> setFrequency(helper, repeater, 1311))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> level.destroyBlock(repeaterAbs, true))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> check(SignalNetwork.get(level).repeaterFrequencyAt(repeaterAbs).isEmpty(), "Breaking it removes it"))
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_REPEATER_ITEM.get())
+                                && Integer.valueOf(1311).equals(stack.get(ModRegistry.FREQUENCY.get()))),
+                        "The dropped repeater should keep frequency 1311"))
+                .thenSucceed();
+    }
+
+    /** A remote press with no towers relaying is carried by a repeater on its frequency, and the message counts it. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void repeaterCarriesRemotePress(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos standAt = new BlockPos(1, 1, 1);
+        int reach = RadioHelper.reachAt(level, helper.absolutePos(standAt));
+        BlockPos repeater = new BlockPos(standAt.getX() + reach - 2, 1, 1);
+        BlockPos rx = new BlockPos(standAt.getX() + reach + 3, 1, 1);
+        if (reach < 8 || rx.getX() > 128) {
+            throw new GameTestAssertException("Reach " + reach + " doesn't fit the test platform");
+        }
+        place(helper, repeater, ModRegistry.RADIO_REPEATER.get(), 1313);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1313);
+        Player player = playerWithRemote(helper, standAt, 1313, true);
+        AtomicReference<Component> message = new AtomicReference<>();
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    ItemStack remote = player.getMainHandItem();
+                    BlockPos origin = player.blockPosition();
+                    message.set(RemoteControlItem.sendSignal(level, player, remote, 1313, true, PulseLength.MIN_TICKS,
+                            SignalNetwork.ownCoverage(origin, RadioHelper.reachAt(level, origin))));
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> {
+                    var outer = (TranslatableContents) message.get().getContents();
+                    var result = (TranslatableContents) ((Component) outer.getArgs()[0]).getContents();
+                    check(keyOf((Component) result.getArgs()[1]).endsWith("reach_plus_one_repeater"),
+                            "The message should count the repeater, got " + keyOf((Component) result.getArgs()[1]));
+                    check(keyOf((Component) outer.getArgs()[1]).endsWith("remote_heard_one"), "Heard by the far receiver");
+                    assertLight(helper, player, true);
+                })
+                .thenExecute(() -> pressWithoutRelays(helper, player)) // toggle off
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
 }

@@ -1,6 +1,7 @@
 package com.reiko.signaltower.radio;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -8,7 +9,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -18,6 +21,8 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
@@ -35,6 +40,11 @@ import java.util.Set;
  * <p>
  * Loaded receivers are also tracked (not saved; each one checks in on its first tick), so a remote
  * can tell its player how many receivers heard a press.
+ * <p>
+ * <b>Repeaters</b> (saved, like transmitters) listen for their frequency where they stand and send
+ * the strongest signal they hear out again with their own reach. What each one repeats is worked
+ * out from the real sources outward (see {@link #resolve}), so repeaters can pass a signal along a
+ * chain but can never keep each other on in a loop.
  */
 public final class SignalNetwork extends SavedData {
     private static final String DATA_NAME = SignalTower.MOD_ID + "_network";
@@ -97,7 +107,7 @@ public final class SignalNetwork extends SavedData {
                     continue;
                 }
                 if (area.tower() && level.isLoaded(area.origin())
-                        && !(level.getBlockState(area.origin()).getBlock() instanceof RadioTransmitterBlock)) {
+                        && !isTower(level.getBlockState(area.origin()).getBlock())) {
                     continue;
                 }
                 return true;
@@ -106,8 +116,25 @@ public final class SignalNetwork extends SavedData {
         }
     }
 
+    /** A Radio Transmitter or Radio Repeater: the blocks that broadcast and relay remote presses. */
+    public static boolean isTower(Block block) {
+        return block instanceof RadioTransmitterBlock || block instanceof RadioRepeaterBlock;
+    }
+
+    /** A Radio Repeater's frequency and reach. What it repeats is worked out by {@link #resolve}. */
+    public record Repeater(int frequency, int reach) {}
+
+    /** What every repeater on one frequency is repeating, worked out at one revision. Not saved. */
+    private record Resolved(long revision, long computedAt, Map<BlockPos, Integer> power) {}
+
+    /** How long a resolved chain is trusted before it's worked out again, as a safety net. */
+    private static final int RESOLVE_INTERVAL = 20;
+
     private final Map<BlockPos, Transmitter> transmitters = new HashMap<>();
     private final Map<Integer, Map<BlockPos, Transmitter>> byFrequency = new HashMap<>();
+    private final Map<BlockPos, Repeater> repeaters = new HashMap<>();
+    private final Map<Integer, Map<BlockPos, Repeater>> repeatersByFrequency = new HashMap<>();
+    private final Map<Integer, Resolved> resolved = new HashMap<>();
     private final Map<Integer, Long> revisions = new HashMap<>();
     private final Map<Integer, RemoteSignal> pulses = new HashMap<>();
     private final Map<Integer, RemoteSignal> latches = new HashMap<>();
@@ -162,6 +189,174 @@ public final class SignalNetwork extends SavedData {
         bump(frequency);
     }
 
+    // ---- Repeaters ----
+
+    /** A repeater was placed, re-tuned, or checks in (once a second, and after its chunk loads). */
+    public void updateRepeater(BlockPos pos, int frequency, int reach) {
+        BlockPos key = pos.immutable();
+        Repeater next = new Repeater(frequency, reach);
+        Repeater previous = repeaters.put(key, next);
+        if (next.equals(previous)) {
+            return;
+        }
+        if (previous != null && previous.frequency() != frequency) {
+            removeRepeaterFromIndex(key, previous.frequency());
+        }
+        repeatersByFrequency.computeIfAbsent(frequency, f -> new HashMap<>()).put(key, next);
+        bump(frequency);
+        setDirty();
+    }
+
+    public void removeRepeater(BlockPos pos) {
+        Repeater previous = repeaters.remove(pos);
+        if (previous != null) {
+            removeRepeaterFromIndex(pos, previous.frequency());
+            setDirty();
+        }
+    }
+
+    private void removeRepeaterFromIndex(BlockPos pos, int frequency) {
+        Map<BlockPos, Repeater> onFrequency = repeatersByFrequency.get(frequency);
+        if (onFrequency != null) {
+            onFrequency.remove(pos);
+            if (onFrequency.isEmpty()) {
+                repeatersByFrequency.remove(frequency);
+            }
+        }
+        bump(frequency);
+    }
+
+    /** The frequency of the repeater at {@code pos}, or empty if there's none in the network there. */
+    public OptionalInt repeaterFrequencyAt(BlockPos pos) {
+        Repeater repeater = repeaters.get(pos);
+        return repeater == null ? OptionalInt.empty() : OptionalInt.of(repeater.frequency());
+    }
+
+    /** The frequency of the transmitter or repeater at {@code pos}, or empty if there's neither. */
+    public OptionalInt towerFrequencyAt(BlockPos pos) {
+        OptionalInt transmitter = transmitterFrequencyAt(pos);
+        return transmitter.isPresent() ? transmitter : repeaterFrequencyAt(pos);
+    }
+
+    /** The signal the repeater at {@code pos} is sending out right now (0 if it hears nothing, or there's none). */
+    public int repeaterPower(ServerLevel level, BlockPos pos) {
+        Repeater repeater = repeaters.get(pos);
+        return repeater == null ? 0 : resolve(level, repeater.frequency()).getOrDefault(pos, 0);
+    }
+
+    /**
+     * Works out what every repeater on {@code frequency} is sending, by position. First each one
+     * gets what it hears straight from transmitters and remote presses; then, strongest first, each
+     * repeater that hears something passes it on to the repeaters in its reach. Because it only
+     * spreads outward from real sources, two repeaters in each other's reach can't keep each other
+     * on once the source goes quiet. The strength is passed on unchanged.
+     * <p>
+     * The answer is kept until something on the frequency changes (its revision goes up), and
+     * re-worked once a second anyway, for changes the revision doesn't see (a relay tower of a
+     * remote press being broken).
+     */
+    private Map<BlockPos, Integer> resolve(ServerLevel level, int frequency) {
+        if (!repeatersByFrequency.containsKey(frequency)) {
+            return Map.of();
+        }
+        Resolved cached = resolved.get(frequency);
+        if (cached != null && cached.revision() == revision(frequency)
+                && now >= cached.computedAt() && now - cached.computedAt() < RESOLVE_INTERVAL) {
+            return cached.power();
+        }
+        dropStaleRepeaters(level, frequency);
+        Map<BlockPos, Repeater> onFrequency = repeatersByFrequency.get(frequency);
+        if (onFrequency == null) {
+            resolved.remove(frequency);
+            return Map.of();
+        }
+        List<BlockPos> positions = new ArrayList<>(onFrequency.keySet());
+        Map<BlockPos, Integer> power = new HashMap<>();
+        for (BlockPos pos : positions) {
+            power.put(pos, listenDirect(level, frequency, pos).power());
+        }
+        Set<BlockPos> done = new HashSet<>();
+        while (true) {
+            BlockPos next = null;
+            int nextPower = 0;
+            for (BlockPos pos : positions) {
+                int p = power.get(pos);
+                if (p > nextPower && !done.contains(pos)) {
+                    next = pos;
+                    nextPower = p;
+                }
+            }
+            if (next == null) {
+                break;
+            }
+            done.add(next);
+            Coverage area = new Coverage(next, onFrequency.get(next).reach(), true);
+            for (BlockPos pos : positions) {
+                if (power.get(pos) < nextPower && !done.contains(pos) && area.reaches(pos)) {
+                    power.put(pos, nextPower);
+                }
+            }
+        }
+        Map<BlockPos, Integer> result = Map.copyOf(power);
+        resolved.put(frequency, new Resolved(revision(frequency), now, result));
+        return result;
+    }
+
+    /** Self-repair: forgets repeaters on {@code frequency} whose block is gone (for example removed by a world editor). */
+    private void dropStaleRepeaters(ServerLevel level, int frequency) {
+        Map<BlockPos, Repeater> onFrequency = repeatersByFrequency.get(frequency);
+        if (onFrequency == null) {
+            return;
+        }
+        List<BlockPos> stale = null;
+        for (BlockPos pos : onFrequency.keySet()) {
+            if (isStale(level, pos)) {
+                if (stale == null) stale = new ArrayList<>();
+                stale.add(pos);
+            }
+        }
+        if (stale != null) {
+            stale.forEach(this::removeRepeater);
+        }
+    }
+
+    /** True if {@code pos} is loaded and holds neither a transmitter nor a repeater any more. */
+    private static boolean isStale(@Nullable ServerLevel level, BlockPos pos) {
+        return level != null && level.isLoaded(pos) && !isTower(level.getBlockState(pos).getBlock());
+    }
+
+    /**
+     * {@code coverage} plus the area of every repeater on {@code frequency} the signal gets to
+     * through it: repeaters inside the coverage, then repeaters inside those, and so on. Used to
+     * count who hears a remote press and to remember where a turn-on reached. With a
+     * {@code level}, repeaters whose block is gone are skipped.
+     */
+    public List<Coverage> withRepeaters(@Nullable ServerLevel level, int frequency, List<Coverage> coverage) {
+        Map<BlockPos, Repeater> onFrequency = repeatersByFrequency.get(frequency);
+        if (onFrequency == null) {
+            return coverage;
+        }
+        List<Coverage> result = new ArrayList<>(coverage);
+        Set<BlockPos> reached = new HashSet<>();
+        ArrayDeque<Coverage> queue = new ArrayDeque<>(coverage);
+        while (!queue.isEmpty()) {
+            Coverage area = queue.poll();
+            for (Map.Entry<BlockPos, Repeater> entry : onFrequency.entrySet()) {
+                BlockPos pos = entry.getKey();
+                if (reached.contains(pos) || !area.reaches(pos) || isStale(level, pos)) {
+                    continue;
+                }
+                reached.add(pos);
+                Coverage own = new Coverage(pos, entry.getValue().reach(), true);
+                if (!result.contains(own)) { // already there if it relayed the press as a tower
+                    result.add(own);
+                }
+                queue.add(own);
+            }
+        }
+        return result;
+    }
+
     public long revision(int frequency) {
         return revisions.getOrDefault(frequency, 0L);
     }
@@ -174,9 +369,10 @@ public final class SignalNetwork extends SavedData {
 
     /**
      * Where a remote press from {@code origin} goes out: the player's own reach first, then, if
-     * {@code relayThroughTowers}, every Radio Transmitter within that reach (horizontally, on any
-     * frequency), each with its own reach. A tower only relays a press it heard directly; towers
-     * don't pass it on to each other.
+     * {@code relayThroughTowers}, every Radio Transmitter and Radio Repeater within that reach
+     * (horizontally, on any frequency), each with its own reach. A tower only relays a press it
+     * heard directly; towers don't pass it on to each other. (Repeaters on the press's own
+     * frequency do pass it on, through {@link #resolve}.)
      */
     public List<Coverage> remoteCoverage(ServerLevel level, BlockPos origin, int reach, boolean relayThroughTowers) {
         List<Coverage> coverage = new ArrayList<>();
@@ -200,6 +396,22 @@ public final class SignalNetwork extends SavedData {
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
+        }
+        List<BlockPos> staleRepeaters = null;
+        for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
+            BlockPos pos = entry.getKey();
+            if (!own.reaches(pos)) {
+                continue;
+            }
+            if (level.isLoaded(pos) && !(level.getBlockState(pos).getBlock() instanceof RadioRepeaterBlock)) {
+                if (staleRepeaters == null) staleRepeaters = new ArrayList<>();
+                staleRepeaters.add(pos);
+                continue;
+            }
+            coverage.add(new Coverage(pos, entry.getValue().reach(), true));
+        }
+        if (staleRepeaters != null) {
+            staleRepeaters.forEach(this::removeRepeater);
         }
         // Nearest towers first, so messages and saves come out in a stable order.
         coverage.subList(1, coverage.size()).sort(Comparator
@@ -263,9 +475,10 @@ public final class SignalNetwork extends SavedData {
         }
     }
 
+    /** Remembers a turn-on, over {@code coverage} plus every repeater on the frequency it reaches. */
     private void recordTurnOn(int frequency, List<Coverage> coverage) {
         ArrayDeque<TurnOn> list = history.computeIfAbsent(frequency, f -> new ArrayDeque<>());
-        list.addLast(new TurnOn(now, nowDayTime, coverage));
+        list.addLast(new TurnOn(now, nowDayTime, withRepeaters(null, frequency, coverage)));
         while (list.size() > MAX_HISTORY) {
             list.removeFirst();
         }
@@ -418,22 +631,41 @@ public final class SignalNetwork extends SavedData {
 
     // ---- Receivers ----
 
-    /** Where the strongest signal on a frequency comes from, for the Signal Scanner. */
-    public enum Source { TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE }
+    /** Where the strongest signal on a frequency comes from, for the Signal Scanner. (Sent by ordinal: only add at the end.) */
+    public enum Source { TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, REPEATER }
 
     /**
-     * One frequency the Signal Scanner hears. {@code transmitters} is how many transmitters on it
-     * reach this spot. For a {@link Source#TRANSMITTER}, {@code distance} and {@code direction}
-     * point to the strongest one (the nearest, if several are equally strong); for a remote signal
-     * they're -1, so the scanner never points at players.
+     * One frequency the Signal Scanner hears. {@code transmitters} is how many transmitters and
+     * repeaters on it reach this spot. For a {@link Source#TRANSMITTER} or {@link Source#REPEATER},
+     * {@code distance} and {@code direction} point to the strongest one (the nearest, if several
+     * are equally strong); for a remote signal they're -1, so the scanner never points at players.
      */
     public record HeardFrequency(int frequency, int power, Source source, int transmitters, int distance, int direction) {}
 
     /** The most frequencies one scan reports. */
     public static final int MAX_SCAN_RESULTS = 64;
 
-    /** Per frequency, the strongest transmitter reaching a spot (the nearest among equally strong ones), and how many reach it. */
-    private record BestTransmitter(int power, long distSq, BlockPos at, int count) {}
+    /**
+     * Per frequency, the strongest transmitter or repeater reaching a spot (the nearest among
+     * equally strong ones, a transmitter before a repeater), and how many reach it.
+     */
+    private record BestTransmitter(int power, long distSq, BlockPos at, int count, boolean repeater) {
+        boolean beats(BestTransmitter other) {
+            if (power != other.power) return power > other.power;
+            if (distSq != other.distSq) return distSq < other.distSq;
+            return !repeater && other.repeater;
+        }
+    }
+
+    private static void offer(Map<Integer, BestTransmitter> best, int frequency, BestTransmitter candidate) {
+        BestTransmitter old = best.get(frequency);
+        if (old == null) {
+            best.put(frequency, candidate);
+        } else {
+            BestTransmitter winner = candidate.beats(old) ? candidate : old;
+            best.put(frequency, new BestTransmitter(winner.power(), winner.distSq(), winner.at(), old.count() + 1, winner.repeater()));
+        }
+    }
 
     private Map<Integer, BestTransmitter> bestTransmitters(ServerLevel level, BlockPos pos) {
         Map<Integer, BestTransmitter> best = new HashMap<>();
@@ -441,9 +673,7 @@ public final class SignalNetwork extends SavedData {
         for (Map.Entry<BlockPos, Transmitter> entry : transmitters.entrySet()) {
             BlockPos at = entry.getKey();
             Transmitter tx = entry.getValue();
-            long dx = at.getX() - pos.getX();
-            long dz = at.getZ() - pos.getZ();
-            long distSq = dx * dx + dz * dz;
+            long distSq = horizontalDistSq(at, pos);
             if (distSq > (long) tx.reach() * tx.reach()) {
                 continue;
             }
@@ -452,40 +682,49 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            BestTransmitter old = best.get(tx.frequency());
-            if (old == null) {
-                best.put(tx.frequency(), new BestTransmitter(tx.power(), distSq, at, 1));
-            } else if (tx.power() > old.power() || (tx.power() == old.power() && distSq < old.distSq())) {
-                best.put(tx.frequency(), new BestTransmitter(tx.power(), distSq, at, old.count() + 1));
-            } else {
-                best.put(tx.frequency(), new BestTransmitter(old.power(), old.distSq(), old.at(), old.count() + 1));
-            }
+            offer(best, tx.frequency(), new BestTransmitter(tx.power(), distSq, at, 1, false));
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
+        }
+        // Copy first: working out a chain can forget repeaters whose block is gone.
+        for (BlockPos at : new ArrayList<>(repeaters.keySet())) {
+            Repeater repeater = repeaters.get(at);
+            if (repeater == null) {
+                continue;
+            }
+            long distSq = horizontalDistSq(at, pos);
+            if (distSq > (long) repeater.reach() * repeater.reach()) {
+                continue;
+            }
+            int power = resolve(level, repeater.frequency()).getOrDefault(at, 0);
+            if (repeaters.containsKey(at)) {
+                offer(best, repeater.frequency(), new BestTransmitter(power, distSq, at, 1, true));
+            }
         }
         return best;
     }
 
     /**
-     * The transmitter the Signal Scanner points to for {@code frequency} at {@code pos}: the
-     * strongest one whose reach covers it, the nearest among equally strong ones. Empty if none does.
+     * The transmitter or repeater the Signal Scanner points to for {@code frequency} at
+     * {@code pos}: the strongest one whose reach covers it, the nearest among equally strong ones.
+     * Empty if none does.
      */
-    public java.util.Optional<BlockPos> strongestTransmitter(ServerLevel level, BlockPos pos, int frequency) {
+    public Optional<BlockPos> strongestTransmitter(ServerLevel level, BlockPos pos, int frequency) {
         BestTransmitter best = bestTransmitters(level, pos).get(frequency);
-        return best == null ? java.util.Optional.empty() : java.util.Optional.of(best.at());
+        return best == null ? Optional.empty() : Optional.of(best.at());
     }
 
     /** The frequency of the transmitter at {@code pos}, or empty if there's none in the network there. */
-    public java.util.OptionalInt transmitterFrequencyAt(BlockPos pos) {
+    public OptionalInt transmitterFrequencyAt(BlockPos pos) {
         Transmitter tx = transmitters.get(pos);
-        return tx == null ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(tx.frequency());
+        return tx == null ? OptionalInt.empty() : OptionalInt.of(tx.frequency());
     }
 
     /**
-     * Everything a receiver at {@code pos} could hear: every frequency with a transmitter whose
-     * reach covers it (including silent ones, with power 0) or a remote signal covering it.
-     * Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
+     * Everything a receiver at {@code pos} could hear: every frequency with a transmitter or
+     * repeater whose reach covers it (including silent ones, with power 0) or a remote signal
+     * covering it. Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
      */
     public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos) {
         Map<Integer, BestTransmitter> best = bestTransmitters(level, pos);
@@ -511,8 +750,8 @@ public final class SignalNetwork extends SavedData {
                 long dx = tx.at().getX() - pos.getX();
                 long dz = tx.at().getZ() - pos.getZ();
                 int distance = (int) Math.min(Integer.MAX_VALUE, Math.round(Math.sqrt(tx.distSq())));
-                heard.add(new HeardFrequency(frequency, tx.power(), Source.TRANSMITTER, count, distance,
-                        distance == 0 ? -1 : compassDirection(dx, dz)));
+                heard.add(new HeardFrequency(frequency, tx.power(), tx.repeater() ? Source.REPEATER : Source.TRANSMITTER,
+                        count, distance, distance == 0 ? -1 : compassDirection(dx, dz)));
             }
         }
         heard.sort(Comparator.comparingInt(HeardFrequency::power).reversed()
@@ -522,9 +761,34 @@ public final class SignalNetwork extends SavedData {
 
     /**
      * Finds the strongest signal on {@code frequency} that reaches {@code receiverPos}. A
-     * transmitter reaches every receiver within its reach, measured horizontally, at any height.
+     * transmitter or repeater reaches every receiver within its reach, measured horizontally, at
+     * any height. {@code transmittersInReach} counts repeaters too.
      */
     public Reception listen(ServerLevel level, int frequency, BlockPos receiverPos) {
+        Reception direct = listenDirect(level, frequency, receiverPos);
+        if (!repeatersByFrequency.containsKey(frequency)) {
+            return direct;
+        }
+        Map<BlockPos, Integer> repeating = resolve(level, frequency);
+        Map<BlockPos, Repeater> onFrequency = repeatersByFrequency.get(frequency);
+        if (onFrequency == null) { // resolving forgot the last ones (their blocks were gone)
+            return direct;
+        }
+        int best = direct.power();
+        int heard = direct.transmittersInReach();
+        for (Map.Entry<BlockPos, Repeater> entry : onFrequency.entrySet()) {
+            BlockPos pos = entry.getKey();
+            if (pos.equals(receiverPos) || horizontalDistSq(pos, receiverPos) > (long) entry.getValue().reach() * entry.getValue().reach()) {
+                continue;
+            }
+            heard++;
+            best = Math.max(best, repeating.getOrDefault(pos, 0));
+        }
+        return new Reception(best, heard);
+    }
+
+    /** What {@code receiverPos} hears straight from transmitters and remote presses, leaving repeaters out. */
+    private Reception listenDirect(ServerLevel level, int frequency, BlockPos receiverPos) {
         int best = 0;
         int heard = 0;
         for (RemoteSignal remote : new RemoteSignal[] {pulses.get(frequency), latches.get(frequency)}) {
@@ -578,6 +842,16 @@ public final class SignalNetwork extends SavedData {
             list.add(entry);
         });
         tag.put("transmitters", list);
+
+        ListTag repeaterList = new ListTag();
+        repeaters.forEach((pos, repeater) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("pos", pos.asLong());
+            entry.putInt("frequency", repeater.frequency());
+            entry.putInt("reach", repeater.reach());
+            repeaterList.add(entry);
+        });
+        tag.put("repeaters", repeaterList);
 
         ListTag latchList = new ListTag();
         latches.forEach((frequency, latch) -> {
@@ -636,6 +910,14 @@ public final class SignalNetwork extends SavedData {
                     entry.getInt("reach"));
             network.transmitters.put(pos, tx);
             network.byFrequency.computeIfAbsent(tx.frequency(), f -> new HashMap<>()).put(pos, tx);
+        }
+        ListTag repeaterList = tag.getList("repeaters", Tag.TAG_COMPOUND);
+        for (int i = 0; i < repeaterList.size(); i++) {
+            CompoundTag entry = repeaterList.getCompound(i);
+            BlockPos pos = BlockPos.of(entry.getLong("pos"));
+            Repeater repeater = new Repeater(Frequency.clamp(entry.getInt("frequency")), entry.getInt("reach"));
+            network.repeaters.put(pos, repeater);
+            network.repeatersByFrequency.computeIfAbsent(repeater.frequency(), f -> new HashMap<>()).put(pos, repeater);
         }
         ListTag latchList = tag.getList("remote_latches", Tag.TAG_COMPOUND);
         for (int i = 0; i < latchList.size(); i++) {

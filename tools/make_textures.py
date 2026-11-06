@@ -24,6 +24,10 @@ H = (156, 162, 175, 255)   # highlight
 OFF = [(74, 10, 10, 255), (112, 18, 16, 255), (146, 30, 26, 255)]
 ON = [(170, 14, 10, 255), (236, 44, 30, 255), (255, 150, 120, 255)]
 
+# Repeater amber, off and on
+AMBER_OFF = [(84, 52, 8, 255), (124, 80, 14, 255), (156, 104, 24, 255)]
+AMBER_ON = [(204, 122, 10, 255), (255, 178, 40, 255), (255, 226, 140, 255)]
+
 CLEAR = (0, 0, 0, 0)
 
 
@@ -110,8 +114,32 @@ def receiver_side(lit):
     return img
 
 
-def top(lit, receiver):
-    r = ON if lit else OFF
+def repeater_side(lit):
+    """An amber mast with arcs passing through it: picked up on the left, sent on to the right."""
+    r = AMBER_ON if lit else AMBER_OFF
+    img = casing(6)
+    px = img.load()
+    vents(img)
+    for y in range(3, 10):
+        px[7, y] = r[2]
+        px[8, y] = r[1]
+    px[7, 2] = px[8, 2] = r[2]
+    # Both sides bow the same way, so the waves read as travelling left to right through the mast.
+    for (x, y) in [(4, 4), (5, 5), (5, 6), (4, 7)]:
+        px[x, y] = r[1]
+    for (x, y) in [(2, 3), (3, 4), (3, 5), (3, 6), (3, 7), (2, 8)]:
+        px[x, y] = r[0] if not lit else r[1]
+    for (x, y) in [(10, 4), (11, 5), (11, 6), (10, 7)]:
+        px[x, y] = r[1]
+    for (x, y) in [(12, 3), (13, 4), (13, 5), (13, 6), (13, 7), (12, 8)]:
+        px[x, y] = r[0] if not lit else r[1]
+    for x in range(5, 11):
+        px[x, 10] = O
+    return img
+
+
+def top(lit, receiver, palette=None):
+    r = palette if palette else (ON if lit else OFF)
     img = casing(3 if receiver else 4, rivets=not receiver)
     px = img.load()
     for i in range(5, 11):
@@ -179,11 +207,15 @@ def mast_lattice():
     return img
 
 
-def antenna_tip(lit):
-    """Aviation warning light at the top of the transmitter's antenna."""
+def antenna_tip(lit, amber=False):
+    """Warning light at the top of the antenna: red on a transmitter, amber on a repeater."""
     img = blank()
     px = img.load()
-    if lit:
+    if amber and lit:
+        core, mid, rim = (255, 238, 176, 255), (255, 182, 40, 255), (212, 122, 10, 255)
+    elif amber:
+        core, mid, rim = (152, 104, 32, 255), (112, 72, 14, 255), (72, 46, 8, 255)
+    elif lit:
         core, mid, rim = (255, 200, 170, 255), (255, 60, 40, 255), (200, 20, 12, 255)
     else:
         core, mid, rim = (150, 40, 34, 255), (110, 18, 14, 255), (70, 10, 8, 255)
@@ -481,6 +513,12 @@ blocks = {
     "radio_mast_lattice": mast_lattice(),
     "antenna_tip": antenna_tip(False),
     "antenna_tip_on": antenna_tip(True),
+    "radio_repeater_side": repeater_side(False),
+    "radio_repeater_side_on": repeater_side(True),
+    "radio_repeater_top": top(False, receiver=False, palette=AMBER_OFF),
+    "radio_repeater_top_on": top(True, receiver=False, palette=AMBER_ON),
+    "repeater_tip": antenna_tip(False, amber=True),
+    "repeater_tip_on": antenna_tip(True, amber=True),
 }
 items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
          "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),

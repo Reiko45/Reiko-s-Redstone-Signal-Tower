@@ -5,9 +5,14 @@
 
 ## Rules
 
-- **Frequencies** are whole numbers from 1 to 999,999,999, stored in each transmitter and receiver's block entity (NBT key `frequency`). New blocks start on 1.
-- **Reach** belongs to the transmitter only: `baseReach + reachPerBlockOfHeight × max(0, y − seaLevel)`, capped by `maxReach` if that's above 0. Defaults are 32 and 8, with no cap.
-- **Links:** a receiver hears a transmitter on its frequency if their *horizontal* distance is at most the transmitter's reach. Height difference doesn't matter.
+- **Frequencies** are whole numbers from 1 to 999,999,999, stored in each transmitter, receiver and repeater's block entity (NBT key `frequency`). New blocks start on 1.
+- **Reach** belongs to transmitters and repeaters: `baseReach + reachPerBlockOfHeight × max(0, y − seaLevel)`, capped by `maxReach` if that's above 0. Defaults are 32 and 8, with no cap.
+- **Links:** a receiver hears a transmitter or repeater on its frequency if their *horizontal* distance is at most its reach. Height difference doesn't matter.
+- **Radio Repeater:**
+  - Listens for its frequency at its own position (like a receiver there) and sends the strongest signal it hears out again with its own reach, at the same strength. No redstone input.
+  - It hears transmitters, remote pulses and latches, and other repeaters, but only signals that trace back to a real transmitter or remote press: two repeaters can't keep each other on.
+  - Like a transmitter, it relays remote presses on any frequency when it's within the player's reach (`towersRelayRemotes`).
+  - `LIT` block state (light level 7, amber sparks) while repeating. Recipe: Radio Receiver + Radio Transmitter (shapeless).
 - **Sea level** comes from the dimension's chunk generator (`ServerLevel.getChunkSource().getGenerator().getSeaLevel()`), because `Level.getSeaLevel()` is hard-coded to 63 in 1.21.1.
 - **Compact Radio Receiver:**
   - It's a `RadioReceiverBlock` subclass with the button's `face`/`facing` properties, shapes, attach rules and model rotations, and it shares the receiver block entity type.
@@ -87,6 +92,14 @@
 ## How it works
 
 - `SignalNetwork` is `SavedData`, one per dimension. It maps transmitter position → (frequency, power, reach), indexed by frequency, with a revision counter per frequency (not saved).
+- **Repeaters** are kept the same way (position → frequency, reach, indexed by frequency, saved as `repeaters`). `RadioRepeaterBlockEntity` checks in on its first tick, when re-tuned and once a second; `onRemove` takes it out. What each repeater sends isn't stored but worked out by `SignalNetwork.resolve(level, frequency)`:
+  - each repeater starts with what it hears straight from transmitters and remote signals (`listenDirect`);
+  - then, strongest first, each repeater that hears something passes that strength to the repeaters inside its reach (a max-strength spread, O(n²) per frequency). Because it only spreads out from real sources, a loop of repeaters with no source stays at 0.
+  - The answer is cached per frequency with the revision it was worked out at, and re-worked when the revision changes or after 20 ticks (for changes the revision doesn't see, such as a remote's relay tower being broken). Stale entries (block gone, chunk loaded) are dropped while resolving.
+  - `listen` = `listenDirect` plus every repeater on the frequency whose reach covers the position (its resolved strength; it counts toward `transmittersInReach`). So receivers, pagers and everything else built on `listen` hear repeaters with no changes of their own.
+  - `withRepeaters(level, frequency, coverage)` extends a coverage list through the repeaters on a frequency (breadth-first, each repeater once, not re-adding one already relaying as a tower). `RemoteControlItem.sendSignal` uses it for "Heard by", the light and the "+ N repeaters" in the message; the locator uses it per frequency; `recordTurnOn` stores turn-ons with it, so the pager catch-up covers repeater areas as they were at the time.
+  - `remoteCoverage` adds repeaters as relay towers next to transmitters, and `RemoteSignal.reaches` accepts either block (`SignalNetwork.isTower`).
+  - The scanner's `bestTransmitters` also offers each repeater covering the position (resolved strength, `Source.REPEATER`, added at the end of the enum since it's sent by ordinal). Ties go to the stronger, then nearer, then a transmitter before a repeater. Tracking accepts either block (`towerFrequencyAt`).
 - **Transmitters** update their entry when:
   - a neighbor changes,
   - a mast in their column reports a change (masts walk up their column on neighbor change, placement and removal),
@@ -99,9 +112,10 @@
 
 ## Verified
 
-- 71 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 79 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
+  - repeater chain in a superflat world: a ground transmitter (reach 56) with a lever, a repeater on 4 masts 50 blocks away (reach 88) and a receiver with a lamp 130 blocks from the transmitter. Flipping the lever lit the repeater ("Repeating 15 | 7 blocks above sea level | Reach 88 blocks") and the far lamp ("Output 15 | Towers in range: 1"); the scanner there said "Repeater, 78 blocks west" and tracked it ("78 blocks, 4 up"). A second repeater placed by hand from its item (keeping frequency 2026) 85 blocks further lit a lamp 190 blocks from the transmitter. Lever off: everything went off ("Nothing to repeat"); on again: both lamps lit. A remote press beside the first repeater said "reach 56 blocks + 1 tower + 1 repeater | Heard by 2 receivers";
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
@@ -117,6 +131,7 @@
 
 ## History
 
+- **v0.20.0:** Radio Repeater (repeater towers).
 - **v0.19.0:** pager catch-up.
 - **v0.18.0:** scanner tracking arrow.
 - **v0.17.0:** pager chat log.
@@ -145,3 +160,5 @@
 - A blinking warning light, or a separate light block for the top of tall towers
 - Strong-power option on receivers; an inverted receiver
 - Signal falloff at the edge of reach
+- Private frequencies, locked to a player or team, so other players' remotes can't trigger them
+- A ring on the ground showing a transmitter's or repeater's reach

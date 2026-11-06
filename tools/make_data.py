@@ -51,19 +51,20 @@ def box(frm, to, texture, uv_sides, uv_ends, glow=False):
     return element
 
 
-def transmitter_model(lit):
-    """Steel cabinet with a dipole antenna and a warning light that glows while broadcasting."""
+def transmitter_model(lit, name="radio_transmitter", tip="antenna_tip"):
+    """Steel cabinet with a dipole antenna and a warning light that glows while broadcasting.
+    The repeater uses the same shape with its own (amber) textures."""
     suffix = "_on" if lit else ""
     return {
         "parent": "minecraft:block/block",
         "render_type": "minecraft:cutout",
         "textures": {
-            "particle": tex(f"radio_transmitter_side{suffix}"),
-            "side": tex(f"radio_transmitter_side{suffix}"),
-            "top": tex(f"radio_transmitter_top{suffix}"),
+            "particle": tex(f"{name}_side{suffix}"),
+            "side": tex(f"{name}_side{suffix}"),
+            "top": tex(f"{name}_top{suffix}"),
             "bottom": tex("radio_bottom"),
             "rod": tex("radio_mast_post"),
-            "tip": tex(f"antenna_tip{suffix}"),
+            "tip": tex(f"{tip}{suffix}"),
         },
         "elements": [
             {"from": [0, 0, 0], "to": [16, 16, 16], "faces": casing_faces()},
@@ -103,6 +104,7 @@ def receiver_model(lit):
 for lit in (False, True):
     suffix = "_on" if lit else ""
     write(models / f"radio_transmitter{suffix}.json", transmitter_model(lit))
+    write(models / f"radio_repeater{suffix}.json", transmitter_model(lit, "radio_repeater", "repeater_tip"))
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
 
 
@@ -215,7 +217,7 @@ write(models / "radio_mast.json", {
 # ---------------------------------------------------------------- item models
 
 items = ASSETS / "models" / "item"
-for name in ("radio_transmitter", "radio_receiver", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "wall_redstone.json", {
@@ -287,6 +289,10 @@ write(states / "radio_transmitter.json", {"variants": {
     "powered=false": {"model": f"{MOD}:block/radio_transmitter"},
     "powered=true": {"model": f"{MOD}:block/radio_transmitter_on"},
 }})
+write(states / "radio_repeater.json", {"variants": {
+    "lit=false": {"model": f"{MOD}:block/radio_repeater"},
+    "lit=true": {"model": f"{MOD}:block/radio_repeater_on"},
+}})
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -324,6 +330,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
     f"block.{MOD}.radio_receiver": "Radio Receiver",
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
+    f"block.{MOD}.radio_repeater": "Radio Repeater",
+    f"block.{MOD}.radio_repeater.tooltip": "Picks up its frequency and broadcasts it again from its own height, to chain towers across long distances. Needs no redstone.",
     f"block.{MOD}.compact_radio_receiver": "Compact Radio Receiver",
     f"block.{MOD}.compact_radio_receiver.tooltip": "A button-sized receiver. Sticks to walls, floors and ceilings, and powers the block it's on.",
     f"block.{MOD}.wall_redstone": "Wall Redstone",
@@ -356,31 +364,33 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.scanner.off": "off",
     f"screen.{MOD}.scanner.transmitter": "Transmitter, %s",
     f"screen.{MOD}.scanner.transmitters": "Transmitter, %s (+%s more)",
+    f"screen.{MOD}.scanner.repeater": "Repeater, %s",
+    f"screen.{MOD}.scanner.repeaters": "Repeater, %s (+%s more)",
     f"screen.{MOD}.scanner.remote_pulse": "Remote pulse",
     f"screen.{MOD}.scanner.remote_toggle": "Remote toggle",
-    f"screen.{MOD}.scanner.plus_one": "%s, plus 1 transmitter",
-    f"screen.{MOD}.scanner.plus_many": "%s, plus %s transmitters",
+    f"screen.{MOD}.scanner.plus_one": "%s, plus 1 tower",
+    f"screen.{MOD}.scanner.plus_many": "%s, plus %s towers",
     f"screen.{MOD}.scanner.tune": "Tune",
     f"screen.{MOD}.scanner.tune_hint": "Hold a tuner, remote or pager in your other hand to tune it",
     f"screen.{MOD}.scanner.tune_tooltip": "Set %s to frequency %s",
     f"screen.{MOD}.scanner.tuned": "%s tuned to frequency %s",
     f"screen.{MOD}.scanner.more": "Showing %s-%s of %s, scroll for more",
-    f"screen.{MOD}.scanner.track_hint": "Click a transmitter's row to track it with an arrow",
+    f"screen.{MOD}.scanner.track_hint": "Click a transmitter or repeater row to track it with an arrow",
     f"screen.{MOD}.scanner.tracking": "Tracking frequency %s. Click its row again to stop",
-    f"screen.{MOD}.scanner.row_track": "Click to track this transmitter with an arrow on screen",
+    f"screen.{MOD}.scanner.row_track": "Click to track this tower with an arrow on screen",
     f"screen.{MOD}.scanner.row_stop": "Click to stop tracking",
     f"screen.{MOD}.scanner.row_remote": "Remote presses can't be tracked",
     f"message.{MOD}.scanner_tracking": "Tracking frequency %s",
     f"message.{MOD}.scanner_stopped": "Stopped tracking",
-    f"message.{MOD}.scanner_lost": "Lost track of frequency %s: its transmitter is gone",
-    f"message.{MOD}.scanner_cant_track": "No transmitter on frequency %s reaches you here",
+    f"message.{MOD}.scanner_lost": "Lost track of frequency %s: its tower is gone",
+    f"message.{MOD}.scanner_cant_track": "No transmitter or repeater on frequency %s reaches you here",
     f"hud.{MOD}.scanner_distance": "Frequency %s: %s blocks",
     f"hud.{MOD}.scanner_distance_up": "Frequency %s: %s blocks, %s up",
     f"hud.{MOD}.scanner_distance_down": "Frequency %s: %s blocks, %s down",
     f"hud.{MOD}.scanner_here": "Frequency %s: you're there",
     f"hud.{MOD}.scanner_other_dimension": "Frequency %s: in another dimension",
     f"tooltip.{MOD}.scanner_tracking": "Tracking frequency %s",
-    f"tooltip.{MOD}.scanner_track": "Click a transmitter's row to track it with an arrow while you hold the scanner",
+    f"tooltip.{MOD}.scanner_track": "Click a transmitter or repeater row to track it with an arrow while you hold the scanner",
     f"message.{MOD}.pager_alert": "%s: frequency %s is ON (strength %s)",
     f"message.{MOD}.pager_sound_on": "Pager sound ON",
     f"message.{MOD}.pager_sound_off": "Pager sound OFF (messages only)",
@@ -456,6 +466,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.reach_blocks": "%s blocks",
     f"message.{MOD}.reach_one_tower": "%s blocks + 1 tower",
     f"message.{MOD}.reach_towers": "%s blocks + %s towers",
+    f"message.{MOD}.reach_plus_one_repeater": "%s + 1 repeater",
+    f"message.{MOD}.reach_plus_repeaters": "%s + %s repeaters",
     f"message.{MOD}.remote_off": "Frequency %s switched OFF",
     f"message.{MOD}.remote_result": "%s | %s",
     f"message.{MOD}.remote_heard_one": "Heard by 1 receiver",
@@ -471,7 +483,10 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.frequency_set": "Tuned to frequency %s",
     f"message.{MOD}.frequency_copied": "Copied frequency %s to the tuner",
     f"message.{MOD}.transmitter_status": "Transmitter | Frequency %s | Sending %s | %s | Reach %s blocks",
-    f"message.{MOD}.receiver_status": "Receiver | Frequency %s | Output %s | Transmitters in range: %s",
+    f"message.{MOD}.repeater_status": "Repeater | Frequency %s | %s | %s | Reach %s blocks",
+    f"message.{MOD}.repeater_repeating": "Repeating %s",
+    f"message.{MOD}.repeater_quiet": "Nothing to repeat",
+    f"message.{MOD}.receiver_status": "Receiver | Frequency %s | Output %s | Towers in range: %s",
     f"message.{MOD}.height_above": "%s blocks above sea level",
     f"message.{MOD}.height_below": "At or below sea level",
 
@@ -485,7 +500,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"{MOD}.configuration.baseReach": "Base reach",
     f"{MOD}.configuration.reachPerBlockOfHeight": "Reach per block of height",
     f"{MOD}.configuration.maxReach": "Max reach (0 = no limit)",
-    f"{MOD}.configuration.towersRelayRemotes": "Transmitters relay remote presses",
+    f"{MOD}.configuration.towersRelayRemotes": "Transmitters and repeaters relay remote presses",
 })
 
 # ---------------------------------------------------------------- recipes
@@ -552,6 +567,13 @@ recipes["multi_remote"] = ({
     "result": {"count": 1, "id": f"{MOD}:multi_remote"},
 }, f"{MOD}:remote_control")
 
+recipes["radio_repeater"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": f"{MOD}:radio_transmitter"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_repeater"},
+}, f"{MOD}:radio_transmitter")
+
 recipes["signal_scanner"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -585,7 +607,7 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "compact_radio_receiver", "radio_mast", "wall_redstone"):
+for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "compact_radio_receiver", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency onto the dropped item so it keeps its tuning.
@@ -608,7 +630,7 @@ for name in ("radio_transmitter", "radio_receiver", "compact_radio_receiver", "r
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_repeater", f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

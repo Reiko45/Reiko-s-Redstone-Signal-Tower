@@ -5,9 +5,11 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
+import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
+import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
@@ -134,6 +136,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** Listens for its frequency and broadcasts it again from its own height. */
+    public static final DeferredBlock<RadioRepeaterBlock> RADIO_REPEATER = BLOCKS.register("radio_repeater",
+            () -> new RadioRepeaterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioRepeaterBlock.LIT) ? 7 : 0)));
+
     /** Button-sized receiver. Breaks quickly like a button and gets knocked off by pistons. */
     public static final DeferredBlock<CompactRadioReceiverBlock> COMPACT_RADIO_RECEIVER = BLOCKS.register("compact_radio_receiver",
             () -> new CompactRadioReceiverBlock(BlockBehaviour.Properties.of()
@@ -167,6 +178,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_transmitter", RADIO_TRANSMITTER);
     public static final DeferredItem<BlockItem> RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> COMPACT_RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
@@ -194,6 +207,10 @@ public final class ModRegistry {
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
                             RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
+            BLOCK_ENTITIES.register("radio_repeater",
+                    () -> BlockEntityType.Builder.of(RadioRepeaterBlockEntity::new, RADIO_REPEATER.get()).build(null));
 
     public static void register(IEventBus modEventBus) {
         DATA_COMPONENTS.register(modEventBus);

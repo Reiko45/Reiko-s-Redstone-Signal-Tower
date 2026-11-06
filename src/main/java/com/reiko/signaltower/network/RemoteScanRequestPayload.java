@@ -55,7 +55,7 @@ public record RemoteScanRequestPayload(List<Integer> frequencies) implements Cus
         List<RemoteScanResultPayload.Entry> results = new ArrayList<>();
         for (int frequency : payload.frequencies()) {
             int clamped = Frequency.clamp(frequency);
-            SignalNetwork.ReceiverScan scan = network.scanReceivers(clamped, origin, reach, coverage);
+            SignalNetwork.ReceiverScan scan = network.scanReceivers(clamped, origin, reach, network.withRepeaters(level, clamped, coverage));
             results.add(new RemoteScanResultPayload.Entry(clamped, scan.inRange(), scan.nearestDistance(),
                     scan.direction(), scan.nearestInRange()));
         }

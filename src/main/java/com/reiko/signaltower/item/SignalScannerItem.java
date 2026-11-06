@@ -1,7 +1,6 @@
 package com.reiko.signaltower.item;
 
 import com.reiko.signaltower.SignalTower;
-import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -75,7 +74,7 @@ public class SignalScannerItem extends Item {
     }
 
     /**
-     * Drops the target if its transmitter is gone or was re-tuned to another frequency (only
+     * Drops the target if its transmitter (or repeater) is gone or was re-tuned to another frequency (only
      * checked in the target's own dimension). Returns the message to show, or null if it's fine.
      */
     public static @Nullable Component checkTarget(ServerLevel level, ItemStack scanner) {
@@ -84,8 +83,8 @@ public class SignalScannerItem extends Item {
             return null;
         }
         boolean blockGone = level.isLoaded(target.pos())
-                && !(level.getBlockState(target.pos()).getBlock() instanceof RadioTransmitterBlock);
-        OptionalInt frequency = SignalNetwork.get(level).transmitterFrequencyAt(target.pos());
+                && !SignalNetwork.isTower(level.getBlockState(target.pos()).getBlock());
+        OptionalInt frequency = SignalNetwork.get(level).towerFrequencyAt(target.pos());
         if (!blockGone && frequency.isPresent() && frequency.getAsInt() == target.frequency()) {
             return null;
         }

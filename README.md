@@ -10,6 +10,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 |---|---|
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
+| **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
@@ -61,7 +62,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![The Remote Control's screen with two favorites saved, and the messages from scrolling](docs/images/remote-favorites.png)
 - Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
-- **Tower relay:** every Radio Transmitter within your remote's reach relays your press. The signal goes out again from the top of that tower, with the tower's reach. So you can stand at the foot of a tall tower, press, and reach as far as the tower does. It works on any frequency (the tower doesn't need to be on the remote's frequency, or powered), so one tall tower at your base boosts every button. The message shows how many towers relayed it ("reach 56 blocks + 1 tower"), and the signal light and "Heard by" count include them. A toggle switched on through a tower goes off if that tower is broken. Server owners can turn relaying off in the config (`towersRelayRemotes`).
+- **Tower relay:** every Radio Transmitter (and Radio Repeater) within your remote's reach relays your press. The signal goes out again from the top of that tower, with the tower's reach. So you can stand at the foot of a tall tower, press, and reach as far as the tower does. It works on any frequency (the tower doesn't need to be on the remote's frequency, or powered), so one tall tower at your base boosts every button. The message shows how many towers relayed it ("reach 56 blocks + 1 tower"), and the signal light and "Heard by" count include them. A toggle switched on through a tower goes off if that tower is broken. Server owners can turn relaying off in the config (`towersRelayRemotes`).
 
 ![Toggling a lamp 150 blocks away through a tower: the screen counts the receiver as in range, the message counts the tower, and the lamp lights](docs/images/tower-relay.png)
 - Any remote on the same frequency can switch a toggle off, so a lost remote can't leave something stuck on.
@@ -69,7 +70,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ![The remote's light: off, green after a press a receiver heard, red after a press nobody heard, then off again](docs/images/remote-light.png)
 
-- **Locator:** while a remote's screen is open, each frequency shows who's listening, without sending anything. For example "2 receivers in range, nearest 14 blocks north-east", or "None in range. Nearest is 120 blocks south". A line underneath shows your reach and how many towers are relaying for you ("Your reach: 56 blocks, plus 1 tower relaying"). It updates about once a second, follows what you type, and only sees receivers in loaded chunks: within twice your own reach, or anywhere a relaying tower reaches.
+- **Locator:** while a remote's screen is open, each frequency shows who's listening, without sending anything. For example "2 receivers in range, nearest 14 blocks north-east", or "None in range. Nearest is 120 blocks south". A line underneath shows your reach and how many towers are relaying for you ("Your reach: 56 blocks, plus 1 tower relaying"). It updates about once a second, follows what you type, and only sees receivers in loaded chunks: within twice your own reach, or anywhere a relaying tower (or a repeater on that frequency) carries your press.
 
 ![The keypad's locator lines](docs/images/remote-locator.png)
 
@@ -91,7 +92,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 ![The Multi-Button Remote's tooltip, with each named button in its color](docs/images/multi-remote-tooltip.png)
 
 **Radio Pager:**
-- Keep it anywhere in your inventory (hotbar, backpack slots or off-hand). When its frequency turns on where you are, it beeps three times and shows "Radio Pager: frequency 5 is ON (strength 15)". "Where you are" means inside the reach of a transmitter on that frequency, or of a remote press (including towers relaying it).
+- Keep it anywhere in your inventory (hotbar, backpack slots or off-hand). When its frequency turns on where you are, it beeps three times and shows "Radio Pager: frequency 5 is ON (strength 15)". "Where you are" means inside the reach of a transmitter or repeater on that frequency, or of a remote press (including towers relaying it).
 - It alerts once each time the signal turns on, not again while it stays on. Its little screen glows green while the signal is on, and the tooltip shows the live status.
 - Rename it in an anvil and the alert uses that name: "Front Door: frequency 5 is ON".
 - **Chat log:** each alert also goes into chat, with the in-game day and time in front: "[Day 4, 08:30] Front Door: frequency 5 is ON (strength 15)". Open chat to scroll back and see what went off while you weren't looking. It's on for every pager by default; switch it off for one pager (say, one on a fast clock) with the **Chat log** button in its screen. The time comes from the world's clock, with each day starting at midnight.
@@ -111,9 +112,10 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Signal Scanner:**
 - Right-click to open it. It shows a live list (updated every second) of everything a receiver where you're standing would hear: every frequency, its strength ("ON 15", or "off" for a transmitter that's silent right now), and its strongest source.
 - For a transmitter, the source is its distance and direction: "Transmitter, 27 blocks south". If several transmitters on that frequency reach you, it points to the strongest one (the nearest, if they're equally strong) and says how many more there are ("+1 more").
+- For a repeater it says "Repeater, 78 blocks west" in the same way, and a repeater with nothing to repeat is listed as "off".
 - For a remote press it just says "Remote pulse" or "Remote toggle", with no distance or direction, so it can't be used to find players.
 - Strongest signals come first. Scroll the mouse wheel if there are more than 6.
-- **Track with an arrow:** click a transmitter's row to track it. While you hold the scanner (either hand), an arrow at the top of the screen points to that transmitter as you walk and turn, with the distance underneath and how far up or down it is: "Frequency 77: 3 blocks, 30 up". The tracked row shows in green with a "»". Click it again to stop. If the transmitter is broken or re-tuned to another frequency, the scanner says it lost track. With several transmitters on one frequency, it tracks the one the row points to. Remote presses can't be tracked, so it still never points at players.
+- **Track with an arrow:** click a transmitter's (or repeater's) row to track it. While you hold the scanner (either hand), an arrow at the top of the screen points to that transmitter as you walk and turn, with the distance underneath and how far up or down it is: "Frequency 77: 3 blocks, 30 up". The tracked row shows in green with a "»". Click it again to stop. If the transmitter is broken or re-tuned to another frequency, the scanner says it lost track. With several transmitters on one frequency, it tracks the one the row points to. Remote presses can't be tracked, so it still never points at players.
 
   ![Tracking frequency 42 in the scanner, then the arrow pointing to it facing north, south and east, and to the tower 30 blocks up](docs/images/scanner-arrow.png)
 - **Tune:** hold a Frequency Tuner, Remote Control, Multi-Button Remote or Radio Pager in your other hand, and each row's Tune button sets that frequency on it. A remote keeps its mode and pulse length, and a Multi-Button Remote changes only its selected button.
@@ -122,15 +124,30 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
-- Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach.
-- Breaking a transmitter or receiver keeps its frequency on the dropped item, so you can move it without re-tuning.
+- Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach. A receiver's "Towers in range" counts the transmitters and repeaters on its frequency that reach it.
+- Breaking a transmitter, receiver or repeater keeps its frequency on the dropped item, so you can move it without re-tuning.
 - One transmitter can feed any number of receivers. A receiver that hears several transmitters on its frequency outputs the strongest.
 - A transmitter keeps broadcasting its last signal while its chunk is unloaded, so long-distance links keep working.
 - Don't put a receiver next to a transmitter (or its mast column) on the **same** frequency. That makes a loop that latches on, like a redstone torch loop.
 
+### Repeater towers
+
+One transmitter only reaches so far. To go farther, put a **Radio Repeater** partway out, inside the transmitter's reach, and tune it to the same frequency. The repeater picks up the signal and broadcasts it again from where it stands, with its own reach. Receivers in either circle hear it.
+
+- **Build it like a transmitter tower:** Radio Masts with the repeater on top. It uses the same height rule, so the higher it is, the farther it sends. It doesn't need redstone or power.
+- **Chain them:** a repeater inside another repeater's reach passes the signal on again, so a line of towers can carry it across the map. The strength stays the same at every hop (15 in, 15 out at the far end).
+- **No loops:** repeaters only pass on a signal that comes from a real transmitter or remote press somewhere up the chain. Two repeaters in each other's reach can't keep each other on: when the transmitter goes quiet, the whole chain goes quiet within a tick.
+- **Remote presses too:** a remote press that reaches a repeater on its frequency is passed along the chain like anything else. The message counts those repeaters ("reach 56 blocks + 1 tower + 1 repeater"), and the "Heard by" count and signal light include the receivers they reach.
+- **Relay tower:** like a transmitter, a repeater within your remote's reach also relays your presses on any frequency.
+- It keeps repeating while its chunk is unloaded, like a transmitter.
+- Right-click it with an empty hand: "Repeater | Frequency 2026 | Repeating 15 | 7 blocks above sea level | Reach 88 blocks", or "Nothing to repeat".
+- The pager, the Signal Scanner ("Repeater, 78 blocks west"), the remote's locator and the pager catch-up all take repeaters into account.
+
+![A repeater on a mast tower repeating frequency 2026; the lamp 130 blocks from the transmitter lit through it; the scanner pointing to the repeater; and a remote press carried on by a second repeater](docs/images/repeater-tower.png)
+
 ### Reach
 
-Reach is measured horizontally from the transmitter, so a receiver works at any height inside that circle.
+Reach is measured horizontally from the transmitter (or repeater), so a receiver works at any height inside that circle.
 
 ```
 reach = 32 + 8 × (blocks above sea level)
@@ -146,7 +163,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters relay remote presses.
+All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency.
 
 ### Recipes
 
@@ -159,6 +176,8 @@ Radio Transmitter       Radio Receiver          Radio Mast (x6)       Frequency 
 L = Lightning Rod   E = Ender Pearl   T = Redstone Torch   P = Redstone Repeater
 I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 ```
+
+**Radio Repeater:** a Radio Receiver and a Radio Transmitter, in any arrangement in the crafting grid.
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
@@ -205,12 +224,14 @@ src/main/java/com/reiko/signaltower/
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
+  block/RadioRepeaterBlock.java          picks up its frequency and broadcasts it again
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
   block/WallRedstoneBlock.java           redstone dust for walls
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
+  blockentity/RadioRepeaterBlockEntity.java  checks the repeater in with the network, drives its light
   item/TunerPresets.java                 5 favorite frequencies (data component)
   item/RadioFavorites.java               sneak + scroll and favorites for the tuner, remote and pager
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
@@ -229,7 +250,7 @@ src/main/java/com/reiko/signaltower/
   network/ConfigureMultiRemotePayload.java  keypad -> server (save, and optionally press)
   network/SelectRemoteButtonPayload.java sneak + scroll -> server
   network/ConfigureRadioItemPayload.java frequency screen -> server packet
-  radio/SignalNetwork.java               per-dimension list of transmitters and remote signals (with relay coverage), saved with the world
+  radio/SignalNetwork.java               per-dimension list of transmitters, repeaters and remote signals (with relay coverage), saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
@@ -322,7 +343,15 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 68. the network remembers each turn-on (a transmitter going from off to on, a remote pulse, a toggle switched on), not staying on, strength changes or switching off, and keeps the last 32 per frequency;
 69. the remembered turn-ons are saved with the world;
 70. at login, each pager reports how often its frequency turned on where the player is while they were away ("once", "N times"), one line says so if nothing happened, and singleplayer stays quiet;
-71. logging out stamps every pager in the inventory, off-hand included, and nothing else.
+71. logging out stamps every pager in the inventory, off-hand included, and nothing else;
+72. a repeater in a transmitter's reach passes the signal on at the same strength, a second one carries it further, other frequencies aren't repeated, and switching off or removing a repeater breaks the chain;
+73. two repeaters in each other's reach stay on only while a real source (transmitter, remote pulse or toggle) feeds them, and each repeats the strongest signal it gets;
+74. repeaters are saved with the world and keep repeating after loading;
+75. a remote press counts the receivers repeaters carry it to (without adding a relaying repeater twice), and the message wording names the repeaters;
+76. turn-ons are remembered over the repeaters they reached, for the pager catch-up;
+77. the scanner names a repeater as the source with its distance and direction, can track it, lists a quiet one as off, and prefers a transmitter in a tie;
+78. a placed repeater checks in, lights up while repeating, reaches a receiver the transmitter can't, relays remote presses as a tower, stops when re-tuned or broken, and drops with its frequency;
+79. a remote press with no towers relaying is carried by a repeater on its frequency to a far receiver, and the message and light count it.
 
 ## License
 

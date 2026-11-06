@@ -126,15 +126,23 @@ public class RemoteControlItem extends Item {
 
     /** "32 blocks", "32 blocks + 1 tower" or "32 blocks + 3 towers". */
     public static Component describeReach(int reach, int towers) {
+        return describeReach(reach, towers, 0);
+    }
+
+    /** {@link #describeReach(int, int)}, then " + 1 repeater" or " + 2 repeaters" for repeaters passing it on further. */
+    public static Component describeReach(int reach, int towers, int repeaters) {
         String key = "message." + SignalTower.MOD_ID + ".reach_";
-        return towers == 0 ? Component.translatable(key + "blocks", reach)
+        Component base = towers == 0 ? Component.translatable(key + "blocks", reach)
                 : towers == 1 ? Component.translatable(key + "one_tower", reach)
                 : Component.translatable(key + "towers", reach, towers);
+        return repeaters == 0 ? base
+                : repeaters == 1 ? Component.translatable(key + "plus_one_repeater", base)
+                : Component.translatable(key + "plus_repeaters", base, repeaters);
     }
 
     /**
      * Sends a remote signal on {@code frequency} from where the player is standing (and from every
-     * tower relaying it), plays the click, lights the remote's status light (green if a receiver
+     * tower relaying it, and every repeater on that frequency passing it on), plays the click, lights the remote's status light (green if a receiver
      * heard it, red if not), and returns a short description of what happened. Shared with the
      * Multi-Button Remote.
      */
@@ -147,8 +155,10 @@ public class RemoteControlItem extends Item {
     public static Component sendSignal(ServerLevel level, Player player, ItemStack remote, int frequency,
                                        boolean toggle, int pulseTicks, List<SignalNetwork.Coverage> coverage) {
         BlockPos origin = coverage.get(0).origin();
-        Component reach = describeReach(coverage.get(0).reach(), coverage.size() - 1);
         SignalNetwork network = SignalNetwork.get(level);
+        // Repeaters on this frequency pass the press on further; count who hears it there too.
+        List<SignalNetwork.Coverage> reached = network.withRepeaters(level, frequency, coverage);
+        Component reach = describeReach(coverage.get(0).reach(), coverage.size() - 1, reached.size() - coverage.size());
         String key = "message." + SignalTower.MOD_ID + ".remote_";
         Component result;
         if (toggle) {
@@ -166,7 +176,7 @@ public class RemoteControlItem extends Item {
         }
 
         // Pagers in players' pockets count as receivers too.
-        int heardBy = network.countReceivers(frequency, coverage) + PagerItem.countPagers(level, frequency, coverage);
+        int heardBy = network.countReceivers(frequency, reached) + PagerItem.countPagers(level, frequency, reached);
         remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(heardBy > 0, level.getGameTime() + RemoteLight.SHOW_TICKS));
         Component heard = heardBy == 0
                 ? Component.translatable(key + "not_heard").withStyle(ChatFormatting.RED)
