@@ -13,6 +13,10 @@
   - It hears transmitters, remote pulses and latches, and other repeaters, but only signals that trace back to a real transmitter or remote press: two repeaters can't keep each other on.
   - Like a transmitter, it relays remote presses on any frequency when it's within the player's reach (`towersRelayRemotes`).
   - `LIT` block state (light level 7, amber sparks) while repeating. Recipe: Radio Receiver + Radio Transmitter (shapeless).
+- **Radio Toggle Receiver (v0.23.0):**
+  - A receiver that flips between off and on (15) each time its frequency turns on where it stands (silent → any strength). Turning off does nothing. It starts off.
+  - Placing it, re-tuning it, or loading its chunk while the frequency is on isn't a turn-on. Its state is saved; the dropped item keeps only the frequency.
+  - Recipe: Radio Receiver + Lever (shapeless), and back to a Radio Receiver on its own.
 - **Radio Converter (v0.22.0):**
   - A repeater that listens on one frequency and sends on another (its output frequency), same strength, own reach. Teal light and sparks while converting.
   - Chains with repeaters and other converters; loops (even across frequencies, A to B and back) can't latch, for the same reason as repeaters.
@@ -108,6 +112,16 @@
   - `remoteCoverage` adds repeaters and converters as relay towers next to transmitters, and `RemoteSignal.reaches` accepts any of them (`SignalNetwork.isTower`).
   - The scanner's `bestTransmitters` also offers each repeater and converter covering the position, under the frequency it sends on (resolved strength, `Source.REPEATER` or `Source.CONVERTER`, added at the end of the enum since it's sent by ordinal). Ties go to the stronger, then nearer, then a transmitter. Tracking accepts any of them (`towerFrequencyAt` gives the frequency it sends on).
   - Converter screen: `RadioConverterBlock.useWithoutItem` sends `OpenConverterScreenPayload` (position, both frequencies, current strength, reach; block entities aren't synced) to the player; `ConverterScreen` sends `ConfigureConverterPayload` back, which only applies if `player.canInteractWithBlock(pos, 1.0)` and the block is a converter, then sets both with `setFrequencies`.
+- **Transmitters** update their entry when:
+  - a neighbor changes,
+  - a mast in their column reports a change (masts walk up their column on neighbor change, placement and removal),
+  - their frequency changes,
+  - and once a second in their block entity tick, which also catches config changes and world edits.
+- **Receivers** re-scan only when their frequency's revision changes or their own frequency changes, plus a once-a-second fallback. Changes arrive within one tick.
+- **Toggle receiver (v0.23.0):** `RadioToggleReceiverBlock extends RadioReceiverBlock` and shares `RadioReceiverBlockEntity` (one block entity type for all three receivers). Each re-scan goes through `outputFor(heard)`: a plain receiver outputs what it heard; a toggle receiver remembers whether it heard anything last time (`lastHeard`, not saved) and flips `toggledOn` (saved as `toggled_on`, only when true) on silent → heard, outputting 15 or 0 through the same `POWER` state. `primed` (not saved) starts false on placement, load and re-tune (`onFrequencyChanged`), so the first check only records what it hears. Pulses bump the revision when they start and end, so even a 0.1s pulse is seen. Turn-ons while unloaded are missed. Jade and the readout use `isToggledOn()`.
+- **Cleanup:** entries whose transmitter (or repeater/converter) block is gone are removed the next time something in range scans.
+- **Dropped items:** the frequency rides on the item as the `reikos_signal_tower:frequency` data component (a converter also carries `output_frequency`). The block entity's `collectImplicitComponents` adds it, and the loot table's `copy_components` copies it onto the drop. `applyImplicitComponents` reads it back when the block is placed.
+- **Tuner:** the screen sends `ConfigureRadioItemPayload` (hand, value, and the remote's mode and pulse length). The server checks the player is holding the right item and clamps the value. Tuning and copying happen in `FrequencyTunerItem.useOn` on the server. Radio blocks return `SKIP_DEFAULT_BLOCK_INTERACTION` for any held item so the tuner's `useOn` runs, and so masts can be placed against them.
 - **Jade (optional, v0.21.0):**
   - `compat/jade/SignalTowerJadePlugin` (`@WailaPlugin`) registers one provider (`reikos_signal_tower:radio`, a toggle in Jade's plugin settings) as both the block data provider and the block component for `RadioBlock` (transmitter, both receivers, repeater, converter) and `RadioMastBlock`. A converter (and a mast under one) shows "Listens on" and "Sends on" instead of "Frequency". Only Jade loads it, so nothing else references Jade's API.
   - The work is in `compat/RadioInfo`, which doesn't touch Jade: `read(ServerLevel, pos)` (server) gathers frequency, power (transmitter input, repeater's resolved strength, receiver output), reach, towers in range (`listen().transmittersInReach()`), and for a mast the block on top of its column, its distance and frequency. It goes into Jade's server data under the key `reikos_signal_tower`. `lines(state, data)` (client) builds the tooltip lines; without server data (Jade missing on the server) it falls back to the block state (`POWERED`, `LIT`, `POWER`).
@@ -116,9 +130,10 @@
 
 ## Verified
 
-- 88 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 92 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
+  - Radio Toggle Receiver, placed by hand 12 blocks from the demo transmitter with a lamp beside it: tuning it to 2026 with the tuner while 2026 was on left it off (Jade: "Switched off / Hearing: 15 / Towers in range: 2"). Lever off: still off; lever on: "Switched on" and the lamp lit; lever off: still on ("Hearing nothing"). A 2026 remote pulse switched it off and the next one on again; the press message said "Heard by 4 receivers";
   - Radio Converter, added to the repeater demo: placed by hand 20 blocks from the first repeater, it showed in Jade as "Listens on: 1 / Sends on: 1 / Nothing to convert". Right-clicking it opened its screen; typing 2026, Tab, 3001, Enter set it ("Radio Converter: listens on 2026, sends on 3001"), and Jade then said "Converting: 15". A receiver on 3001 about 50 blocks away lit its lamp ("Output: 15 / Towers in range: 1"); the scanner there listed "2,026: Repeater, 16 blocks south-east (+1 more)" and "3,001: Converter, 52 blocks west". A 2026 remote press beside it said "reach 56 blocks + 2 towers + 1 repeater + 1 converter | Heard by 3 receivers". Lever off: the 3001 lamp went out and the converter said "Nothing to convert"; on again: lit;
   - with Jade 15.10.6: looking at the transmitter showed "Frequency: 2026 / Sending: 15 / Reach: 56 blocks", the repeater "Repeating: 15 / Reach: 88 blocks", a mast "Top: Radio Repeater, 3 blocks up / Frequency: 2026", the far receiver "Output: 15 / Towers in range: 2" (with Jade's own "Power" line gone), and a compact receiver on an unused frequency "Output: off / Towers in range: 0". The plugin's switch shows under the mod's name in Jade's Plugin Settings. Without Jade (`-PnoJade`) the game loads normally and the right-click readout works;
   - repeater chain in a superflat world: a ground transmitter (reach 56) with a lever, a repeater on 4 masts 50 blocks away (reach 88) and a receiver with a lamp 130 blocks from the transmitter. Flipping the lever lit the repeater ("Repeating 15 | 7 blocks above sea level | Reach 88 blocks") and the far lamp ("Output 15 | Towers in range: 1"); the scanner there said "Repeater, 78 blocks west" and tracked it ("78 blocks, 4 up"). A second repeater placed by hand from its item (keeping frequency 2026) 85 blocks further lit a lamp 190 blocks from the transmitter. Lever off: everything went off ("Nothing to repeat"); on again: both lamps lit. A remote press beside the first repeater said "reach 56 blocks + 1 tower + 1 repeater | Heard by 2 receivers";
@@ -137,6 +152,7 @@
 
 ## History
 
+- **v0.23.0:** Radio Toggle Receiver.
 - **v0.22.0:** Radio Converter (frequency converter).
 - **v0.21.0:** Jade tooltip (optional).
 - **v0.20.0:** Radio Repeater (repeater towers).

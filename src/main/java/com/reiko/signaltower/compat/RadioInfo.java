@@ -5,8 +5,10 @@ import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
+import com.reiko.signaltower.block.RadioToggleReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
+import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -81,6 +83,10 @@ public final class RadioInfo {
             SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
             tag.putInt("power", state.getValue(RadioReceiverBlock.POWER));
             tag.putInt("towers", reception.transmittersInReach());
+            if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
+                tag.putBoolean("toggled_on", toggle.isToggledOn());
+                tag.putInt("heard", reception.power());
+            }
         }
         return tag;
     }
@@ -146,6 +152,17 @@ public final class RadioInfo {
                     : Component.translatable(LANG + "repeating_on").withStyle(ChatFormatting.GREEN));
             if (hasData) {
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+        } else if (block instanceof RadioToggleReceiverBlock) {
+            // The block state's output says whether it's on (it's 15 or 0), with or without server data.
+            boolean on = state.getValue(RadioReceiverBlock.POWER) > 0;
+            lines.add(on ? Component.translatable(LANG + "switched_on").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "switched_off").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                int heard = data.getInt("heard");
+                lines.add(heard > 0 ? Component.translatable(LANG + "hearing", value(heard))
+                        : Component.translatable(LANG + "hearing_nothing").withStyle(ChatFormatting.GRAY));
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
         } else if (block instanceof RadioReceiverBlock) {
             int power = state.getValue(RadioReceiverBlock.POWER);

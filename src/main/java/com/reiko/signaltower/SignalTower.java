@@ -114,6 +114,7 @@ public final class SignalTower {
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(ModRegistry.RADIO_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.RADIO_TOGGLE_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());

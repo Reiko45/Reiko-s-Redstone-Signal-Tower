@@ -7,6 +7,7 @@ import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
+import com.reiko.signaltower.block.RadioToggleReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
@@ -143,6 +144,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** A receiver that flips on and off each time its frequency turns on. */
+    public static final DeferredBlock<RadioToggleReceiverBlock> RADIO_TOGGLE_RECEIVER = BLOCKS.register("radio_toggle_receiver",
+            () -> new RadioToggleReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
     /** Listens for its frequency and broadcasts it again from its own height. */
     public static final DeferredBlock<RadioRepeaterBlock> RADIO_REPEATER = BLOCKS.register("radio_repeater",
             () -> new RadioRepeaterBlock(BlockBehaviour.Properties.of()
@@ -194,6 +204,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_transmitter", RADIO_TRANSMITTER);
     public static final DeferredItem<BlockItem> RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_TOGGLE_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_toggle_receiver", RADIO_TOGGLE_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -224,7 +236,7 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER_BE =
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
-                            RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get()).build(null));
+                            RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",

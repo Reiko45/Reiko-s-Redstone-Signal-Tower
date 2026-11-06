@@ -2456,4 +2456,129 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---- Radio Toggle Receiver ----
+
+    /**
+     * Each time the transmitter turns on, the toggle receiver flips; turning off does nothing. Its
+     * state is saved, and Jade shows it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void toggleReceiverFlipsOnEachTurnOn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos rx = inReach(helper, tx, 10);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1601);
+        place(helper, rx, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 1601);
+        BlockPos power = tx.north();
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK)) // on: flips on
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> helper.setBlock(power, Blocks.AIR))            // off: stays on
+                .thenIdle(5)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity be = helper.getBlockEntity(rx);
+                    check(be.isToggle() && be.isToggledOn(), "Should be switched on");
+                    CompoundTag saved = be.saveWithFullMetadata(level.registryAccess());
+                    check(saved.getBoolean("toggled_on"), "The state should be saved: " + saved);
+                    var copy = new com.reiko.signaltower.blockentity.RadioReceiverBlockEntity(helper.absolutePos(rx), helper.getBlockState(rx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.isToggledOn() && copy.getFrequency() == 1601, "And loaded back");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rx));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("frequency", "switched_on", "hearing_nothing", "towers")), "Jade lines while on, input quiet");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), null))
+                            .equals(List.of("switched_on")), "Jade without server data");
+                })
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK)) // on: flips off
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rx));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("frequency", "switched_off", "hearing", "towers")), "Jade lines while off, hearing 15");
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity be = helper.getBlockEntity(rx);
+                    check(!be.isToggledOn() && !be.saveWithFullMetadata(level.registryAccess()).contains("toggled_on"), "Off isn't stored");
+                })
+                .thenExecute(() -> helper.setBlock(power, Blocks.AIR))            // off: stays off
+                .thenIdle(5)
+                .thenExecute(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK)) // on: flips on again
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenSucceed();
+    }
+
+    /** A weak signal (14) still switches it fully on (15). */
+    @GameTest(template = PLATFORM)
+    public static void toggleReceiverOutputsFullStrength(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(4, 1, 1);
+        BlockPos rx = inReach(helper, tx, 10);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1602);
+        place(helper, rx, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 1602);
+        helper.setBlock(new BlockPos(2, 0, 1), Blocks.STONE);
+        helper.setBlock(new BlockPos(3, 0, 1), Blocks.STONE);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    helper.setBlock(new BlockPos(1, 1, 1), Blocks.REDSTONE_BLOCK);
+                    helper.setBlock(new BlockPos(2, 1, 1), Blocks.REDSTONE_WIRE); // 15
+                    helper.setBlock(new BlockPos(3, 1, 1), Blocks.REDSTONE_WIRE); // 14 -> into the transmitter
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenSucceed();
+    }
+
+    /** Remote pulses switch it on with one press and off with the next, and the press counts it as heard. */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void toggleReceiverFromRemotePulses(GameTestHelper helper) {
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 1603);
+        Player player = playerWithRemote(helper, new BlockPos(1, 1, 1), 1603, false);
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> pressWithoutRelays(helper, player))
+                .thenExecute(() -> assertLight(helper, player, true))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(30) // the 1s pulse ends; it stays on
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> pressWithoutRelays(helper, player))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenIdle(30)
+                .thenExecute(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    /**
+     * A frequency that's already on when the toggle receiver is placed, or re-tuned to it, isn't a
+     * turn-on: it stays off until the next one.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void toggleReceiverIgnoresAlreadyOn(GameTestHelper helper) {
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos placedLater = inReach(helper, tx, 6);
+        BlockPos retuned = inReach(helper, tx, 9);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1604);
+        helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK);
+        place(helper, retuned, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 1605); // quiet frequency for now
+        helper.startSequence()
+                .thenIdle(5)
+                .thenExecute(() -> place(helper, placedLater, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 1604))
+                .thenExecute(() -> setFrequency(helper, retuned, 1604))
+                .thenIdle(10)
+                .thenExecute(() -> {
+                    assertOutput(helper, placedLater, 0);
+                    assertOutput(helper, retuned, 0);
+                })
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.AIR))
+                .thenIdle(3)
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> {
+                    assertOutput(helper, placedLater, 15);
+                    assertOutput(helper, retuned, 15);
+                })
+                .thenSucceed();
+    }
 }

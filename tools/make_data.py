@@ -85,16 +85,16 @@ def transmitter_model(lit, name="radio_transmitter", tip="antenna_tip"):
     }
 
 
-def receiver_model(lit):
+def receiver_model(lit, side="radio_receiver_side"):
     suffix = "_on" if lit else ""
     return {
         "parent": "minecraft:block/cube",
         "textures": {
-            "particle": tex(f"radio_receiver_side{suffix}"),
-            "north": tex(f"radio_receiver_side{suffix}"),
-            "south": tex(f"radio_receiver_side{suffix}"),
-            "east": tex(f"radio_receiver_side{suffix}"),
-            "west": tex(f"radio_receiver_side{suffix}"),
+            "particle": tex(f"{side}{suffix}"),
+            "north": tex(f"{side}{suffix}"),
+            "south": tex(f"{side}{suffix}"),
+            "east": tex(f"{side}{suffix}"),
+            "west": tex(f"{side}{suffix}"),
             "up": tex(f"radio_receiver_top{suffix}"),
             "down": tex("radio_bottom"),
         },
@@ -107,6 +107,7 @@ for lit in (False, True):
     write(models / f"radio_repeater{suffix}.json", transmitter_model(lit, "radio_repeater", "repeater_tip"))
     write(models / f"radio_converter{suffix}.json", transmitter_model(lit, "radio_converter", "converter_tip"))
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
+    write(models / f"radio_toggle_receiver{suffix}.json", receiver_model(lit, "radio_toggle_receiver_side"))
 
 
 def compact_receiver_model(lit):
@@ -218,7 +219,7 @@ write(models / "radio_mast.json", {
 # ---------------------------------------------------------------- item models
 
 items = ASSETS / "models" / "item"
-for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_converter", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "wall_redstone.json", {
@@ -301,6 +302,9 @@ write(states / "radio_converter.json", {"variants": {
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+write(states / "radio_toggle_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
 BUTTON_ROTATIONS = {
     ("floor", "north"): {}, ("floor", "east"): {"y": 90}, ("floor", "south"): {"y": 180}, ("floor", "west"): {"y": 270},
     ("wall", "north"): {"x": 90}, ("wall", "east"): {"x": 90, "y": 90},
@@ -335,6 +339,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
     f"block.{MOD}.radio_receiver": "Radio Receiver",
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
+    f"block.{MOD}.radio_toggle_receiver": "Radio Toggle Receiver",
+    f"block.{MOD}.radio_toggle_receiver.tooltip": "Flips on or off each time its frequency turns on, like a light switch. Outputs full strength while on.",
     f"block.{MOD}.radio_repeater": "Radio Repeater",
     f"block.{MOD}.radio_repeater.tooltip": "Picks up its frequency and broadcasts it again from its own height, to chain towers across long distances. Needs no redstone.",
     f"block.{MOD}.radio_converter": "Radio Converter",
@@ -511,6 +517,9 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.repeater_repeating": "Repeating %s",
     f"message.{MOD}.repeater_quiet": "Nothing to repeat",
     f"message.{MOD}.receiver_status": "Receiver | Frequency %s | Output %s | Towers in range: %s",
+    f"message.{MOD}.toggle_status": "Toggle Receiver | Frequency %s | %s | Hearing %s | Towers in range: %s",
+    f"message.{MOD}.toggle_on": "ON",
+    f"message.{MOD}.toggle_off": "OFF",
     f"message.{MOD}.height_above": "%s blocks above sea level",
     f"message.{MOD}.height_below": "At or below sea level",
 
@@ -541,6 +550,10 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.mast_top": "Top: %s, %s blocks up",
     f"jade.{MOD}.mast_no_top": "No transmitter, repeater or converter on top",
     f"jade.{MOD}.listens": "Listens on: %s",
+    f"jade.{MOD}.switched_on": "Switched on",
+    f"jade.{MOD}.switched_off": "Switched off",
+    f"jade.{MOD}.hearing": "Hearing: %s",
+    f"jade.{MOD}.hearing_nothing": "Hearing nothing",
     f"jade.{MOD}.sends": "Sends on: %s",
     f"jade.{MOD}.converting": "Converting: %s",
     f"jade.{MOD}.converting_on": "Converting",
@@ -618,6 +631,14 @@ recipes["radio_repeater"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_repeater"},
 }, f"{MOD}:radio_transmitter")
 
+recipes["radio_toggle_receiver"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:lever"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_toggle_receiver"},
+}, f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
+
 recipes["radio_converter"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -658,7 +679,8 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_converter", "compact_radio_receiver", "radio_mast", "wall_redstone"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter",
+             "compact_radio_receiver", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
@@ -681,7 +703,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_repeater", "radio_con
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
 })
 

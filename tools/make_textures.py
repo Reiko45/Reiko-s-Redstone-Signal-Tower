@@ -118,6 +118,32 @@ def receiver_side(lit):
     return img
 
 
+def toggle_receiver_side(lit):
+    """Incoming waves above a little two-position switch: knob on the left when off, on the right when on."""
+    r = ON if lit else OFF
+    img = casing(8)
+    px = img.load()
+    vents(img)
+    # Waves coming in, like the receiver's (smaller)
+    for p in [(6, 4), (7, 3), (8, 3), (9, 4)]:
+        px[p] = r[1]
+    px[7, 5] = px[8, 5] = r[2]
+    # Switch body
+    for x in range(4, 12):
+        px[x, 7] = O
+        px[x, 9] = O
+    px[4, 8] = px[11, 8] = O
+    for x in range(5, 11):
+        px[x, 8] = D
+    # Knob
+    knob = (8, 9, 10) if lit else (5, 6, 7)
+    for x in knob:
+        px[x, 8] = r[2] if lit else r[1]
+    for x in range(5, 11):
+        px[x, 10] = O
+    return img
+
+
 def repeater_side(lit, palette=None):
     """An amber mast with arcs passing through it: picked up on the left, sent on to the right.
     The converter uses the same picture in teal (palette = (off, on))."""
@@ -513,6 +539,8 @@ blocks = {
     "radio_transmitter_side_on": transmitter_side(True),
     "radio_transmitter_top": top(False, receiver=False),
     "radio_transmitter_top_on": top(True, receiver=False),
+    "radio_toggle_receiver_side": toggle_receiver_side(False),
+    "radio_toggle_receiver_side_on": toggle_receiver_side(True),
     "radio_receiver_side": receiver_side(False),
     "radio_receiver_side_on": receiver_side(True),
     "radio_receiver_top": top(False, receiver=True),

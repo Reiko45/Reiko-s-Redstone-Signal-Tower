@@ -12,6 +12,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
+| **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
@@ -129,6 +130,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - **Radio Repeater:** frequency, what it's repeating ("Repeating: 15" or "Nothing to repeat") and its reach.
   - **Radio Converter:** both frequencies ("Listens on: 2026", "Sends on: 3001"), what it's converting and its reach.
   - **Radio Receiver** and **Compact Radio Receiver:** frequency, output ("Output: 15" or "Output: off") and how many transmitters and repeaters reach it ("Towers in range: 2").
+  - **Radio Toggle Receiver:** frequency, "Switched on" or "Switched off", what it's hearing right now, and towers in range.
   - **Radio Mast:** what's on top of its column and how far up ("Top: Radio Repeater, 3 blocks up"), and that tower's frequency. Handy at the foot of a tall tower.
 - Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
 - Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Redstone Signal Tower).
@@ -143,6 +145,21 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - One transmitter can feed any number of receivers. A receiver that hears several transmitters on its frequency outputs the strongest.
 - A transmitter keeps broadcasting its last signal while its chunk is unloaded, so long-distance links keep working.
 - Don't put a receiver next to a transmitter (or its mast column) on the **same** frequency. That makes a loop that latches on, like a redstone torch loop.
+
+### Toggle receivers
+
+A **Radio Toggle Receiver** doesn't pass the signal through like a normal receiver. It **flips** each time its frequency turns on where it stands, like a T flip-flop: the first turn-on switches it on, the next one switches it off, and so on. Turning off does nothing.
+
+- **What it outputs:** while it's on, it outputs full strength (15), whatever strength it heard, and its lights glow. It starts off.
+- **What counts as a turn-on:** any time its frequency goes from silent to on. That includes a remote pulse, a button or pressure plate driving a transmitter, a lever, or a toggle remote being switched on.
+- **Use it as a light switch:** with a pulse remote, one press turns your lights on and the next turns them off. Put buttons on transmitters at both ends of a hallway and either one switches the same lamps.
+- **No surprise flips:** placing it, re-tuning it, or its chunk loading while the frequency is already on doesn't flip it. It waits for the next turn-on.
+- **Saving:** its on/off state is saved with the world. Breaking it drops a toggle receiver that remembers its frequency, but starts off when placed again.
+- **Unloaded chunks:** turn-ons while its chunk is unloaded are missed, because it only listens while loaded.
+- **Readout and Jade:** an empty-hand right-click shows "Toggle Receiver | Frequency 2026 | ON | Hearing 15 | Towers in range: 2". Jade shows "Switched on" or "Switched off", and what it's hearing.
+- **Counts as a receiver:** it counts toward a remote's "Heard by" and signal light, and the locator finds it like any receiver.
+
+![Tuning it while 2026 is on leaves it off; the lever turning on switches it on; the lever turning off leaves it on; a remote pulse switches it off](docs/images/toggle-receiver.png)
 
 ### Repeater towers
 
@@ -208,6 +225,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Converter:** a Radio Repeater and a Redstone Comparator, in any arrangement in the crafting grid.
 
+**Radio Toggle Receiver:** a Radio Receiver and a Lever, in any arrangement in the crafting grid. Put a toggle receiver in the grid on its own to get the Radio Receiver back.
+
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
 **Remote Control:**
@@ -255,6 +274,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
+  block/RadioToggleReceiverBlock.java    receiver that flips on and off with each turn-on
   block/RadioRepeaterBlock.java          picks up its frequency and broadcasts it again
   block/RadioConverterBlock.java         a repeater that sends on another frequency; opens its screen
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
@@ -396,9 +416,13 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 85. a turn-on carried across a converter is remembered on the converted frequency too;
 86. the scanner lists a converter under the frequency it sends on, as "Converter", and can track it;
 87. converters are saved with their output frequency, and repeaters saved by 0.20.0 still load as repeaters;
-88. a placed converter is set from its screen's packet (only from within reach), lights a receiver on its output frequency, shows in Jade (and on the mast under it), and keeps both frequencies on the dropped item and when placed again.
+88. a placed converter is set from its screen's packet (only from within reach), lights a receiver on its output frequency, shows in Jade (and on the mast under it), and keeps both frequencies on the dropped item and when placed again;
+89. a toggle receiver flips on each time the transmitter turns on and ignores it turning off; its state is saved and loaded back, and Jade shows it;
+90. a weak signal (14) switches it fully on (15);
+91. remote pulses switch it on with one press and off with the next, and the press counts it as heard;
+92. a frequency that's already on when it's placed, or when it's re-tuned to it, isn't a turn-on: it waits for the next one.
 
-All 88 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 92 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
