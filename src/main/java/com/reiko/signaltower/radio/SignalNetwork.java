@@ -368,6 +368,28 @@ public final class SignalNetwork extends SavedData {
         return repeater == null ? OptionalInt.empty() : OptionalInt.of(repeater.output());
     }
 
+    /**
+     * The strongest signal sent on {@code frequency} anywhere in this dimension right now, 0 if it's
+     * quiet: transmitters (leaving out ones silenced on a private frequency), repeaters and
+     * converters sending on it, and remote presses (15). For the frequency directory.
+     */
+    public int strongestAnywhere(ServerLevel level, int frequency) {
+        int best = pulses.containsKey(frequency) || latches.containsKey(frequency) ? 15 : 0;
+        for (Transmitter tx : byFrequency.getOrDefault(frequency, Map.of()).values()) {
+            if (tx.power() > best && !blocked(level, frequency, tx.tunedBy())) {
+                best = tx.power();
+            }
+        }
+        Map<BlockPos, Repeater> relays = repeatersByOutput.get(frequency);
+        if (relays != null && best < 15) {
+            Map<BlockPos, Integer> sending = resolve(level); // silenced relays are already 0 here
+            for (BlockPos pos : relays.keySet()) {
+                best = Math.max(best, sending.getOrDefault(pos, 0));
+            }
+        }
+        return best;
+    }
+
     /** The signal the repeater or converter at {@code pos} is sending out right now (0 if it hears nothing, or there's none). */
     public int repeaterPower(ServerLevel level, BlockPos pos) {
         return repeaters.containsKey(pos) ? resolve(level).getOrDefault(pos, 0) : 0;

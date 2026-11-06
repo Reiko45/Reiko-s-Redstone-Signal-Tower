@@ -3040,4 +3040,125 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Frequency directory ----
+
+    /** The directory's answer survives the network; an entry knows whether it's hidden and whether it's on. */
+    @GameTest(template = PLATFORM)
+    public static void directoryResultSurvivesNetwork(GameTestHelper helper) {
+        var result = new com.reiko.signaltower.network.DirectoryResultPayload(List.of(
+                new com.reiko.signaltower.network.DirectoryResultPayload.Entry(2026, 15, 0),
+                new com.reiko.signaltower.network.DirectoryResultPayload.Entry(7777, -1, 12),
+                new com.reiko.signaltower.network.DirectoryResultPayload.Entry(999_999_999, 0, 0)));
+        var buffer = Unpooled.buffer();
+        com.reiko.signaltower.network.DirectoryResultPayload.STREAM_CODEC.encode(buffer, result);
+        check(com.reiko.signaltower.network.DirectoryResultPayload.STREAM_CODEC.decode(buffer).equals(result), "Same after the network");
+        var on = result.entries().get(0);
+        var hiddenHere = result.entries().get(1);
+        var off = result.entries().get(2);
+        check(on.on() && !on.hidden(), "On anywhere");
+        check(hiddenHere.hidden() && hiddenHere.on(), "Hidden, but heard here");
+        check(!off.on() && !off.hidden(), "Off");
+        check(com.reiko.signaltower.network.DirectoryResultPayload.MAX_ENTRIES >= 8192, "Room for every name and claim");
+        helper.succeed();
+    }
+
+    /**
+     * "Strongest anywhere" counts every sender on the frequency in the dimension: transmitters
+     * (not ones silenced on a private frequency), repeaters and converters sending on it, and
+     * remote presses.
+     */
+    @GameTest(template = PLATFORM)
+    public static void directoryStrongestAnywhere(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos here = new BlockPos(63_000, 100, 63_000);
+        UUID owner = UUID.randomUUID();
+        try {
+            check(network.strongestAnywhere(level, 1901) == 0, "Nothing on it");
+            network.updateTransmitter(here, 1901, 7, 30, null);
+            check(network.strongestAnywhere(level, 1901) == 7, "A transmitter far from everything still counts");
+            claims.put(1901, owner, "Owner", java.util.Map.of());
+            network.invalidate(1901);
+            network.updateTransmitter(here.east(500), 1901, 12, 30, UUID.randomUUID());
+            check(network.strongestAnywhere(level, 1901) == 7, "A silenced one doesn't");
+            network.updateTransmitter(here.east(1000), 1902, 11, 30, owner);
+            network.updateRepeater(here.east(1020), 1902, 1901, 30, owner);
+            check(network.strongestAnywhere(level, 1901) == 11, "A converter sending on it does");
+            network.toggleLatch(1901, SignalNetwork.ownCoverage(here.south(2000), 10));
+            check(network.strongestAnywhere(level, 1901) == 15, "So does a remote toggle");
+            check(network.strongestAnywhere(level, 1902) == 11, "The converter's input frequency is on too");
+        } finally {
+            claims.remove(1901);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The directory lists every named and private frequency in order, only for a player holding a
+     * radio item. Someone else's private frequency only says whether it's heard where the player
+     * stands; their own, a public one and one they're a friend on say whether it's on anywhere.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void directoryEntriesHideOtherPlayersPrivateFrequencies(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        var names = com.reiko.signaltower.radio.FrequencyNames.get(server);
+        UUID meId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        Player me = namedPlayer(helper, new BlockPos(1, 1, 1), meId, "Me", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos far = new BlockPos(64_000, 100, 64_000);
+        SignalNetwork network = SignalNetwork.get(level);
+        names.set(1903, "Directory Test");
+        claims.put(1904, otherId, "Other", java.util.Map.of());
+        claims.put(1905, meId, "Me", java.util.Map.of());
+        claims.put(1906, otherId, "Other", java.util.Map.of(meId, "Me"));
+        network.updateTransmitter(far, 1903, 5, 30, null);
+        network.updateTransmitter(far.east(100), 1904, 9, 30, otherId);
+        network.updateTransmitter(far.east(200), 1906, 4, 30, otherId);
+        BlockPos near = new BlockPos(3, 1, 1);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    check(!com.reiko.signaltower.network.DirectoryRequestPayload.holdsRadioItem(me), "Nothing in hand");
+                    me.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+                    check(com.reiko.signaltower.network.DirectoryRequestPayload.holdsRadioItem(me), "A tuner counts");
+                    me.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                    me.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(ModRegistry.PAGER.get()));
+                    check(com.reiko.signaltower.network.DirectoryRequestPayload.holdsRadioItem(me), "So does a pager in the off-hand");
+
+                    var entries = com.reiko.signaltower.network.DirectoryRequestPayload.entriesFor(me);
+                    List<Integer> order = entries.stream().map(com.reiko.signaltower.network.DirectoryResultPayload.Entry::frequency)
+                            .filter(f -> f >= 1903 && f <= 1906).toList();
+                    check(order.equals(List.of(1903, 1904, 1905, 1906)), "Named and private, in order: " + order);
+                    var byFrequency = entries.stream().collect(java.util.stream.Collectors.toMap(
+                            com.reiko.signaltower.network.DirectoryResultPayload.Entry::frequency, e -> e));
+                    check(byFrequency.get(1903).anywhere() == 5 && byFrequency.get(1903).here() == 0, "Named and public: on anywhere, not here");
+                    check(byFrequency.get(1904).hidden() && byFrequency.get(1904).here() == 0, "Someone else's: hidden");
+                    check(byFrequency.get(1905).anywhere() == 0 && !byFrequency.get(1905).hidden(), "Mine: off, and shown");
+                    check(byFrequency.get(1906).anywhere() == 4, "One I'm a friend on: shown");
+
+                    // Someone else's transmitter right next to me: I can hear it, so that much is shown.
+                    place(helper, near, ModRegistry.RADIO_TRANSMITTER.get(), 1904);
+                    RadioBlockEntity transmitter = helper.getBlockEntity(near);
+                    transmitter.setTunedBy(otherId);
+                    helper.setBlock(near.above(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> {
+                    var entry = com.reiko.signaltower.network.DirectoryRequestPayload.entriesFor(me).stream()
+                            .filter(e -> e.frequency() == 1904).findFirst().orElseThrow();
+                    check(entry.hidden() && entry.here() == 15, "Still hidden, but heard here: " + entry);
+                })
+                .thenExecute(() -> {
+                    claims.remove(1904);
+                    claims.remove(1905);
+                    claims.remove(1906);
+                    names.set(1903, "");
+                    network.removeTransmitter(far);
+                    network.removeTransmitter(far.east(100));
+                    network.removeTransmitter(far.east(200));
+                })
+                .thenSucceed();
+    }
 }

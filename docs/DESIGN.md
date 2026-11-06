@@ -13,6 +13,10 @@
   - It hears transmitters, remote pulses and latches, and other repeaters, but only signals that trace back to a real transmitter or remote press: two repeaters can't keep each other on.
   - Like a transmitter, it relays remote presses on any frequency when it's within the player's reach (`towersRelayRemotes`).
   - `LIT` block state (light level 7, amber sparks) while repeating. Recipe: Radio Receiver + Radio Transmitter (shapeless).
+- **Frequency directory (v0.26.0):**
+  - A **Directory** button in the tuner's, remote's and pager's screens opens a list of every named and private frequency in the world, in order: frequency, name, who can send ("Anyone", "You + 2", "Dev + you", "Dev") and whether it's on now ("On 15", "On 15, here", "Off").
+  - For someone else's private frequency it only shows whether it's heard where the player stands ("Here 15", else "?"), so it can't be used to watch it from afar.
+  - Search (name, number, owner), a filter (All, Named, Private, Mine, On now), row tooltips (owner, friends for members, status). Clicking a row puts the frequency into the screen it came from; Back keeps what was typed. Updates every second.
 - **Private frequencies (v0.25.0):**
   - In the Frequency Tuner's screen a player can make a frequency private (Private button) and list up to 16 friends (Friends box). Claims belong to the world like names: saved with it, valid in every dimension, shown to every player.
   - On a private frequency only the owner and friends can send: other players' remote presses are refused, and transmitters, repeaters and converters only broadcast on it if a member tuned or placed them. Others can't tune a transmitter, repeater or converter onto it; one placed with it already set stays silent. Taking a friend off silences their blocks at once.
@@ -141,6 +145,9 @@
   - `SetFrequencyPrivacyPayload(frequency, private, friends)` from the tuner screen's Done (only when the button or box differs from the claim). Server: needs a tuner in hand; refuses anyone but the owner (operators may only make it public); for a new claim checks the per-player limit, the world limit and `otherSenders` (blocks in any dimension tuned by anyone else). Friend names are resolved among online players, or kept from the existing claim by name; unknown names and an over-full list are reported in chat.
   - Remote presses (`RemoteControlItem.sendSignal`, shared with the Multi-Button Remote) check the claim first and return the refusal without sending. `SetFrequencyNamePayload` refuses non-members unless they're operators.
   - The tuner screen adds a row under the Name box: the Private button and the Friends box, then a status line (public / yours / a friend's / someone else's / what Done will change). Someone else's frequency can't be edited (operators can still switch Private off), and its name box is read-only for non-members.
+- **Frequency directory (v0.26.0):**
+  - `client/DirectoryScreen` builds its rows from the client's copies of the names and claims (`FrequencyNames.clientFrequencies()` / `FrequencyClaims.clientFrequencies()`), and once a second sends `DirectoryRequestPayload`. The server answers players holding a tuner, remote, Multi-Button Remote, pager or scanner with `DirectoryResultPayload`: per frequency (names and claims, in order, at most 8,192) `anywhere` = `SignalNetwork.strongestAnywhere(level, f)` (transmitters not silenced, relays' resolved strength, remote pulses/latches as 15), or -1 for someone else's private frequency, and `here` = `listen(level, f, playerPos).power()`.
+  - `FrequencyScreen` has a third bottom button (Done / Directory / Cancel, 72 wide each). The directory gets the parent screen and a callback; a pick sets `picked`, and `setScreen(parent)` runs `init()` again, which now keeps the typed frequency, an edited name and edited friends (so a window resize no longer loses them either), or uses the picked frequency and refills name and privacy from it.
 - **Jade (optional, v0.21.0):**
   - `compat/jade/SignalTowerJadePlugin` (`@WailaPlugin`) registers one provider (`reikos_signal_tower:radio`, a toggle in Jade's plugin settings) as both the block data provider and the block component for `RadioBlock` (transmitter, both receivers, repeater, converter) and `RadioMastBlock`. A converter (and a mast under one) shows "Listens on" and "Sends on" instead of "Frequency". Only Jade loads it, so nothing else references Jade's API.
   - The work is in `compat/RadioInfo`, which doesn't touch Jade: `read(ServerLevel, pos)` (server) gathers frequency, power (transmitter input, repeater's resolved strength, receiver output), reach, towers in range (`listen().transmittersInReach()`), and for a mast the block on top of its column, its distance and frequency. It goes into Jade's server data under the key `reikos_signal_tower`. `lines(state, data)` (client) builds the tooltip lines; without server data (Jade missing on the server) it falls back to the block state (`POWERED`, `LIT`, `POWER`).
@@ -149,8 +156,9 @@
 
 ## Verified
 
-- 100 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 103 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
+  - Frequency directory, on a dedicated server with Dev and Steve. Dev named 3001 "Garage Lights", 42 "Farm Door" and 4242 "Vault" (private); Steve made 7777 "Steve's Farm" and 7778 "Steve's Bell" private, with transmitters at his farm 200 blocks away and next to Dev. Dev's directory listed all six in order: 42 "Anyone / On 15", 2026 "You + 1 / On 15, here", 3001 "Anyone / On 15", "» 4,242 Vault / You / Off", 7777 "Steve / ?", 7778 "Steve / Here 15", updating within a second when the transmitters were switched on. Hovering 7777 explained it's only shown when heard; hovering 2026 listed "Friends: Steve". Typing "steve" left 7777 and 7778; "Show: Mine" left 2026 and 4242. Clicking 2026 brought the tuner screen back with 2026, "Front Gate" and "Private: you and 1 friend can send on it". In the remote's screen, typing 12345, opening the directory and pressing Back kept 12345; picking 3001 showed "Garage Lights" and "1 receiver in range, 118 blocks east". Steve's directory showed 2026 as "Dev + you / On 15, here", 4242 as "Dev / ?", his own as "You / On 15"; "Show: On now" left five rows;
   - Private frequencies, on a dedicated server with two clients, Dev and Steve. Dev clicked Private for 2026 (Front Gate): "2026 (Front Gate) is now private: only you can send on it". Steve's remote press was refused ("Can't send: 2026 (Front Gate) is private to Dev", red light) and his toggle receiver didn't flip; his tuner screen said "Private to Dev: you can't send on it" with the button greyed out; tuning Dev's transmitter was refused. A transmitter Steve placed with 2026 on it said "Silent: 2026 (Front Gate) is private to Dev, so this won't broadcast", and Jade showed "Silent: private to Dev". Dev typed "Steve" in the Friends box ("only you and Steve can send on it"): Steve's powered transmitter lit the toggle receiver's lamp and his press worked. Dev took him off again: his transmitter went silent at once (Jade: "Sending: 15 / Silent: private to Dev"). With Steve made an operator, his Private button was active and switching it off made 2026 public again; his transmitter broadcast again. The old demo blocks (tuned before v0.25) kept working throughout, and while Steve's transmitter sent on 2026 Dev couldn't claim it ("other players' blocks already send on it (1)");
   - models, the glowing warning light and items render correctly;
   - Frequency names: typing "Front Gate" in the tuner screen's Name box for 2026 and pressing Enter said "Frequency 2026 is now called Front Gate, for everyone". Straight away Jade showed "Frequency: 2026 (Front Gate)", a remote press said "pulse sent on frequency 2026 (Front Gate)", the scanner row read "Front Gate: Repeater, 7 blocks east", and the tuner's and remote's tooltips read "Frequency: 2026 (Front Gate)". After closing and restarting the game the names file was in the world's data, and the remote's screen showed "Front Gate" under its title and the tuner's tooltip still had the name (sent again on joining);
@@ -173,6 +181,7 @@
 
 ## History
 
+- **v0.26.0:** frequency directory.
 - **v0.25.0:** private frequencies.
 - **v0.24.0:** frequency names.
 - **v0.23.0:** Radio Toggle Receiver.
@@ -206,5 +215,4 @@
 - A blinking warning light, or a separate light block for the top of tall towers
 - Strong-power option on receivers; an inverted receiver
 - Signal falloff at the edge of reach
-- A frequency directory: a screen listing the world's named and private frequencies
 - A ring on the ground showing a transmitter's or repeater's reach

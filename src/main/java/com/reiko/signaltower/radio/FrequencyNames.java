@@ -119,6 +119,11 @@ public final class FrequencyNames extends SavedData {
     // ---- The client's copy ----
 
     /** The server's whole list arrived (on joining). */
+    /** Every frequency in the client's copy. */
+    public static java.util.Set<Integer> clientFrequencies() {
+        return java.util.Set.copyOf(CLIENT.keySet());
+    }
+
     public static void clientReplaceAll(Map<Integer, String> all) {
         CLIENT.clear();
         CLIENT.putAll(all);

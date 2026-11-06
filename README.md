@@ -15,7 +15,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
-| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends. |
+| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
@@ -87,6 +87,19 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Jade** shows "Private to Dev" on a private frequency's blocks, and "Silent: private to Dev" on ones kept quiet. The empty-hand readout and the converter's screen also say when a block is kept quiet.
 
   ![Dev adding Steve as a friend on private frequency 2026; Steve's tuner screen before that ("Private to Dev: you can't send on it"); Jade on a friend's and on a silenced transmitter; and the messages for claiming, a refused remote press, a refused tuning and a silent placement](docs/images/private-frequencies.png)
+
+**Frequency directory:**
+- **Opening it:** click **Directory** in the Frequency Tuner's, Remote Control's or Radio Pager's screen (between Done and Cancel). It lists every named and private frequency in the world, in order.
+- **Columns:**
+  - **Frequency** and **Name**. The one typed in the screen you came from is marked "»".
+  - **Who sends:** "Anyone" for a public frequency; "You" or "You + 2" (friends) for your own private one; "Dev + you" for one where you're a friend; "Dev" (red) for someone else's.
+  - **Now:** "On 15" if something is sending on it anywhere in your dimension, "On 15, here" if you also hear it where you stand, "Off" if nothing is.
+- **Others' private frequencies stay private:** for someone else's private frequency the directory only says "Here 15" when you can hear it where you stand, and "?" otherwise, so it can't be used to watch their base from afar.
+- **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's), so you just press Done. **Back** returns with what you'd typed.
+- **Finding one:** type in the search box to match a name, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
+- It updates every second while open.
+
+  ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
 
 **Remote Control:**
 - Right-click: press the button.
@@ -345,6 +358,8 @@ src/main/java/com/reiko/signaltower/
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
+  client/DirectoryScreen.java            the frequency directory
+  network/DirectoryRequestPayload.java, DirectoryResultPayload.java  the directory asking the server what's on
   client/MultiRemoteScreen.java          the Multi-Button Remote keypad
   client/ConverterScreen.java            the Radio Converter's two frequencies
   network/OpenConverterScreenPayload.java, ConfigureConverterPayload.java  converter screen <-> server
@@ -465,9 +480,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 97. on a private frequency, a stranger's transmitter, repeater and converter stay quiet (receivers and the scanner don't hear them, their turn-ons aren't remembered, a press isn't carried through them), while the owner's, a friend's and an old untracked one work; who tuned them is saved; taking a friend off silences theirs at once, and making it public brings everyone back;
 98. a stranger's remote press on a private frequency is refused (with a red light and the owner's name) and can't switch it on or off, while the owner's and a friend's presses work;
 99. the Private button only works with a tuner in hand; only the owner changes a private frequency, an operator can make it public; unknown names are reported, offline friends are kept by name, the per-player limit is enforced, and a frequency other players' blocks send on can't be claimed; only members rename it;
-100. a stranger can't tune a transmitter or converter onto a private frequency (a receiver is fine), a block they place with it stays silent and says so (readout and Jade), and whoever tunes or places a block becomes its tuner, saved with it.
+100. a stranger can't tune a transmitter or converter onto a private frequency (a receiver is fine), a block they place with it stays silent and says so (readout and Jade), and whoever tunes or places a block becomes its tuner, saved with it;
+101. the directory's answer survives the network, and each entry knows whether it's hidden and whether it's on;
+102. "strongest anywhere" counts transmitters far from everything, leaves out silenced ones, and counts converters sending on the frequency and remote toggles;
+103. the directory answers only players holding a radio item, lists named and private frequencies in order, hides someone else's private frequency except for what's heard where the player stands, and shows a player's own, a public one and one they're a friend on.
 
-All 100 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 103 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

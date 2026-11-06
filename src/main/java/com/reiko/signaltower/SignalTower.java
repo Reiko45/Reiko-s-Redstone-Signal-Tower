@@ -7,6 +7,8 @@ import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
+import com.reiko.signaltower.network.DirectoryRequestPayload;
+import com.reiko.signaltower.network.DirectoryResultPayload;
 import com.reiko.signaltower.network.FrequencyClaimPayload;
 import com.reiko.signaltower.network.FrequencyClaimsPayload;
 import com.reiko.signaltower.network.FrequencyNamePayload;
@@ -94,6 +96,10 @@ public final class SignalTower {
                 FrequencyNamePayload::handle);
         registrar.playToClient(FrequencyNamesPayload.TYPE, FrequencyNamesPayload.STREAM_CODEC,
                 FrequencyNamesPayload::handle);
+        registrar.playToServer(DirectoryRequestPayload.TYPE, DirectoryRequestPayload.STREAM_CODEC,
+                DirectoryRequestPayload::handle);
+        registrar.playToClient(DirectoryResultPayload.TYPE, DirectoryResultPayload.STREAM_CODEC,
+                DirectoryResultPayload::handle);
         registrar.playToServer(SetFrequencyPrivacyPayload.TYPE, SetFrequencyPrivacyPayload.STREAM_CODEC,
                 SetFrequencyPrivacyPayload::handle);
         registrar.playToClient(FrequencyClaimPayload.TYPE, FrequencyClaimPayload.STREAM_CODEC,

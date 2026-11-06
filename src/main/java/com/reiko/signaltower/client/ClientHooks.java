@@ -2,6 +2,7 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.TunerPresets;
+import com.reiko.signaltower.network.DirectoryResultPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
@@ -46,6 +47,13 @@ public final class ClientHooks {
     /** A scanner answer arrived: hand it to the open scanner screen, if there is one. */
     public static void onScannerResult(ScannerResultPayload result) {
         if (Minecraft.getInstance().screen instanceof ScannerScreen screen) {
+            screen.onResult(result);
+        }
+    }
+
+    /** A directory answer arrived: hand it to the open directory screen, if there is one. */
+    public static void onDirectoryResult(DirectoryResultPayload result) {
+        if (Minecraft.getInstance().screen instanceof DirectoryScreen screen) {
             screen.onResult(result);
         }
     }

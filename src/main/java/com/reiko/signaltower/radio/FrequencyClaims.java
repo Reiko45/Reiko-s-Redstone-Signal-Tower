@@ -180,6 +180,11 @@ public final class FrequencyClaims extends SavedData {
         return CLIENT.get(frequency);
     }
 
+    /** Every frequency in the client's copy. */
+    public static java.util.Set<Integer> clientFrequencies() {
+        return java.util.Set.copyOf(CLIENT.keySet());
+    }
+
     public static void clientReplaceAll(Map<Integer, ClaimInfo> all) {
         CLIENT.clear();
         CLIENT.putAll(all);

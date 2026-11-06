@@ -72,6 +72,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** True once the player clicked Private or typed friends, so changing the frequency doesn't undo it. */
     private boolean privacyEdited;
     private boolean fillingPrivacy;
+    /** A frequency picked in the directory, used when this screen is shown again. */
+    private @Nullable Integer picked;
     /** Where things go, worked out in init(). */
     private int top;
     private int inputY;
@@ -115,10 +117,23 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         // under the frequency row (and the remote's two locator lines, or the tuner's name and privacy rows)
         int y = inputY + 20 + (remote ? 32 : 6) + (tuner ? tunerRows : 0);
 
+        // init() runs again when the window is resized or the directory hands back: keep what was typed.
+        String keepFrequency = input != null ? input.getValue() : null;
+        if (picked != null) {
+            keepFrequency = Integer.toString(picked);
+            picked = null;
+            nameEdited = false;     // a new frequency: show its own name and privacy
+            privacyEdited = false;
+            scan = null;            // and ask the locator about it straight away
+            scanTimer = 1;
+        }
+        String keepName = nameBox != null && nameEdited ? nameBox.getValue() : null;
+        String keepFriends = friendsBox != null && privacyEdited ? friendsBox.getValue() : null;
+
         input = new EditBox(font, centerX - 50, inputY, 100, 20, Component.translatable(KEY + ".input"));
         input.setMaxLength(Frequency.MAX_DIGITS);
         input.setFilter(text -> text.chars().allMatch(Character::isDigit));
-        input.setValue(Integer.toString(initialFrequency));
+        input.setValue(keepFrequency != null ? keepFrequency : Integer.toString(initialFrequency));
         input.setResponder(text -> {
             updateDoneButton();
             updatePresetButtons();
@@ -140,6 +155,11 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             });
             addRenderableWidget(nameBox);
             fillName();
+            if (keepName != null) {
+                fillingName = true;
+                nameBox.setValue(keepName);
+                fillingName = false;
+            }
 
             privateButton = addRenderableWidget(Button.builder(Component.empty(), button -> {
                 privateOn = !privateOn;
@@ -158,6 +178,12 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             });
             addRenderableWidget(friendsBox);
             fillPrivacy();
+            if (keepFriends != null) {
+                fillingPrivacy = true;
+                friendsBox.setValue(keepFriends);
+                fillingPrivacy = false;
+                updatePrivacyWidgets();
+            }
         }
 
         addRenderableWidget(nudgeButton(-100, centerX - 112, 32));
@@ -205,9 +231,12 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             buttonsY += 24;
         }
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> save())
-                .bounds(centerX - 102, buttonsY, 100, 20).build());
+                .bounds(centerX - 112, buttonsY, 72, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable(KEY + ".directory"), button -> openDirectory())
+                .tooltip(Tooltip.create(Component.translatable(KEY + ".directory_tooltip")))
+                .bounds(centerX - 36, buttonsY, 72, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, button -> onClose())
-                .bounds(centerX + 2, buttonsY, 100, 20).build());
+                .bounds(centerX + 40, buttonsY, 72, 20).build());
 
         setInitialFocus(input);
         updateDoneButton();
@@ -405,6 +434,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         return value >= Frequency.MIN && value <= Frequency.MAX
                 ? java.util.OptionalInt.of((int) value)
                 : java.util.OptionalInt.empty();
+    }
+
+    /** Opens the frequency directory; a frequency clicked there comes back into the box. */
+    private void openDirectory() {
+        if (minecraft != null) {
+            minecraft.setScreen(new DirectoryScreen(this, parsed().orElse(-1), frequency -> picked = frequency));
+        }
     }
 
     private void updateDoneButton() {
