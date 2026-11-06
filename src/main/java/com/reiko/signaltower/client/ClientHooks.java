@@ -25,6 +25,12 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks, favorites));
     }
 
+    /** Opens a Radio Pager's screen: frequency and favorites, plus its Sound and Chat log buttons. */
+    public static void openPagerScreen(InteractionHand hand, int frequency, Component title, TunerPresets favorites,
+                                       boolean sound, boolean chatLog) {
+        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, favorites, sound, chatLog));
+    }
+
     /** A locator answer arrived: hand it to the open remote screen, if there is one. */
     public static void onRemoteScan(RemoteScanResultPayload result) {
         if (Minecraft.getInstance().screen instanceof RemoteScanListener listener) {

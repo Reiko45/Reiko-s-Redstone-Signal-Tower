@@ -94,9 +94,12 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Keep it anywhere in your inventory (hotbar, backpack slots or off-hand). When its frequency turns on where you are, it beeps three times and shows "Radio Pager: frequency 5 is ON (strength 15)". "Where you are" means inside the reach of a transmitter on that frequency, or of a remote press (including towers relaying it).
 - It alerts once each time the signal turns on, not again while it stays on. Its little screen glows green while the signal is on, and the tooltip shows the live status.
 - Rename it in an anvil and the alert uses that name: "Front Door: frequency 5 is ON".
+- **Chat log:** each alert also goes into chat, with the in-game day and time in front: "[Day 4, 08:30] Front Door: frequency 5 is ON (strength 15)". Open chat to scroll back and see what went off while you weren't looking. It's on for every pager by default; switch it off for one pager (say, one on a fast clock) with the **Chat log** button in its screen. The time comes from the world's clock, with each day starting at midnight.
+
+  ![Pager alerts in chat with their day and time, and the pager's Sound and Chat log buttons](docs/images/pager-chat-log.png)
 - Right-click: switch the sound on or off. With the sound off it still shows the message.
 - Sneak + scroll, Sneak + Ctrl + scroll and the 5 favorites in its screen work just like the tuner's. After a change it alerts if the new frequency is already on.
-- Sneak + right-click the air: change its frequency. Sneak + right-click a transmitter or receiver: copy its frequency.
+- Sneak + right-click the air: change its frequency, and switch its **Sound** and **Chat log** on or off. Sneak + right-click a transmitter or receiver: copy its frequency.
 - Pagers count toward a remote's "Heard by" number and signal light, so a doorbell press shows green when only your pager hears it. The locator never shows pagers, so it can't be used to find players.
 - The beep is only heard by the pager's owner.
 
@@ -301,7 +304,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 58. favorites survive saving and network sync, and a tuner without any has no extra data;
 59. sneak + scroll steps by 1 and stops at 1 and 999,999,999; with Ctrl it jumps between favorites, and says so when there are none;
 60. the Remote Control and pager scroll and jump between favorites too (the remote keeps its mode and pulse length, the pager re-arms its alert), and the Multi-Button Remote and scanner don't;
-61. the remote's, pager's and tuner's tooltips list their favorites right under the frequency and explain scrolling.
+61. the remote's, pager's and tuner's tooltips list their favorites right under the frequency and explain scrolling;
+62. a pager posts its alert in chat (day and time, then the alert) as well as above the hotbar, and one with its chat log off only shows it above the hotbar;
+63. the chat line's day and time come from the world's day time, with days starting at midnight;
+64. the chat log is on by default, can be switched off and on, and the tooltip says which.
 
 ## License
 

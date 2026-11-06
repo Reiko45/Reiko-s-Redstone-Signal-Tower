@@ -1,5 +1,6 @@
 package com.reiko.signaltower.gametest;
 
+import com.mojang.authlib.GameProfile;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
@@ -51,6 +52,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.mojang.serialization.JsonOps;
@@ -1566,5 +1568,111 @@ public final class SignalTowerGameTests {
             check(keys.contains("tooltip." + SignalTower.MOD_ID + ".frequency_scroll"), stack.getHoverName().getString() + ": should explain scrolling");
         }
         helper.succeed();
+    }
+
+    // ---- Pager chat log ----
+
+    /** A test player that keeps the messages sent to it: action-bar ones in one list, chat ones in the other. */
+    private static Player listeningPlayer(GameTestHelper helper, BlockPos standAt, List<Component> actionBar, List<Component> chat) {
+        Player player = new Player(helper.getLevel(), BlockPos.ZERO, 0.0F, new GameProfile(UUID.randomUUID(), "pager-test")) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+
+            @Override
+            public boolean isLocalPlayer() {
+                return true;
+            }
+
+            @Override
+            public void displayClientMessage(Component message, boolean overlay) {
+                (overlay ? actionBar : chat).add(message);
+            }
+        };
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(standAt));
+        player.moveTo(feet.x, feet.y, feet.z);
+        return player;
+    }
+
+    private static String keyOf(Component component) {
+        return component.getContents() instanceof TranslatableContents t ? t.getKey() : "";
+    }
+
+    /**
+     * A pager posts its alert in chat (with the day and time in front) as well as above the hotbar;
+     * one with its chat log switched off only shows it above the hotbar.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void pagerPostsAlertsInChat(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        place(helper, new BlockPos(4, 1, 1), ModRegistry.RADIO_TRANSMITTER.get(), 957);
+        helper.setBlock(new BlockPos(4, 1, 0), Blocks.REDSTONE_BLOCK);
+        place(helper, new BlockPos(6, 1, 1), ModRegistry.RADIO_TRANSMITTER.get(), 958);
+        helper.setBlock(new BlockPos(6, 1, 0), Blocks.REDSTONE_BLOCK);
+        List<Component> barA = new java.util.ArrayList<>(), chatA = new java.util.ArrayList<>();
+        List<Component> barB = new java.util.ArrayList<>(), chatB = new java.util.ArrayList<>();
+        Player playerA = listeningPlayer(helper, new BlockPos(1, 1, 1), barA, chatA);
+        Player playerB = listeningPlayer(helper, new BlockPos(1, 1, 1), barB, chatB);
+        ItemStack logging = pagerFor(playerA, 957);
+        ItemStack quiet = pagerFor(playerB, 958);
+        PagerItem.setChatLog(quiet, false);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    PagerItem.checkSignal(level, playerA, logging);
+                    PagerItem.checkSignal(level, playerB, quiet);
+                    check(!barA.isEmpty() && !barB.isEmpty(), "Both pagers should alert");
+                })
+                .thenExecute(() -> {
+                    check(barA.size() == 1 && keyOf(barA.get(0)).endsWith("pager_alert"), "The alert should show above the hotbar");
+                    check(chatA.size() == 1, "The alert should also go in chat once, got " + chatA.size());
+                    Component line = chatA.get(0);
+                    check(keyOf(line).endsWith("pager_log") && keyOf(line.getSiblings().get(0)).endsWith("pager_alert"),
+                            "The chat line should be the day and time, then the alert: " + line.getString());
+                    check(barB.size() == 1 && chatB.isEmpty(), "With the chat log off, nothing should go in chat");
+                })
+                .thenSucceed();
+    }
+
+    /** The chat line's day and time come from the world's day time, with days starting at midnight. */
+    @GameTest(template = PLATFORM)
+    public static void pagerChatLineShowsDayAndTime(GameTestHelper helper) {
+        Component alert = Component.literal("Front Door: frequency 5 is ON (strength 15)");
+        long[][] cases = {{0, 1, 600}, {18000, 2, 0}, {23999, 2, 559}, {4 * 24000 + 6500, 5, 1230}, {6000, 1, 1200}};
+        for (long[] c : cases) {
+            var stamp = (TranslatableContents) PagerItem.chatLine(c[0], alert).getContents();
+            String time = String.format(java.util.Locale.ROOT, "%02d:%02d", c[2] / 100, c[2] % 100);
+            check(String.valueOf(stamp.getArgs()[0]).equals(String.valueOf(c[1])) && time.equals(stamp.getArgs()[1]),
+                    "Day time " + c[0] + " should be Day " + c[1] + ", " + time + ", got Day " + stamp.getArgs()[0] + ", " + stamp.getArgs()[1]);
+        }
+        check(PagerItem.chatLine(0, alert).getString().endsWith("Front Door: frequency 5 is ON (strength 15)"),
+                "The alert should follow the time stamp");
+        helper.succeed();
+    }
+
+    /** The chat log is on by default, can be switched off and on, and the tooltip says which. */
+    @GameTest(template = PLATFORM)
+    public static void pagerChatLogSettingAndTooltip(GameTestHelper helper) {
+        ItemStack pager = new ItemStack(ModRegistry.PAGER.get());
+        check(PagerItem.isChatLog(pager) && !pager.has(ModRegistry.PAGER_CHAT_LOG.get()), "New pagers log to chat, with no extra data");
+        check(tooltipKeys(pager).contains("tooltip." + SignalTower.MOD_ID + ".pager_chat_on"), "The tooltip should say the chat log is on");
+        PagerItem.setChatLog(pager, false);
+        check(!PagerItem.isChatLog(pager) && tooltipKeys(pager).contains("tooltip." + SignalTower.MOD_ID + ".pager_chat_off"),
+                "Switched off, and the tooltip should say so");
+        PagerItem.setChatLog(pager, true);
+        check(PagerItem.isChatLog(pager) && !pager.has(ModRegistry.PAGER_CHAT_LOG.get()), "Switched back on, with the data removed");
+        helper.succeed();
+    }
+
+    private static List<String> tooltipKeys(ItemStack stack) {
+        List<Component> lines = new java.util.ArrayList<>();
+        stack.getItem().appendHoverText(stack, Item.TooltipContext.EMPTY, lines, net.minecraft.world.item.TooltipFlag.NORMAL);
+        return lines.stream().map(SignalTowerGameTests::keyOf).toList();
     }
 }

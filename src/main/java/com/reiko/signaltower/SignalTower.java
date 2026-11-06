@@ -2,6 +2,7 @@ package com.reiko.signaltower;
 
 import com.mojang.logging.LogUtils;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
+import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
@@ -58,6 +59,8 @@ public final class SignalTower {
                 SelectRemoteButtonPayload::handle);
         registrar.playToServer(RemoteScanRequestPayload.TYPE, RemoteScanRequestPayload.STREAM_CODEC,
                 RemoteScanRequestPayload::handle);
+        registrar.playToServer(ConfigurePagerPayload.TYPE, ConfigurePagerPayload.STREAM_CODEC,
+                ConfigurePagerPayload::handle);
         registrar.playToServer(ScrollFrequencyPayload.TYPE, ScrollFrequencyPayload.STREAM_CODEC,
                 ScrollFrequencyPayload::handle);
         registrar.playToServer(ConfigureFavoritesPayload.TYPE, ConfigureFavoritesPayload.STREAM_CODEC,

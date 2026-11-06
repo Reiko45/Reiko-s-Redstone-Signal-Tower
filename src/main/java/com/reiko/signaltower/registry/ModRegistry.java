@@ -91,6 +91,12 @@ public final class ModRegistry {
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
 
+    /** False if a Radio Pager shouldn't post its alerts in chat (absent means it does). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> PAGER_CHAT_LOG =
+            DATA_COMPONENTS.registerComponentType("pager_chat_log", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
+
     /** The Frequency Tuner's favorite frequencies. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<TunerPresets>> TUNER_PRESETS =
             DATA_COMPONENTS.registerComponentType("tuner_presets", builder -> builder

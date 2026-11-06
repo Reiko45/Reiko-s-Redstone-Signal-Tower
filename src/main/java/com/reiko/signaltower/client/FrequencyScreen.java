@@ -5,6 +5,7 @@ import net.minecraft.ChatFormatting;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.network.ConfigureFavoritesPayload;
+import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
@@ -47,8 +48,11 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     private int scanTimer;
     private EditBox input;
     private Button doneButton;
-    /** The tuner's favorites; null for the remote and pager. */
+    /** The favorites (all three items have them). */
     private @Nullable TunerPresets presets;
+    /** Pager only: its Sound and Chat log settings (null for the tuner and remote). */
+    private @Nullable Boolean pagerSound;
+    private boolean pagerChatLog;
     private final Button[] presetButtons = new Button[TunerPresets.COUNT];
     /** Where things go, worked out in init(). */
     private int top;
@@ -71,12 +75,21 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         this.presets = presets;
     }
 
+    /** A Radio Pager's screen: like the tuner's, plus Sound and Chat log buttons. */
+    public FrequencyScreen(InteractionHand hand, int frequency, Component title, TunerPresets presets,
+                           boolean sound, boolean chatLog) {
+        this(hand, frequency, title, null, null, presets);
+        this.pagerSound = sound;
+        this.pagerChatLog = chatLog;
+    }
+
     @Override
     protected void init() {
         int centerX = width / 2;
         int centerY = height / 2;
         boolean remote = toggleMode != null;
-        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (presets != null ? 37 : 0) + (remote ? 24 : 0) + 20;
+        boolean optionRow = remote || pagerSound != null;
+        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (presets != null ? 37 : 0) + (optionRow ? 24 : 0) + 20;
         top = centerY - Math.max(44, contentHeight / 2);
         inputY = top + 34;
         int y = inputY + 20 + (remote ? 32 : 6);  // under the frequency row (and the remote's two locator lines)
@@ -123,6 +136,18 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 updateLengthButton();
             }).bounds(centerX + 2, buttonsY, 100, 20).build());
             updateLengthButton();
+            buttonsY += 24;
+        }
+        if (pagerSound != null) {
+            addRenderableWidget(Button.builder(pagerSoundLabel(), button -> {
+                pagerSound = !pagerSound;
+                button.setMessage(pagerSoundLabel());
+            }).bounds(centerX - 102, buttonsY, 100, 20).build());
+            addRenderableWidget(Button.builder(pagerChatLabel(), button -> {
+                pagerChatLog = !pagerChatLog;
+                button.setMessage(pagerChatLabel());
+            }).tooltip(Tooltip.create(Component.translatable(KEY + ".pager_chat_tooltip")))
+                    .bounds(centerX + 2, buttonsY, 100, 20).build());
             buttonsY += 24;
         }
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> save())
@@ -230,10 +255,25 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         }
     }
 
+    private Component pagerSoundLabel() {
+        return CommonComponents.optionNameValue(Component.translatable(KEY + ".pager_sound"),
+                CommonComponents.optionStatus(Boolean.TRUE.equals(pagerSound)));
+    }
+
+    private Component pagerChatLabel() {
+        return CommonComponents.optionNameValue(Component.translatable(KEY + ".pager_chat"),
+                CommonComponents.optionStatus(pagerChatLog));
+    }
+
     private void save() {
         parsed().ifPresent(frequency -> {
-            PacketDistributor.sendToServer(new ConfigureRadioItemPayload(
-                    hand == InteractionHand.OFF_HAND, frequency, Boolean.TRUE.equals(toggleMode), pulseTicks));
+            boolean offhand = hand == InteractionHand.OFF_HAND;
+            if (pagerSound != null) {
+                PacketDistributor.sendToServer(new ConfigurePagerPayload(offhand, frequency, pagerSound, pagerChatLog));
+            } else {
+                PacketDistributor.sendToServer(new ConfigureRadioItemPayload(
+                        offhand, frequency, Boolean.TRUE.equals(toggleMode), pulseTicks));
+            }
             onClose();
         });
     }

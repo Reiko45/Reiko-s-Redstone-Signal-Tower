@@ -38,6 +38,8 @@ import java.util.List;
  *   <li>Sneak + right-click a transmitter or receiver: copy its frequency.</li>
  * </ul>
  * Renaming it in an anvil changes the name its messages use ("Front Door: frequency 5 is ON").
+ * Alerts also go in chat with the in-game day and time ("[Day 12, 06:30] Front Door: ..."), so
+ * you can scroll back to see what went off; the pager's screen switches that off.
  */
 public class PagerItem extends Item {
     private static final String KEY = "message." + SignalTower.MOD_ID + ".";
@@ -69,6 +71,32 @@ public class PagerItem extends Item {
         stack.set(ModRegistry.PAGER_SILENT.get(), silent);
     }
 
+    /** True if alerts also go in chat (the default). */
+    public static boolean isChatLog(ItemStack stack) {
+        return stack.getOrDefault(ModRegistry.PAGER_CHAT_LOG.get(), true);
+    }
+
+    public static void setChatLog(ItemStack stack, boolean chatLog) {
+        if (chatLog) {
+            stack.remove(ModRegistry.PAGER_CHAT_LOG.get());
+        } else {
+            stack.set(ModRegistry.PAGER_CHAT_LOG.get(), false);
+        }
+    }
+
+    /**
+     * The chat version of an alert: "[Day 12, 06:30] " in front, from the world's day time.
+     * Days start at midnight here (the game's own day count starts at 6:00), so 23:59 is followed
+     * by the next day's 00:00.
+     */
+    public static Component chatLine(long dayTime, Component alert) {
+        long sinceMidnight = dayTime + 6000; // day time 0 is 06:00
+        long day = Math.floorDiv(sinceMidnight, 24000L) + 1;
+        long ticks = Math.floorMod(sinceMidnight, 24000L);
+        String time = String.format(java.util.Locale.ROOT, "%02d:%02d", ticks / 1000, ticks % 1000 * 60 / 1000);
+        return Component.translatable(KEY + "pager_log", day, time).withStyle(ChatFormatting.GRAY)
+                .append(alert.copy());
+    }
     /** "Radio Pager", or the name it was given in an anvil. */
     public static Component label(ItemStack stack) {
         Component custom = stack.get(DataComponents.CUSTOM_NAME);
@@ -116,6 +144,9 @@ public class PagerItem extends Item {
                 .withStyle(ChatFormatting.GOLD);
         if (holder instanceof Player player) {
             player.displayClientMessage(alert, true);
+            if (isChatLog(stack)) {
+                player.displayClientMessage(chatLine(level.getDayTime(), alert), false);
+            }
         }
         if (!isSilent(stack)) {
             beep(holder);
@@ -180,8 +211,8 @@ public class PagerItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
         if (player.isSecondaryUseActive()) {
             if (level.isClientSide) {
-                ClientHooks.openFrequencyScreen(hand, FrequencyTunerItem.getFrequency(stack), stack.getHoverName(), null, null,
-                        RadioFavorites.get(stack));
+                ClientHooks.openPagerScreen(hand, FrequencyTunerItem.getFrequency(stack), stack.getHoverName(),
+                        RadioFavorites.get(stack), !isSilent(stack), isChatLog(stack));
             }
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
@@ -213,6 +244,8 @@ public class PagerItem extends Item {
                 ? Component.translatable(prefix + "pager_status_on", signal).withStyle(ChatFormatting.GREEN)
                 : Component.translatable(prefix + "pager_status_quiet").withStyle(ChatFormatting.DARK_GREEN));
         tooltip.add(Component.translatable(prefix + (isSilent(stack) ? "pager_silent" : "pager_beeping"))
+                .withStyle(ChatFormatting.AQUA));
+        tooltip.add(Component.translatable(prefix + (isChatLog(stack) ? "pager_chat_on" : "pager_chat_off"))
                 .withStyle(ChatFormatting.AQUA));
         tooltip.add(Component.translatable(prefix + "pager_use").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "pager_toggle").withStyle(ChatFormatting.GRAY));

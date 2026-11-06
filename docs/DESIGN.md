@@ -54,7 +54,8 @@
   - `PagerItem.inventoryTick` runs every tick on the server for each pager in a player's inventory (including off-hand and armor slots) and calls `checkSignal`: `SignalNetwork.listen` at the player's block position, the same rule as a receiver there. Every tick, so even a 0.1s remote pulse is caught.
   - The last strength is kept in a `pager_signal` component (saved, so reloading with the signal on doesn't re-alert; synced, so the client's `pager_on` item property can light the screen). Only a change from 0 to more than 0 alerts.
   - An alert shows an action-bar message (the anvil name if it has one) and plays `NOTE_BLOCK_BIT` with `ServerPlayer.playNotifySound`, so only the owner hears it. The other two beeps come from a `pager_beeps` component (synced, never saved), one every 4 ticks. `pager_silent` turns the beeps off.
-  - Re-tuning (`PagerItem.setFrequency`, used by the screen packet and by copying) clears the stored signal, so the new frequency alerts if it's already on.
+  - Chat log: on by default (`pager_chat_log` component, only stored as `false`). An alert also goes to chat as `PagerItem.chatLine(dayTime, alert)`: "[Day N, HH:MM] " from `level.getDayTime()`, shifted 6000 ticks so days start at midnight (day time 0 is 06:00), then the alert. The pager's screen has Sound and Chat log buttons and saves with `ConfigurePagerPayload`, which only re-tunes (re-arming the alert) if the frequency really changed.
+  - Re-tuning (`PagerItem.setFrequency`, used by the screen packet, scrolling and copying) clears the stored signal, so the new frequency alerts if it's already on.
   - `RemoteControlItem.sendSignal` adds `PagerItem.countPagers` (pagers on that frequency carried by players inside the coverage) to "Heard by". The locator doesn't include pagers, so it can't track players.
 - **Signal Scanner:**
   - `SignalNetwork.scanAt(level, pos)` goes through every transmitter in the dimension and keeps, per frequency, the strongest one whose reach covers `pos` (the nearest, among equally strong ones), plus a count. Pulses and latches covering `pos` make a frequency strength 15 with source `REMOTE_PULSE`/`REMOTE_TOGGLE`, and no distance or direction, so it can't locate players. Sorted strongest first, then by frequency; at most 64. Stale transmitter entries are dropped, as in `listen`.
@@ -95,12 +96,13 @@
 
 ## Verified
 
-- 61 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 64 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - three remote presses put three "[Day 1, 12:00] Radio Pager: frequency 12 is ON (strength 15)" lines in chat; after `/time set 74500` and `/time add 15700` the stamps read Day 4, 08:30 and Day 5, 00:12; a pager with its chat log switched off in its screen only showed the alert above the hotbar;
   - sneak + scroll took a Remote Control from 9 to 10 and a pager from 5 to 4; favorites saved in the remote's screen (which fits the locator lines, favorites, Mode/Length and Done); Ctrl-scrolling wrapped from 42 to favorite 1; a tuner kept the favorites it saved in v0.15.0;
   - sneak + scroll took the tuner from 40 to 42 without moving the hotbar; favorites saved, cleared and used in the screen; Sneak + Ctrl + scroll went 42 → 77 → 5 → 42 (skipping the empty slot); favorites were still there after reloading the world and show in the tooltip;
   - with five transmitters and a remote toggle around, the scanner lists all five frequencies with the right strengths, distances and directions (checked by hand), and Tune set the off-hand Remote Control to 42 (confirmed with `/data get`, mode and pulse length unchanged);
@@ -110,6 +112,7 @@
 
 ## History
 
+- **v0.17.0:** pager chat log.
 - **v0.16.0:** scroll and favorites for the Remote Control and Radio Pager.
 - **v0.15.0:** tuner scroll and favorites.
 - **v0.14.0:** added the Signal Scanner.
