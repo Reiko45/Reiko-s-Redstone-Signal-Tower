@@ -3316,4 +3316,35 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * The directory answers a player with nothing in hand if they opened it from a converter's
+     * screen and are within reach of that converter, but not for a converter out of reach or a
+     * block that isn't a converter. The request survives the network with and without a converter.
+     */
+    @GameTest(template = PLATFORM)
+    public static void directoryFromConverterScreen(GameTestHelper helper) {
+        BlockPos converter = new BlockPos(2, 1, 2);
+        BlockPos receiver = new BlockPos(4, 1, 2);
+        place(helper, converter, ModRegistry.RADIO_CONVERTER.get(), 2101);
+        place(helper, receiver, ModRegistry.RADIO_RECEIVER.get(), 2101);
+        Player near = namedPlayer(helper, new BlockPos(3, 1, 3), UUID.randomUUID(), "Near", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = mockPlayerAt(helper, new BlockPos(2, 1, 2).south(40));
+        var fromConverter = new com.reiko.signaltower.network.DirectoryRequestPayload(java.util.Optional.of(helper.absolutePos(converter)));
+        var fromReceiver = new com.reiko.signaltower.network.DirectoryRequestPayload(java.util.Optional.of(helper.absolutePos(receiver)));
+        check(!com.reiko.signaltower.network.DirectoryRequestPayload.mayAsk(near, com.reiko.signaltower.network.DirectoryRequestPayload.FROM_ITEM),
+                "Nothing in hand and no converter: no answer");
+        check(com.reiko.signaltower.network.DirectoryRequestPayload.mayAsk(near, fromConverter), "Next to the converter: answered");
+        check(!com.reiko.signaltower.network.DirectoryRequestPayload.mayAsk(far, fromConverter), "Too far from it: no answer");
+        check(!com.reiko.signaltower.network.DirectoryRequestPayload.mayAsk(near, fromReceiver), "A receiver isn't a converter");
+        near.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.MULTI_REMOTE.get()));
+        check(com.reiko.signaltower.network.DirectoryRequestPayload.mayAsk(near, com.reiko.signaltower.network.DirectoryRequestPayload.FROM_ITEM),
+                "With a Multi-Button Remote in hand: answered");
+        var buffer = Unpooled.buffer();
+        for (var payload : List.of(fromConverter, com.reiko.signaltower.network.DirectoryRequestPayload.FROM_ITEM)) {
+            com.reiko.signaltower.network.DirectoryRequestPayload.STREAM_CODEC.encode(buffer, payload);
+            check(com.reiko.signaltower.network.DirectoryRequestPayload.STREAM_CODEC.decode(buffer).equals(payload), "Same after the network: " + payload);
+        }
+        helper.succeed();
+    }
 }

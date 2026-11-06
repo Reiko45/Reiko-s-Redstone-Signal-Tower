@@ -7,6 +7,7 @@ import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
@@ -68,6 +69,8 @@ public class DirectoryScreen extends Screen {
     private final Screen parent;
     private final int current;
     private final IntConsumer onPick;
+    /** The converter whose screen it was opened from, or null (opened from an item's screen). */
+    private final @Nullable BlockPos converter;
     private EditBox search;
     private Button filterButton;
     private Filter filter = Filter.ALL;
@@ -86,10 +89,16 @@ public class DirectoryScreen extends Screen {
      * @param onPick  gets the clicked frequency; the directory then goes back to {@code parent}
      */
     public DirectoryScreen(Screen parent, int current, IntConsumer onPick) {
+        this(parent, current, onPick, null);
+    }
+
+    /** @param converter the converter whose screen it's opened from (so the server answers without a radio item in hand) */
+    public DirectoryScreen(Screen parent, int current, IntConsumer onPick, @Nullable BlockPos converter) {
         super(Component.translatable(KEY + "title"));
         this.parent = parent;
         this.current = current;
         this.onPick = onPick;
+        this.converter = converter;
     }
 
     @Override
@@ -189,7 +198,7 @@ public class DirectoryScreen extends Screen {
         super.tick();
         if (--requestTimer <= 0) {
             requestTimer = 20;
-            PacketDistributor.sendToServer(DirectoryRequestPayload.INSTANCE);
+            PacketDistributor.sendToServer(new DirectoryRequestPayload(java.util.Optional.ofNullable(converter)));
         }
     }
 

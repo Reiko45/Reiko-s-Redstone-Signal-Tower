@@ -96,17 +96,19 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   ![Dev's Groups screen with "Base crew" (Steve), used by 2026 and 4242; Steve's tuner on 4242 ("Private to Dev: you're a friend, so you can send"); and the messages: 4242 made private for #Base crew, Steve's press working, and refused once Dev took him out of the group](docs/images/friend-groups.png)
 
 **Frequency directory:**
-- **Opening it:** click **Directory** in the Frequency Tuner's, Remote Control's or Radio Pager's screen (between Done and Cancel). It lists every named and private frequency in the world, in order.
+- **Opening it:** click **Directory** in the Frequency Tuner's, Remote Control's or Radio Pager's screen (between Done and Cancel). The Multi-Button Remote's keypad has a small **...** button after each button's frequency, and the Radio Converter's screen one after each of its two boxes (that works with nothing in your hand). It lists every named and private frequency in the world, in order.
 - **Columns:**
   - **Frequency** and **Name**. The one typed in the screen you came from is marked "»".
   - **Who sends:** "Anyone" for a public frequency; "You" or "You + 2" (friends) for your own private one; "Dev + you" for one where you're a friend; "Dev" (red) for someone else's.
   - **Now:** "On 15" if something is sending on it anywhere in your dimension, "On 15, here" if you also hear it where you stand, "Off" if nothing is.
 - **Others' private frequencies stay private:** for someone else's private frequency the directory only says "Here 15" when you can hear it where you stand, and "?" otherwise, so it can't be used to watch their base from afar.
-- **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's), so you just press Done. **Back** returns with what you'd typed.
+- **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's; into that button's or that box's frequency in the keypad and the converter's screen), so you just press Done. **Back** returns with what you'd typed.
 - **Finding one:** type in the search box to match a name, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
 - It updates every second while open.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
+
+  ![The Multi-Button Remote's keypad with a directory button after each frequency (3001 picked for button 2, which now finds a receiver), and a Radio Converter's screen with one after each box (42, Farm Door, picked for Sends on)](docs/images/directory-everywhere.png)
 
 **Remote Control:**
 - Right-click: press the button.
@@ -495,9 +497,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 103. the directory answers only players holding a radio item, lists named and private frequencies in order, hides someone else's private frequency except for what's heard where the player stands, and shows a player's own, a public one and one they're a friend on;
 104. friend groups leave out their owner and cap their members; a claim uses its owner's groups by name (ignoring case, unknown ones left out) and lets their members send; renaming carries the frequencies along, changing members or deleting the group changes who can send; all of it survives saving and the network; the Friends box tells "#groups" from names;
 105. a group member's transmitter broadcasts on a frequency using the group, goes silent as soon as they're taken out, and comes back when they're put back;
-106. the Groups screen's packet needs a tuner in hand and a name that isn't already one of the player's groups; unknown members are reported and offline ones kept by name; renaming carries a frequency along; the per-player limit; deleting; and the Friends box takes "#group" and reports unknown ones.
+106. the Groups screen's packet needs a tuner in hand and a name that isn't already one of the player's groups; unknown members are reported and offline ones kept by name; renaming carries a frequency along; the per-player limit; deleting; and the Friends box takes "#group" and reports unknown ones;
+107. the directory answers a player with nothing in hand who opened it from a converter's screen within reach, but not for a converter out of reach or a block that isn't one; a Multi-Button Remote in hand counts; the request survives the network.
 
-All 106 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 107 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

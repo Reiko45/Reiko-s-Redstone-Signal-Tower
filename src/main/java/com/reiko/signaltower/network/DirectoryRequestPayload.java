@@ -1,6 +1,7 @@
 package com.reiko.signaltower.network;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
@@ -10,6 +11,8 @@ import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import io.netty.buffer.ByteBuf;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -23,28 +26,45 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.TreeSet;
 
 /**
  * Sent about once a second by an open frequency directory: "which of the world's named and
  * private frequencies are on right now?" The server answers with {@link DirectoryResultPayload}.
+ * {@code converter} is the converter whose screen the directory was opened from, if it was (the
+ * player may have nothing in hand then).
  */
-public record DirectoryRequestPayload() implements CustomPacketPayload {
-    public static final DirectoryRequestPayload INSTANCE = new DirectoryRequestPayload();
+public record DirectoryRequestPayload(Optional<BlockPos> converter) implements CustomPacketPayload {
+    public static final DirectoryRequestPayload FROM_ITEM = new DirectoryRequestPayload(Optional.empty());
     public static final Type<DirectoryRequestPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "directory_request"));
-    public static final StreamCodec<ByteBuf, DirectoryRequestPayload> STREAM_CODEC = StreamCodec.unit(INSTANCE);
+    public static final StreamCodec<ByteBuf, DirectoryRequestPayload> STREAM_CODEC = StreamCodec.composite(
+            ByteBufCodecs.optional(BlockPos.STREAM_CODEC), DirectoryRequestPayload::converter,
+            DirectoryRequestPayload::new);
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
 
-    /** Runs on the server's main thread. Only answers players holding a radio item (the directory opens from their screens). */
+    /** Runs on the server's main thread. Only answers players who may ask ({@link #mayAsk}). */
     public static void handle(DirectoryRequestPayload payload, IPayloadContext context) {
-        if (context.player() instanceof ServerPlayer player && holdsRadioItem(player)) {
+        if (context.player() instanceof ServerPlayer player && mayAsk(player, payload)) {
             PacketDistributor.sendToPlayer(player, new DirectoryResultPayload(entriesFor(player)));
         }
+    }
+
+    /**
+     * True if the player holds a radio item (the directory opens from their screens), or is within
+     * reach of the converter whose screen they opened it from.
+     */
+    public static boolean mayAsk(Player player, DirectoryRequestPayload payload) {
+        if (holdsRadioItem(player)) {
+            return true;
+        }
+        return payload.converter().filter(pos -> player.canInteractWithBlock(pos, 1.0)
+                && player.level().getBlockState(pos).getBlock() instanceof RadioConverterBlock).isPresent();
     }
 
     public static boolean holdsRadioItem(Player player) {

@@ -9,6 +9,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -30,6 +31,9 @@ public class ConverterScreen extends Screen {
     private EditBox sendBox;
     private Button doneButton;
     private int top;
+    /** Frequencies picked in the directory for the two boxes, used when this screen is shown again. */
+    private OptionalInt pickedListen = OptionalInt.empty();
+    private OptionalInt pickedSend = OptionalInt.empty();
 
     public ConverterScreen(OpenConverterScreenPayload state) {
         super(Component.translatable("block." + SignalTower.MOD_ID + ".radio_converter"));
@@ -40,8 +44,21 @@ public class ConverterScreen extends Screen {
     protected void init() {
         int centerX = width / 2;
         top = height / 2 - 66;
-        listenBox = frequencyBox(centerX - 4, top + 34, state.listen(), KEY + "listens");
-        sendBox = frequencyBox(centerX - 4, top + 60, state.send(), KEY + "sends");
+        // init() runs again after the directory (or a window resize): keep what was typed, or use what was picked.
+        String keepListen = listenBox != null ? listenBox.getValue() : Integer.toString(state.listen());
+        String keepSend = sendBox != null ? sendBox.getValue() : Integer.toString(state.send());
+        if (pickedListen.isPresent()) keepListen = Integer.toString(pickedListen.getAsInt());
+        if (pickedSend.isPresent()) keepSend = Integer.toString(pickedSend.getAsInt());
+        pickedListen = OptionalInt.empty();
+        pickedSend = OptionalInt.empty();
+        listenBox = frequencyBox(centerX - 4, top + 34, keepListen, KEY + "listens");
+        sendBox = frequencyBox(centerX - 4, top + 60, keepSend, KEY + "sends");
+        addRenderableWidget(Button.builder(Component.literal("..."), b -> openDirectory(true))
+                .tooltip(Tooltip.create(Component.translatable(KEY + "directory_listens")))
+                .bounds(centerX + 102, top + 34, 16, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("..."), b -> openDirectory(false))
+                .tooltip(Tooltip.create(Component.translatable(KEY + "directory_sends")))
+                .bounds(centerX + 102, top + 60, 16, 20).build());
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> save())
                 .bounds(centerX - 102, top + 122, 100, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
@@ -50,11 +67,25 @@ public class ConverterScreen extends Screen {
         updateDoneButton();
     }
 
-    private EditBox frequencyBox(int x, int y, int value, String narration) {
+    /** Opens the frequency directory for the Listens on box ({@code listen}) or the Sends on box. */
+    private void openDirectory(boolean listen) {
+        if (minecraft != null) {
+            OptionalInt current = parse(listen ? listenBox : sendBox);
+            minecraft.setScreen(new DirectoryScreen(this, current.orElse(-1), frequency -> {
+                if (listen) {
+                    pickedListen = OptionalInt.of(frequency);
+                } else {
+                    pickedSend = OptionalInt.of(frequency);
+                }
+            }, state.pos()));
+        }
+    }
+
+    private EditBox frequencyBox(int x, int y, String value, String narration) {
         EditBox box = new EditBox(font, x, y, 104, 20, Component.translatable(narration));
         box.setMaxLength(Frequency.MAX_DIGITS);
         box.setFilter(text -> text.chars().allMatch(Character::isDigit));
-        box.setValue(Integer.toString(value));
+        box.setValue(value);
         box.setResponder(text -> updateDoneButton());
         return addRenderableWidget(box);
     }
@@ -119,7 +150,7 @@ public class ConverterScreen extends Screen {
     private void drawName(GuiGraphics graphics, EditBox box, int y) {
         OptionalInt frequency = parse(box);
         String name = frequency.isPresent() ? FrequencyNames.nameOf(null, frequency.getAsInt()) : null;
-        int x = box.getX() + box.getWidth() + 6;
+        int x = box.getX() + box.getWidth() + 24; // after the directory button
         if (name != null && width - x > 12) {
             graphics.drawString(font, font.plainSubstrByWidth(name, width - x - 4), x, y, 0x55FFFF);
         }

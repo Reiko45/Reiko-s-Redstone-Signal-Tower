@@ -452,6 +452,9 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.private_refused_name": "Only %s and their friends can rename frequency %s",
     f"message.{MOD}.private_silenced": "Silent: %s is private to %s, so this won't broadcast",
     f"screen.{MOD}.converter.silenced": "Silent: %s is someone else's private frequency",
+    f"screen.{MOD}.converter.directory_listens": "Pick the frequency it listens on from the frequency directory",
+    f"screen.{MOD}.converter.directory_sends": "Pick the frequency it sends on from the frequency directory",
+    f"screen.{MOD}.multi_remote.directory": "Pick button %s's frequency from the frequency directory",
     # Friend groups
     f"screen.{MOD}.groups.title": "Friend Groups",
     f"screen.{MOD}.groups.new": "+ New group",

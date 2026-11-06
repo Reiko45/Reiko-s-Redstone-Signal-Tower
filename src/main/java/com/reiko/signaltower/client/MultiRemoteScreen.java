@@ -55,7 +55,7 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         int centerX = width / 2;
         int top = height / 2 - 70;
 
-        // Columns: [#] [color] [name] [frequency] [mode] [pulse length] [Press], 372 wide in total.
+        // Columns: [#] [color] [name] [frequency][...] [mode] [pulse length] [Press], 372 wide in total.
         int left = centerX - COLUMNS_WIDTH / 2;
         for (int i = 0; i < RemoteButtons.COUNT; i++) {
             final int index = i;
@@ -73,14 +73,14 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
                 refreshLabels();
             }).bounds(left + 28, y, 20, 20).build());
 
-            EditBox nameBox = new EditBox(font, left + 52, y, 96, 20, Component.translatable(KEY + ".name", i + 1));
+            EditBox nameBox = new EditBox(font, left + 52, y, 80, 20, Component.translatable(KEY + ".name", i + 1));
             nameBox.setMaxLength(RemoteButtons.MAX_NAME_LENGTH);
             nameBox.setValue(buttons.button(i).name());
             nameBox.setHint(buttons.button(i).withName("").label(i).copy().withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
             nameBox.setResponder(text -> buttons = buttons.withButton(index, buttons.button(index).withName(text)));
             addRenderableWidget(nameBox);
 
-            EditBox box = new EditBox(font, left + 152, y, 64, 20, Component.translatable(KEY + ".frequency", i + 1));
+            EditBox box = new EditBox(font, left + 136, y, 64, 20, Component.translatable(KEY + ".frequency", i + 1));
             box.setMaxLength(Frequency.MAX_DIGITS);
             box.setFilter(text -> text.chars().allMatch(Character::isDigit));
             box.setValue(Integer.toString(buttons.button(i).frequency()));
@@ -95,6 +95,11 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
                 }
             });
             addRenderableWidget(box);
+
+            // The frequency directory: a frequency clicked there becomes this button's.
+            addRenderableWidget(Button.builder(Component.literal("..."), b -> openDirectory(index))
+                    .tooltip(Tooltip.create(Component.translatable(KEY + ".directory", i + 1)))
+                    .bounds(left + 202, y, 16, 20).build());
 
             modeButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> {
                 RemoteButtons.Button old = buttons.button(index);
@@ -120,6 +125,17 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         }).bounds(centerX - 102, bottom, 100, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
                 .bounds(centerX + 2, bottom, 100, 20).build());
+    }
+
+    /** Opens the frequency directory for button {@code index}; the frequency picked there becomes its own. */
+    private void openDirectory(int index) {
+        if (minecraft != null) {
+            minecraft.setScreen(new DirectoryScreen(this, buttons.button(index).frequency(), frequency -> {
+                buttons = buttons.withButton(index, buttons.button(index).withFrequency(frequency));
+                scans[index] = null;
+                scanTimer = 1;
+            }));
+        }
     }
 
     private Component selectLabel(int index) {
@@ -182,7 +198,7 @@ public class MultiRemoteScreen extends Screen implements RemoteScanListener {
         int left = centerX - COLUMNS_WIDTH / 2;
         int headingY = top - 11;
         graphics.drawString(font, Component.translatable(KEY + ".heading_name"), left + 54, headingY, 0xC0C0C0);
-        graphics.drawString(font, Component.translatable(KEY + ".heading_frequency"), left + 154, headingY, 0xC0C0C0);
+        graphics.drawString(font, Component.translatable(KEY + ".heading_frequency"), left + 138, headingY, 0xC0C0C0);
         graphics.drawString(font, Component.translatable(KEY + ".heading_mode"), left + 222, headingY, 0xC0C0C0);
         graphics.drawString(font, Component.translatable(KEY + ".heading_length"), left + 278, headingY, 0xC0C0C0);
         // Each button's color, as a square inside its color button
