@@ -60,11 +60,12 @@
   - `SignalNetwork.scanAt(level, pos)` goes through every transmitter in the dimension and keeps, per frequency, the strongest one whose reach covers `pos` (the nearest, among equally strong ones), plus a count. Pulses and latches covering `pos` make a frequency strength 15 with source `REMOTE_PULSE`/`REMOTE_TOGGLE`, and no distance or direction, so it can't locate players. Sorted strongest first, then by frequency; at most 64. Stale transmitter entries are dropped, as in `listen`.
   - `ScannerScreen` (not a pause screen, so it stays live in singleplayer) sends `ScannerRequestPayload` every 20 ticks. The server answers only players holding a scanner, with `ScannerResultPayload`.
   - Tune reuses the existing packets: `ConfigureRadioItemPayload` for the tuner, Remote Control (sending its current mode and pulse length back unchanged) and pager; `ConfigureMultiRemotePayload` with the selected button re-tuned (`SignalScannerItem.retuneSelected`) for the Multi-Button Remote.
-- **Tuner favorites and scrolling:**
-  - `tuner_presets` component: a `TunerPresets` record that always has 5 slots, 0 meaning empty. It's removed entirely when every slot is empty.
-  - `FrequencyTunerItem.scroll(stack, up, favorites)`: ±1 (clamped), or `TunerPresets.next` to the next (scroll down) or previous favorite in slot order, wrapping and skipping empty slots. It returns the action-bar message, which says "(favorite N)" when the frequency is one.
-  - The client's `MouseScrollingEvent` handler checks the main hand, then the off-hand: a Multi-Button Remote selects buttons, a tuner sends `ScrollTunerPayload` (with `Screen.hasControlDown()` for favorites). The event is cancelled so the hotbar doesn't move. The server applies it and plays a quiet `NOTE_BLOCK_HAT` tick to the player only.
-  - The tuner's `FrequencyScreen` (opened via `ClientHooks.openTunerScreen`) has the favorites row. Edits are sent at once with `ConfigureTunerPresetsPayload`; right-click is caught in `mouseClicked`.
+- **Favorites and scrolling (tuner, Remote Control, pager):**
+  - `RadioFavorites` holds the shared logic. `isScrollable` is true for the tuner, the Remote Control and the pager; the Multi-Button Remote keeps sneak + scroll for picking its button.
+  - Favorites live in the `tuner_presets` component (the name dates from v0.15.0, when only the tuner had them; kept so saved favorites still load). It's a `TunerPresets` record that always has 5 slots, 0 meaning empty, removed entirely when every slot is empty.
+  - `RadioFavorites.scroll(stack, up, favorites)`: ±1 (clamped), or `TunerPresets.next` to the next (scroll down) or previous favorite in slot order, wrapping and skipping empty slots. `RadioFavorites.setFrequency` goes through `PagerItem.setFrequency` for pagers, so they re-arm. The message names the item ("Remote Control: frequency 42 (favorite 2)").
+  - The client's `MouseScrollingEvent` handler checks the main hand, then the off-hand: a Multi-Button Remote sends `SelectRemoteButtonPayload`, a scrollable item sends `ScrollFrequencyPayload` (with `Screen.hasControlDown()` for favorites). The event is cancelled so the hotbar doesn't move. The server plays a quiet `NOTE_BLOCK_HAT` tick to the player only.
+  - `FrequencyScreen` shows the favorites row for all three (`ClientHooks.openFrequencyScreen` takes the favorites). Edits go at once in `ConfigureFavoritesPayload`; right-click is caught in `mouseClicked`. The layout is worked out from a `top` so the remote's version (locator lines, favorites, Mode/Length, Done) fits in a 240-pixel-high GUI.
 - **Locator:**
   - An open remote screen sends `RemoteScanRequestPayload` (up to 4 frequencies) every 20 ticks, or sooner after typing. The server only answers players holding a remote.
   - It uses the receiver tracking (`SignalNetwork.scanReceivers`): count within reach, and nearest within 2× reach, with distance and 8-way compass direction.
@@ -94,12 +95,13 @@
 
 ## Verified
 
-- 59 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 61 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - sneak + scroll took a Remote Control from 9 to 10 and a pager from 5 to 4; favorites saved in the remote's screen (which fits the locator lines, favorites, Mode/Length and Done); Ctrl-scrolling wrapped from 42 to favorite 1; a tuner kept the favorites it saved in v0.15.0;
   - sneak + scroll took the tuner from 40 to 42 without moving the hotbar; favorites saved, cleared and used in the screen; Sneak + Ctrl + scroll went 42 → 77 → 5 → 42 (skipping the empty slot); favorites were still there after reloading the world and show in the tooltip;
   - with five transmitters and a remote toggle around, the scanner lists all five frequencies with the right strengths, distances and directions (checked by hand), and Tune set the off-hand Remote Control to 42 (confirmed with `/data get`, mode and pulse length unchanged);
   - a pager in the hotbar goes off from a Multi-Button Remote press (the remote's light goes green from the pager alone) and a renamed one when the tower next to the player is powered; each screen lights while its signal is on; the sound switch and frequency screen work;
@@ -108,6 +110,7 @@
 
 ## History
 
+- **v0.16.0:** scroll and favorites for the Remote Control and Radio Pager.
 - **v0.15.0:** tuner scroll and favorites.
 - **v0.14.0:** added the Signal Scanner.
 - **v0.13.0:** added the Radio Pager.

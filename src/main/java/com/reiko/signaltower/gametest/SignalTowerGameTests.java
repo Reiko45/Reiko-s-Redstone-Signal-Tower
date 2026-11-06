@@ -8,6 +8,7 @@ import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.item.RadioFavorites;
 import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
@@ -33,6 +34,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
@@ -1462,10 +1464,10 @@ public final class SignalTowerGameTests {
         check(TunerPresets.STREAM_CODEC.decode(buffer).equals(original), "Network sync changed the favorites");
 
         ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
-        check(FrequencyTunerItem.getPresets(tuner).equals(TunerPresets.EMPTY), "A new tuner has no favorites");
-        FrequencyTunerItem.setPresets(tuner, original);
-        check(FrequencyTunerItem.getPresets(tuner).equals(original), "The tuner should keep its favorites");
-        FrequencyTunerItem.setPresets(tuner, TunerPresets.EMPTY);
+        check(RadioFavorites.get(tuner).equals(TunerPresets.EMPTY), "A new tuner has no favorites");
+        RadioFavorites.set(tuner, original);
+        check(RadioFavorites.get(tuner).equals(original), "The tuner should keep its favorites");
+        RadioFavorites.set(tuner, TunerPresets.EMPTY);
         check(!tuner.has(ModRegistry.TUNER_PRESETS.get()), "Clearing every favorite should remove the data");
         helper.succeed();
     }
@@ -1475,33 +1477,94 @@ public final class SignalTowerGameTests {
     public static void tunerScrollStepsAndJumps(GameTestHelper helper) {
         ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
         FrequencyTunerItem.setFrequency(tuner, 41);
-        FrequencyTunerItem.scroll(tuner, true, false);
+        RadioFavorites.scroll(tuner, true, false);
         check(FrequencyTunerItem.getFrequency(tuner) == 42, "Scrolling up should go to 42");
-        FrequencyTunerItem.scroll(tuner, false, false);
-        FrequencyTunerItem.scroll(tuner, false, false);
+        RadioFavorites.scroll(tuner, false, false);
+        RadioFavorites.scroll(tuner, false, false);
         check(FrequencyTunerItem.getFrequency(tuner) == 40, "Scrolling down twice should go to 40");
         FrequencyTunerItem.setFrequency(tuner, Frequency.MIN);
-        FrequencyTunerItem.scroll(tuner, false, false);
+        RadioFavorites.scroll(tuner, false, false);
         check(FrequencyTunerItem.getFrequency(tuner) == Frequency.MIN, "It shouldn't go below " + Frequency.MIN);
         FrequencyTunerItem.setFrequency(tuner, Frequency.MAX);
-        FrequencyTunerItem.scroll(tuner, true, false);
+        RadioFavorites.scroll(tuner, true, false);
         check(FrequencyTunerItem.getFrequency(tuner) == Frequency.MAX, "It shouldn't go above " + Frequency.MAX);
 
-        var none = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, true).getContents();
-        check(none.getKey().endsWith("tuner_no_favorites") && FrequencyTunerItem.getFrequency(tuner) == Frequency.MAX,
+        var none = (TranslatableContents) RadioFavorites.scroll(tuner, false, true).getContents();
+        check(none.getKey().endsWith("no_favorites") && FrequencyTunerItem.getFrequency(tuner) == Frequency.MAX,
                 "With no favorites, Ctrl-scrolling should say so and change nothing");
 
-        FrequencyTunerItem.setPresets(tuner, new TunerPresets(List.of(5, 0, 77)));
-        var jumped = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, true).getContents();
+        RadioFavorites.set(tuner, new TunerPresets(List.of(5, 0, 77)));
+        var jumped = (TranslatableContents) RadioFavorites.scroll(tuner, false, true).getContents();
         check(FrequencyTunerItem.getFrequency(tuner) == 5, "Ctrl-scrolling down should jump to the first favorite");
-        check(jumped.getKey().endsWith("tuner_scrolled_favorite") && Integer.valueOf(1).equals(jumped.getArgs()[1]),
+        check(jumped.getKey().endsWith("frequency_scrolled_favorite") && Integer.valueOf(1).equals(jumped.getArgs()[2]),
                 "The message should say it's favorite 1");
-        FrequencyTunerItem.scroll(tuner, false, true);
+        RadioFavorites.scroll(tuner, false, true);
         check(FrequencyTunerItem.getFrequency(tuner) == 77, "Next favorite after 5 is 77");
-        FrequencyTunerItem.scroll(tuner, true, false);
-        var stepped = (TranslatableContents) FrequencyTunerItem.scroll(tuner, false, false).getContents();
-        check(FrequencyTunerItem.getFrequency(tuner) == 77 && stepped.getKey().endsWith("tuner_scrolled_favorite"),
+        RadioFavorites.scroll(tuner, true, false);
+        var stepped = (TranslatableContents) RadioFavorites.scroll(tuner, false, false).getContents();
+        check(FrequencyTunerItem.getFrequency(tuner) == 77 && stepped.getKey().endsWith("frequency_scrolled_favorite"),
                 "Stepping back onto a favorite should say so");
+        helper.succeed();
+    }
+
+    /**
+     * Sneak + scroll and favorites work the same on the Remote Control and the pager: the remote
+     * keeps its mode and pulse length, the pager re-arms its alert, and messages name the item.
+     * The Multi-Button Remote isn't included (sneak + scroll picks its button).
+     */
+    @GameTest(template = PLATFORM)
+    public static void remoteAndPagerScrollAndFavorites(GameTestHelper helper) {
+        check(RadioFavorites.isScrollable(new ItemStack(ModRegistry.FREQUENCY_TUNER.get()))
+                && RadioFavorites.isScrollable(new ItemStack(ModRegistry.REMOTE_CONTROL.get()))
+                && RadioFavorites.isScrollable(new ItemStack(ModRegistry.PAGER.get())), "Tuner, remote and pager scroll");
+        check(!RadioFavorites.isScrollable(new ItemStack(ModRegistry.MULTI_REMOTE.get()))
+                && !RadioFavorites.isScrollable(new ItemStack(ModRegistry.SIGNAL_SCANNER.get())),
+                "The Multi-Button Remote and scanner don't");
+
+        ItemStack remote = new ItemStack(ModRegistry.REMOTE_CONTROL.get());
+        FrequencyTunerItem.setFrequency(remote, 9);
+        RemoteControlItem.setToggleMode(remote, true);
+        RemoteControlItem.setPulseTicks(remote, 40);
+        var message = (TranslatableContents) RadioFavorites.scroll(remote, true, false).getContents();
+        check(FrequencyTunerItem.getFrequency(remote) == 10, "The remote should step up to 10");
+        check(message.getKey().endsWith("frequency_scrolled")
+                        && ((Component) message.getArgs()[0]).getString().equals(remote.getHoverName().getString()),
+                "The message should name the remote");
+        RadioFavorites.set(remote, new TunerPresets(List.of(0, 300, 0, 0, 12)));
+        RadioFavorites.scroll(remote, false, true);
+        check(FrequencyTunerItem.getFrequency(remote) == 300, "Ctrl-scrolling the remote should jump to its first favorite");
+        RadioFavorites.scroll(remote, true, true);
+        check(FrequencyTunerItem.getFrequency(remote) == 12, "Ctrl-scrolling up from 300 wraps to 12");
+        check(RemoteControlItem.isToggleMode(remote) && RemoteControlItem.getPulseTicks(remote) == 40,
+                "Scrolling shouldn't change the remote's mode or pulse length");
+
+        ItemStack pager = new ItemStack(ModRegistry.PAGER.get());
+        PagerItem.setFrequency(pager, 5);
+        pager.set(ModRegistry.PAGER_SIGNAL.get(), 15);
+        RadioFavorites.scroll(pager, false, false);
+        check(FrequencyTunerItem.getFrequency(pager) == 4 && PagerItem.lastSignal(pager) == 0,
+                "Scrolling the pager should step to 4 and forget the old signal, so it alerts if 4 is on");
+        RadioFavorites.set(pager, new TunerPresets(List.of(77)));
+        RadioFavorites.scroll(pager, false, true);
+        check(FrequencyTunerItem.getFrequency(pager) == 77, "Ctrl-scrolling the pager should jump to 77");
+        helper.succeed();
+    }
+
+    /** The remote's and pager's tooltips list their favorites under the frequency and explain scrolling. */
+    @GameTest(template = PLATFORM)
+    public static void remoteAndPagerTooltipsShowFavorites(GameTestHelper helper) {
+        for (ItemStack stack : List.of(new ItemStack(ModRegistry.REMOTE_CONTROL.get()), new ItemStack(ModRegistry.PAGER.get()),
+                new ItemStack(ModRegistry.FREQUENCY_TUNER.get()))) {
+            RadioFavorites.set(stack, new TunerPresets(List.of(5, 0, 42)));
+            List<Component> lines = new java.util.ArrayList<>();
+            stack.getItem().appendHoverText(stack, Item.TooltipContext.EMPTY, lines, net.minecraft.world.item.TooltipFlag.NORMAL);
+            List<String> keys = lines.stream().map(line -> line.getContents() instanceof TranslatableContents t ? t.getKey() : "").toList();
+            int frequency = keys.indexOf("tooltip." + SignalTower.MOD_ID + ".frequency");
+            int favorites = keys.indexOf("tooltip." + SignalTower.MOD_ID + ".favorites");
+            check(frequency >= 0 && favorites == frequency + 1, stack.getHoverName().getString() + ": favorites should be right under the frequency, got " + keys);
+            check(lines.get(favorites).getString().contains("5, 42"), stack.getHoverName().getString() + ": should list 5, 42");
+            check(keys.contains("tooltip." + SignalTower.MOD_ID + ".frequency_scroll"), stack.getHoverName().getString() + ": should explain scrolling");
+        }
         helper.succeed();
     }
 }

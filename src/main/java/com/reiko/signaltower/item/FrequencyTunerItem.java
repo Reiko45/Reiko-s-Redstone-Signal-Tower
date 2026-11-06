@@ -21,7 +21,6 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
-import java.util.OptionalInt;
 
 /**
  * Sets which frequency a transmitter or receiver uses.
@@ -42,42 +41,6 @@ public class FrequencyTunerItem extends Item {
 
     public static void setFrequency(ItemStack stack, int frequency) {
         stack.set(ModRegistry.FREQUENCY.get(), Frequency.clamp(frequency));
-    }
-
-    public static TunerPresets getPresets(ItemStack stack) {
-        return stack.getOrDefault(ModRegistry.TUNER_PRESETS.get(), TunerPresets.EMPTY);
-    }
-
-    public static void setPresets(ItemStack stack, TunerPresets presets) {
-        if (presets.hasAny()) {
-            stack.set(ModRegistry.TUNER_PRESETS.get(), presets);
-        } else {
-            stack.remove(ModRegistry.TUNER_PRESETS.get());
-        }
-    }
-
-    /**
-     * Sneak + scroll: steps the frequency up or down by 1 (stopping at the ends), or with
-     * {@code favorites} jumps to the next favorite (scrolling down) or the previous one (up).
-     * Returns the message to show.
-     */
-    public static Component scroll(ItemStack stack, boolean up, boolean favorites) {
-        int current = getFrequency(stack);
-        String key = "message." + SignalTower.MOD_ID + ".";
-        if (favorites) {
-            OptionalInt next = getPresets(stack).next(current, up);
-            if (next.isEmpty()) {
-                return Component.translatable(key + "tuner_no_favorites").withStyle(ChatFormatting.YELLOW);
-            }
-            setFrequency(stack, next.getAsInt());
-        } else {
-            setFrequency(stack, Frequency.clamp((long) current + (up ? 1 : -1)));
-        }
-        int frequency = getFrequency(stack);
-        int favorite = getPresets(stack).indexOf(frequency);
-        return (favorite >= 0
-                ? Component.translatable(key + "tuner_scrolled_favorite", frequency, favorite + 1)
-                : Component.translatable(key + "tuner_scrolled", frequency)).withStyle(ChatFormatting.AQUA);
     }
 
     /** The frequency changes while it's held when you scroll; don't replay the "pull out" animation for that. */
@@ -118,7 +81,7 @@ public class FrequencyTunerItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
         if (level.isClientSide) {
             // Only runs on the client, so the screen class is never loaded on a dedicated server.
-            ClientHooks.openTunerScreen(hand, getFrequency(stack), stack.getHoverName(), getPresets(stack));
+            ClientHooks.openFrequencyScreen(hand, getFrequency(stack), stack.getHoverName(), null, null, RadioFavorites.get(stack));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }
@@ -127,17 +90,11 @@ public class FrequencyTunerItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".frequency", getFrequency(stack))
                 .withStyle(ChatFormatting.AQUA));
-        TunerPresets presets = getPresets(stack);
-        if (presets.hasAny()) {
-            String list = presets.slots().stream().filter(f -> f != 0).map(String::valueOf)
-                    .collect(java.util.stream.Collectors.joining(", "));
-            tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_favorites", list)
-                    .withStyle(ChatFormatting.DARK_AQUA));
-        }
+        RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_air").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_block").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_copy").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_scroll").withStyle(ChatFormatting.GRAY));
+        RadioFavorites.addScrollHint(tooltip);
 
     }
 }

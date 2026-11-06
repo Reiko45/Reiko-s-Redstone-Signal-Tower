@@ -4,7 +4,7 @@ import com.reiko.signaltower.SignalTower;
 import net.minecraft.ChatFormatting;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.TunerPresets;
-import com.reiko.signaltower.network.ConfigureTunerPresetsPayload;
+import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
@@ -23,9 +23,12 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * Type a frequency for the Frequency Tuner, Remote Control or Radio Pager (plus the remote's mode).
- * Enter or Done saves it, Escape cancels. The tuner also gets a row of favorites: click an empty
- * one to save the frequency above, click a saved one to use it, sneak-click to replace it,
- * right-click to clear it. Favorites are saved straight away, even if you then press Cancel.
+ * Enter or Done saves it, Escape cancels. All three get a row of favorites: click an empty one to
+ * save the frequency above, click a saved one to use it, sneak-click to replace it, right-click to
+ * clear it. Favorites are saved straight away, even if you then press Cancel.
+ * <p>
+ * Layout, from {@code top}: title, range hint, the frequency row; for the remote the locator and
+ * reach lines; the favorites; the remote's Mode and Length buttons; Done and Cancel.
  */
 public class FrequencyScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".tuner";
@@ -47,6 +50,10 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** The tuner's favorites; null for the remote and pager. */
     private @Nullable TunerPresets presets;
     private final Button[] presetButtons = new Button[TunerPresets.COUNT];
+    /** Where things go, worked out in init(). */
+    private int top;
+    private int inputY;
+    private int favoritesY;
 
     public FrequencyScreen(InteractionHand hand, int frequency, Component title,
                            @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
@@ -57,7 +64,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         this.pulseTicks = pulseTicks == null ? PulseLength.DEFAULT_TICKS : pulseTicks;
     }
 
-    /** The tuner's screen, with its favorites. */
+    /** The screen with a row of favorites (all three items use this). */
     public FrequencyScreen(InteractionHand hand, int frequency, Component title,
                            @Nullable Boolean toggleMode, @Nullable Integer pulseTicks, @Nullable TunerPresets presets) {
         this(hand, frequency, title, toggleMode, pulseTicks);
@@ -68,8 +75,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     protected void init() {
         int centerX = width / 2;
         int centerY = height / 2;
+        boolean remote = toggleMode != null;
+        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (presets != null ? 37 : 0) + (remote ? 24 : 0) + 20;
+        top = centerY - Math.max(44, contentHeight / 2);
+        inputY = top + 34;
+        int y = inputY + 20 + (remote ? 32 : 6);  // under the frequency row (and the remote's two locator lines)
 
-        input = new EditBox(font, centerX - 50, centerY - 10, 100, 20, Component.translatable(KEY + ".input"));
+        input = new EditBox(font, centerX - 50, inputY, 100, 20, Component.translatable(KEY + ".input"));
         input.setMaxLength(Frequency.MAX_DIGITS);
         input.setFilter(text -> text.chars().allMatch(Character::isDigit));
         input.setValue(Integer.toString(initialFrequency));
@@ -86,19 +98,19 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         addRenderableWidget(nudgeButton(1, centerX + 54, 22));
         addRenderableWidget(nudgeButton(100, centerX + 80, 32));
 
-        // The remote's mode button sits between the frequency row and Done/Cancel, under the locator and reach lines.
-        int buttonsY = toggleMode != null ? centerY + 42 : centerY + 22;
         if (presets != null) {
-            // Five favorites under the frequency row, with a "Favorites" heading drawn in render()
+            // Five favorites, with a "Favorites" heading (drawn in render()) above them
+            favoritesY = y - 1;
             int rowX = centerX - (TunerPresets.COUNT * 64 - 4) / 2;
             for (int i = 0; i < TunerPresets.COUNT; i++) {
                 int slot = i;
                 presetButtons[i] = addRenderableWidget(Button.builder(Component.empty(), b -> pressPreset(slot))
-                        .bounds(rowX + i * 64, centerY + 26, 60, 20).build());
+                        .bounds(rowX + i * 64, y + 10, 60, 20).build());
             }
             updatePresetButtons();
-            buttonsY = centerY + 52;
+            y += 37;
         }
+        int buttonsY = y;
         if (toggleMode != null) {
             addRenderableWidget(Button.builder(modeLabel(), button -> {
                 toggleMode = !toggleMode;
@@ -136,7 +148,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
 
     private void setPresets(TunerPresets newPresets) {
         presets = newPresets;
-        PacketDistributor.sendToServer(new ConfigureTunerPresetsPayload(hand == InteractionHand.OFF_HAND, newPresets));
+        PacketDistributor.sendToServer(new ConfigureFavoritesPayload(hand == InteractionHand.OFF_HAND, newPresets));
         updatePresetButtons();
     }
 
@@ -194,7 +206,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     private Button nudgeButton(int amount, int x, int buttonWidth) {
         String label = (amount > 0 ? "+" : "") + amount;
         return Button.builder(Component.literal(label), button -> nudge(amount))
-                .bounds(x, height / 2 - 10, buttonWidth, 20).build();
+                .bounds(x, inputY, buttonWidth, 20).build();
     }
 
     private void nudge(int amount) {
@@ -259,16 +271,15 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         int centerX = width / 2;
-        int centerY = height / 2;
-        graphics.drawCenteredString(font, title, centerX, centerY - 44, 0xFFFFFF);
+        graphics.drawCenteredString(font, title, centerX, top, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.translatable(KEY + ".range", Frequency.MIN, Frequency.MAX),
-                centerX, centerY - 28, 0xA0A0A0);
+                centerX, top + 16, 0xA0A0A0);
         if (toggleMode != null) {
-            graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, centerY + 16, 0xFFFFFF);
-            graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, centerY + 28, 0xFFFFFF);
+            graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, inputY + 26, 0xFFFFFF);
+            graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, inputY + 38, 0xFFFFFF);
         }
         if (presets != null) {
-            graphics.drawCenteredString(font, Component.translatable(KEY + ".favorites"), centerX, centerY + 15, 0xA0A0A0);
+            graphics.drawCenteredString(font, Component.translatable(KEY + ".favorites"), centerX, favoritesY, 0xA0A0A0);
         }
     }
 

@@ -97,7 +97,7 @@ public class RemoteControlItem extends Item {
         if (player.isSecondaryUseActive()) {
             if (level.isClientSide) {
                 ClientHooks.openFrequencyScreen(hand, FrequencyTunerItem.getFrequency(stack),
-                        stack.getHoverName(), isToggleMode(stack), getPulseTicks(stack));
+                        stack.getHoverName(), isToggleMode(stack), getPulseTicks(stack), RadioFavorites.get(stack));
             }
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
@@ -187,10 +187,12 @@ public class RemoteControlItem extends Item {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
         tooltip.add(Component.translatable(prefix + "frequency", FrequencyTunerItem.getFrequency(stack))
                 .withStyle(ChatFormatting.AQUA));
+        RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "remote_mode", describeMode(isToggleMode(stack), getPulseTicks(stack)))
                 .withStyle(ChatFormatting.AQUA));
         tooltip.add(Component.translatable(prefix + "remote_use").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "remote_configure").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "remote_copy").withStyle(ChatFormatting.GRAY));
+        RadioFavorites.addScrollHint(tooltip);
     }
 }

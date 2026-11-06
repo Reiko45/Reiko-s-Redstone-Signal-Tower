@@ -13,7 +13,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
-| **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
+| **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
 | **Signal Scanner** | A handheld direction-finder. It lists every frequency you can hear where you stand, how strong it is and where it comes from, and can tune the radio item in your other hand. |
@@ -49,12 +49,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   Favorites are saved straight away (even if you then press Cancel), stay on the tuner, and are listed in its tooltip. The slot matching the frequency in the box shows in green.
 
+  The Remote Control and Radio Pager have the same scrolling and favorites, each with its own 5 slots. The Multi-Button Remote keeps sneak + scroll for picking its button.
+
   ![Saving favorites in the tuner's screen, then jumping between them with Sneak + Ctrl + scroll](docs/images/tuner-favorites.png)
 
 **Remote Control:**
 - Right-click: press the button.
 - Sneak + right-click the air: change its frequency, switch between **Pulse** and **Toggle** (on until you press it again), and set the **pulse length**. Click the length button for longer or sneak-click for shorter: 0.1s, 0.25s, 0.5s, 1s (the default, like a stone button), 1.5s, 2s, 3s, 5s or 10s.
 - Sneak + right-click a transmitter or receiver: copy its frequency.
+- Sneak + scroll, Sneak + Ctrl + scroll and the 5 favorites in its screen work just like the tuner's (see **Tuner controls** above). Scrolling doesn't change its mode or pulse length.
+
+  ![The Remote Control's screen with two favorites saved, and the messages from scrolling](docs/images/remote-favorites.png)
 - Its reach uses the same height rule as a transmitter, measured from where you're standing, so pressing it from a hilltop or the top of a tower reaches farther.
 - **Tower relay:** every Radio Transmitter within your remote's reach relays your press. The signal goes out again from the top of that tower, with the tower's reach. So you can stand at the foot of a tall tower, press, and reach as far as the tower does. It works on any frequency (the tower doesn't need to be on the remote's frequency, or powered), so one tall tower at your base boosts every button. The message shows how many towers relayed it ("reach 56 blocks + 1 tower"), and the signal light and "Heard by" count include them. A toggle switched on through a tower goes off if that tower is broken. Server owners can turn relaying off in the config (`towersRelayRemotes`).
 
@@ -90,6 +95,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - It alerts once each time the signal turns on, not again while it stays on. Its little screen glows green while the signal is on, and the tooltip shows the live status.
 - Rename it in an anvil and the alert uses that name: "Front Door: frequency 5 is ON".
 - Right-click: switch the sound on or off. With the sound off it still shows the message.
+- Sneak + scroll, Sneak + Ctrl + scroll and the 5 favorites in its screen work just like the tuner's. After a change it alerts if the new frequency is already on.
 - Sneak + right-click the air: change its frequency. Sneak + right-click a transmitter or receiver: copy its frequency.
 - Pagers count toward a remote's "Heard by" number and signal light, so a doorbell press shows green when only your pager hears it. The locator never shows pagers, so it can't be used to find players.
 - The beep is only heard by the pager's owner.
@@ -196,7 +202,8 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
-  item/TunerPresets.java                 the tuner's 5 favorites (data component)
+  item/TunerPresets.java                 5 favorite frequencies (data component)
+  item/RadioFavorites.java               sneak + scroll and favorites for the tuner, remote and pager
   item/FrequencyTunerItem.java           tune, copy, open the frequency screen
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
@@ -292,7 +299,9 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 56. tuner favorites always have 5 slots, empty bad numbers, cap huge ones, and can be saved and cleared;
 57. jumping between favorites goes in slot order, skips empty slots and wraps around, both ways;
 58. favorites survive saving and network sync, and a tuner without any has no extra data;
-59. sneak + scroll steps by 1 and stops at 1 and 999,999,999; with Ctrl it jumps between favorites, and says so when there are none.
+59. sneak + scroll steps by 1 and stops at 1 and 999,999,999; with Ctrl it jumps between favorites, and says so when there are none;
+60. the Remote Control and pager scroll and jump between favorites too (the remote keeps its mode and pulse length, the pager re-arms its alert), and the Multi-Button Remote and scanner don't;
+61. the remote's, pager's and tuner's tooltips list their favorites right under the frequency and explain scrolling.
 
 ## License
 

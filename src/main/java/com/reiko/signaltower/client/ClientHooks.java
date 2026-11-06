@@ -17,17 +17,12 @@ public final class ClientHooks {
     private ClientHooks() {}
 
     /**
-     * Opens the frequency screen. {@code toggleMode} and {@code pulseTicks} are null for items without
-     * a mode (the tuner).
+     * Opens the frequency screen (tuner, Remote Control, pager), with its row of favorites.
+     * {@code toggleMode} and {@code pulseTicks} are null for items without a mode.
      */
     public static void openFrequencyScreen(InteractionHand hand, int frequency, Component title,
-                                           @Nullable Boolean toggleMode, @Nullable Integer pulseTicks) {
-        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks));
-    }
-
-    /** Opens the tuner's frequency screen, with its row of favorites. */
-    public static void openTunerScreen(InteractionHand hand, int frequency, Component title, TunerPresets presets) {
-        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, null, null, presets));
+                                           @Nullable Boolean toggleMode, @Nullable Integer pulseTicks, TunerPresets favorites) {
+        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, toggleMode, pulseTicks, favorites));
     }
 
     /** A locator answer arrived: hand it to the open remote screen, if there is one. */

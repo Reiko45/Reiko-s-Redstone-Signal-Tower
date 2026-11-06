@@ -2,11 +2,11 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.WallRedstoneBlock;
-import com.reiko.signaltower.item.FrequencyTunerItem;
+import com.reiko.signaltower.item.RadioFavorites;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.RemoteLight;
-import com.reiko.signaltower.network.ScrollTunerPayload;
+import com.reiko.signaltower.network.ScrollFrequencyPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.registry.ModRegistry;
 
@@ -86,10 +86,10 @@ public final class SignalTowerClient {
                 PacketDistributor.sendToServer(new SelectRemoteButtonPayload(offhand, event.getScrollDeltaY() < 0));
                 return;
             }
-            if (item instanceof FrequencyTunerItem) {
+            if (RadioFavorites.isScrollable(player.getItemInHand(hand))) {
                 event.setCanceled(true);
                 // Up raises the frequency by 1; with Ctrl it jumps between favorites (down = next).
-                PacketDistributor.sendToServer(new ScrollTunerPayload(offhand, event.getScrollDeltaY() > 0, Screen.hasControlDown()));
+                PacketDistributor.sendToServer(new ScrollFrequencyPayload(offhand, event.getScrollDeltaY() > 0, Screen.hasControlDown()));
                 return;
             }
         }

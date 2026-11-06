@@ -180,7 +180,8 @@ public class PagerItem extends Item {
         ItemStack stack = player.getItemInHand(hand);
         if (player.isSecondaryUseActive()) {
             if (level.isClientSide) {
-                ClientHooks.openFrequencyScreen(hand, FrequencyTunerItem.getFrequency(stack), stack.getHoverName(), null, null);
+                ClientHooks.openFrequencyScreen(hand, FrequencyTunerItem.getFrequency(stack), stack.getHoverName(), null, null,
+                        RadioFavorites.get(stack));
             }
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
         }
@@ -206,6 +207,7 @@ public class PagerItem extends Item {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
         tooltip.add(Component.translatable(prefix + "frequency", FrequencyTunerItem.getFrequency(stack))
                 .withStyle(ChatFormatting.AQUA));
+        RadioFavorites.addFavoritesLine(stack, tooltip);
         int signal = lastSignal(stack);
         tooltip.add(signal > 0
                 ? Component.translatable(prefix + "pager_status_on", signal).withStyle(ChatFormatting.GREEN)
@@ -216,5 +218,6 @@ public class PagerItem extends Item {
         tooltip.add(Component.translatable(prefix + "pager_toggle").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "pager_configure").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "pager_copy").withStyle(ChatFormatting.GRAY));
+        RadioFavorites.addScrollHint(tooltip);
     }
 }
