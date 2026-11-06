@@ -6,6 +6,8 @@ import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
+import com.reiko.signaltower.network.ScannerRequestPayload;
+import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.server.level.ServerLevel;
@@ -54,6 +56,10 @@ public final class SignalTower {
                 SelectRemoteButtonPayload::handle);
         registrar.playToServer(RemoteScanRequestPayload.TYPE, RemoteScanRequestPayload.STREAM_CODEC,
                 RemoteScanRequestPayload::handle);
+        registrar.playToServer(ScannerRequestPayload.TYPE, ScannerRequestPayload.STREAM_CODEC,
+                ScannerRequestPayload::handle);
+        registrar.playToClient(ScannerResultPayload.TYPE, ScannerResultPayload.STREAM_CODEC,
+                ScannerResultPayload::handle);
         registrar.playToClient(RemoteScanResultPayload.TYPE, RemoteScanResultPayload.STREAM_CODEC,
                 RemoteScanResultPayload::handle);
     }
@@ -76,11 +82,13 @@ public final class SignalTower {
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
+            event.accept(ModRegistry.SIGNAL_SCANNER.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
+            event.accept(ModRegistry.SIGNAL_SCANNER.get());
         }
     }
 }

@@ -262,6 +262,10 @@ def multi_remote_models():
 
 
 multi_remote_models()
+write(items / "signal_scanner.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("signal_scanner", "item")},
+})
 write(items / "pager_on.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("pager_on", "item")},
@@ -329,6 +333,30 @@ write(ASSETS / "lang" / "en_us.json", {
     f"item.{MOD}.remote_control": "Remote Control",
     f"item.{MOD}.multi_remote": "Multi-Button Remote",
     f"item.{MOD}.pager": "Radio Pager",
+    f"item.{MOD}.signal_scanner": "Signal Scanner",
+    f"tooltip.{MOD}.scanner_use": "Lists every frequency you can hear where you stand",
+    f"tooltip.{MOD}.scanner_open": "Right-click to open it",
+    f"tooltip.{MOD}.scanner_tune": "Its Tune buttons set the tuner, remote or pager in your other hand",
+    f"screen.{MOD}.scanner.scanning": "Scanning...",
+    f"screen.{MOD}.scanner.nothing": "Nothing heard here",
+    f"screen.{MOD}.scanner.heard_one": "1 frequency heard here",
+    f"screen.{MOD}.scanner.heard_many": "%s frequencies heard here",
+    f"screen.{MOD}.scanner.heading_frequency": "Frequency",
+    f"screen.{MOD}.scanner.heading_signal": "Signal",
+    f"screen.{MOD}.scanner.heading_source": "Strongest source",
+    f"screen.{MOD}.scanner.on": "ON %s",
+    f"screen.{MOD}.scanner.off": "off",
+    f"screen.{MOD}.scanner.transmitter": "Transmitter, %s",
+    f"screen.{MOD}.scanner.transmitters": "Transmitter, %s (+%s more)",
+    f"screen.{MOD}.scanner.remote_pulse": "Remote pulse",
+    f"screen.{MOD}.scanner.remote_toggle": "Remote toggle",
+    f"screen.{MOD}.scanner.plus_one": "%s, plus 1 transmitter",
+    f"screen.{MOD}.scanner.plus_many": "%s, plus %s transmitters",
+    f"screen.{MOD}.scanner.tune": "Tune",
+    f"screen.{MOD}.scanner.tune_hint": "Hold a tuner, remote or pager in your other hand to tune it",
+    f"screen.{MOD}.scanner.tune_tooltip": "Set %s to frequency %s",
+    f"screen.{MOD}.scanner.tuned": "%s tuned to frequency %s",
+    f"screen.{MOD}.scanner.more": "Showing %s-%s of %s, scroll for more",
     f"message.{MOD}.pager_alert": "%s: frequency %s is ON (strength %s)",
     f"message.{MOD}.pager_sound_on": "Pager sound ON",
     f"message.{MOD}.pager_sound_off": "Pager sound OFF (messages only)",
@@ -488,6 +516,14 @@ recipes["multi_remote"] = ({
     "ingredients": [{"item": f"{MOD}:remote_control"}] + [{"item": "minecraft:stone_button"}] * 3,
     "result": {"count": 1, "id": f"{MOD}:multi_remote"},
 }, f"{MOD}:remote_control")
+
+recipes["signal_scanner"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "equipment",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:compass"},
+                    {"item": "minecraft:iron_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:signal_scanner"},
+}, f"{MOD}:radio_receiver")
 
 recipes["pager"] = ({
     "type": "minecraft:crafting_shapeless",

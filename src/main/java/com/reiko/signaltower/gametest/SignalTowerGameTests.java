@@ -8,6 +8,7 @@ import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
@@ -31,6 +32,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
@@ -1312,6 +1314,107 @@ public final class SignalTowerGameTests {
         PagerItem.setFrequency(pager, 956);
         check(PagerItem.lastSignal(pager) == 0 && FrequencyTunerItem.getFrequency(pager) == 956,
                 "Re-tuning should forget the old signal, so the new frequency alerts if it's already on");
+        helper.succeed();
+    }
+
+    // ---- Signal Scanner ----
+
+    /** Finds one frequency in a scan, or fails. */
+    private static SignalNetwork.HeardFrequency heardOn(List<SignalNetwork.HeardFrequency> heard, int frequency) {
+        return heard.stream().filter(h -> h.frequency() == frequency).findFirst()
+                .orElseThrow(() -> new GameTestAssertException("Frequency " + frequency + " should be in the scan: " + heard));
+    }
+
+    /**
+     * The scanner lists what a receiver where you stand would hear: transmitters whose reach covers
+     * you (silent ones too, with "off"), with the distance and direction to them, strongest first.
+     * A powered transmitter whose reach doesn't cover you isn't listed. (A fresh network far away,
+     * so other tests can't add to it.)
+     */
+    @GameTest(template = PLATFORM)
+    public static void scannerListsWhatYouCanHear(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        network.updateTransmitter(here.north(10), 971, 0, 20); // silent, 10 blocks north
+        network.updateTransmitter(here.east(30), 970, 15, 50); // on, 30 blocks east
+        network.updateTransmitter(here.west(80), 972, 15, 50); // on, but too far for its reach
+        List<SignalNetwork.HeardFrequency> heard = network.scanAt(level, here);
+        check(heard.size() == 2, "Two frequencies should be heard, got " + heard);
+        check(heard.get(0).equals(new SignalNetwork.HeardFrequency(970, 15, SignalNetwork.Source.TRANSMITTER, 1, 30, 2)),
+                "The strongest (970, 30 blocks east) should come first, got " + heard.get(0));
+        check(heard.get(1).equals(new SignalNetwork.HeardFrequency(971, 0, SignalNetwork.Source.TRANSMITTER, 1, 10, 0)),
+                "The silent one (971, 10 blocks north) should come last, got " + heard.get(1));
+        helper.succeed();
+    }
+
+    /** With several transmitters on one frequency, the scanner points to the strongest, and of those the nearest. */
+    @GameTest(template = PLATFORM)
+    public static void scannerPointsToStrongestThenNearest(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        network.updateTransmitter(here.south(40), 973, 15, 100);
+        network.updateTransmitter(here.west(5), 973, 7, 100);
+        network.updateTransmitter(here.south(20).east(20), 973, 15, 100);
+        SignalNetwork.HeardFrequency entry = heardOn(network.scanAt(level, here), 973);
+        check(entry.power() == 15 && entry.transmitters() == 3, "Should be strength 15 from 3 transmitters, got " + entry);
+        check(entry.distance() == 28 && entry.direction() == 3, "Should point 28 blocks south-east, got " + entry);
+        helper.succeed();
+    }
+
+    /** Remote signals show as "remote", with no distance or direction, so the scanner never points at players. */
+    @GameTest(template = PLATFORM)
+    public static void scannerShowsRemotesWithoutPointingAtPlayers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        network.toggleLatch(974, SignalNetwork.ownCoverage(here.east(4), 10));
+        network.updateTransmitter(here.north(3), 974, 0, 20);
+        network.pulse(975, SignalNetwork.ownCoverage(here.west(4), 10), level.getGameTime() + 100);
+        network.toggleLatch(976, SignalNetwork.ownCoverage(here.east(500), 10)); // doesn't cover us
+        List<SignalNetwork.HeardFrequency> heard = network.scanAt(level, here);
+        check(heard.equals(List.of(
+                        new SignalNetwork.HeardFrequency(974, 15, SignalNetwork.Source.REMOTE_TOGGLE, 1, -1, -1),
+                        new SignalNetwork.HeardFrequency(975, 15, SignalNetwork.Source.REMOTE_PULSE, 0, -1, -1))),
+                "Should hear the toggle (with its transmitter) and the pulse, nothing else: " + heard);
+        helper.succeed();
+    }
+
+    /** A real placed transmitter shows up in a scan of the world, with the right distance and direction. */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void scannerSeesPlacedTransmitter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(4, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 977);
+        helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK);
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    SignalNetwork.HeardFrequency entry = heardOn(
+                            SignalNetwork.get(level).scanAt(level, helper.absolutePos(new BlockPos(1, 1, 1))), 977);
+                    check(entry.power() == 15 && entry.distance() == 3 && entry.direction() == 2,
+                            "Should hear strength 15 from 3 blocks east, got " + entry);
+                })
+                .thenSucceed();
+    }
+
+    /** The Tune buttons work on the tuner, both remotes and the pager, and keep a button's other settings. */
+    @GameTest(template = PLATFORM)
+    public static void scannerTunesRadioItems(GameTestHelper helper) {
+        check(SignalScannerItem.canTune(new ItemStack(ModRegistry.FREQUENCY_TUNER.get())), "Tuner");
+        check(SignalScannerItem.canTune(new ItemStack(ModRegistry.REMOTE_CONTROL.get())), "Remote Control");
+        check(SignalScannerItem.canTune(new ItemStack(ModRegistry.MULTI_REMOTE.get())), "Multi-Button Remote");
+        check(SignalScannerItem.canTune(new ItemStack(ModRegistry.PAGER.get())), "Pager");
+        check(!SignalScannerItem.canTune(new ItemStack(ModRegistry.SIGNAL_SCANNER.get()))
+                && !SignalScannerItem.canTune(new ItemStack(Items.STICK)) && !SignalScannerItem.canTune(ItemStack.EMPTY),
+                "Other items can't be tuned");
+        RemoteButtons buttons = RemoteButtons.DEFAULT
+                .withButton(2, new RemoteButtons.Button(3, true, 40, "Gate", DyeColor.PINK))
+                .withSelected(2);
+        RemoteButtons tuned = SignalScannerItem.retuneSelected(buttons, 978);
+        check(tuned.button(2).equals(new RemoteButtons.Button(978, true, 40, "Gate", DyeColor.PINK)),
+                "Only the selected button's frequency should change, got " + tuned.button(2));
+        check(tuned.button(0).equals(buttons.button(0)), "Other buttons shouldn't change");
         helper.succeed();
     }
 }

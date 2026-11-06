@@ -12,6 +12,7 @@ import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.item.RemoteLight;
@@ -154,6 +155,8 @@ public final class ModRegistry {
             ITEMS.register("multi_remote", () -> new MultiRemoteItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<PagerItem> PAGER =
             ITEMS.register("pager", () -> new PagerItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<SignalScannerItem> SIGNAL_SCANNER =
+            ITEMS.register("signal_scanner", () -> new SignalScannerItem(new Item.Properties().stacksTo(1)));
 
     // ---- Block entities ----
 

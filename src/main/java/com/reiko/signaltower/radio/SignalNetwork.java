@@ -366,6 +366,86 @@ public final class SignalNetwork extends SavedData {
 
     // ---- Receivers ----
 
+    /** Where the strongest signal on a frequency comes from, for the Signal Scanner. */
+    public enum Source { TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE }
+
+    /**
+     * One frequency the Signal Scanner hears. {@code transmitters} is how many transmitters on it
+     * reach this spot. For a {@link Source#TRANSMITTER}, {@code distance} and {@code direction}
+     * point to the strongest one (the nearest, if several are equally strong); for a remote signal
+     * they're -1, so the scanner never points at players.
+     */
+    public record HeardFrequency(int frequency, int power, Source source, int transmitters, int distance, int direction) {}
+
+    /** The most frequencies one scan reports. */
+    public static final int MAX_SCAN_RESULTS = 64;
+
+    /**
+     * Everything a receiver at {@code pos} could hear: every frequency with a transmitter whose
+     * reach covers it (including silent ones, with power 0) or a remote signal covering it.
+     * Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
+     */
+    public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos) {
+        record Best(int power, long distSq, BlockPos at, int count) {}
+        Map<Integer, Best> best = new HashMap<>();
+        List<BlockPos> stale = null;
+        for (Map.Entry<BlockPos, Transmitter> entry : transmitters.entrySet()) {
+            BlockPos at = entry.getKey();
+            Transmitter tx = entry.getValue();
+            long dx = at.getX() - pos.getX();
+            long dz = at.getZ() - pos.getZ();
+            long distSq = dx * dx + dz * dz;
+            if (distSq > (long) tx.reach() * tx.reach()) {
+                continue;
+            }
+            if (level.isLoaded(at) && !(level.getBlockState(at).getBlock() instanceof RadioTransmitterBlock)) {
+                if (stale == null) stale = new ArrayList<>();
+                stale.add(at);
+                continue;
+            }
+            Best old = best.get(tx.frequency());
+            if (old == null) {
+                best.put(tx.frequency(), new Best(tx.power(), distSq, at, 1));
+            } else if (tx.power() > old.power() || (tx.power() == old.power() && distSq < old.distSq())) {
+                best.put(tx.frequency(), new Best(tx.power(), distSq, at, old.count() + 1));
+            } else {
+                best.put(tx.frequency(), new Best(old.power(), old.distSq(), old.at(), old.count() + 1));
+            }
+        }
+        if (stale != null) {
+            stale.forEach(this::removeTransmitter);
+        }
+
+        Map<Integer, Source> remotes = new HashMap<>();
+        pulses.forEach((frequency, pulse) -> {
+            if (pulse.reaches(level, pos)) remotes.put(frequency, Source.REMOTE_PULSE);
+        });
+        latches.forEach((frequency, latch) -> {
+            if (latch.reaches(level, pos)) remotes.put(frequency, Source.REMOTE_TOGGLE);
+        });
+
+        Set<Integer> frequencies = new HashSet<>(best.keySet());
+        frequencies.addAll(remotes.keySet());
+        List<HeardFrequency> heard = new ArrayList<>();
+        for (int frequency : frequencies) {
+            Best tx = best.get(frequency);
+            int count = tx == null ? 0 : tx.count();
+            Source remote = remotes.get(frequency);
+            if (remote != null) {
+                heard.add(new HeardFrequency(frequency, 15, remote, count, -1, -1));
+            } else {
+                long dx = tx.at().getX() - pos.getX();
+                long dz = tx.at().getZ() - pos.getZ();
+                int distance = (int) Math.min(Integer.MAX_VALUE, Math.round(Math.sqrt(tx.distSq())));
+                heard.add(new HeardFrequency(frequency, tx.power(), Source.TRANSMITTER, count, distance,
+                        distance == 0 ? -1 : compassDirection(dx, dz)));
+            }
+        }
+        heard.sort(Comparator.comparingInt(HeardFrequency::power).reversed()
+                .thenComparingInt(HeardFrequency::frequency));
+        return heard.size() > MAX_SCAN_RESULTS ? new ArrayList<>(heard.subList(0, MAX_SCAN_RESULTS)) : heard;
+    }
+
     /**
      * Finds the strongest signal on {@code frequency} that reaches {@code receiverPos}. A
      * transmitter reaches every receiver within its reach, measured horizontally, at any height.

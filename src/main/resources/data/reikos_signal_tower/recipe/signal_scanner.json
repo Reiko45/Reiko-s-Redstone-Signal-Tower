@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    {
+      "item": "reikos_signal_tower:radio_receiver"
+    },
+    {
+      "item": "minecraft:compass"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:signal_scanner"
+  }
+}

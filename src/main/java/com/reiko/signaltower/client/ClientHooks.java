@@ -2,6 +2,7 @@ package com.reiko.signaltower.client;
 
 import com.reiko.signaltower.item.RemoteButtons;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
+import com.reiko.signaltower.network.ScannerResultPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -27,6 +28,17 @@ public final class ClientHooks {
     public static void onRemoteScan(RemoteScanResultPayload result) {
         if (Minecraft.getInstance().screen instanceof RemoteScanListener listener) {
             listener.onRemoteScan(result);
+        }
+    }
+
+    public static void openScannerScreen(InteractionHand hand, Component title) {
+        Minecraft.getInstance().setScreen(new ScannerScreen(hand, title));
+    }
+
+    /** A scanner answer arrived: hand it to the open scanner screen, if there is one. */
+    public static void onScannerResult(ScannerResultPayload result) {
+        if (Minecraft.getInstance().screen instanceof ScannerScreen screen) {
+            screen.onResult(result);
         }
     }
 

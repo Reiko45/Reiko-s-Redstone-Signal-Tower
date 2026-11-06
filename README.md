@@ -16,6 +16,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
+| **Signal Scanner** | A handheld direction-finder. It lists every frequency you can hear where you stand, how strong it is and where it comes from, and can tune the radio item in your other hand. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
@@ -84,6 +85,15 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ![Two pagers going off: one from a remote press, one renamed "Tower Alarm" from a tower, with its tooltip](docs/images/pager.png)
 
+**Signal Scanner:**
+- Right-click to open it. It shows a live list (updated every second) of everything a receiver where you're standing would hear: every frequency, its strength ("ON 15", or "off" for a transmitter that's silent right now), and its strongest source.
+- For a transmitter, the source is its distance and direction: "Transmitter, 27 blocks south". If several transmitters on that frequency reach you, it points to the strongest one (the nearest, if they're equally strong) and says how many more there are ("+1 more").
+- For a remote press it just says "Remote pulse" or "Remote toggle", with no distance or direction, so it can't be used to find players.
+- Strongest signals come first. Scroll the mouse wheel if there are more than 6.
+- **Tune:** hold a Frequency Tuner, Remote Control, Multi-Button Remote or Radio Pager in your other hand, and each row's Tune button sets that frequency on it. A remote keeps its mode and pulse length, and a Multi-Button Remote changes only its selected button.
+
+![The Signal Scanner listing five frequencies, after tuning the Remote Control in the off-hand to 42](docs/images/signal-scanner.png)
+
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
 - Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach.
@@ -138,6 +148,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Pager:** a Compact Radio Receiver, a Note Block and an Iron Ingot, in any arrangement in the crafting grid.
 
+**Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
+
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
 
 ## Building and running
@@ -177,6 +189,7 @@ src/main/java/com/reiko/signaltower/
   item/RemoteControlItem.java            handheld transmitter: pulse or toggle
   item/MultiRemoteItem.java              4-button remote
   item/PagerItem.java                    pocket receiver that beeps when its frequency turns on
+  item/SignalScannerItem.java            handheld that lists every frequency heard where you stand
   item/RemoteButtons.java                the 4 buttons' settings (data component), colors
   item/PulseLength.java                  pulse length presets, limits and labels
   item/RemoteLight.java                  the remotes' green/red status light after a press
@@ -258,7 +271,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 47. a pager hears a Remote Control press made near its owner;
 48. a powered transmitter out of reach leaves the pager quiet;
 49. a renamed pager uses its name in the alert, and a silenced one shows the message without beeping;
-50. pagers count toward a remote's "Heard by" only when in range and on that frequency, and re-tuning re-arms the alert.
+50. pagers count toward a remote's "Heard by" only when in range and on that frequency, and re-tuning re-arms the alert;
+51. the scanner lists what a receiver here would hear (silent transmitters too), strongest first, with distance and direction, and leaves out transmitters whose reach doesn't cover you;
+52. with several transmitters on one frequency, it points to the strongest, then the nearest, and counts them all;
+53. remote signals show as "remote" with no distance or direction, and remotes that don't cover you aren't listed;
+54. a real placed transmitter shows up in a scan of the world;
+55. the Tune buttons work on the tuner, both remotes and the pager, and change only the Multi-Button Remote's selected button's frequency.
 
 ## License
 

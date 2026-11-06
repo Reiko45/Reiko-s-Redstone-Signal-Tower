@@ -396,6 +396,45 @@ def pager_item(on=False):
     return img
 
 
+def scanner_item():
+    """A yellow handheld direction-finder: a round radar screen with a sweep line and blips, an
+    antenna with a red tip, and a grip."""
+    img = blank()
+    px = img.load()
+    o = (52, 38, 8, 255)
+    body, body_d, body_l = (226, 178, 40, 255), (178, 132, 22, 255), (248, 214, 96, 255)
+    grip, grip_l = (46, 48, 54, 255), (78, 82, 92, 255)
+    # Antenna, top right, with a red tip
+    for y in (1, 2, 3):
+        px[12, y] = (128, 132, 142, 255)
+    px[12, 0] = (230, 50, 40, 255)
+    # Grip
+    for y in range(11, 16):
+        for x in range(6, 10):
+            px[x, y] = o if x in (6, 9) or y == 15 else (grip_l if x == 7 else grip)
+    # Body
+    for y in range(3, 12):
+        for x in range(2, 14):
+            if (y in (3, 11)) and x in (2, 13):
+                continue
+            edge = x in (2, 13) or y in (3, 11)
+            px[x, y] = o if edge else (body_l if y == 4 else body_d if y == 10 else body)
+    # Round radar screen
+    screen, ring, sweep, blip = (18, 46, 26, 255), (40, 86, 48, 255), (110, 240, 120, 255), (200, 255, 190, 255)
+    cx, cy = 7.5, 6.5
+    for y in range(4, 10):
+        for x in range(4, 12):
+            d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+            if d <= 3.2:
+                px[x, y] = ring if d > 2.4 else screen
+    for (x, y) in [(8, 6), (9, 5), (10, 4)]:
+        px[x, y] = sweep
+    px[5, 7] = blip
+    px[9, 8] = blip
+    px[7, 6] = (60, 160, 70, 255)
+    return img
+
+
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
@@ -418,7 +457,7 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "multi_remote": multi_remote_item(),
          "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
          **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
-         "pager": pager_item(), "pager_on": pager_item(True)}
+         "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)
