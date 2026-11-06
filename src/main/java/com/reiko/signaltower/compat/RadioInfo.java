@@ -10,6 +10,7 @@ import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
@@ -42,8 +43,30 @@ public final class RadioInfo {
 
     private RadioInfo() {}
 
-    /** The server's data for the block at {@code pos}, or null if it isn't one of the mod's radio blocks or masts. */
+    /**
+     * The server's data for the block at {@code pos}, or null if it isn't one of the mod's radio
+     * blocks or masts. The frequencies' names (if they have any) come along as "name" and
+     * "output_name", since the client might not know them.
+     */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos) {
+        CompoundTag tag = gather(level, pos);
+        if (tag != null) {
+            addName(level, tag, "frequency", "name");
+            addName(level, tag, "output", "output_name");
+        }
+        return tag;
+    }
+
+    private static void addName(ServerLevel level, CompoundTag tag, String frequencyKey, String nameKey) {
+        if (tag.contains(frequencyKey)) {
+            String name = FrequencyNames.nameOf(level, tag.getInt(frequencyKey));
+            if (name != null) {
+                tag.putString(nameKey, name);
+            }
+        }
+    }
+
+    private static @Nullable CompoundTag gather(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         Block block = state.getBlock();
         CompoundTag tag = new CompoundTag();
@@ -110,10 +133,10 @@ public final class RadioInfo {
             Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
             if (data.contains("output")) {
-                lines.add(Component.translatable(LANG + "listens", number(data.getInt("frequency"))));
-                lines.add(Component.translatable(LANG + "sends", number(data.getInt("output"))));
+                lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));
+                lines.add(Component.translatable(LANG + "sends", number(data, "output", "output_name")));
             } else {
-                lines.add(frequencyLine(data.getInt("frequency")));
+                lines.add(frequencyLine(data));
             }
             return lines;
         }
@@ -123,8 +146,8 @@ public final class RadioInfo {
         if (block instanceof RadioConverterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioRepeaterBlock.LIT);
             if (hasData) {
-                lines.add(Component.translatable(LANG + "listens", number(data.getInt("frequency"))));
-                lines.add(Component.translatable(LANG + "sends", number(data.getInt("output"))));
+                lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));
+                lines.add(Component.translatable(LANG + "sends", number(data, "output", "output_name")));
             }
             lines.add(!on ? Component.translatable(LANG + "converting_nothing").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "converting", value(data.getInt("power")))
@@ -135,7 +158,7 @@ public final class RadioInfo {
             return lines;
         }
         if (hasData) {
-            lines.add(frequencyLine(data.getInt("frequency")));
+            lines.add(frequencyLine(data));
         }
         if (block instanceof RadioTransmitterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
@@ -175,8 +198,17 @@ public final class RadioInfo {
         return lines;
     }
 
-    private static Component frequencyLine(int frequency) {
-        return Component.translatable(LANG + "frequency", number(frequency));
+    private static Component frequencyLine(CompoundTag data) {
+        return Component.translatable(LANG + "frequency", number(data, "frequency", "name"));
+    }
+
+    /** "2026", or "2026 (Front Gate)" if the server sent a name, in aqua. */
+    private static Component number(CompoundTag data, String frequencyKey, String nameKey) {
+        Component number = number(data.getInt(frequencyKey));
+        return data.contains(nameKey)
+                ? Component.translatable("frequency." + SignalTower.MOD_ID + ".named", number,
+                        Component.literal(data.getString(nameKey)).withStyle(ChatFormatting.AQUA))
+                : number;
     }
 
     private static Component number(int frequency) {

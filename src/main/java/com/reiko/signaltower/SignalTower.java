@@ -7,14 +7,18 @@ import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
+import com.reiko.signaltower.network.FrequencyNamePayload;
+import com.reiko.signaltower.network.FrequencyNamesPayload;
+import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
-import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.network.ScrollFrequencyPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
+import com.reiko.signaltower.network.SetFrequencyNamePayload;
 import com.reiko.signaltower.network.TrackTransmitterPayload;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 
@@ -29,6 +33,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -79,6 +84,12 @@ public final class SignalTower {
                 TrackTransmitterPayload::handle);
         registrar.playToServer(ScannerRequestPayload.TYPE, ScannerRequestPayload.STREAM_CODEC,
                 ScannerRequestPayload::handle);
+        registrar.playToServer(SetFrequencyNamePayload.TYPE, SetFrequencyNamePayload.STREAM_CODEC,
+                SetFrequencyNamePayload::handle);
+        registrar.playToClient(FrequencyNamePayload.TYPE, FrequencyNamePayload.STREAM_CODEC,
+                FrequencyNamePayload::handle);
+        registrar.playToClient(FrequencyNamesPayload.TYPE, FrequencyNamesPayload.STREAM_CODEC,
+                FrequencyNamesPayload::handle);
         registrar.playToServer(ConfigureConverterPayload.TYPE, ConfigureConverterPayload.STREAM_CODEC,
                 ConfigureConverterPayload::handle);
         registrar.playToClient(OpenConverterScreenPayload.TYPE, OpenConverterScreenPayload.STREAM_CODEC,
@@ -95,9 +106,10 @@ public final class SignalTower {
         PagerItem.markAway(event.getEntity(), event.getEntity().level().getGameTime());
     }
 
-    /** Pagers say what turned on while their owner was away. */
+    /** The player gets the world's frequency names, and pagers say what turned on while their owner was away. */
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            PacketDistributor.sendToPlayer(player, new FrequencyNamesPayload(FrequencyNames.get(player.server).all()));
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.
             boolean worldRan = !player.server.isSingleplayerOwner(player.getGameProfile());
             PagerItem.catchUp(player.serverLevel(), player, worldRan);

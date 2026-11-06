@@ -4,6 +4,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.network.ConfigureConverterPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -102,11 +103,24 @@ public class ConverterScreen extends Screen {
         Component sends = Component.translatable(KEY + "sends");
         graphics.drawString(font, listens, centerX - 12 - font.width(listens), top + 40, 0xFFFFFF);
         graphics.drawString(font, sends, centerX - 12 - font.width(sends), top + 66, 0xFFFFFF);
+        drawName(graphics, listenBox, top + 40);
+        drawName(graphics, sendBox, top + 66);
         Component status = state.power() > 0
-                ? Component.translatable(KEY + "converting", state.power(), state.listen(), state.send()).withStyle(ChatFormatting.GREEN)
-                : Component.translatable(KEY + "quiet", state.listen()).withStyle(ChatFormatting.GRAY);
+                ? Component.translatable(KEY + "converting", state.power(), FrequencyNames.label(null, state.listen()),
+                        FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GREEN)
+                : Component.translatable(KEY + "quiet", FrequencyNames.label(null, state.listen())).withStyle(ChatFormatting.GRAY);
         graphics.drawCenteredString(font, status, centerX, top + 90, 0xFFFFFF);
         graphics.drawCenteredString(font, Component.translatable(KEY + "reach", state.reach()), centerX, top + 104, 0xA0A0A0);
+    }
+
+    /** The typed frequency's name (if it has one) to the right of its box, cut to fit. */
+    private void drawName(GuiGraphics graphics, EditBox box, int y) {
+        OptionalInt frequency = parse(box);
+        String name = frequency.isPresent() ? FrequencyNames.nameOf(null, frequency.getAsInt()) : null;
+        int x = box.getX() + box.getWidth() + 6;
+        if (name != null && width - x > 12) {
+            graphics.drawString(font, font.plainSubstrByWidth(name, width - x - 4), x, y, 0x55FFFF);
+        }
     }
 
     @Override

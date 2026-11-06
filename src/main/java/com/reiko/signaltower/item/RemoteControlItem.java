@@ -4,6 +4,7 @@ import com.reiko.signaltower.Config;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -174,13 +175,13 @@ public class RemoteControlItem extends Item {
             level.playSound(null, origin, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                     SoundSource.PLAYERS, 0.6F, on ? 1.3F : 1.0F);
             result = on
-                    ? Component.translatable(key + "on", frequency, reach).withStyle(ChatFormatting.GREEN)
-                    : Component.translatable(key + "off", frequency).withStyle(ChatFormatting.RED);
+                    ? Component.translatable(key + "on", FrequencyNames.label(level, frequency), reach).withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(key + "off", FrequencyNames.label(level, frequency)).withStyle(ChatFormatting.RED);
         } else {
             int ticks = PulseLength.clamp(pulseTicks);
             network.pulse(frequency, coverage, level.getGameTime() + ticks);
             level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
-            result = Component.translatable(key + "pulse", PulseLength.format(ticks), frequency, reach);
+            result = Component.translatable(key + "pulse", PulseLength.format(ticks), FrequencyNames.label(level, frequency), reach);
         }
 
         // Pagers in players' pockets count as receivers too.
@@ -207,7 +208,7 @@ public class RemoteControlItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
-        tooltip.add(Component.translatable(prefix + "frequency", FrequencyTunerItem.getFrequency(stack))
+        tooltip.add(Component.translatable(prefix + "frequency", FrequencyNames.label(null, FrequencyTunerItem.getFrequency(stack)))
                 .withStyle(ChatFormatting.AQUA));
         RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "remote_mode", describeMode(isToggleMode(stack), getPulseTicks(stack)))

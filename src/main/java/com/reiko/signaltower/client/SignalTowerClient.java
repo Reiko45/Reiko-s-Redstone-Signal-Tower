@@ -46,6 +46,7 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::clientSetup);
         modEventBus.addListener(SignalTowerClient::registerGuiLayers);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
+        NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
     }
 
     /**
@@ -113,5 +114,10 @@ public final class SignalTowerClient {
         event.register((state, level, pos, tintIndex) ->
                         tintIndex == 0 ? RedStoneWireBlock.getColorForPower(state.getValue(WallRedstoneBlock.POWER)) : -1,
                 ModRegistry.WALL_REDSTONE.get());
+    }
+
+    /** Leaving a world or server: forget its frequency names (the next one sends its own). */
+    private static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        com.reiko.signaltower.radio.FrequencyNames.clientClear();
     }
 }

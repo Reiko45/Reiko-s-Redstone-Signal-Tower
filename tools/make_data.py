@@ -369,6 +369,12 @@ write(ASSETS / "lang" / "en_us.json", {
     f"item.{MOD}.pager": "Radio Pager",
     f"item.{MOD}.signal_scanner": "Signal Scanner",
     f"screen.{MOD}.tuner.favorites": "Favorites",
+    f"screen.{MOD}.tuner.name": "Name",
+    f"screen.{MOD}.tuner.name_hint": "No name",
+    f"frequency.{MOD}.named": "%s (%s)",
+    f"message.{MOD}.name_set": "Frequency %s is now called %s, for everyone",
+    f"message.{MOD}.name_removed": "Frequency %s has no name now",
+    f"message.{MOD}.name_full": "Can't name more frequencies: this world already has %s names",
     f"screen.{MOD}.tuner.favorite": "Favorite %s: %s. Click to use, sneak-click to replace, right-click to clear",
     f"screen.{MOD}.tuner.favorite_empty": "Favorite %s is empty. Click to save the frequency above",
     f"tooltip.{MOD}.favorites": "Favorites: %s",
@@ -506,7 +512,7 @@ write(ASSETS / "lang" / "en_us.json", {
 
     f"tooltip.{MOD}.frequency": "Frequency: %s",
     f"tooltip.{MOD}.tune_hint": "Use a Frequency Tuner to change its frequency.",
-    f"tooltip.{MOD}.tuner_use_air": "Right-click the air to type a frequency",
+    f"tooltip.{MOD}.tuner_use_air": "Right-click the air to type a frequency, or give it a name",
     f"tooltip.{MOD}.tuner_use_block": "Right-click a transmitter or receiver to tune it",
     f"tooltip.{MOD}.tuner_copy": "Sneak + right-click one to copy its frequency",
 

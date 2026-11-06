@@ -2,6 +2,7 @@ package com.reiko.signaltower.item;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
@@ -62,10 +63,10 @@ public class SignalScannerItem extends Item {
     public static Component track(ServerLevel level, Player player, ItemStack scanner, int frequency) {
         Optional<BlockPos> found = SignalNetwork.get(level).strongestTransmitter(level, player.blockPosition(), frequency);
         if (found.isEmpty()) {
-            return Component.translatable(MESSAGE + "scanner_cant_track", frequency).withStyle(ChatFormatting.YELLOW);
+            return Component.translatable(MESSAGE + "scanner_cant_track", FrequencyNames.label(level, frequency)).withStyle(ChatFormatting.YELLOW);
         }
         scanner.set(ModRegistry.SCANNER_TARGET.get(), new ScannerTarget(frequency, found.get(), level.dimension()));
-        return Component.translatable(MESSAGE + "scanner_tracking", frequency).withStyle(ChatFormatting.GREEN);
+        return Component.translatable(MESSAGE + "scanner_tracking", FrequencyNames.label(level, frequency)).withStyle(ChatFormatting.GREEN);
     }
 
     public static Component stopTracking(ItemStack scanner) {
@@ -89,7 +90,7 @@ public class SignalScannerItem extends Item {
             return null;
         }
         scanner.remove(ModRegistry.SCANNER_TARGET.get());
-        return Component.translatable(MESSAGE + "scanner_lost", target.frequency()).withStyle(ChatFormatting.YELLOW);
+        return Component.translatable(MESSAGE + "scanner_lost", FrequencyNames.label(level, target.frequency())).withStyle(ChatFormatting.YELLOW);
     }
 
     /** Once a second, makes sure the tracked transmitter is still there. */
@@ -123,7 +124,7 @@ public class SignalScannerItem extends Item {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".scanner_";
         ScannerTarget target = getTarget(stack);
         if (target != null) {
-            tooltip.add(Component.translatable(prefix + "tracking", target.frequency()).withStyle(ChatFormatting.GREEN));
+            tooltip.add(Component.translatable(prefix + "tracking", FrequencyNames.label(null, target.frequency())).withStyle(ChatFormatting.GREEN));
         }
         tooltip.add(Component.translatable(prefix + "use").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "open").withStyle(ChatFormatting.GRAY));

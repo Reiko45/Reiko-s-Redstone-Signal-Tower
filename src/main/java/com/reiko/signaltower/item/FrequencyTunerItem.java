@@ -4,6 +4,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -62,11 +63,11 @@ public class FrequencyTunerItem extends Item {
             Component message;
             if (player != null && player.isSecondaryUseActive()) {
                 setFrequency(stack, radio.getFrequency());
-                message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_copied", radio.getFrequency());
+                message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_copied", FrequencyNames.label(level, radio.getFrequency()));
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
             } else {
                 radio.setFrequency(getFrequency(stack));
-                message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", radio.getFrequency());
+                message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
             }
             if (player != null) {
@@ -88,7 +89,7 @@ public class FrequencyTunerItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".frequency", getFrequency(stack))
+        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".frequency", FrequencyNames.label(null, getFrequency(stack)))
                 .withStyle(ChatFormatting.AQUA));
         RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_air").withStyle(ChatFormatting.GRAY));

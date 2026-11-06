@@ -3,6 +3,7 @@ package com.reiko.signaltower.block;
 import com.mojang.serialization.MapCodec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
@@ -69,7 +70,7 @@ public class RadioReceiverBlock extends RadioBlock {
         int frequency = level.getBlockEntity(pos) instanceof RadioReceiverBlockEntity rx ? rx.getFrequency() : 0;
         SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
         return Component.translatable("message." + SignalTower.MOD_ID + ".receiver_status",
-                frequency, reception.power(), reception.transmittersInReach());
+                FrequencyNames.label(level, frequency), reception.power(), reception.transmittersInReach());
     }
 
     // ---- Block entity ----

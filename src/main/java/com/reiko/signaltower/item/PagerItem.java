@@ -3,6 +3,7 @@ package com.reiko.signaltower.item;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
@@ -155,9 +156,9 @@ public class PagerItem extends Item {
             Object[] when = dayAndTime(heard.get(heard.size() - 1).dayTime());
             int times = heard.size();
             lines.add((times == 1
-                    ? Component.translatable(KEY + "pager_catchup_once", label(pager), frequency, when[0], when[1])
+                    ? Component.translatable(KEY + "pager_catchup_once", label(pager), FrequencyNames.label(level, frequency), when[0], when[1])
                     : Component.translatable(KEY + (times >= SignalNetwork.MAX_HISTORY ? "pager_catchup_lots" : "pager_catchup_many"),
-                            label(pager), frequency, times, when[0], when[1]))
+                            label(pager), FrequencyNames.label(level, frequency), times, when[0], when[1]))
                     .withStyle(ChatFormatting.GOLD));
         }
         if (lines.isEmpty() && pagersBack > 0 && worldRanWhileAway) {
@@ -213,7 +214,7 @@ public class PagerItem extends Item {
         if (previous > 0 || power == 0) {
             return null; // only the moment it turns on is news
         }
-        Component alert = Component.translatable(KEY + "pager_alert", label(stack), frequency, power)
+        Component alert = Component.translatable(KEY + "pager_alert", label(stack), FrequencyNames.label(level, frequency), power)
                 .withStyle(ChatFormatting.GOLD);
         if (holder instanceof Player player) {
             player.displayClientMessage(alert, true);
@@ -271,7 +272,7 @@ public class PagerItem extends Item {
         if (player != null && player.isSecondaryUseActive() && level.getBlockEntity(pos) instanceof RadioBlockEntity radio) {
             if (!level.isClientSide) {
                 setFrequency(context.getItemInHand(), radio.getFrequency());
-                player.displayClientMessage(Component.translatable(KEY + "frequency_copied_pager", radio.getFrequency()), true);
+                player.displayClientMessage(Component.translatable(KEY + "frequency_copied_pager", FrequencyNames.label(level, radio.getFrequency())), true);
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -309,7 +310,7 @@ public class PagerItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
-        tooltip.add(Component.translatable(prefix + "frequency", FrequencyTunerItem.getFrequency(stack))
+        tooltip.add(Component.translatable(prefix + "frequency", FrequencyNames.label(null, FrequencyTunerItem.getFrequency(stack)))
                 .withStyle(ChatFormatting.AQUA));
         RadioFavorites.addFavoritesLine(stack, tooltip);
         int signal = lastSignal(stack);

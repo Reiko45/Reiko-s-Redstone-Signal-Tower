@@ -11,6 +11,7 @@ import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.network.TrackTransmitterPayload;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -238,7 +239,10 @@ public class ScannerScreen extends Screen {
                     ? Component.translatable(KEY + "on", entry.power()).withStyle(ChatFormatting.GREEN)
                     : Component.translatable(KEY + "off").withStyle(ChatFormatting.DARK_GRAY);
             graphics.drawString(font, power, left + 80, textY, 0xFFFFFF);
-            FormattedText fitted = font.substrByWidth(source(entry), SOURCE_WIDTH);
+            String name = FrequencyNames.nameOf(null, entry.frequency());
+            Component sourceText = name == null ? source(entry)
+                    : Component.literal(name + ": ").withStyle(ChatFormatting.AQUA).append(source(entry));
+            FormattedText fitted = font.substrByWidth(sourceText, SOURCE_WIDTH);
             graphics.drawString(font, Language.getInstance().getVisualOrder(fitted), left + 124, textY, 0xFFFFFF);
         }
 

@@ -5,6 +5,7 @@ import com.mojang.math.Axis;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.ScannerTarget;
 import com.reiko.signaltower.item.SignalScannerItem;
+import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -55,7 +56,7 @@ public final class ScannerHud {
         int arrowY = 14;
         Component label;
         if (!target.dimension().equals(player.level().dimension())) {
-            label = Component.translatable(KEY + "other_dimension", target.frequency());
+            label = Component.translatable(KEY + "other_dimension", FrequencyNames.label(null, target.frequency()));
         } else {
             float partial = delta.getGameTimeDeltaPartialTick(true);
             Vec3 at = player.getPosition(partial);
@@ -64,7 +65,7 @@ public final class ScannerHud {
             int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
             int dy = target.pos().getY() - Mth.floor(at.y);
             if (distance <= 1 && Math.abs(dy) <= 2) {
-                label = Component.translatable(KEY + "here", target.frequency());
+                label = Component.translatable(KEY + "here", FrequencyNames.label(null, target.frequency()));
             } else {
                 float angle = ScannerTarget.relativeAngle(at.x, at.z, player.getViewYRot(partial), target.pos());
                 RenderSystem.enableBlend();
@@ -75,8 +76,8 @@ public final class ScannerHud {
                 graphics.pose().popPose();
                 RenderSystem.disableBlend();
                 label = Math.abs(dy) >= 3
-                        ? Component.translatable(KEY + (dy > 0 ? "distance_up" : "distance_down"), target.frequency(), distance, Math.abs(dy))
-                        : Component.translatable(KEY + "distance", target.frequency(), distance);
+                        ? Component.translatable(KEY + (dy > 0 ? "distance_up" : "distance_down"), FrequencyNames.label(null, target.frequency()), distance, Math.abs(dy))
+                        : Component.translatable(KEY + "distance", FrequencyNames.label(null, target.frequency()), distance);
             }
         }
         graphics.drawCenteredString(minecraft.font, label, centerX, arrowY + 11, 0x80F080);

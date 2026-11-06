@@ -3,6 +3,7 @@ package com.reiko.signaltower.item;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -71,12 +72,13 @@ public class MultiRemoteItem extends Item {
         RemoteButtons buttons = getButtons(stack);
         RemoteButtons updated = buttons.withSelected(buttons.selected() + delta);
         setButtons(stack, updated);
-        player.displayClientMessage(describeSelected(updated), true);
+        player.displayClientMessage(describeSelected(player.level(), updated), true);
     }
 
-    private static Component describeSelected(RemoteButtons buttons) {
+    private static Component describeSelected(Level level, RemoteButtons buttons) {
         RemoteButtons.Button button = buttons.selectedButton();
-        return Component.translatable(KEY + "remote_button_selected", button.label(buttons.selected()), button.frequency(),
+        return Component.translatable(KEY + "remote_button_selected", button.label(buttons.selected()),
+                FrequencyNames.label(level, button.frequency()),
                 RemoteControlItem.describeMode(button.toggle(), button.pulseTicks())).withStyle(ChatFormatting.AQUA);
     }
 
@@ -102,7 +104,7 @@ public class MultiRemoteItem extends Item {
                 RemoteButtons.Button old = buttons.selectedButton();
                 setButtons(stack, buttons.withButton(buttons.selected(), old.withFrequency(radio.getFrequency())));
                 player.displayClientMessage(Component.translatable(KEY + "frequency_copied_button",
-                        radio.getFrequency(), old.label(buttons.selected())), true);
+                        FrequencyNames.label(level, radio.getFrequency()), old.label(buttons.selected())), true);
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -134,7 +136,7 @@ public class MultiRemoteItem extends Item {
             RemoteButtons.Button button = buttons.button(i);
             boolean selected = i == buttons.selected();
             tooltip.add(Component.translatable(prefix + (selected ? "remote_button_line_selected" : "remote_button_line"),
-                    button.label(i), button.frequency(), RemoteControlItem.describeMode(button.toggle(), button.pulseTicks()))
+                    button.label(i), FrequencyNames.label(null, button.frequency()), RemoteControlItem.describeMode(button.toggle(), button.pulseTicks()))
                     .withStyle(selected ? ChatFormatting.AQUA : ChatFormatting.DARK_AQUA));
         }
         tooltip.add(Component.translatable(prefix + "multi_remote_use").withStyle(ChatFormatting.GRAY));

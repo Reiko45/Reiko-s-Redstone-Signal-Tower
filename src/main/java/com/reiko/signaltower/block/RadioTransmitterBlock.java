@@ -3,6 +3,7 @@ package com.reiko.signaltower.block;
 import com.mojang.serialization.MapCodec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -82,7 +83,7 @@ public class RadioTransmitterBlock extends RadioBlock {
                 ? Component.translatable("message." + SignalTower.MOD_ID + ".height_above", height)
                 : Component.translatable("message." + SignalTower.MOD_ID + ".height_below");
         return Component.translatable("message." + SignalTower.MOD_ID + ".transmitter_status",
-                frequency,
+                FrequencyNames.label(level, frequency),
                 RadioHelper.readTransmitterInput(level, pos),
                 heightText,
                 RadioHelper.reachAt(level, pos));

@@ -3,6 +3,7 @@ package com.reiko.signaltower.block;
 import com.mojang.serialization.MapCodec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -43,6 +44,6 @@ public class RadioToggleReceiverBlock extends RadioReceiverBlock {
         Component state1 = on
                 ? Component.translatable(key + "toggle_on").withStyle(ChatFormatting.GREEN)
                 : Component.translatable(key + "toggle_off").withStyle(ChatFormatting.GRAY);
-        return Component.translatable(key + "toggle_status", frequency, state1, reception.power(), reception.transmittersInReach());
+        return Component.translatable(key + "toggle_status", FrequencyNames.label(level, frequency), state1, reception.power(), reception.transmittersInReach());
     }
 }

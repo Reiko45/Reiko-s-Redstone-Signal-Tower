@@ -56,6 +56,21 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![Saving favorites in the tuner's screen, then jumping between them with Sneak + Ctrl + scroll](docs/images/tuner-favorites.png)
 
+**Frequency names:**
+- **Naming one:** give a frequency a name in the Frequency Tuner's screen. Type the frequency, type a name in the **Name** box under it (up to 24 characters), and press Done: "Frequency 2026 is now called Front Gate, for everyone". The box shows the typed frequency's current name; clear it and press Done to remove the name.
+- **Shared:** names belong to the world. Everyone on a server sees the same names, they're saved with the world, and they count in every dimension. Anyone holding a tuner can rename a frequency.
+- **Where they show:** most places a frequency number appears, as "2026 (Front Gate)":
+  - item tooltips (tuner, remotes, pager, radio blocks);
+  - the remote's press message and the pager's alerts, chat log and catch-up lines;
+  - the tuner's "Tuned to" message and the empty-hand readouts;
+  - the scanner's rows ("Front Gate: Repeater, 7 blocks east") and its tracking arrow;
+  - Jade, and the converter screen.
+
+  The Remote Control and pager screens show the typed frequency's name under the title.
+- **Unnamed frequencies:** they show just their number, as before. A world holds up to 4,096 names.
+
+  ![Naming 2026 "Front Gate" in the tuner, and the name in the remote's screen, Jade, the tuner's tooltip, the scanner and a remote press](docs/images/frequency-names.png)
+
 **Remote Control:**
 - Right-click: press the button.
 - Sneak + right-click the air: change its frequency, switch between **Pulse** and **Toggle** (on until you press it again), and set the **pulse length**. Click the length button for longer or sneak-click for shorter: 0.1s, 0.25s, 0.5s, 1s (the default, like a stone button), 1.5s, 2s, 3s, 5s or 10s.
@@ -305,6 +320,8 @@ src/main/java/com/reiko/signaltower/
   radio/SignalNetwork.java               per-dimension list of transmitters, repeaters and remote signals (with relay coverage), saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
+  radio/FrequencyNames.java              frequency names, saved with the world (and the client's synced copy)
+  network/SetFrequencyNamePayload.java, FrequencyNamePayload.java, FrequencyNamesPayload.java  naming, and keeping clients in sync
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
@@ -420,9 +437,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 89. a toggle receiver flips on each time the transmitter turns on and ignores it turning off; its state is saved and loaded back, and Jade shows it;
 90. a weak signal (14) switches it fully on (15);
 91. remote pulses switch it on with one press and off with the next, and the press counts it as heard;
-92. a frequency that's already on when it's placed, or when it's re-tuned to it, isn't a turn-on: it waits for the next one.
+92. a frequency that's already on when it's placed, or when it's re-tuned to it, isn't a turn-on: it waits for the next one;
+93. frequency names are tidied (spaces, formatting codes, length), removed by an empty name, capped at 4,096, saved, and survive the network;
+94. the client's copy of the names is filled by the full list, changed one at a time and cleared on leaving;
+95. naming a frequency only works with a tuner in hand, and the name then shows in the remote's press message, the pager's alert, Jade and the tuner's message; a frequency without a name shows just its number.
 
-All 92 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 95 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

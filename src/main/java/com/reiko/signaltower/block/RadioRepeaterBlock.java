@@ -3,6 +3,7 @@ package com.reiko.signaltower.block;
 import com.mojang.serialization.MapCodec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
+import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -73,7 +74,7 @@ public class RadioRepeaterBlock extends RadioBlock {
         Component repeating = power > 0
                 ? Component.translatable(key + "repeater_repeating", power)
                 : Component.translatable(key + "repeater_quiet");
-        return Component.translatable(key + "repeater_status", frequency, repeating, heightText,
+        return Component.translatable(key + "repeater_status", FrequencyNames.label(level, frequency), repeating, heightText,
                 RadioHelper.reachAt(level, pos));
     }
 

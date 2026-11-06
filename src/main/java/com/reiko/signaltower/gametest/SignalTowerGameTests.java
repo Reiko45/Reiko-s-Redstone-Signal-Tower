@@ -2581,4 +2581,112 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---- Frequency names ----
+
+    /** Names are tidied (spaces, formatting codes, length), removed by an empty name, capped in number, and saved. */
+    @GameTest(template = PLATFORM)
+    public static void frequencyNamesAreCleanedAndSaved(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        com.reiko.signaltower.radio.FrequencyNames names = new com.reiko.signaltower.radio.FrequencyNames();
+        check("Front Gate".equals(names.set(1701, "  Front Gate  ")), "Spaces trimmed");
+        check(!names.set(1702, "§cRed Door").contains("§"), "Formatting codes dropped");
+        check(names.set(1703, "A very long name that goes on and on").length() == com.reiko.signaltower.radio.FrequencyNames.MAX_LENGTH,
+                "Cut to the maximum length");
+        check("".equals(names.set(1702, "   ")) && names.get(1702) == null, "An empty name removes it");
+        check(names.get(1701).equals("Front Gate"), "Kept");
+        var loaded = com.reiko.signaltower.radio.FrequencyNames.load(names.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check("Front Gate".equals(loaded.get(1701)) && loaded.get(1702) == null && loaded.all().size() == 2, "Saved and loaded: " + loaded.all());
+        var full = new com.reiko.signaltower.radio.FrequencyNames();
+        for (int i = 0; i < com.reiko.signaltower.radio.FrequencyNames.MAX_NAMES; i++) {
+            full.set(10_000 + i, "n" + i);
+        }
+        check(full.set(9_999, "one too many") == null, "No more than the maximum number of names");
+        check("renamed".equals(full.set(10_000, "renamed")), "Renaming an existing one is still fine");
+
+        var buffer = Unpooled.buffer();
+        var payload = new com.reiko.signaltower.network.FrequencyNamesPayload(java.util.Map.of(1701, "Front Gate", 42, "Barn"));
+        com.reiko.signaltower.network.FrequencyNamesPayload.STREAM_CODEC.encode(buffer, payload);
+        check(com.reiko.signaltower.network.FrequencyNamesPayload.STREAM_CODEC.decode(buffer).names().equals(payload.names()), "The list survives the network");
+        helper.succeed();
+    }
+
+    /** The client's copy: filled by the server's packets, changed one at a time, cleared on leaving. */
+    @GameTest(template = PLATFORM)
+    public static void frequencyNamesClientCopy(GameTestHelper helper) {
+        com.reiko.signaltower.radio.FrequencyNames.clientReplaceAll(java.util.Map.of(1799, "Shed"));
+        check("Shed".equals(com.reiko.signaltower.radio.FrequencyNames.nameOf(null, 1799)), "From the full list");
+        check(keyOf((Component) com.reiko.signaltower.radio.FrequencyNames.label(null, 1799)).endsWith("named"), "Labels use it");
+        com.reiko.signaltower.radio.FrequencyNames.clientSet(1798, "Barn");
+        com.reiko.signaltower.radio.FrequencyNames.clientSet(1799, "");
+        check(com.reiko.signaltower.radio.FrequencyNames.nameOf(null, 1799) == null
+                && "Barn".equals(com.reiko.signaltower.radio.FrequencyNames.nameOf(null, 1798)), "One change at a time");
+        com.reiko.signaltower.radio.FrequencyNames.clientClear();
+        check(com.reiko.signaltower.radio.FrequencyNames.nameOf(null, 1798) == null, "Cleared on leaving");
+        helper.succeed();
+    }
+
+    /**
+     * Naming a frequency (only while holding a tuner) shows the name in messages built on the
+     * server: the remote's press message, a pager's alert, the tuner's "tuned" message and Jade.
+     * A frequency without a name shows just its number, as before.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void frequencyNameShowsInMessages(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(1, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1704);
+        Player player = mockPlayerAt(helper, new BlockPos(3, 1, 1));
+        check(!com.reiko.signaltower.network.SetFrequencyNamePayload.apply(player,
+                new com.reiko.signaltower.network.SetFrequencyNamePayload(1704, "Front Gate")), "Only with a tuner in hand");
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+        check(com.reiko.signaltower.network.SetFrequencyNamePayload.apply(player,
+                new com.reiko.signaltower.network.SetFrequencyNamePayload(1704, "Front Gate")), "Named with a tuner");
+        check(!com.reiko.signaltower.network.SetFrequencyNamePayload.apply(player,
+                new com.reiko.signaltower.network.SetFrequencyNamePayload(1704, "Front Gate")), "Same name again: nothing changes");
+        check("Front Gate".equals(com.reiko.signaltower.radio.FrequencyNames.nameOf(level, 1704)), "Stored for the world");
+        check(Integer.valueOf(1705).equals(com.reiko.signaltower.radio.FrequencyNames.label(level, 1705)), "No name: just the number");
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    try {
+                        ItemStack remote = new ItemStack(ModRegistry.REMOTE_CONTROL.get());
+                        FrequencyTunerItem.setFrequency(remote, 1704);
+                        var outer = (TranslatableContents) RemoteControlItem.sendSignal(level, player, remote, 1704, false, PulseLength.MIN_TICKS,
+                                SignalNetwork.ownCoverage(player.blockPosition(), 5)).getContents();
+                        var result = (TranslatableContents) ((Component) outer.getArgs()[0]).getContents();
+                        Component freq = (Component) result.getArgs()[1];
+                        check(keyOf(freq).endsWith("named") && freq.getString().equals("1704 (Front Gate)"),
+                                "The press message names it: " + freq.getString());
+
+                        ItemStack pager = pagerFor(player, 1704);
+                        Component alert = PagerItem.checkSignal(level, player, pager);
+                        check(alert != null && alert.getString().contains("1704 (Front Gate)"), "The pager's alert names it: " + alert);
+
+                        CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx));
+                        check(info != null && "Front Gate".equals(info.getString("name")), "Jade's data carries the name");
+                        Component line = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info).get(0);
+                        check(line.getString().equals("Frequency: 1704 (Front Gate)"), "Jade line: " + line.getString());
+
+                        BlockPos rxPos = new BlockPos(6, 1, 1);
+                        place(helper, rxPos, ModRegistry.RADIO_RECEIVER.get(), 1);
+                        ItemStack tuner = player.getMainHandItem();
+                        FrequencyTunerItem.setFrequency(tuner, 1704);
+                        List<Component> bar = new java.util.ArrayList<>();
+                        Player listener = listeningPlayer(helper, new BlockPos(5, 1, 1), bar, new java.util.ArrayList<>());
+                        listener.setItemInHand(InteractionHand.MAIN_HAND, tuner.copy());
+                        BlockPos abs = helper.absolutePos(rxPos);
+                        listener.getMainHandItem().getItem().useOn(new UseOnContext(listener, InteractionHand.MAIN_HAND,
+                                new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false)));
+                        check(!bar.isEmpty() && bar.get(bar.size() - 1).getString().contains("1704 (Front Gate)"),
+                                "The tuner's message names it: " + bar);
+                    } finally {
+                        com.reiko.signaltower.network.SetFrequencyNamePayload.apply(player,
+                                new com.reiko.signaltower.network.SetFrequencyNamePayload(1704, ""));
+                    }
+                    check(com.reiko.signaltower.radio.FrequencyNames.nameOf(level, 1704) == null, "Removed again");
+                })
+                .thenSucceed();
+    }
 }

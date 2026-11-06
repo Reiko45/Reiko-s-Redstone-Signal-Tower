@@ -13,6 +13,9 @@
   - It hears transmitters, remote pulses and latches, and other repeaters, but only signals that trace back to a real transmitter or remote press: two repeaters can't keep each other on.
   - Like a transmitter, it relays remote presses on any frequency when it's within the player's reach (`towersRelayRemotes`).
   - `LIT` block state (light level 7, amber sparks) while repeating. Recipe: Radio Receiver + Radio Transmitter (shapeless).
+- **Frequency names (v0.24.0):**
+  - A frequency can be given a name (up to 24 characters) in the Frequency Tuner's screen. Names belong to the world: shared by every player, saved with it, valid in every dimension. Anyone holding a tuner can change one. At most 4,096 per world.
+  - Shown as "2026 (Front Gate)" wherever a frequency number appears in messages, tooltips, readouts, Jade and the scanner. An unnamed frequency shows just its number, exactly as before.
 - **Radio Toggle Receiver (v0.23.0):**
   - A receiver that flips between off and on (15) each time its frequency turns on where it stands (silent → any strength). Turning off does nothing. It starts off.
   - Placing it, re-tuning it, or loading its chunk while the frequency is on isn't a turn-on. Its state is saved; the dropped item keeps only the frequency.
@@ -122,6 +125,7 @@
 - **Cleanup:** entries whose transmitter (or repeater/converter) block is gone are removed the next time something in range scans.
 - **Dropped items:** the frequency rides on the item as the `reikos_signal_tower:frequency` data component (a converter also carries `output_frequency`). The block entity's `collectImplicitComponents` adds it, and the loot table's `copy_components` copies it onto the drop. `applyImplicitComponents` reads it back when the block is placed.
 - **Tuner:** the screen sends `ConfigureRadioItemPayload` (hand, value, and the remote's mode and pulse length). The server checks the player is holding the right item and clamps the value. Tuning and copying happen in `FrequencyTunerItem.useOn` on the server. Radio blocks return `SKIP_DEFAULT_BLOCK_INTERACTION` for any held item so the tuner's `useOn` runs, and so masts can be placed against them.
+- **Frequency names (v0.24.0):** `radio/FrequencyNames` is `SavedData` in the Overworld's data storage (`reikos_signal_tower_frequency_names`, a compound of frequency → name). `clean` drops characters chat can't show (`StringUtil.filterText`, so formatting codes go), trims and cuts to 24. The tuner screen sends `SetFrequencyNamePayload` on Done when the name box differs from the current name; the server applies it only if the player holds a tuner, then sends `FrequencyNamePayload` to every player. `PlayerLoggedInEvent` sends the whole list (`FrequencyNamesPayload`); `ClientPlayerNetworkEvent.LoggingOut` clears the client's copy. `FrequencyNames.nameOf(level, f)` reads the world's names for a `ServerLevel` and the client's copy otherwise (tooltips pass no level). `FrequencyNames.label(level, f)` is used as a message argument: the plain `Integer` when there's no name (so every message is unchanged), else a `frequency.reikos_signal_tower.named` component "%s (%s)" with the name in aqua. Server-built messages pass their level; `RadioFavorites.scroll` got a level overload for that. Jade's server data carries `name` / `output_name`, since the client copy could be missing. The scanner adds the name in front of a row's source; the remote and pager screens show it in place of the range hint; the converter screen next to its boxes.
 - **Jade (optional, v0.21.0):**
   - `compat/jade/SignalTowerJadePlugin` (`@WailaPlugin`) registers one provider (`reikos_signal_tower:radio`, a toggle in Jade's plugin settings) as both the block data provider and the block component for `RadioBlock` (transmitter, both receivers, repeater, converter) and `RadioMastBlock`. A converter (and a mast under one) shows "Listens on" and "Sends on" instead of "Frequency". Only Jade loads it, so nothing else references Jade's API.
   - The work is in `compat/RadioInfo`, which doesn't touch Jade: `read(ServerLevel, pos)` (server) gathers frequency, power (transmitter input, repeater's resolved strength, receiver output), reach, towers in range (`listen().transmittersInReach()`), and for a mast the block on top of its column, its distance and frequency. It goes into Jade's server data under the key `reikos_signal_tower`. `lines(state, data)` (client) builds the tooltip lines; without server data (Jade missing on the server) it falls back to the block state (`POWERED`, `LIT`, `POWER`).
@@ -130,9 +134,10 @@
 
 ## Verified
 
-- 92 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 95 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
+  - Frequency names: typing "Front Gate" in the tuner screen's Name box for 2026 and pressing Enter said "Frequency 2026 is now called Front Gate, for everyone". Straight away Jade showed "Frequency: 2026 (Front Gate)", a remote press said "pulse sent on frequency 2026 (Front Gate)", the scanner row read "Front Gate: Repeater, 7 blocks east", and the tuner's and remote's tooltips read "Frequency: 2026 (Front Gate)". After closing and restarting the game the names file was in the world's data, and the remote's screen showed "Front Gate" under its title and the tuner's tooltip still had the name (sent again on joining);
   - Radio Toggle Receiver, placed by hand 12 blocks from the demo transmitter with a lamp beside it: tuning it to 2026 with the tuner while 2026 was on left it off (Jade: "Switched off / Hearing: 15 / Towers in range: 2"). Lever off: still off; lever on: "Switched on" and the lamp lit; lever off: still on ("Hearing nothing"). A 2026 remote pulse switched it off and the next one on again; the press message said "Heard by 4 receivers";
   - Radio Converter, added to the repeater demo: placed by hand 20 blocks from the first repeater, it showed in Jade as "Listens on: 1 / Sends on: 1 / Nothing to convert". Right-clicking it opened its screen; typing 2026, Tab, 3001, Enter set it ("Radio Converter: listens on 2026, sends on 3001"), and Jade then said "Converting: 15". A receiver on 3001 about 50 blocks away lit its lamp ("Output: 15 / Towers in range: 1"); the scanner there listed "2,026: Repeater, 16 blocks south-east (+1 more)" and "3,001: Converter, 52 blocks west". A 2026 remote press beside it said "reach 56 blocks + 2 towers + 1 repeater + 1 converter | Heard by 3 receivers". Lever off: the 3001 lamp went out and the converter said "Nothing to convert"; on again: lit;
   - with Jade 15.10.6: looking at the transmitter showed "Frequency: 2026 / Sending: 15 / Reach: 56 blocks", the repeater "Repeating: 15 / Reach: 88 blocks", a mast "Top: Radio Repeater, 3 blocks up / Frequency: 2026", the far receiver "Output: 15 / Towers in range: 2" (with Jade's own "Power" line gone), and a compact receiver on an unused frequency "Output: off / Towers in range: 0". The plugin's switch shows under the mod's name in Jade's Plugin Settings. Without Jade (`-PnoJade`) the game loads normally and the right-click readout works;
@@ -152,6 +157,7 @@
 
 ## History
 
+- **v0.24.0:** frequency names.
 - **v0.23.0:** Radio Toggle Receiver.
 - **v0.22.0:** Radio Converter (frequency converter).
 - **v0.21.0:** Jade tooltip (optional).
@@ -178,7 +184,6 @@
 ## Ideas for later
 
 - Show the frequency on the block (floating text); a WTHIT plugin like the Jade one
-- Named frequencies ("Base Door") as aliases for numbers
 - Receivers that also gain range with height, or terrain blocking the signal
 - Links between dimensions
 - A blinking warning light, or a separate light block for the top of tall towers

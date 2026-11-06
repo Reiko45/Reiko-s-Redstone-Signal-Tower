@@ -9,7 +9,9 @@ import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
+import com.reiko.signaltower.network.SetFrequencyNamePayload;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -54,6 +56,11 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     private @Nullable Boolean pagerSound;
     private boolean pagerChatLog;
     private final Button[] presetButtons = new Button[TunerPresets.COUNT];
+    /** Tuner only: the name of the typed frequency (shared by everyone in the world). */
+    private @Nullable EditBox nameBox;
+    /** True once the player typed in the name box, so changing the frequency doesn't overwrite it. */
+    private boolean nameEdited;
+    private boolean fillingName;
     /** Where things go, worked out in init(). */
     private int top;
     private int inputY;
@@ -89,10 +96,12 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         int centerY = height / 2;
         boolean remote = toggleMode != null;
         boolean optionRow = remote || pagerSound != null;
-        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (presets != null ? 37 : 0) + (optionRow ? 24 : 0) + 20;
+        boolean tuner = !remote && pagerSound == null;
+        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (tuner ? 26 : 0) + (presets != null ? 37 : 0) + (optionRow ? 24 : 0) + 20;
         top = centerY - Math.max(44, contentHeight / 2);
         inputY = top + 34;
-        int y = inputY + 20 + (remote ? 32 : 6);  // under the frequency row (and the remote's two locator lines)
+        // under the frequency row (and the remote's two locator lines, or the tuner's name box)
+        int y = inputY + 20 + (remote ? 32 : 6) + (tuner ? 26 : 0);
 
         input = new EditBox(font, centerX - 50, inputY, 100, 20, Component.translatable(KEY + ".input"));
         input.setMaxLength(Frequency.MAX_DIGITS);
@@ -103,8 +112,22 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             updatePresetButtons();
             scan = null;     // show "checking" until the new frequency's answer arrives
             scanTimer = 5;
+            fillName();
         });
         addRenderableWidget(input);
+
+        if (tuner) {
+            nameBox = new EditBox(font, centerX - 50, inputY + 26, 162, 20, Component.translatable(KEY + ".name"));
+            nameBox.setMaxLength(FrequencyNames.MAX_LENGTH);
+            nameBox.setHint(Component.translatable(KEY + ".name_hint").withStyle(ChatFormatting.DARK_GRAY));
+            nameBox.setResponder(text -> {
+                if (!fillingName) {
+                    nameEdited = true;
+                }
+            });
+            addRenderableWidget(nameBox);
+            fillName();
+        }
 
         addRenderableWidget(nudgeButton(-100, centerX - 112, 32));
         addRenderableWidget(nudgeButton(-1, centerX - 76, 22));
@@ -159,6 +182,17 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         updateDoneButton();
     }
 
+    /** Shows the typed frequency's current name in the name box, until the player types their own. */
+    private void fillName() {
+        if (nameBox == null || nameEdited) {
+            return;
+        }
+        String name = parsed().isPresent() ? FrequencyNames.nameOf(null, parsed().getAsInt()) : null;
+        fillingName = true;
+        nameBox.setValue(name == null ? "" : name);
+        fillingName = false;
+    }
+
     /** Click: use a saved favorite, or save the frequency above into an empty one. Sneak-click: replace. */
     private void pressPreset(int slot) {
         if (presets == null) {
@@ -191,7 +225,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 int frequency = presets.get(i);
                 Component label = Component.literal(Integer.toString(frequency));
                 button.setMessage(frequency == current ? label.copy().withStyle(ChatFormatting.GREEN) : label);
-                button.setTooltip(Tooltip.create(Component.translatable(KEY + ".favorite", i + 1, frequency)));
+                button.setTooltip(Tooltip.create(Component.translatable(KEY + ".favorite", i + 1, FrequencyNames.label(null, frequency))));
             }
         }
     }
@@ -274,6 +308,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 PacketDistributor.sendToServer(new ConfigureRadioItemPayload(
                         offhand, frequency, Boolean.TRUE.equals(toggleMode), pulseTicks));
             }
+            if (nameBox != null) {
+                String typed = FrequencyNames.clean(nameBox.getValue());
+                String current = FrequencyNames.nameOf(null, frequency);
+                if (!typed.equals(current == null ? "" : current)) {
+                    PacketDistributor.sendToServer(new SetFrequencyNamePayload(frequency, typed));
+                }
+            }
             onClose();
         });
     }
@@ -312,8 +353,16 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         super.render(graphics, mouseX, mouseY, partialTick);
         int centerX = width / 2;
         graphics.drawCenteredString(font, title, centerX, top, 0xFFFFFF);
-        graphics.drawCenteredString(font, Component.translatable(KEY + ".range", Frequency.MIN, Frequency.MAX),
+        // The typed frequency's name if it has one (the tuner shows it in its name box instead), else the range.
+        String name = nameBox == null && parsed().isPresent() ? FrequencyNames.nameOf(null, parsed().getAsInt()) : null;
+        graphics.drawCenteredString(font, name != null
+                        ? Component.literal(name).withStyle(ChatFormatting.AQUA)
+                        : Component.translatable(KEY + ".range", Frequency.MIN, Frequency.MAX),
                 centerX, top + 16, 0xA0A0A0);
+        if (nameBox != null) {
+            Component label = Component.translatable(KEY + ".name");
+            graphics.drawString(font, label, centerX - 56 - font.width(label), inputY + 32, 0xFFFFFF);
+        }
         if (toggleMode != null) {
             graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, inputY + 26, 0xFFFFFF);
             graphics.drawCenteredString(font, LocatorText.reachLine(scanned, scanReach, scanTowers), centerX, inputY + 38, 0xFFFFFF);

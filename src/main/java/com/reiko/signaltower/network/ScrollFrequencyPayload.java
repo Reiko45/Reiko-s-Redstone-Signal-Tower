@@ -42,7 +42,7 @@ public record ScrollFrequencyPayload(boolean offhand, boolean up, boolean favori
         if (!RadioFavorites.isScrollable(stack)) {
             return;
         }
-        Component message = RadioFavorites.scroll(stack, payload.up(), payload.favorites());
+        Component message = RadioFavorites.scroll(player.level(), stack, payload.up(), payload.favorites());
         player.displayClientMessage(message, true);
         if (player instanceof ServerPlayer serverPlayer) {
             serverPlayer.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.PLAYERS, 0.35F, payload.up() ? 1.9F : 1.6F);
