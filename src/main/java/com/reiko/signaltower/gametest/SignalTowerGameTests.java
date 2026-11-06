@@ -3161,4 +3161,159 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---- Friend groups ----
+
+    /**
+     * Groups: the owner isn't their own member, members are capped, a claim uses its owner's groups
+     * by name (ignoring case, unknown ones left out) and lets their members send; renaming keeps the
+     * frequencies using it, changing members or deleting the group changes who can send. Everything
+     * survives saving and the network, and the Friends box tells "#groups" from names.
+     */
+    @GameTest(template = PLATFORM)
+    public static void friendGroupsSavedAndSynced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID owner = UUID.randomUUID();
+        UUID alex = UUID.randomUUID();
+        UUID bob = UUID.randomUUID();
+        var claims = new com.reiko.signaltower.radio.FrequencyClaims();
+        java.util.Map<UUID, String> members = new java.util.LinkedHashMap<>();
+        members.put(owner, "Owner");
+        members.put(alex, "Alex");
+        members.put(bob, "Bob");
+        for (int i = 0; i < 40; i++) {
+            members.put(UUID.randomUUID(), "M" + i);
+        }
+        claims.putGroup(owner, null, "Base crew", members);
+        var group = claims.group(owner, "base CREW");
+        check(group != null && group.name().equals("Base crew"), "Found ignoring case");
+        check(group.members().size() == com.reiko.signaltower.radio.FrequencyClaims.MAX_GROUP_MEMBERS
+                && !group.members().containsKey(owner), "Capped, owner left out: " + group.members().size());
+
+        var claim = claims.put(2001, owner, "Owner", java.util.Map.of(), List.of("base crew", "Nope"));
+        check(claim.groups().equals(List.of("Base crew")), "Uses the group by its own name, unknown ones left out: " + claim.groups());
+        check(claims.allows(2001, alex) && claims.allows(2001, bob) && !claims.allows(2001, UUID.randomUUID()), "Members can send");
+        var info = com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.of(claim);
+        check(info.hasMember("alex") && info.usesGroup("BASE CREW") && info.friends().isEmpty(), "What clients are told: " + info.groups());
+
+        var loaded = com.reiko.signaltower.radio.FrequencyClaims.load(claims.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(loaded.allows(2001, alex) && loaded.groupsOf(owner).size() == 1 && loaded.get(2001).groups().equals(List.of("Base crew")),
+                "Saved and loaded");
+
+        var buffer = Unpooled.buffer();
+        var groupsPayload = new com.reiko.signaltower.network.GroupsPayload(claims.groupInfo(owner));
+        com.reiko.signaltower.network.GroupsPayload.STREAM_CODEC.encode(buffer, groupsPayload);
+        check(com.reiko.signaltower.network.GroupsPayload.STREAM_CODEC.decode(buffer).equals(groupsPayload), "Groups survive the network");
+        var claimsPayload = new com.reiko.signaltower.network.FrequencyClaimsPayload(java.util.Map.of(2001, info));
+        com.reiko.signaltower.network.FrequencyClaimsPayload.STREAM_CODEC.encode(buffer, claimsPayload);
+        check(com.reiko.signaltower.network.FrequencyClaimsPayload.STREAM_CODEC.decode(buffer).equals(claimsPayload), "So do claims with groups");
+
+        var affected = claims.putGroup(owner, "Base crew", "Crew", java.util.Map.of(alex, "Alex"));
+        check(affected.equals(java.util.Set.of(2001)), "Renaming changes the frequency using it: " + affected);
+        check(claims.get(2001).groups().equals(List.of("Crew")) && claims.allows(2001, alex) && !claims.allows(2001, bob),
+                "Renamed, and Bob taken off");
+        check(claims.removeGroup(owner, "CREW").equals(java.util.Set.of(2001)), "Deleting it changes the frequency too");
+        check(claims.get(2001).groups().isEmpty() && !claims.allows(2001, alex), "No group, no Alex");
+
+        check(com.reiko.signaltower.radio.FrequencyClaims.friendsText(List.of("Crew"), List.of("Sam")).equals("#Crew, Sam"), "Friends box text");
+        String typed = "#Base crew, Sam Jo, # Night shift ,#base crew";
+        check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.parseGroups(typed).equals(List.of("Base crew", "Night shift")),
+                "Groups: " + com.reiko.signaltower.network.SetFrequencyPrivacyPayload.parseGroups(typed));
+        check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.parseNames(typed).equals(List.of("Sam", "Jo")),
+                "Names: " + com.reiko.signaltower.network.SetFrequencyPrivacyPayload.parseNames(typed));
+        check(com.reiko.signaltower.network.EditGroupPayload.cleanName("  #Night, shift ").equals("Night shift"), "Group names lose # and commas");
+        helper.succeed();
+    }
+
+    /** A group member's transmitter broadcasts on a frequency using the group, and goes quiet when they're taken off. */
+    @GameTest(template = PLATFORM)
+    public static void friendGroupChangesSilenceBlocks(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID owner = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos here = new BlockPos(65_000, 100, 65_000);
+        try {
+            claims.putGroup(owner, null, "Night shift", java.util.Map.of(member, "Member"));
+            claims.put(2002, owner, "Owner", java.util.Map.of(), List.of("Night shift"));
+            network.invalidate(2002);
+            network.updateTransmitter(here, 2002, 6, 30, member);
+            check(network.listen(level, 2002, here.east(5)).power() == 6, "The member's transmitter broadcasts");
+            var affected = claims.putGroup(owner, "Night shift", "Night shift", java.util.Map.of());
+            check(affected.contains(2002), "The frequency is affected: " + affected);
+            network.invalidate(2002);
+            check(network.listen(level, 2002, here.east(5)).power() == 0 && network.isSilenced(level, here), "Taken off: silent at once");
+            claims.putGroup(owner, "Night shift", "Night shift", java.util.Map.of(member, "Member"));
+            network.invalidate(2002);
+            check(network.listen(level, 2002, here.east(5)).power() == 6, "Back in the group: broadcasting again");
+        } finally {
+            claims.remove(2002);
+            claims.removeGroup(owner, "Night shift");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The Groups screen's packet: only with a tuner in hand; a name is needed and can't repeat one
+     * of the player's own; unknown members are reported, offline ones kept by name; renaming carries
+     * the frequencies using it along; the per-player limit; deleting. The Friends box takes
+     * "#group" and reports unknown groups.
+     */
+    @GameTest(template = PLATFORM)
+    public static void editGroupPayloadRules(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        List<Component> chat = new java.util.ArrayList<>();
+        Player alice = namedPlayer(helper, new BlockPos(1, 1, 1), aliceId, "Alice", false, bar, chat);
+        java.util.function.Function<com.reiko.signaltower.network.EditGroupPayload, Boolean> edit =
+                payload -> com.reiko.signaltower.network.EditGroupPayload.apply(alice, payload);
+        try {
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("", "Base crew", "", false)), "Only with a tuner in hand");
+            alice.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+            chat.clear();
+            check(edit.apply(new com.reiko.signaltower.network.EditGroupPayload("", "Base crew", "Zed", false)), "Created");
+            check(lastKey(bar).endsWith("group_created") && claims.group(aliceId, "Base crew").members().isEmpty(), "Empty: " + lastKey(bar));
+            check(lastKey(chat).endsWith("group_members_missing"), "Zed isn't online: " + lastKey(chat));
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("", "BASE CREW", "", false)), "Same name again");
+            check(lastKey(bar).endsWith("group_name_taken"), "Told: " + lastKey(bar));
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("", " #, ", "", false)), "No name");
+            check(lastKey(bar).endsWith("group_name_needed"), "Told: " + lastKey(bar));
+
+            // Alice uses it on a frequency through the Friends box.
+            check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.apply(alice,
+                    new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2003, true, "#base crew, #Nope")), "Private with a group");
+            check(claims.get(2003).groups().equals(List.of("Base crew")), "Uses it: " + claims.get(2003).groups());
+            check(lastKey(chat).endsWith("private_no_group") && chat.get(chat.size() - 1).getString().contains("Nope"), "Nope reported: " + lastKey(chat));
+
+            // Bob is a member already (as if added while online); he's kept by name while offline.
+            claims.putGroup(aliceId, "Base crew", "Base crew", java.util.Map.of(bobId, "Bob"));
+            check(claims.allows(2003, bobId), "Bob can send on 2003");
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("Base crew", "Base crew", "bob", false)), "Unchanged");
+            check(edit.apply(new com.reiko.signaltower.network.EditGroupPayload("Base crew", "Crew", "bob", false)), "Renamed");
+            check(claims.get(2003).groups().equals(List.of("Crew")) && claims.allows(2003, bobId), "2003 follows the new name");
+            check(edit.apply(new com.reiko.signaltower.network.EditGroupPayload("Crew", "Crew", "", false)), "Bob taken off");
+            check(!claims.allows(2003, bobId) && lastKey(bar).endsWith("group_saved"), "Bob can't send now: " + lastKey(bar));
+
+            for (int i = claims.groupsOf(aliceId).size(); i < com.reiko.signaltower.radio.FrequencyClaims.MAX_GROUPS; i++) {
+                claims.putGroup(aliceId, null, "Extra " + i, java.util.Map.of());
+            }
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("", "One too many", "", false)), "Over the limit");
+            check(lastKey(bar).endsWith("group_limit"), "Told: " + lastKey(bar));
+
+            check(edit.apply(new com.reiko.signaltower.network.EditGroupPayload("Crew", "", "", true)), "Deleted");
+            check(lastKey(bar).endsWith("group_deleted") && claims.group(aliceId, "Crew") == null && claims.get(2003).groups().isEmpty(),
+                    "Gone, and 2003 doesn't use it: " + lastKey(bar));
+            check(!edit.apply(new com.reiko.signaltower.network.EditGroupPayload("Crew", "", "", true)), "Already gone");
+        } finally {
+            claims.remove(2003);
+            for (var group : claims.groupsOf(aliceId)) {
+                claims.removeGroup(aliceId, group.name());
+            }
+        }
+        helper.succeed();
+    }
 }

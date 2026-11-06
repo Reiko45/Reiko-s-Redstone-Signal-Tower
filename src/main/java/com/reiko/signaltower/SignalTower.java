@@ -9,10 +9,12 @@ import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.DirectoryRequestPayload;
 import com.reiko.signaltower.network.DirectoryResultPayload;
+import com.reiko.signaltower.network.EditGroupPayload;
 import com.reiko.signaltower.network.FrequencyClaimPayload;
 import com.reiko.signaltower.network.FrequencyClaimsPayload;
 import com.reiko.signaltower.network.FrequencyNamePayload;
 import com.reiko.signaltower.network.FrequencyNamesPayload;
+import com.reiko.signaltower.network.GroupsPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
@@ -96,6 +98,8 @@ public final class SignalTower {
                 FrequencyNamePayload::handle);
         registrar.playToClient(FrequencyNamesPayload.TYPE, FrequencyNamesPayload.STREAM_CODEC,
                 FrequencyNamesPayload::handle);
+        registrar.playToServer(EditGroupPayload.TYPE, EditGroupPayload.STREAM_CODEC, EditGroupPayload::handle);
+        registrar.playToClient(GroupsPayload.TYPE, GroupsPayload.STREAM_CODEC, GroupsPayload::handle);
         registrar.playToServer(DirectoryRequestPayload.TYPE, DirectoryRequestPayload.STREAM_CODEC,
                 DirectoryRequestPayload::handle);
         registrar.playToClient(DirectoryResultPayload.TYPE, DirectoryResultPayload.STREAM_CODEC,
@@ -122,13 +126,14 @@ public final class SignalTower {
     }
 
     /**
-     * The player gets the world's frequency names and private frequencies, and pagers say what
-     * turned on while their owner was away.
+     * The player gets the world's frequency names and private frequencies, and their own friend
+     * groups, and pagers say what turned on while their owner was away.
      */
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             PacketDistributor.sendToPlayer(player, new FrequencyNamesPayload(FrequencyNames.get(player.server).all()));
             PacketDistributor.sendToPlayer(player, new FrequencyClaimsPayload(FrequencyClaims.get(player.server).allInfo()));
+            PacketDistributor.sendToPlayer(player, new GroupsPayload(FrequencyClaims.get(player.server).groupInfo(player.getUUID())));
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.
             boolean worldRan = !player.server.isSingleplayerOwner(player.getGameProfile());
             PagerItem.catchUp(player.serverLevel(), player, worldRan);

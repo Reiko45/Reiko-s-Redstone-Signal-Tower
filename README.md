@@ -83,10 +83,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Claiming fairly:** you can't make a frequency private while other players' transmitters, repeaters or converters send on it ("other players' blocks already send on it"). Pick one nobody else uses.
 - **Older blocks:** blocks tuned before version 0.25 don't know who tuned them, so they keep working on a private frequency. Tune one again to make it yours.
 - **Who can change it:** only the owner can change the friends or make it public again (click **Private: On** so it says Off, then Done). Server operators can make anyone's private frequency public the same way. Other players see the button greyed out: "Private to Dev: you can't send on it".
+- **Friend groups:** click **Groups** next to the Friends box to manage your own named lists of players, like "Base crew".
+  - In the Groups screen, click **+ New group**, type a name and its members (separated by commas), and press **Save**: "Group Base crew created with 1 member". Pick a group on the left to change it; **Delete** (click twice) removes it.
+  - Use a group on a frequency by typing `#Base crew` in the Friends box (on its own, or with single names: `#Base crew, Alex`), or click **Use here** in the Groups screen to add it to the frequency in the tuner. Done: "only you and #Base crew can send on it".
+  - Changing a group changes every frequency using it at once: add someone and they can send on all of them; take them out and their blocks on all of them go silent. The Groups screen shows which frequencies use the selected group ("Used by: 2026 (Front Gate), 4242 (Vault)"). Renaming a group keeps it on those frequencies; deleting it takes its members off them.
+  - Members must be online the first time you add them, like friends. Up to 16 groups per player, 32 members per group, and 4 groups per frequency.
 - **Limits:** up to 32 private frequencies per player (`privateFrequenciesPerPlayer` in the server config; 0 turns the feature off), and 4,096 per world.
 - **Jade** shows "Private to Dev" on a private frequency's blocks, and "Silent: private to Dev" on ones kept quiet. The empty-hand readout and the converter's screen also say when a block is kept quiet.
 
   ![Dev adding Steve as a friend on private frequency 2026; Steve's tuner screen before that ("Private to Dev: you can't send on it"); Jade on a friend's and on a silenced transmitter; and the messages for claiming, a refused remote press, a refused tuning and a silent placement](docs/images/private-frequencies.png)
+
+  ![Dev's Groups screen with "Base crew" (Steve), used by 2026 and 4242; Steve's tuner on 4242 ("Private to Dev: you're a friend, so you can send"); and the messages: 4242 made private for #Base crew, Steve's press working, and refused once Dev took him out of the group](docs/images/friend-groups.png)
 
 **Frequency directory:**
 - **Opening it:** click **Directory** in the Frequency Tuner's, Remote Control's or Radio Pager's screen (between Done and Cancel). It lists every named and private frequency in the world, in order.
@@ -355,6 +362,8 @@ src/main/java/com/reiko/signaltower/
   network/SetFrequencyNamePayload.java, FrequencyNamePayload.java, FrequencyNamesPayload.java  naming, and keeping clients in sync
   radio/FrequencyClaims.java             private frequencies: owners and friends, saved with the world (and the client's synced copy)
   network/SetFrequencyPrivacyPayload.java, FrequencyClaimPayload.java, FrequencyClaimsPayload.java  the Private button and Friends box, and keeping clients in sync
+  client/GroupsScreen.java               the friend groups screen
+  network/EditGroupPayload.java, GroupsPayload.java  saving a friend group, and sending a player their groups
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
@@ -483,9 +492,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 100. a stranger can't tune a transmitter or converter onto a private frequency (a receiver is fine), a block they place with it stays silent and says so (readout and Jade), and whoever tunes or places a block becomes its tuner, saved with it;
 101. the directory's answer survives the network, and each entry knows whether it's hidden and whether it's on;
 102. "strongest anywhere" counts transmitters far from everything, leaves out silenced ones, and counts converters sending on the frequency and remote toggles;
-103. the directory answers only players holding a radio item, lists named and private frequencies in order, hides someone else's private frequency except for what's heard where the player stands, and shows a player's own, a public one and one they're a friend on.
+103. the directory answers only players holding a radio item, lists named and private frequencies in order, hides someone else's private frequency except for what's heard where the player stands, and shows a player's own, a public one and one they're a friend on;
+104. friend groups leave out their owner and cap their members; a claim uses its owner's groups by name (ignoring case, unknown ones left out) and lets their members send; renaming carries the frequencies along, changing members or deleting the group changes who can send; all of it survives saving and the network; the Friends box tells "#groups" from names;
+105. a group member's transmitter broadcasts on a frequency using the group, goes silent as soon as they're taken out, and comes back when they're put back;
+106. the Groups screen's packet needs a tuner in hand and a name that isn't already one of the player's groups; unknown members are reported and offline ones kept by name; renaming carries a frequency along; the per-player limit; deleting; and the Friends box takes "#group" and reports unknown ones.
 
-All 103 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 106 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

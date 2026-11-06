@@ -171,7 +171,7 @@ public class DirectoryScreen extends Screen {
 
     private boolean friendOf(FrequencyClaims.ClaimInfo claim) {
         return minecraft != null && minecraft.player != null
-                && claim.friends().stream().anyMatch(n -> n.equalsIgnoreCase(minecraft.player.getGameProfile().getName()));
+                && claim.hasMember(minecraft.player.getGameProfile().getName());
     }
 
     /** A status answer arrived. */
@@ -241,9 +241,9 @@ public class DirectoryScreen extends Screen {
             return Component.translatable(KEY + "public").withStyle(ChatFormatting.GRAY);
         }
         if (mine(claim)) {
-            return claim.friends().isEmpty()
+            return claim.members().isEmpty()
                     ? Component.translatable(KEY + "yours").withStyle(ChatFormatting.GOLD)
-                    : Component.translatable(KEY + "yours_friends", claim.friends().size()).withStyle(ChatFormatting.GOLD);
+                    : Component.translatable(KEY + "yours_friends", claim.members().size()).withStyle(ChatFormatting.GOLD);
         }
         return friendOf(claim)
                 ? Component.translatable(KEY + "friend", claim.ownerName()).withStyle(ChatFormatting.GOLD)
@@ -280,8 +280,11 @@ public class DirectoryScreen extends Screen {
         } else if (mine(claim) || friendOf(claim)) {
             lines.add(Component.translatable(mine(claim) ? KEY + "tip_yours" : KEY + "tip_friend", claim.ownerName())
                     .withStyle(ChatFormatting.GOLD));
-            if (!claim.friends().isEmpty()) {
-                lines.add(Component.translatable(KEY + "tip_friends", String.join(", ", claim.friends())).withStyle(ChatFormatting.GRAY));
+            if (!claim.groups().isEmpty()) {
+                lines.add(Component.translatable(KEY + "tip_groups", String.join(", ", claim.groups())).withStyle(ChatFormatting.GRAY));
+            }
+            if (!claim.members().isEmpty()) {
+                lines.add(Component.translatable(KEY + "tip_friends", String.join(", ", claim.members())).withStyle(ChatFormatting.GRAY));
             }
         } else {
             lines.add(Component.translatable(KEY + "tip_other", claim.ownerName()).withStyle(ChatFormatting.RED));

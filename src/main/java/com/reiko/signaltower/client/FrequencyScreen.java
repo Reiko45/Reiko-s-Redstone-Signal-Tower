@@ -26,6 +26,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.List;
+
 /**
  * Type a frequency for the Frequency Tuner, Remote Control or Radio Pager (plus the remote's mode).
  * Enter or Done saves it, Escape cancels. All three get a row of favorites: click an empty one to
@@ -74,6 +76,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     private boolean fillingPrivacy;
     /** A frequency picked in the directory, used when this screen is shown again. */
     private @Nullable Integer picked;
+    /** A group chosen with Use here in the Groups screen, added to the Friends box when this screen is shown again. */
+    private @Nullable String pickedGroup;
     /** Where things go, worked out in init(). */
     private int top;
     private int inputY;
@@ -167,7 +171,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 updatePrivacyWidgets();
             }).tooltip(Tooltip.create(Component.translatable(KEY + ".private_tooltip")))
                     .bounds(centerX - 112, inputY + 50, 76, 20).build());
-            friendsBox = new EditBox(font, centerX - 32, inputY + 50, 144, 20, Component.translatable(KEY + ".friends"));
+            friendsBox = new EditBox(font, centerX - 32, inputY + 50, 98, 20, Component.translatable(KEY + ".friends"));
             friendsBox.setMaxLength(SetFrequencyPrivacyPayload.MAX_FRIENDS_TEXT);
             friendsBox.setHint(Component.translatable(KEY + ".friends_hint").withStyle(ChatFormatting.DARK_GRAY));
             friendsBox.setTooltip(Tooltip.create(Component.translatable(KEY + ".friends_tooltip", FrequencyClaims.MAX_FRIENDS)));
@@ -177,6 +181,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 }
             });
             addRenderableWidget(friendsBox);
+            addRenderableWidget(Button.builder(Component.translatable(KEY + ".groups"), button -> openGroups())
+                    .tooltip(Tooltip.create(Component.translatable(KEY + ".groups_tooltip")))
+                    .bounds(centerX + 70, inputY + 50, 42, 20).build());
             fillPrivacy();
             if (keepFriends != null) {
                 fillingPrivacy = true;
@@ -184,6 +191,23 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 fillingPrivacy = false;
                 updatePrivacyWidgets();
             }
+            FrequencyClaims.ClaimInfo claim = claim();
+            if (pickedGroup != null && (claim == null || mine(claim))) {
+                // Use here in the Groups screen: add "#name" to the Friends box, and make it private.
+                List<String> groups = SetFrequencyPrivacyPayload.parseGroups(friendsBox.getValue());
+                if (groups.stream().noneMatch(g -> g.equalsIgnoreCase(pickedGroup))) {
+                    groups = new java.util.ArrayList<>(groups);
+                    groups.add(pickedGroup);
+                }
+                fillingPrivacy = true;
+                friendsBox.setValue(FrequencyClaims.friendsText(groups, SetFrequencyPrivacyPayload.parseNames(friendsBox.getValue())));
+                friendsBox.moveCursorToStart(false);
+                fillingPrivacy = false;
+                privateOn = true;
+                privacyEdited = true;
+                updatePrivacyWidgets();
+            }
+            pickedGroup = null;
         }
 
         addRenderableWidget(nudgeButton(-100, centerX - 112, 32));
@@ -281,7 +305,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             privacyEdited = false;
             privateOn = claim != null;
             fillingPrivacy = true;
-            friendsBox.setValue(claim == null ? "" : String.join(", ", claim.friends()));
+            friendsBox.setValue(claim == null ? "" : FrequencyClaims.friendsText(claim.groups(), claim.friends()));
+            friendsBox.moveCursorToStart(false); // so a long list shows its start
             fillingPrivacy = false;
         }
         updatePrivacyWidgets();
@@ -304,8 +329,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     }
 
     private boolean isFriend(FrequencyClaims.ClaimInfo claim) {
-        return minecraft != null && minecraft.player != null
-                && claim.friends().stream().anyMatch(n -> n.equalsIgnoreCase(minecraft.player.getGameProfile().getName()));
+        return minecraft != null && minecraft.player != null && claim.hasMember(minecraft.player.getGameProfile().getName());
     }
 
     /** True if Done should send the Private button and Friends box: they differ from the frequency's claim. */
@@ -316,11 +340,15 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         if (claim == null || !mine(claim)) {
             return false;
         }
-        java.util.Set<String> typed = new java.util.HashSet<>();
-        SetFrequencyPrivacyPayload.parseNames(friendsBox.getValue()).forEach(n -> typed.add(n.toLowerCase(java.util.Locale.ROOT)));
-        java.util.Set<String> current = new java.util.HashSet<>();
-        claim.friends().forEach(n -> current.add(n.toLowerCase(java.util.Locale.ROOT)));
-        return !typed.equals(current);
+        String text = friendsBox.getValue();
+        return !lower(SetFrequencyPrivacyPayload.parseNames(text)).equals(lower(claim.friends()))
+                || !lower(SetFrequencyPrivacyPayload.parseGroups(text)).equals(lower(claim.groups()));
+    }
+
+    private static java.util.Set<String> lower(List<String> names) {
+        java.util.Set<String> set = new java.util.HashSet<>();
+        names.forEach(n -> set.add(n.toLowerCase(java.util.Locale.ROOT)));
+        return set;
     }
 
     /** The line under the Private button: who can send on the typed frequency, or what Done will change. */
@@ -335,11 +363,11 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             return Component.translatable(key + "public").withStyle(ChatFormatting.GRAY);
         }
         if (mine(claim)) {
-            return claim.friends().isEmpty()
+            return claim.members().isEmpty()
                     ? Component.translatable(key + "mine").withStyle(ChatFormatting.GOLD)
-                    : claim.friends().size() == 1
+                    : claim.members().size() == 1
                     ? Component.translatable(key + "mine_one_friend").withStyle(ChatFormatting.GOLD)
-                    : Component.translatable(key + "mine_friends", claim.friends().size()).withStyle(ChatFormatting.GOLD);
+                    : Component.translatable(key + "mine_friends", claim.members().size()).withStyle(ChatFormatting.GOLD);
         }
         return isFriend(claim)
                 ? Component.translatable(key + "friend", claim.ownerName()).withStyle(ChatFormatting.GOLD)
@@ -434,6 +462,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         return value >= Frequency.MIN && value <= Frequency.MAX
                 ? java.util.OptionalInt.of((int) value)
                 : java.util.OptionalInt.empty();
+    }
+
+    /** Opens the player's friend groups; Use here there adds the group to the Friends box. */
+    private void openGroups() {
+        if (minecraft != null) {
+            minecraft.setScreen(new GroupsScreen(this, name -> pickedGroup = name));
+        }
     }
 
     /** Opens the frequency directory; a frequency clicked there comes back into the box. */

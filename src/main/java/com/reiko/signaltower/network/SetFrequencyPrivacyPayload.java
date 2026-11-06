@@ -56,16 +56,82 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
         apply(context.player(), payload);
     }
 
-    /** The names in a friends list as typed: split on commas and spaces, without repeats (ignoring case). */
+    /**
+     * The player names in a friends list as typed: split on commas and spaces, without repeats
+     * (ignoring case). Group references ("#Base crew") are left out; see {@link #parseGroups}.
+     */
     public static List<String> parseNames(String text) {
         List<String> names = new ArrayList<>();
-        for (String part : text.split("[,\\s]+")) {
-            String name = part.strip();
-            if (!name.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(name))) {
-                names.add(name);
+        for (String part : text.split(",")) {
+            if (part.strip().startsWith("#")) {
+                continue;
+            }
+            for (String word : part.split("\\s+")) {
+                String name = word.strip();
+                if (!name.isEmpty() && names.stream().noneMatch(n -> n.equalsIgnoreCase(name))) {
+                    names.add(name);
+                }
             }
         }
         return names;
+    }
+
+    /** The group names in a friends list as typed: each comma-separated part starting with "#", without repeats. */
+    public static List<String> parseGroups(String text) {
+        List<String> groups = new ArrayList<>();
+        for (String part : text.split(",")) {
+            String trimmed = part.strip();
+            if (trimmed.startsWith("#")) {
+                String name = trimmed.substring(1).strip();
+                if (!name.isEmpty() && groups.stream().noneMatch(n -> n.equalsIgnoreCase(name))) {
+                    groups.add(name);
+                }
+            }
+        }
+        return groups;
+    }
+
+    /** Players found for a list of names: who they are, which names weren't found, and whether some didn't fit. */
+    public record Resolved(Map<UUID, String> players, List<String> missing, boolean tooMany) {}
+
+    /**
+     * Finds players by name for {@code owner}'s friends or group: someone online now by that name,
+     * or someone in {@code known} (already a friend or member, kept by UUID, so they needn't be
+     * online). The owner's own name is skipped; at most {@code max} are kept.
+     */
+    public static Resolved resolve(MinecraftServer server, Player owner, List<String> names, Map<UUID, String> known, int max) {
+        Map<UUID, String> players = new LinkedHashMap<>();
+        List<String> missing = new ArrayList<>();
+        boolean tooMany = false;
+        for (String name : names) {
+            if (name.equalsIgnoreCase(owner.getGameProfile().getName())) {
+                continue; // the owner isn't their own friend
+            }
+            UUID uuid = null;
+            String found = name;
+            ServerPlayer online = server.getPlayerList().getPlayerByName(name);
+            if (online != null) {
+                uuid = online.getUUID();
+                found = online.getGameProfile().getName();
+            } else {
+                for (Map.Entry<UUID, String> entry : known.entrySet()) {
+                    if (entry.getValue().equalsIgnoreCase(name)) {
+                        uuid = entry.getKey();
+                        found = entry.getValue();
+                    }
+                }
+            }
+            if (uuid == null) {
+                missing.add(name);
+            } else if (!uuid.equals(owner.getUUID()) && !players.containsKey(uuid)) {
+                if (players.size() >= max) {
+                    tooMany = true;
+                } else {
+                    players.put(uuid, found);
+                }
+            }
+        }
+        return new Resolved(players, missing, tooMany);
     }
 
     /**
@@ -124,36 +190,32 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
         }
 
         // Friends: players online now by that name, or friends it already has (kept by UUID, so they needn't be online).
-        Map<UUID, String> friends = new LinkedHashMap<>();
-        List<String> missing = new ArrayList<>();
-        boolean tooMany = false;
-        for (String name : parseNames(payload.friends())) {
-            if (name.equalsIgnoreCase(player.getGameProfile().getName())) {
-                continue; // the owner isn't their own friend
+        Resolved resolved = resolve(server, player, parseNames(payload.friends()),
+                claim == null ? Map.of() : claim.friends(), FrequencyClaims.MAX_FRIENDS);
+        Map<UUID, String> friends = resolved.players();
+        List<String> missing = resolved.missing();
+        boolean tooMany = resolved.tooMany();
+        // Groups: the player's own groups, by name ("#Base crew").
+        List<String> groups = new ArrayList<>();
+        List<String> unknownGroups = new ArrayList<>();
+        boolean tooManyGroups = false;
+        for (String name : parseGroups(payload.friends())) {
+            FrequencyClaims.Group group = claims.group(player.getUUID(), name);
+            if (group == null) {
+                unknownGroups.add(name);
+            } else if (groups.size() >= FrequencyClaims.MAX_GROUPS_PER_CLAIM) {
+                tooManyGroups = true;
+            } else {
+                groups.add(group.name());
             }
-            UUID uuid = null;
-            String found = name;
-            ServerPlayer online = server.getPlayerList().getPlayerByName(name);
-            if (online != null) {
-                uuid = online.getUUID();
-                found = online.getGameProfile().getName();
-            } else if (claim != null) {
-                for (Map.Entry<UUID, String> friend : claim.friends().entrySet()) {
-                    if (friend.getValue().equalsIgnoreCase(name)) {
-                        uuid = friend.getKey();
-                        found = friend.getValue();
-                    }
-                }
-            }
-            if (uuid == null) {
-                missing.add(name);
-            } else if (!uuid.equals(player.getUUID()) && !friends.containsKey(uuid)) {
-                if (friends.size() >= FrequencyClaims.MAX_FRIENDS) {
-                    tooMany = true;
-                } else {
-                    friends.put(uuid, found);
-                }
-            }
+        }
+        if (!unknownGroups.isEmpty()) {
+            player.displayClientMessage(Component.translatable(key + "private_no_group",
+                    String.join(", ", unknownGroups)).withStyle(ChatFormatting.YELLOW), false);
+        }
+        if (tooManyGroups) {
+            player.displayClientMessage(Component.translatable(key + "private_too_many_groups",
+                    FrequencyClaims.MAX_GROUPS_PER_CLAIM).withStyle(ChatFormatting.YELLOW), false);
         }
 
         if (claim == null) {
@@ -163,17 +225,17 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
                 tell(player, Component.translatable(key + "private_in_use", label, others).withStyle(ChatFormatting.RED));
                 return false;
             }
-        } else if (claim.friends().equals(friends)) {
+        } else if (claim.friends().equals(friends) && claim.groups().equals(groups)) {
             reportFriends(player, key, missing, tooMany);
             return false;
         }
 
-        FrequencyClaims.Claim stored = claims.put(frequency, player.getUUID(), player.getGameProfile().getName(), friends);
+        FrequencyClaims.Claim stored = claims.put(frequency, player.getUUID(), player.getGameProfile().getName(), friends, groups);
         changed(server, frequency, stored);
-        tell(player, stored.friends().isEmpty()
+        tell(player, stored.friends().isEmpty() && stored.groups().isEmpty()
                 ? Component.translatable(key + "private_set", label).withStyle(ChatFormatting.GOLD)
                 : Component.translatable(key + "private_set_friends", label,
-                        String.join(", ", stored.friendNames())).withStyle(ChatFormatting.GOLD));
+                        FrequencyClaims.friendsText(stored.groups(), stored.friendNames())).withStyle(ChatFormatting.GOLD));
         reportFriends(player, key, missing, tooMany);
         return true;
     }
