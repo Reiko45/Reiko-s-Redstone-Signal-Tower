@@ -22,3 +22,11 @@ description = '''${mod_description}'''
     versionRange = "${minecraft_version_range}"
     ordering = "NONE"
     side = "BOTH"
+
+# Optional: Jade shows radio blocks' frequency, signal and reach. Only checked if Jade is installed.
+[[dependencies.${mod_id}]]
+    modId = "jade"
+    type = "optional"
+    versionRange = "[15.0,)"
+    ordering = "NONE"
+    side = "BOTH"

@@ -169,5 +169,19 @@
   "reikos_signal_tower.configuration.baseReach": "Base reach",
   "reikos_signal_tower.configuration.reachPerBlockOfHeight": "Reach per block of height",
   "reikos_signal_tower.configuration.maxReach": "Max reach (0 = no limit)",
-  "reikos_signal_tower.configuration.towersRelayRemotes": "Transmitters and repeaters relay remote presses"
+  "reikos_signal_tower.configuration.towersRelayRemotes": "Transmitters and repeaters relay remote presses",
+  "config.jade.plugin_reikos_signal_tower.radio": "Radio frequency, signal, reach",
+  "jade.reikos_signal_tower.frequency": "Frequency: %s",
+  "jade.reikos_signal_tower.sending": "Sending: %s",
+  "jade.reikos_signal_tower.sending_nothing": "Sending: nothing",
+  "jade.reikos_signal_tower.broadcasting": "Broadcasting",
+  "jade.reikos_signal_tower.repeating": "Repeating: %s",
+  "jade.reikos_signal_tower.repeating_on": "Repeating",
+  "jade.reikos_signal_tower.repeating_nothing": "Nothing to repeat",
+  "jade.reikos_signal_tower.output": "Output: %s",
+  "jade.reikos_signal_tower.output_off": "Output: off",
+  "jade.reikos_signal_tower.towers": "Towers in range: %s",
+  "jade.reikos_signal_tower.reach": "Reach: %s blocks",
+  "jade.reikos_signal_tower.mast_top": "Top: %s, %s blocks up",
+  "jade.reikos_signal_tower.mast_no_top": "No transmitter or repeater on top"
 }

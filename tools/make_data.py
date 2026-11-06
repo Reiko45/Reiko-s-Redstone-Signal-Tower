@@ -501,6 +501,21 @@ write(ASSETS / "lang" / "en_us.json", {
     f"{MOD}.configuration.reachPerBlockOfHeight": "Reach per block of height",
     f"{MOD}.configuration.maxReach": "Max reach (0 = no limit)",
     f"{MOD}.configuration.towersRelayRemotes": "Transmitters and repeaters relay remote presses",
+    # Jade integration (shown when looking at a block, if Jade is installed)
+    f"config.jade.plugin_{MOD}.radio": "Radio frequency, signal, reach",
+    f"jade.{MOD}.frequency": "Frequency: %s",
+    f"jade.{MOD}.sending": "Sending: %s",
+    f"jade.{MOD}.sending_nothing": "Sending: nothing",
+    f"jade.{MOD}.broadcasting": "Broadcasting",
+    f"jade.{MOD}.repeating": "Repeating: %s",
+    f"jade.{MOD}.repeating_on": "Repeating",
+    f"jade.{MOD}.repeating_nothing": "Nothing to repeat",
+    f"jade.{MOD}.output": "Output: %s",
+    f"jade.{MOD}.output_off": "Output: off",
+    f"jade.{MOD}.towers": "Towers in range: %s",
+    f"jade.{MOD}.reach": "Reach: %s blocks",
+    f"jade.{MOD}.mast_top": "Top: %s, %s blocks up",
+    f"jade.{MOD}.mast_no_top": "No transmitter or repeater on top",
 })
 
 # ---------------------------------------------------------------- recipes

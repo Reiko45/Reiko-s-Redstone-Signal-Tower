@@ -10,6 +10,33 @@ group = mod_group_id
 
 repositories {
     mavenLocal()
+    // Modrinth's maven, only for the optional Jade integration.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter { includeGroup 'maven.modrinth' }
+    }
+}
+
+// Dependencies that are only on the classpath of the dev runs (client, server, game tests),
+// never required by the built mod.
+configurations {
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    // Jade is optional: the tooltip plugin in compat/jade is compiled against it and only loaded by
+    // Jade itself, so the mod works the same without it. Jade is in the dev runs for testing;
+    // run with -PnoJade (for example ./gradlew runGameTestServer -PnoJade) to leave it out.
+    compileOnly "maven.modrinth:jade:${jade_version}"
+    if (!project.hasProperty('noJade')) {
+        localRuntime "maven.modrinth:jade:${jade_version}"
+    }
 }
 
 base {

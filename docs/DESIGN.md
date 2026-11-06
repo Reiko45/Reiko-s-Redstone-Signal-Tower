@@ -110,11 +110,18 @@
 - **Dropped items:** the frequency rides on the item as the `reikos_signal_tower:frequency` data component. The block entity's `collectImplicitComponents` adds it, and the loot table's `copy_components` copies it onto the drop. `applyImplicitComponents` reads it back when the block is placed.
 - **Tuner:** the screen sends `SetTunerFrequencyPayload` (hand + value). The server checks the player is holding a tuner and clamps the value. Tuning and copying happen in `FrequencyTunerItem.useOn` on the server. Radio blocks return `SKIP_DEFAULT_BLOCK_INTERACTION` for any held item so the tuner's `useOn` runs, and so masts can be placed against them.
 
+- **Jade (optional, v0.21.0):**
+  - `compat/jade/SignalTowerJadePlugin` (`@WailaPlugin`) registers one provider (`reikos_signal_tower:radio`, a toggle in Jade's plugin settings) as both the block data provider and the block component for `RadioBlock` (transmitter, both receivers, repeater) and `RadioMastBlock`. Only Jade loads it, so nothing else references Jade's API.
+  - The work is in `compat/RadioInfo`, which doesn't touch Jade: `read(ServerLevel, pos)` (server) gathers frequency, power (transmitter input, repeater's resolved strength, receiver output), reach, towers in range (`listen().transmittersInReach()`), and for a mast the block on top of its column, its distance and frequency. It goes into Jade's server data under the key `reikos_signal_tower`. `lines(state, data)` (client) builds the tooltip lines; without server data (Jade missing on the server) it falls back to the block state (`POWERED`, `LIT`, `POWER`).
+  - Priority 100, after Jade's own body lines, so for receivers it removes Jade's generic "Power: N" redstone line (`JadeIds.MC_REDSTONE`) and shows "Output" instead. Jade tags each line with the provider that added it, which is what makes that removal work.
+  - Build: `compileOnly` and `localRuntime` (dev runs only) on `maven.modrinth:jade:15.10.6+neoforge` from Modrinth's maven (`exclusiveContent`, group `maven.modrinth` only). `-PnoJade` drops it from the dev runs. `neoforge.mods.toml` lists Jade as an optional dependency, `[15.0,)`.
+
 ## Verified
 
-- 79 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 81 GameTests pass (`./gradlew runGameTestServer`), with Jade and with `-PnoJade`. They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
+  - with Jade 15.10.6: looking at the transmitter showed "Frequency: 2026 / Sending: 15 / Reach: 56 blocks", the repeater "Repeating: 15 / Reach: 88 blocks", a mast "Top: Radio Repeater, 3 blocks up / Frequency: 2026", the far receiver "Output: 15 / Towers in range: 2" (with Jade's own "Power" line gone), and a compact receiver on an unused frequency "Output: off / Towers in range: 0". The plugin's switch shows under the mod's name in Jade's Plugin Settings. Without Jade (`-PnoJade`) the game loads normally and the right-click readout works;
   - repeater chain in a superflat world: a ground transmitter (reach 56) with a lever, a repeater on 4 masts 50 blocks away (reach 88) and a receiver with a lamp 130 blocks from the transmitter. Flipping the lever lit the repeater ("Repeating 15 | 7 blocks above sea level | Reach 88 blocks") and the far lamp ("Output 15 | Towers in range: 1"); the scanner there said "Repeater, 78 blocks west" and tracked it ("78 blocks, 4 up"). A second repeater placed by hand from its item (keeping frequency 2026) 85 blocks further lit a lamp 190 blocks from the transmitter. Lever off: everything went off ("Nothing to repeat"); on again: both lamps lit. A remote press beside the first repeater said "reach 56 blocks + 1 tower + 1 repeater | Heard by 2 receivers";
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
@@ -131,6 +138,7 @@
 
 ## History
 
+- **v0.21.0:** Jade tooltip (optional).
 - **v0.20.0:** Radio Repeater (repeater towers).
 - **v0.19.0:** pager catch-up.
 - **v0.18.0:** scanner tracking arrow.
@@ -153,7 +161,7 @@
 
 ## Ideas for later
 
-- Show the frequency on the block (floating text, or a Jade/WTHIT plugin)
+- Show the frequency on the block (floating text); a WTHIT plugin like the Jade one
 - Named frequencies ("Base Door") as aliases for numbers
 - Receivers that also gain range with height, or terrain blocking the signal
 - Links between dimensions

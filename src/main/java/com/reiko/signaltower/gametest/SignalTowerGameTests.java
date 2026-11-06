@@ -2143,4 +2143,105 @@ public final class SignalTowerGameTests {
                 .thenWaitUntil(() -> assertOutput(helper, rx, 0))
                 .thenSucceed();
     }
+
+    // ---- Jade tooltip ----
+
+    private static List<String> lineKeys(List<Component> lines) {
+        return lines.stream().map(SignalTowerGameTests::keyOf).map(key -> key.substring(key.lastIndexOf('.') + 1)).toList();
+    }
+
+    private static String firstArg(Component line) {
+        Object arg = ((TranslatableContents) line.getContents()).getArgs()[0];
+        return arg instanceof Component component ? component.getString() : String.valueOf(arg);
+    }
+
+    /**
+     * What Jade shows: the server reads each block's frequency, signal, reach and towers in range
+     * (and, for a mast, what's on top of its column), and the client turns that into lines.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void jadeInfoForRadioBlocks(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos mast = new BlockPos(3, 1, 1);
+        BlockPos tx = mast.above(3);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        BlockPos repeater = new BlockPos(9, 1, 1);
+        BlockPos bareMast = new BlockPos(12, 1, 1);
+        for (int y = 0; y < 3; y++) {
+            helper.setBlock(mast.above(y), ModRegistry.RADIO_MAST.get());
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1401);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1401);
+        place(helper, repeater, ModRegistry.RADIO_REPEATER.get(), 1401);
+        helper.setBlock(bareMast, ModRegistry.RADIO_MAST.get());
+        helper.setBlock(mast.west(), Blocks.REDSTONE_BLOCK);
+
+        helper.startSequence()
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenWaitUntil(() -> helper.assertBlockProperty(repeater, com.reiko.signaltower.block.RadioRepeaterBlock.LIT, true))
+                .thenExecute(() -> {
+                    CompoundTag txInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx));
+                    check(txInfo != null && txInfo.getInt("frequency") == 1401 && txInfo.getInt("power") == 15
+                            && txInfo.getInt("reach") == RadioHelper.reachAt(level, helper.absolutePos(tx)), "Transmitter data: " + txInfo);
+                    List<Component> txLines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), txInfo);
+                    check(lineKeys(txLines).equals(List.of("frequency", "sending", "reach")), "Transmitter lines: " + lineKeys(txLines));
+                    check(firstArg(txLines.get(0)).equals("1401") && firstArg(txLines.get(1)).equals("15"), "Transmitter values");
+
+                    CompoundTag rxInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rx));
+                    check(rxInfo != null && rxInfo.getInt("power") == 15 && rxInfo.getInt("towers") == 2,
+                            "Receiver data (the transmitter and the repeater reach it): " + rxInfo);
+                    List<Component> rxLines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), rxInfo);
+                    check(lineKeys(rxLines).equals(List.of("frequency", "output", "towers")), "Receiver lines: " + lineKeys(rxLines));
+
+                    CompoundTag repInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(repeater));
+                    check(repInfo != null && repInfo.getInt("power") == 15 && repInfo.getInt("frequency") == 1401, "Repeater data: " + repInfo);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(repeater), repInfo))
+                            .equals(List.of("frequency", "repeating", "reach")), "Repeater lines");
+
+                    CompoundTag mastInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(mast));
+                    check(mastInfo != null && mastInfo.getString("top").equals("transmitter") && mastInfo.getInt("above") == 3
+                            && mastInfo.getInt("frequency") == 1401, "Mast data: " + mastInfo);
+                    List<Component> mastLines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(mast), mastInfo);
+                    check(lineKeys(mastLines).equals(List.of("mast_top", "frequency")), "Mast lines: " + lineKeys(mastLines));
+
+                    CompoundTag bare = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(bareMast));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(bareMast), bare))
+                            .equals(List.of("mast_no_top")), "A mast with nothing on top says so");
+                    check(com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(mast.west())) == null,
+                            "Other blocks get nothing");
+
+                    // Without server data (Jade only on the client): just what the block state shows.
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), null)).equals(List.of("broadcasting")),
+                            "Transmitter without server data");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), null)).equals(List.of("output")),
+                            "Receiver without server data");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(repeater), null)).equals(List.of("repeating_on")),
+                            "Repeater without server data");
+                    check(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(mast), null).isEmpty(), "Mast without server data");
+                })
+                .thenSucceed();
+    }
+
+    /** Quiet blocks: "Sending: nothing", "Output: off" and "Nothing to repeat", with or without server data. */
+    @GameTest(template = PLATFORM)
+    public static void jadeLinesWhenQuiet(GameTestHelper helper) {
+        CompoundTag data = new CompoundTag();
+        data.putInt("frequency", 5);
+        data.putInt("power", 0);
+        data.putInt("reach", 40);
+        data.putInt("towers", 0);
+        BlockState tx = ModRegistry.RADIO_TRANSMITTER.get().defaultBlockState();
+        BlockState rx = ModRegistry.RADIO_RECEIVER.get().defaultBlockState();
+        BlockState repeater = ModRegistry.RADIO_REPEATER.get().defaultBlockState();
+        BlockState compact = ModRegistry.COMPACT_RADIO_RECEIVER.get().defaultBlockState();
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(tx, data)).equals(List.of("frequency", "sending_nothing", "reach")), "Quiet transmitter");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(rx, data)).equals(List.of("frequency", "output_off", "towers")), "Quiet receiver");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(compact, data)).equals(List.of("frequency", "output_off", "towers")),
+                "The compact receiver shows the same as the full one");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(repeater, data)).equals(List.of("frequency", "repeating_nothing", "reach")), "Quiet repeater");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(tx, null)).equals(List.of("sending_nothing")), "Quiet transmitter, no server data");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(repeater, null)).equals(List.of("repeating_nothing")), "Quiet repeater, no server data");
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(Blocks.STONE.defaultBlockState(), data)).isEmpty(), "Not a radio block");
+        helper.succeed();
+    }
 }

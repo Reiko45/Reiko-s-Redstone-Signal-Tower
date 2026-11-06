@@ -122,6 +122,18 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ![The Signal Scanner listing five frequencies, after tuning the Remote Control in the off-hand to 42](docs/images/signal-scanner.png)
 
+**Jade (optional):**
+- If you have [Jade](https://modrinth.com/mod/jade) installed, just look at a block to see its details in Jade's info box, with no clicking:
+  - **Radio Transmitter:** frequency, what it's sending ("Sending: 15" or "Sending: nothing") and its reach.
+  - **Radio Repeater:** frequency, what it's repeating ("Repeating: 15" or "Nothing to repeat") and its reach.
+  - **Radio Receiver** and **Compact Radio Receiver:** frequency, output ("Output: 15" or "Output: off") and how many transmitters and repeaters reach it ("Towers in range: 2").
+  - **Radio Mast:** what's on top of its column and how far up ("Top: Radio Repeater, 3 blocks up"), and that tower's frequency. Handy at the foot of a tall tower.
+- Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
+- Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Redstone Signal Tower).
+- The mod doesn't need Jade. Without it, everything works the same, and an empty-hand right-click still shows the status readout.
+
+![Jade showing a transmitter, a repeater, a mast with the repeater on top, and a receiver](docs/images/jade-tooltips.png)
+
 **Other details:**
 - Both receivers are tuned with the Frequency Tuner and act the same; pick the full block or the compact one depending on how much room you have.
 - Right-click a transmitter or receiver with an empty hand to see its frequency, signal, height and reach. A receiver's "Towers in range" counts the transmitters and repeaters on its frequency that reach it.
@@ -208,6 +220,8 @@ You need **Java 21**. If Gradle can't find it, it downloads one automatically.
 ./gradlew runGameTestServer  # runs the automated in-game tests, then exits
 ```
 
+The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optional tooltip plugin (it isn't bundled in the jar). Add `-PnoJade` to any run to leave it out, for example `./gradlew runGameTestServer -PnoJade`.
+
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
 **IntelliJ IDEA:** File → Open → pick this folder's `build.gradle` → Open as Project. Wait for the Gradle sync to finish, then use the generated run configurations (Client, Server, GameTestServer).
@@ -253,6 +267,8 @@ src/main/java/com/reiko/signaltower/
   radio/SignalNetwork.java               per-dimension list of transmitters, repeaters and remote signals (with relay coverage), saved with the world
   radio/RadioHelper.java                 height, reach, mast-column logic
   radio/Frequency.java                   frequency range (1 to 999,999,999)
+  compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
+  compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/MultiRemoteScreen.java          the Multi-Button Remote keypad
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
@@ -351,7 +367,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 76. turn-ons are remembered over the repeaters they reached, for the pager catch-up;
 77. the scanner names a repeater as the source with its distance and direction, can track it, lists a quiet one as off, and prefers a transmitter in a tie;
 78. a placed repeater checks in, lights up while repeating, reaches a receiver the transmitter can't, relays remote presses as a tower, stops when re-tuned or broken, and drops with its frequency;
-79. a remote press with no towers relaying is carried by a repeater on its frequency to a far receiver, and the message and light count it.
+79. a remote press with no towers relaying is carried by a repeater on its frequency to a far receiver, and the message and light count it;
+80. the Jade info: the server reads each transmitter's, receiver's and repeater's frequency, signal, reach and towers in range, and what's on top of a mast column; the lines come out in the right order; without server data only what the block state shows is listed;
+81. quiet blocks say "Sending: nothing", "Output: off" and "Nothing to repeat", the compact receiver matches the full one, and other blocks get nothing.
+
+All 81 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
