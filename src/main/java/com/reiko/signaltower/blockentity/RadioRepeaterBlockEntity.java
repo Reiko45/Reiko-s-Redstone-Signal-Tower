@@ -75,7 +75,8 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
             return;
         }
         SignalNetwork network = SignalNetwork.get(serverLevel);
-        network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.reachAt(serverLevel, worldPosition));
+        network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.reachAt(serverLevel, worldPosition),
+                getTunedBy());
         seenRevision = network.revision(getSendFrequency());
         updateLight(serverLevel, network);
     }
@@ -93,6 +94,11 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
 
     @Override
     protected void onFrequencyChanged() {
+        refresh();
+    }
+
+    @Override
+    protected void onTunedByChanged() {
         refresh();
     }
 

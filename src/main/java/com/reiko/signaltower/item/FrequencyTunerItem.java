@@ -2,8 +2,11 @@ package com.reiko.signaltower.item;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
+import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
+import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
@@ -20,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -66,15 +70,42 @@ public class FrequencyTunerItem extends Item {
                 message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_copied", FrequencyNames.label(level, radio.getFrequency()));
                 level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
             } else {
-                radio.setFrequency(getFrequency(stack));
-                message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
+                int frequency = getFrequency(stack);
+                Component refused = refusal(level, radio, frequency, player);
+                if (refused != null) {
+                    // Someone else's private frequency: this block would send on it, so it's not tuned.
+                    message = refused;
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
+                } else {
+                    radio.setTunedBy(player == null ? null : player.getUUID());
+                    radio.setFrequency(frequency);
+                    message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
+                }
             }
             if (player != null) {
                 player.displayClientMessage(message, true);
             }
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /**
+     * Why {@code player} may not tune {@code radio} to {@code frequency}, or null if they may. A
+     * transmitter or repeater would send on that frequency, and a converter on its output
+     * frequency, so they're refused if that's someone else's private frequency. Receivers only
+     * listen, so they can always be tuned.
+     */
+    private static @Nullable Component refusal(Level level, RadioBlockEntity radio, int frequency, @Nullable Player player) {
+        int sends;
+        if (radio instanceof RadioTransmitterBlockEntity) {
+            sends = frequency;
+        } else if (radio instanceof RadioRepeaterBlockEntity relay) {
+            sends = relay.isConverter() ? relay.getOutputFrequency() : frequency;
+        } else {
+            return null;
+        }
+        return FrequencyClaims.refusal(level, sends, player == null ? null : player.getUUID(), "private_refused_block");
     }
 
     @Override

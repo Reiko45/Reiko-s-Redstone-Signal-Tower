@@ -30,6 +30,13 @@ public final class Config {
                     "(repeaters on the press's own frequency still pass it on).")
             .define("towersRelayRemotes", true);
 
+    public static final ModConfigSpec.IntValue PRIVATE_FREQUENCIES_PER_PLAYER = BUILDER
+            .comment("How many frequencies each player may make private in the Frequency Tuner's screen.",
+                    "On a private frequency only its owner and their friends can send (remotes, transmitters,",
+                    "repeaters and converters) or rename it. 0 means players can't make frequencies private.",
+                    "Server operators can always make any private frequency public again.")
+            .defineInRange("privateFrequenciesPerPlayer", 32, 0, 100_000);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

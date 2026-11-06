@@ -10,7 +10,9 @@ import com.reiko.signaltower.network.ConfigureRadioItemPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.SetFrequencyNamePayload;
+import com.reiko.signaltower.network.SetFrequencyPrivacyPayload;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -31,7 +33,9 @@ import org.lwjgl.glfw.GLFW;
  * clear it. Favorites are saved straight away, even if you then press Cancel.
  * <p>
  * Layout, from {@code top}: title, range hint, the frequency row; for the remote the locator and
- * reach lines; the favorites; the remote's Mode and Length buttons; Done and Cancel.
+ * reach lines; for the tuner the name box, the Private button and Friends box, and a line saying
+ * who can send on the frequency; the favorites; the remote's Mode and Length buttons; Done and
+ * Cancel.
  */
 public class FrequencyScreen extends Screen implements RemoteScanListener {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".tuner";
@@ -61,6 +65,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** True once the player typed in the name box, so changing the frequency doesn't overwrite it. */
     private boolean nameEdited;
     private boolean fillingName;
+    /** Tuner only: whether the typed frequency is to be private, and the friends typed for it. */
+    private @Nullable Button privateButton;
+    private @Nullable EditBox friendsBox;
+    private boolean privateOn;
+    /** True once the player clicked Private or typed friends, so changing the frequency doesn't undo it. */
+    private boolean privacyEdited;
+    private boolean fillingPrivacy;
     /** Where things go, worked out in init(). */
     private int top;
     private int inputY;
@@ -97,11 +108,12 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         boolean remote = toggleMode != null;
         boolean optionRow = remote || pagerSound != null;
         boolean tuner = !remote && pagerSound == null;
-        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (tuner ? 26 : 0) + (presets != null ? 37 : 0) + (optionRow ? 24 : 0) + 20;
+        int tunerRows = 26 + 24 + 16; // name box, Private and Friends, who can send
+        int contentHeight = 34 + 20 + (remote ? 32 : 6) + (tuner ? tunerRows : 0) + (presets != null ? 37 : 0) + (optionRow ? 24 : 0) + 20;
         top = centerY - Math.max(44, contentHeight / 2);
         inputY = top + 34;
-        // under the frequency row (and the remote's two locator lines, or the tuner's name box)
-        int y = inputY + 20 + (remote ? 32 : 6) + (tuner ? 26 : 0);
+        // under the frequency row (and the remote's two locator lines, or the tuner's name and privacy rows)
+        int y = inputY + 20 + (remote ? 32 : 6) + (tuner ? tunerRows : 0);
 
         input = new EditBox(font, centerX - 50, inputY, 100, 20, Component.translatable(KEY + ".input"));
         input.setMaxLength(Frequency.MAX_DIGITS);
@@ -113,6 +125,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             scan = null;     // show "checking" until the new frequency's answer arrives
             scanTimer = 5;
             fillName();
+            fillPrivacy();
         });
         addRenderableWidget(input);
 
@@ -127,6 +140,24 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             });
             addRenderableWidget(nameBox);
             fillName();
+
+            privateButton = addRenderableWidget(Button.builder(Component.empty(), button -> {
+                privateOn = !privateOn;
+                privacyEdited = true;
+                updatePrivacyWidgets();
+            }).tooltip(Tooltip.create(Component.translatable(KEY + ".private_tooltip")))
+                    .bounds(centerX - 112, inputY + 50, 76, 20).build());
+            friendsBox = new EditBox(font, centerX - 32, inputY + 50, 144, 20, Component.translatable(KEY + ".friends"));
+            friendsBox.setMaxLength(SetFrequencyPrivacyPayload.MAX_FRIENDS_TEXT);
+            friendsBox.setHint(Component.translatable(KEY + ".friends_hint").withStyle(ChatFormatting.DARK_GRAY));
+            friendsBox.setTooltip(Tooltip.create(Component.translatable(KEY + ".friends_tooltip", FrequencyClaims.MAX_FRIENDS)));
+            friendsBox.setResponder(text -> {
+                if (!fillingPrivacy) {
+                    privacyEdited = true;
+                }
+            });
+            addRenderableWidget(friendsBox);
+            fillPrivacy();
         }
 
         addRenderableWidget(nudgeButton(-100, centerX - 112, 32));
@@ -191,6 +222,99 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         fillingName = true;
         nameBox.setValue(name == null ? "" : name);
         fillingName = false;
+    }
+
+    /** The typed frequency's claim as this client knows it, or null if it's public (or the box is empty). */
+    private FrequencyClaims.@Nullable ClaimInfo claim() {
+        return parsed().isPresent() ? FrequencyClaims.clientInfo(parsed().getAsInt()) : null;
+    }
+
+    private boolean mine(FrequencyClaims.@Nullable ClaimInfo claim) {
+        return claim != null && minecraft != null && minecraft.player != null && claim.owner().equals(minecraft.player.getUUID());
+    }
+
+    /** Server operators can make anyone's frequency public. */
+    private boolean isOperator() {
+        return minecraft != null && minecraft.player != null && minecraft.player.hasPermissions(2);
+    }
+
+    /**
+     * Shows whether the typed frequency is private, and its friends, until the player changes
+     * them. Someone else's private frequency can't be edited, so it's always shown as it is.
+     */
+    private void fillPrivacy() {
+        if (friendsBox == null) {
+            return;
+        }
+        FrequencyClaims.ClaimInfo claim = claim();
+        boolean editable = claim == null || mine(claim);
+        if (!privacyEdited || !editable) {
+            privacyEdited = false;
+            privateOn = claim != null;
+            fillingPrivacy = true;
+            friendsBox.setValue(claim == null ? "" : String.join(", ", claim.friends()));
+            fillingPrivacy = false;
+        }
+        updatePrivacyWidgets();
+    }
+
+    private void updatePrivacyWidgets() {
+        if (privateButton == null || friendsBox == null) {
+            return;
+        }
+        FrequencyClaims.ClaimInfo claim = claim();
+        boolean editable = claim == null || mine(claim);
+        privateButton.setMessage(Component.translatable(KEY + (privateOn ? ".private_on" : ".private_off"))
+                .withStyle(privateOn ? ChatFormatting.GOLD : ChatFormatting.WHITE));
+        privateButton.active = parsed().isPresent() && (editable || isOperator());
+        friendsBox.setEditable(editable && privateOn);
+        if (nameBox != null) {
+            // A private frequency's name is up to its owner and friends (and operators).
+            nameBox.setEditable(claim == null || mine(claim) || isFriend(claim) || isOperator());
+        }
+    }
+
+    private boolean isFriend(FrequencyClaims.ClaimInfo claim) {
+        return minecraft != null && minecraft.player != null
+                && claim.friends().stream().anyMatch(n -> n.equalsIgnoreCase(minecraft.player.getGameProfile().getName()));
+    }
+
+    /** True if Done should send the Private button and Friends box: they differ from the frequency's claim. */
+    private boolean privacyChanged(FrequencyClaims.@Nullable ClaimInfo claim) {
+        if (friendsBox == null || privateOn != (claim != null)) {
+            return friendsBox != null;
+        }
+        if (claim == null || !mine(claim)) {
+            return false;
+        }
+        java.util.Set<String> typed = new java.util.HashSet<>();
+        SetFrequencyPrivacyPayload.parseNames(friendsBox.getValue()).forEach(n -> typed.add(n.toLowerCase(java.util.Locale.ROOT)));
+        java.util.Set<String> current = new java.util.HashSet<>();
+        claim.friends().forEach(n -> current.add(n.toLowerCase(java.util.Locale.ROOT)));
+        return !typed.equals(current);
+    }
+
+    /** The line under the Private button: who can send on the typed frequency, or what Done will change. */
+    private Component privacyLine() {
+        FrequencyClaims.ClaimInfo claim = claim();
+        String key = KEY + ".privacy_";
+        if (privacyChanged(claim)) {
+            return Component.translatable(key + (privateOn ? (claim == null ? "will_claim" : "will_update") : "will_release"))
+                    .withStyle(ChatFormatting.YELLOW);
+        }
+        if (claim == null) {
+            return Component.translatable(key + "public").withStyle(ChatFormatting.GRAY);
+        }
+        if (mine(claim)) {
+            return claim.friends().isEmpty()
+                    ? Component.translatable(key + "mine").withStyle(ChatFormatting.GOLD)
+                    : claim.friends().size() == 1
+                    ? Component.translatable(key + "mine_one_friend").withStyle(ChatFormatting.GOLD)
+                    : Component.translatable(key + "mine_friends", claim.friends().size()).withStyle(ChatFormatting.GOLD);
+        }
+        return isFriend(claim)
+                ? Component.translatable(key + "friend", claim.ownerName()).withStyle(ChatFormatting.GOLD)
+                : Component.translatable(key + "other", claim.ownerName()).withStyle(ChatFormatting.RED);
     }
 
     /** Click: use a saved favorite, or save the frequency above into an empty one. Sneak-click: replace. */
@@ -315,6 +439,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                     PacketDistributor.sendToServer(new SetFrequencyNamePayload(frequency, typed));
                 }
             }
+            if (friendsBox != null && privacyChanged(FrequencyClaims.clientInfo(frequency))) {
+                PacketDistributor.sendToServer(new SetFrequencyPrivacyPayload(frequency, privateOn, friendsBox.getValue()));
+            }
             onClose();
         });
     }
@@ -362,6 +489,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         if (nameBox != null) {
             Component label = Component.translatable(KEY + ".name");
             graphics.drawString(font, label, centerX - 56 - font.width(label), inputY + 32, 0xFFFFFF);
+            graphics.drawCenteredString(font, privacyLine(), centerX, inputY + 75, 0xFFFFFF);
         }
         if (toggleMode != null) {
             graphics.drawCenteredString(font, LocatorText.describe(scan, scanReach, scanTowers), centerX, inputY + 26, 0xFFFFFF);

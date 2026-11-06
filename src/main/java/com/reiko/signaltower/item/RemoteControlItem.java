@@ -4,6 +4,7 @@ import com.reiko.signaltower.Config;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -164,6 +165,13 @@ public class RemoteControlItem extends Item {
     public static Component sendSignal(ServerLevel level, Player player, ItemStack remote, int frequency,
                                        boolean toggle, int pulseTicks, List<SignalNetwork.Coverage> coverage) {
         BlockPos origin = coverage.get(0).origin();
+        // Only the owner and their friends can send on a private frequency.
+        Component refused = FrequencyClaims.refusal(level, frequency, player.getUUID(), "private_refused_send");
+        if (refused != null) {
+            level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_OFF, SoundSource.PLAYERS, 0.6F, 0.7F);
+            remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(false, level.getGameTime() + RemoteLight.SHOW_TICKS));
+            return refused;
+        }
         SignalNetwork network = SignalNetwork.get(level);
         // Repeaters pass the press on further, and converters onto other frequencies; count who hears it there too.
         SignalNetwork.Carried carried = network.carried(level, frequency, coverage);

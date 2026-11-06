@@ -105,7 +105,9 @@ public class ConverterScreen extends Screen {
         graphics.drawString(font, sends, centerX - 12 - font.width(sends), top + 66, 0xFFFFFF);
         drawName(graphics, listenBox, top + 40);
         drawName(graphics, sendBox, top + 66);
-        Component status = state.power() > 0
+        Component status = state.silenced()
+                ? Component.translatable(KEY + "silenced", FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.RED)
+                : state.power() > 0
                 ? Component.translatable(KEY + "converting", state.power(), FrequencyNames.label(null, state.listen()),
                         FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GREEN)
                 : Component.translatable(KEY + "quiet", FrequencyNames.label(null, state.listen())).withStyle(ChatFormatting.GRAY);

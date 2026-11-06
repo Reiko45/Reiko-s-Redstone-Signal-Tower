@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Every transmitter in one dimension, saved with the world.
@@ -54,7 +55,11 @@ public final class SignalNetwork extends SavedData {
             new SavedData.Factory<>(SignalNetwork::new, SignalNetwork::load, null);
 
     /** What a transmitter is currently broadcasting. */
-    public record Transmitter(int frequency, int power, int reach) {}
+    public record Transmitter(int frequency, int power, int reach, @Nullable UUID tunedBy) {
+        public Transmitter(int frequency, int power, int reach) {
+            this(frequency, power, reach, null);
+        }
+    }
 
     /** What a receiver can hear: the strongest signal, and how many transmitters reach it. */
     public record Reception(int power, int transmittersInReach) {}
@@ -127,9 +132,13 @@ public final class SignalNetwork extends SavedData {
      * on {@code output} with its reach. A repeater sends on the frequency it listens on; a
      * converter on another one. What it sends is worked out by {@link #resolve}.
      */
-    public record Repeater(int frequency, int output, int reach) {
+    public record Repeater(int frequency, int output, int reach, @Nullable UUID tunedBy) {
         public Repeater(int frequency, int reach) {
-            this(frequency, frequency, reach);
+            this(frequency, frequency, reach, null);
+        }
+
+        public Repeater(int frequency, int output, int reach) {
+            this(frequency, output, reach, null);
         }
 
         /** True for a converter (sends on another frequency than it listens on). */
@@ -165,20 +174,93 @@ public final class SignalNetwork extends SavedData {
     private long now;
     private long nowDayTime;
 
+    /** The dimension this network belongs to, for checking private frequencies where no level is passed in. Not saved. */
+    private @Nullable ServerLevel world;
+
     public static SignalNetwork get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
+        SignalNetwork network = level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
+        network.world = level;
+        return network;
+    }
+
+    /** Ties a network made with {@code new} to {@code level}, so it checks private frequencies. For the GameTests. */
+    public SignalNetwork attachTo(ServerLevel level) {
+        world = level;
+        return this;
+    }
+
+    // ---- Private frequencies ----
+
+    /**
+     * True if a block tuned or placed by {@code tunedBy} may not broadcast on {@code frequency},
+     * because the frequency is private and {@code tunedBy} is neither its owner nor a friend.
+     * Blocks with no recorded tuner are never blocked.
+     */
+    private boolean blocked(@Nullable ServerLevel level, int frequency, @Nullable UUID tunedBy) {
+        if (tunedBy == null) {
+            return false;
+        }
+        ServerLevel at = level != null ? level : world;
+        return at != null && !FrequencyClaims.maySend(at, frequency, tunedBy);
+    }
+
+    /**
+     * True if the transmitter, repeater or converter at {@code pos} is kept quiet because it sends
+     * on someone else's private frequency.
+     */
+    public boolean isSilenced(ServerLevel level, BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        if (tx != null) {
+            return blocked(level, tx.frequency(), tx.tunedBy());
+        }
+        Repeater repeater = repeaters.get(pos);
+        return repeater != null && blocked(level, repeater.output(), repeater.tunedBy());
+    }
+
+    /**
+     * How many transmitters, repeaters and converters send on {@code frequency} that were tuned
+     * or placed by someone {@code allowed} says no to. Blocks with no recorded tuner don't count
+     * (they'd keep working anyway).
+     */
+    public int countOtherSenders(int frequency, java.util.function.Predicate<UUID> allowed) {
+        int count = 0;
+        for (Transmitter tx : byFrequency.getOrDefault(frequency, Map.of()).values()) {
+            if (tx.tunedBy() != null && !allowed.test(tx.tunedBy())) count++;
+        }
+        for (Repeater repeater : repeatersByOutput.getOrDefault(frequency, Map.of()).values()) {
+            if (repeater.tunedBy() != null && !allowed.test(repeater.tunedBy())) count++;
+        }
+        return count;
+    }
+
+    /**
+     * A frequency was made private or public, or its friends changed: who may send on it is
+     * different now, so everything on it (and down the line from it) works it out again.
+     */
+    public void invalidate(int frequency) {
+        relayEpoch++;
+        bump(frequency);
     }
 
     // ---- Transmitters ----
 
     public void updateTransmitter(BlockPos pos, int frequency, int power, int reach) {
+        updateTransmitter(pos, frequency, power, reach, null);
+    }
+
+    /**
+     * What the transmitter at {@code pos} is sending. {@code tunedBy} is the player who last tuned
+     * or placed it (null if unknown), which decides whether it may broadcast on a private frequency.
+     */
+    public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy) {
         BlockPos key = pos.immutable();
-        Transmitter next = new Transmitter(frequency, power, reach);
+        Transmitter next = new Transmitter(frequency, power, reach, tunedBy);
         Transmitter previous = transmitters.put(key, next);
         if (next.equals(previous)) {
             return;
         }
-        if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)) {
+        if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)
+                && !blocked(null, frequency, tunedBy)) {
             recordTurnOn(frequency, ownCoverage(key, reach));
         }
         if (previous != null && previous.frequency() != frequency) {
@@ -217,8 +299,13 @@ public final class SignalNetwork extends SavedData {
 
     /** A repeater ({@code output == frequency}) or converter was placed, re-tuned, or checks in. */
     public void updateRepeater(BlockPos pos, int frequency, int output, int reach) {
+        updateRepeater(pos, frequency, output, reach, null);
+    }
+
+    /** {@link #updateRepeater(BlockPos, int, int, int)}, with the player who last tuned or placed it. */
+    public void updateRepeater(BlockPos pos, int frequency, int output, int reach, @Nullable UUID tunedBy) {
         BlockPos key = pos.immutable();
-        Repeater next = new Repeater(frequency, output, reach);
+        Repeater next = new Repeater(frequency, output, reach, tunedBy);
         Repeater previous = repeaters.put(key, next);
         if (next.equals(previous)) {
             return;
@@ -309,8 +396,15 @@ public final class SignalNetwork extends SavedData {
         dropStaleRepeaters(level);
         List<BlockPos> positions = new ArrayList<>(repeaters.keySet());
         Map<BlockPos, Integer> power = new HashMap<>();
+        Set<BlockPos> silenced = new HashSet<>();
         for (BlockPos pos : positions) {
-            power.put(pos, listenDirect(level, repeaters.get(pos).frequency(), pos).power());
+            Repeater repeater = repeaters.get(pos);
+            if (blocked(level, repeater.output(), repeater.tunedBy())) {
+                silenced.add(pos); // it sends on someone else's private frequency: it stays quiet
+                power.put(pos, 0);
+            } else {
+                power.put(pos, listenDirect(level, repeater.frequency(), pos).power());
+            }
         }
         Set<BlockPos> done = new HashSet<>();
         while (true) {
@@ -334,7 +428,7 @@ public final class SignalNetwork extends SavedData {
             }
             Coverage area = new Coverage(next, from.reach(), true);
             for (BlockPos pos : listening.keySet()) {
-                if (power.get(pos) < nextPower && !done.contains(pos) && area.reaches(pos)) {
+                if (power.get(pos) < nextPower && !done.contains(pos) && !silenced.contains(pos) && area.reaches(pos)) {
                     power.put(pos, nextPower);
                 }
             }
@@ -390,11 +484,12 @@ public final class SignalNetwork extends SavedData {
             }
             for (Map.Entry<BlockPos, Repeater> entry : listening.entrySet()) {
                 BlockPos pos = entry.getKey();
-                if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos)) {
+                Repeater repeater = entry.getValue();
+                if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos)
+                        || blocked(level, repeater.output(), repeater.tunedBy())) {
                     continue;
                 }
                 reached.add(pos);
-                Repeater repeater = entry.getValue();
                 Coverage own = new Coverage(pos, repeater.reach(), true);
                 List<Coverage> list = areas.computeIfAbsent(repeater.output(), f -> new ArrayList<>());
                 if (!list.contains(own)) { // a repeater is already there if it relayed the press as a tower
@@ -780,7 +875,7 @@ public final class SignalNetwork extends SavedData {
             BlockPos at = entry.getKey();
             Transmitter tx = entry.getValue();
             long distSq = horizontalDistSq(at, pos);
-            if (distSq > (long) tx.reach() * tx.reach()) {
+            if (distSq > (long) tx.reach() * tx.reach() || blocked(level, tx.frequency(), tx.tunedBy())) {
                 continue;
             }
             if (level.isLoaded(at) && !(level.getBlockState(at).getBlock() instanceof RadioTransmitterBlock)) {
@@ -799,7 +894,7 @@ public final class SignalNetwork extends SavedData {
             BlockPos at = entry.getKey();
             Repeater repeater = entry.getValue();
             long distSq = horizontalDistSq(at, pos);
-            if (distSq > (long) repeater.reach() * repeater.reach()) {
+            if (distSq > (long) repeater.reach() * repeater.reach() || blocked(level, repeater.output(), repeater.tunedBy())) {
                 continue;
             }
             offer(best, repeater.output(), new BestTransmitter(sending.getOrDefault(at, 0), distSq, at, 1,
@@ -882,7 +977,9 @@ public final class SignalNetwork extends SavedData {
         int heard = direct.transmittersInReach();
         for (Map.Entry<BlockPos, Repeater> entry : onFrequency.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (pos.equals(receiverPos) || horizontalDistSq(pos, receiverPos) > (long) entry.getValue().reach() * entry.getValue().reach()) {
+            Repeater repeater = entry.getValue();
+            if (pos.equals(receiverPos) || horizontalDistSq(pos, receiverPos) > (long) repeater.reach() * repeater.reach()
+                    || blocked(level, frequency, repeater.tunedBy())) {
                 continue;
             }
             heard++;
@@ -913,7 +1010,7 @@ public final class SignalNetwork extends SavedData {
             long dx = pos.getX() - receiverPos.getX();
             long dz = pos.getZ() - receiverPos.getZ();
             long reach = tx.reach();
-            if (dx * dx + dz * dz > reach * reach) {
+            if (dx * dx + dz * dz > reach * reach || blocked(level, frequency, tx.tunedBy())) {
                 continue;
             }
             // Self-repair: drop entries whose block is gone (for example removed by a world editor).
@@ -943,6 +1040,9 @@ public final class SignalNetwork extends SavedData {
             entry.putInt("frequency", tx.frequency());
             entry.putInt("power", tx.power());
             entry.putInt("reach", tx.reach());
+            if (tx.tunedBy() != null) {
+                entry.putUUID("tuned_by", tx.tunedBy());
+            }
             list.add(entry);
         });
         tag.put("transmitters", list);
@@ -956,6 +1056,9 @@ public final class SignalNetwork extends SavedData {
                 entry.putInt("output", repeater.output()); // left out for repeaters, as saved by 0.20.0
             }
             entry.putInt("reach", repeater.reach());
+            if (repeater.tunedBy() != null) {
+                entry.putUUID("tuned_by", repeater.tunedBy());
+            }
             repeaterList.add(entry);
         });
         tag.put("repeaters", repeaterList);
@@ -1014,7 +1117,8 @@ public final class SignalNetwork extends SavedData {
             Transmitter tx = new Transmitter(
                     Frequency.clamp(entry.getInt("frequency")),
                     entry.getInt("power"),
-                    entry.getInt("reach"));
+                    entry.getInt("reach"),
+                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
             network.transmitters.put(pos, tx);
             network.byFrequency.computeIfAbsent(tx.frequency(), f -> new HashMap<>()).put(pos, tx);
         }
@@ -1024,7 +1128,8 @@ public final class SignalNetwork extends SavedData {
             BlockPos pos = BlockPos.of(entry.getLong("pos"));
             int frequency = Frequency.clamp(entry.getInt("frequency"));
             int output = entry.contains("output") ? Frequency.clamp(entry.getInt("output")) : frequency;
-            Repeater repeater = new Repeater(frequency, output, entry.getInt("reach"));
+            Repeater repeater = new Repeater(frequency, output, entry.getInt("reach"),
+                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
             network.repeaters.put(pos, repeater);
             network.repeatersByInput.computeIfAbsent(repeater.frequency(), f -> new HashMap<>()).put(pos, repeater);
             network.repeatersByOutput.computeIfAbsent(repeater.output(), f -> new HashMap<>()).put(pos, repeater);

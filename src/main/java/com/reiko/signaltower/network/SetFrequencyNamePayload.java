@@ -3,6 +3,7 @@ package com.reiko.signaltower.network;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.ChatFormatting;
@@ -49,6 +50,13 @@ public record SetFrequencyNamePayload(int frequency, String name) implements Cus
             return false;
         }
         int frequency = Frequency.clamp(payload.frequency());
+        // A private frequency's name is up to its owner and their friends (and server operators).
+        FrequencyClaims.Claim claim = FrequencyClaims.get(server).get(frequency);
+        if (claim != null && !claim.allows(player.getUUID()) && !player.hasPermissions(2)) {
+            player.displayClientMessage(Component.translatable("message." + SignalTower.MOD_ID + ".private_refused_name",
+                    claim.ownerName(), frequency).withStyle(ChatFormatting.RED), true);
+            return false;
+        }
         FrequencyNames names = FrequencyNames.get(server);
         String before = names.get(frequency);
         String stored = names.set(frequency, payload.name());

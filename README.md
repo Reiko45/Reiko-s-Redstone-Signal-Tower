@@ -15,7 +15,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
-| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. |
+| **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
@@ -58,7 +58,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 **Frequency names:**
 - **Naming one:** give a frequency a name in the Frequency Tuner's screen. Type the frequency, type a name in the **Name** box under it (up to 24 characters), and press Done: "Frequency 2026 is now called Front Gate, for everyone". The box shows the typed frequency's current name; clear it and press Done to remove the name.
-- **Shared:** names belong to the world. Everyone on a server sees the same names, they're saved with the world, and they count in every dimension. Anyone holding a tuner can rename a frequency.
+- **Shared:** names belong to the world. Everyone on a server sees the same names, they're saved with the world, and they count in every dimension. Anyone holding a tuner can rename a frequency, except a private one (only its owner and their friends can).
 - **Where they show:** most places a frequency number appears, as "2026 (Front Gate)":
   - item tooltips (tuner, remotes, pager, radio blocks);
   - the remote's press message and the pager's alerts, chat log and catch-up lines;
@@ -70,6 +70,23 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Unnamed frequencies:** they show just their number, as before. A world holds up to 4,096 names.
 
   ![Naming 2026 "Front Gate" in the tuner, and the name in the remote's screen, Jade, the tuner's tooltip, the scanner and a remote press](docs/images/frequency-names.png)
+
+**Private frequencies:**
+- **Making one private:** in the Frequency Tuner's screen, type the frequency and click **Private: Off** so it says **Private: On**, then press Done: "2026 (Front Gate) is now private: only you can send on it". The line under the button says who can send on the typed frequency, or what Done will change.
+- **Friends:** type players' names in the box next to the button, separated by commas (up to 16), and press Done: "only you and Steve can send on it". A friend must be online the first time you add them; after that they stay a friend by their account, online or not. Delete a name and press Done to take them off.
+- **What private means:** only you and your friends can send on it.
+  - Other players' remote presses are refused, with a red light: "Can't send: 2026 (Front Gate) is private to Dev".
+  - Transmitters, repeaters and converters only broadcast on it if you or a friend tuned or placed them (each block remembers who last tuned or placed it). Anyone else trying to tune one onto it is refused: "Can't do that: it would send on 2026 (Front Gate), which is private to Dev". One they place with that frequency already on it stays silent: "Silent: 2026 (Front Gate) is private to Dev, so this won't broadcast".
+  - Taking a friend off silences their blocks on it at once; adding them back brings them back.
+  - Only you and your friends can rename it.
+- **Listening stays open:** anyone's receivers, toggle receivers, pagers and scanners still hear it, and anyone can tune a receiver to it.
+- **Claiming fairly:** you can't make a frequency private while other players' transmitters, repeaters or converters send on it ("other players' blocks already send on it"). Pick one nobody else uses.
+- **Older blocks:** blocks tuned before version 0.25 don't know who tuned them, so they keep working on a private frequency. Tune one again to make it yours.
+- **Who can change it:** only the owner can change the friends or make it public again (click **Private: On** so it says Off, then Done). Server operators can make anyone's private frequency public the same way. Other players see the button greyed out: "Private to Dev: you can't send on it".
+- **Limits:** up to 32 private frequencies per player (`privateFrequenciesPerPlayer` in the server config; 0 turns the feature off), and 4,096 per world.
+- **Jade** shows "Private to Dev" on a private frequency's blocks, and "Silent: private to Dev" on ones kept quiet. The empty-hand readout and the converter's screen also say when a block is kept quiet.
+
+  ![Dev adding Steve as a friend on private frequency 2026; Steve's tuner screen before that ("Private to Dev: you can't send on it"); Jade on a friend's and on a silenced transmitter; and the messages for claiming, a refused remote press, a refused tuning and a silent placement](docs/images/private-frequencies.png)
 
 **Remote Control:**
 - Right-click: press the button.
@@ -147,6 +164,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - **Radio Receiver** and **Compact Radio Receiver:** frequency, output ("Output: 15" or "Output: off") and how many transmitters and repeaters reach it ("Towers in range: 2").
   - **Radio Toggle Receiver:** frequency, "Switched on" or "Switched off", what it's hearing right now, and towers in range.
   - **Radio Mast:** what's on top of its column and how far up ("Top: Radio Repeater, 3 blocks up"), and that tower's frequency. Handy at the foot of a tall tower.
+  - On a private frequency, any of them also shows "Private to Dev", or "Silent: private to Dev" for a transmitter, repeater or converter kept quiet.
 - Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
 - Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Redstone Signal Tower).
 - The mod doesn't need Jade. Without it, everything works the same, and an empty-hand right-click still shows the status readout.
@@ -222,7 +240,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency.
+All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -284,7 +302,7 @@ To play it in your own instance, copy the jar from `build/libs/` into the instan
 ```
 src/main/java/com/reiko/signaltower/
   SignalTower.java                       mod entry point: registration, creative tabs, packets
-  Config.java                            server config (reach settings, tower relay switch)
+  Config.java                            server config (reach settings, tower relay switch, private frequency limit)
   registry/ModRegistry.java              blocks, items, block entities, the frequency data component
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
@@ -295,7 +313,7 @@ src/main/java/com/reiko/signaltower/
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
   block/WallRedstoneBlock.java           redstone dust for walls
-  blockentity/RadioBlockEntity.java      stores the frequency, keeps it through break/re-place
+  blockentity/RadioBlockEntity.java      stores the frequency (kept through break/re-place) and who last tuned or placed it
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
   blockentity/RadioRepeaterBlockEntity.java  repeater and converter: checks in with the network, drives the light, a converter's output frequency
@@ -322,6 +340,8 @@ src/main/java/com/reiko/signaltower/
   radio/Frequency.java                   frequency range (1 to 999,999,999)
   radio/FrequencyNames.java              frequency names, saved with the world (and the client's synced copy)
   network/SetFrequencyNamePayload.java, FrequencyNamePayload.java, FrequencyNamesPayload.java  naming, and keeping clients in sync
+  radio/FrequencyClaims.java             private frequencies: owners and friends, saved with the world (and the client's synced copy)
+  network/SetFrequencyPrivacyPayload.java, FrequencyClaimPayload.java, FrequencyClaimsPayload.java  the Private button and Friends box, and keeping clients in sync
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
@@ -440,9 +460,14 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 92. a frequency that's already on when it's placed, or when it's re-tuned to it, isn't a turn-on: it waits for the next one;
 93. frequency names are tidied (spaces, formatting codes, length), removed by an empty name, capped at 4,096, saved, and survive the network;
 94. the client's copy of the names is filled by the full list, changed one at a time and cleared on leaving;
-95. naming a frequency only works with a tuner in hand, and the name then shows in the remote's press message, the pager's alert, Jade and the tuner's message; a frequency without a name shows just its number.
+95. naming a frequency only works with a tuner in hand, and the name then shows in the remote's press message, the pager's alert, Jade and the tuner's message; a frequency without a name shows just its number;
+96. private frequency claims allow only the owner and friends, cap the friends at 16 (leaving the owner out, keeping their order), and survive saving, both network packets and the client's copy; the Friends box splits names on commas and spaces without repeats;
+97. on a private frequency, a stranger's transmitter, repeater and converter stay quiet (receivers and the scanner don't hear them, their turn-ons aren't remembered, a press isn't carried through them), while the owner's, a friend's and an old untracked one work; who tuned them is saved; taking a friend off silences theirs at once, and making it public brings everyone back;
+98. a stranger's remote press on a private frequency is refused (with a red light and the owner's name) and can't switch it on or off, while the owner's and a friend's presses work;
+99. the Private button only works with a tuner in hand; only the owner changes a private frequency, an operator can make it public; unknown names are reported, offline friends are kept by name, the per-player limit is enforced, and a frequency other players' blocks send on can't be claimed; only members rename it;
+100. a stranger can't tune a transmitter or converter onto a private frequency (a receiver is fine), a block they place with it stays silent and says so (readout and Jade), and whoever tunes or places a block becomes its tuner, saved with it.
 
-All 95 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 100 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

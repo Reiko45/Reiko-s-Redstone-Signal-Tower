@@ -3,6 +3,8 @@ package com.reiko.signaltower.network;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
+import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -46,6 +48,13 @@ public record ConfigureConverterPayload(BlockPos pos, int listen, int send) impl
                 || !(player.level().getBlockEntity(pos) instanceof RadioRepeaterBlockEntity converter)) {
             return false;
         }
+        Component refused = FrequencyClaims.refusal(player.level(), Frequency.clamp(payload.send()), player.getUUID(),
+                "private_refused_block");
+        if (refused != null) {
+            player.displayClientMessage(refused, true);
+            return false;
+        }
+        converter.setTunedBy(player.getUUID());
         converter.setFrequencies(payload.listen(), payload.send());
         player.displayClientMessage(Component.translatable("message." + SignalTower.MOD_ID + ".converter_set",
                 converter.getFrequency(), converter.getOutputFrequency()).withStyle(ChatFormatting.AQUA), true);

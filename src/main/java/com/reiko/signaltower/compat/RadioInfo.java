@@ -10,6 +10,7 @@ import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -46,13 +47,25 @@ public final class RadioInfo {
     /**
      * The server's data for the block at {@code pos}, or null if it isn't one of the mod's radio
      * blocks or masts. The frequencies' names (if they have any) come along as "name" and
-     * "output_name", since the client might not know them.
+     * "output_name", since the client might not know them. If the frequency it sends on (or a
+     * receiver's) is private, its owner comes along as "private_to", and "silenced" says whether
+     * this block is kept quiet because its tuner isn't the owner or a friend.
      */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos) {
         CompoundTag tag = gather(level, pos);
         if (tag != null) {
             addName(level, tag, "frequency", "name");
             addName(level, tag, "output", "output_name");
+            if (!tag.contains("top") && tag.contains("frequency")) {
+                int frequency = tag.contains("output") ? tag.getInt("output") : tag.getInt("frequency");
+                FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
+                if (claim != null) {
+                    tag.putString("private_to", claim.ownerName());
+                    if (SignalNetwork.get(level).isSilenced(level, pos)) {
+                        tag.putBoolean("silenced", true);
+                    }
+                }
+            }
         }
         return tag;
     }
@@ -119,6 +132,17 @@ public final class RadioInfo {
      * null if the server didn't send any; then only what the block state shows is listed.
      */
     public static List<Component> lines(BlockState state, @Nullable CompoundTag data) {
+        List<Component> lines = blockLines(state, data);
+        if (data != null && data.contains("private_to")) {
+            Component owner = Component.literal(data.getString("private_to"));
+            lines.add(data.getBoolean("silenced")
+                    ? Component.translatable(LANG + "silenced", owner).withStyle(ChatFormatting.RED)
+                    : Component.translatable(LANG + "private", owner).withStyle(ChatFormatting.GOLD));
+        }
+        return lines;
+    }
+
+    private static List<Component> blockLines(BlockState state, @Nullable CompoundTag data) {
         Block block = state.getBlock();
         List<Component> lines = new ArrayList<>();
         boolean hasData = data != null && data.contains("frequency");

@@ -38,11 +38,16 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
         }
         SignalNetwork.get(serverLevel).updateTransmitter(worldPosition, getFrequency(), power,
-                RadioHelper.reachAt(serverLevel, worldPosition));
+                RadioHelper.reachAt(serverLevel, worldPosition), getTunedBy());
     }
 
     @Override
     protected void onFrequencyChanged() {
+        refresh();
+    }
+
+    @Override
+    protected void onTunedByChanged() {
         refresh();
     }
 

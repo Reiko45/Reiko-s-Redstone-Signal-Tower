@@ -2689,4 +2689,355 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---- Private frequencies ----
+
+    /** A test player with a chosen UUID and name (and operator or not) that keeps its messages, like {@link #listeningPlayer}. */
+    private static Player namedPlayer(GameTestHelper helper, BlockPos standAt, UUID uuid, String name, boolean op,
+                                      List<Component> actionBar, List<Component> chat) {
+        Player player = new Player(helper.getLevel(), BlockPos.ZERO, 0.0F, new GameProfile(uuid, name)) {
+            @Override
+            public boolean isSpectator() {
+                return false;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+
+            @Override
+            public boolean hasPermissions(int level) {
+                return op;
+            }
+
+            @Override
+            public void displayClientMessage(Component message, boolean overlay) {
+                (overlay ? actionBar : chat).add(message);
+            }
+        };
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(standAt));
+        player.moveTo(feet.x, feet.y, feet.z);
+        return player;
+    }
+
+    private static String lastKey(List<Component> messages) {
+        return messages.isEmpty() ? "(none)" : keyOf(messages.get(messages.size() - 1));
+    }
+
+    /**
+     * Claims: owner and friends are allowed, the owner isn't their own friend, friends are capped,
+     * and claims survive saving, the network (both packets) and the client's copy. The friends box
+     * is split on commas and spaces without repeats.
+     */
+    @GameTest(template = PLATFORM)
+    public static void privateFrequencyClaimsSavedAndSynced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID owner = UUID.randomUUID();
+        UUID friend = UUID.randomUUID();
+        var claims = new com.reiko.signaltower.radio.FrequencyClaims();
+        java.util.Map<UUID, String> many = new java.util.LinkedHashMap<>();
+        many.put(owner, "Owner"); // left out: the owner isn't their own friend
+        many.put(friend, "Friend");
+        for (int i = 0; i < 30; i++) {
+            many.put(UUID.randomUUID(), "F" + i);
+        }
+        var claim = claims.put(1801, owner, "Owner", many);
+        check(claim.friends().size() == com.reiko.signaltower.radio.FrequencyClaims.MAX_FRIENDS, "Friends capped: " + claim.friends().size());
+        check(!claim.friends().containsKey(owner) && claim.friendNames().get(0).equals("Friend"), "Owner left out, order kept");
+        check(claims.allows(1801, owner) && claims.allows(1801, friend) && !claims.allows(1801, UUID.randomUUID()), "Owner and friend only");
+        check(claims.allows(1802, UUID.randomUUID()) && claims.allows(1802, null), "A public frequency allows anyone");
+        check(!claims.allows(1801, null), "Nobody (a press with no player) isn't a member");
+        check(claims.countOwnedBy(owner) == 1 && claims.countOwnedBy(friend) == 0, "Counted by owner");
+
+        var loaded = com.reiko.signaltower.radio.FrequencyClaims.load(claims.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(loaded.get(1801) != null && loaded.get(1801).equals(claims.get(1801)), "Saved and loaded");
+
+        var info = com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.of(claim);
+        var buffer = Unpooled.buffer();
+        var all = new com.reiko.signaltower.network.FrequencyClaimsPayload(java.util.Map.of(1801, info));
+        com.reiko.signaltower.network.FrequencyClaimsPayload.STREAM_CODEC.encode(buffer, all);
+        check(com.reiko.signaltower.network.FrequencyClaimsPayload.STREAM_CODEC.decode(buffer).claims().equals(all.claims()), "The full list survives the network");
+        var one = new com.reiko.signaltower.network.FrequencyClaimPayload(1801, java.util.Optional.empty());
+        com.reiko.signaltower.network.FrequencyClaimPayload.STREAM_CODEC.encode(buffer, one);
+        check(com.reiko.signaltower.network.FrequencyClaimPayload.STREAM_CODEC.decode(buffer).equals(one), "So does 'public again'");
+
+        com.reiko.signaltower.radio.FrequencyClaims.clientReplaceAll(java.util.Map.of(1801, info));
+        check("Owner".equals(com.reiko.signaltower.radio.FrequencyClaims.clientInfo(1801).ownerName()), "Client copy filled");
+        com.reiko.signaltower.radio.FrequencyClaims.clientSet(1801, null);
+        check(com.reiko.signaltower.radio.FrequencyClaims.clientInfo(1801) == null, "Client copy: public again");
+        com.reiko.signaltower.radio.FrequencyClaims.clientClear();
+
+        check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.parseNames(" Alex, sam  alex,,Bo ")
+                .equals(List.of("Alex", "sam", "Bo")), "Names split and de-duplicated");
+        helper.succeed();
+    }
+
+    /**
+     * On a private frequency, transmitters, repeaters and converters tuned by someone else stay
+     * quiet (receivers and the scanner don't hear them, and their turn-ons aren't remembered);
+     * the owner's, friends' and old blocks with no recorded tuner still work. Taking a friend off
+     * silences their blocks at once, and making it public brings everyone back.
+     */
+    @GameTest(template = PLATFORM)
+    public static void privateFrequencySilencesOtherPlayersBlocks(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID owner = UUID.randomUUID();
+        UUID friend = UUID.randomUUID();
+        UUID stranger = UUID.randomUUID();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos here = new BlockPos(61_000, 100, 61_000); // far away and never loaded
+        claims.put(1803, owner, "Owner", java.util.Map.of(friend, "Friend"));
+        network.invalidate(1803);
+        try {
+            network.updateTransmitter(here, 1803, 9, 30, stranger);
+            check(network.listen(level, 1803, here.east(5)).power() == 0
+                    && network.listen(level, 1803, here.east(5)).transmittersInReach() == 0, "A stranger's transmitter is silent");
+            check(network.isSilenced(level, here), "And says so");
+            network.updateTransmitter(here.south(3), 1803, 7, 30, friend);
+            network.updateTransmitter(here.north(3), 1803, 5, 30, null);
+            var heard = network.listen(level, 1803, here.east(5));
+            check(heard.power() == 7 && heard.transmittersInReach() == 2, "A friend's and an old one count: " + heard);
+            check(!network.isSilenced(level, here.south(3)) && !network.isSilenced(level, here.north(3)), "Not silenced");
+            var scan = network.scanAt(level, here.east(5)).stream().filter(h -> h.frequency() == 1803).findFirst().orElseThrow();
+            check(scan.power() == 7 && scan.transmitters() == 2, "The scanner leaves the stranger out: " + scan);
+            check(network.turnOnsSince(1803, -1, here).size() == 2, "Only the friend's and the old one's turn-ons are remembered");
+
+            // A stranger's repeater listening on 1803 and a stranger's converter sending on it stay quiet too.
+            BlockPos repeater = here.south(3).east(25);
+            network.updateRepeater(repeater, 1803, 1803, 30, stranger);
+            check(network.listen(level, 1803, repeater.east(25)).power() == 0, "The stranger's repeater doesn't pass it on");
+            check(network.repeaterPower(level, repeater) == 0, "And isn't lit");
+            BlockPos source = here.east(1000);
+            network.updateTransmitter(source, 1804, 12, 30, stranger); // 1804 is public: fine
+            BlockPos converter = source.east(20);
+            network.updateRepeater(converter, 1804, 1803, 30, stranger);
+            check(network.listen(level, 1803, converter.east(25)).power() == 0, "Nor does the stranger's converter");
+            check(network.carried(level, 1804, SignalNetwork.ownCoverage(source, 30)).on(1803).isEmpty(),
+                    "A press on 1804 isn't carried onto 1803 by it");
+
+            var loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess()).attachTo(level);
+            check(loaded.isSilenced(level, here) && loaded.isSilenced(level, converter) && !loaded.isSilenced(level, here.south(3)),
+                    "Who tuned them is saved");
+
+            network.updateRepeater(converter, 1804, 1803, 30, friend);
+            network.updateRepeater(repeater, 1803, 1803, 30, friend);
+            check(network.listen(level, 1803, converter.east(25)).power() == 12, "The friend's converter sends");
+            check(network.listen(level, 1803, repeater.east(25)).power() == 7, "The friend's repeater repeats");
+
+            claims.put(1803, owner, "Owner", java.util.Map.of());
+            network.invalidate(1803);
+            check(network.listen(level, 1803, here.east(5)).power() == 5, "Friend taken off: only the old one is left");
+            check(network.listen(level, 1803, converter.east(25)).power() == 0, "Their converter went quiet at once");
+
+            claims.remove(1803);
+            network.invalidate(1803);
+            check(network.listen(level, 1803, here.east(5)).power() == 9, "Public again: everyone counts");
+            check(!network.isSilenced(level, here), "Nobody is silenced");
+        } finally {
+            claims.remove(1803);
+        }
+        helper.succeed();
+    }
+
+    /** Remote presses on a private frequency only count from the owner and friends; anyone else's is refused. */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void privateFrequencyRefusesOtherPlayersRemotes(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1805);
+        claims.put(1805, ownerId, "Owner", java.util.Map.of(friendId, "Friend"));
+        List<Component> bar = new java.util.ArrayList<>();
+        Player stranger = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Stranger", false, bar, new java.util.ArrayList<>());
+        Player owner = namedPlayer(helper, new BlockPos(1, 1, 1), ownerId, "Owner", false, bar, new java.util.ArrayList<>());
+        Player friend = namedPlayer(helper, new BlockPos(1, 1, 1), friendId, "Friend", false, bar, new java.util.ArrayList<>());
+        ItemStack remote = new ItemStack(ModRegistry.REMOTE_CONTROL.get());
+        FrequencyTunerItem.setFrequency(remote, 1805);
+        RemoteControlItem.setToggleMode(remote, true);
+        AtomicReference<Component> answer = new AtomicReference<>();
+        java.util.function.Consumer<Player> press = player -> answer.set(RemoteControlItem.sendSignal(level, player, remote, 1805, true,
+                PulseLength.MIN_TICKS, SignalNetwork.ownCoverage(player.blockPosition(), 10)));
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> press.accept(stranger))
+                .thenExecute(() -> {
+                    check(keyOf(answer.get()).endsWith("private_refused_send"), "Refused: " + answer.get().getString());
+                    check(answer.get().getString().contains("Owner"), "Says whose it is: " + answer.get().getString());
+                    RemoteLight light = remote.get(ModRegistry.REMOTE_LIGHT.get());
+                    check(light != null && !light.heard(), "Red light");
+                })
+                .thenIdle(5)
+                .thenExecute(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> press.accept(owner))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> press.accept(stranger)) // can't switch it off either
+                .thenIdle(5)
+                .thenExecute(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> press.accept(friend))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> claims.remove(1805))
+                .thenSucceed();
+    }
+
+    /**
+     * The tuner screen's Private button and Friends box: only with a tuner in hand; only the owner
+     * changes a private frequency, though an operator can make it public; offline friends are kept
+     * by name, unknown names are reported; the per-player limit; no claiming a frequency other
+     * players' blocks already send on. Renaming a private frequency is for members only.
+     */
+    @GameTest(template = PLATFORM)
+    public static void privacyButtonClaimsAndReleases(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID aliceId = UUID.randomUUID();
+        UUID bobId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        List<Component> chat = new java.util.ArrayList<>();
+        Player alice = namedPlayer(helper, new BlockPos(1, 1, 1), aliceId, "Alice", false, bar, chat);
+        Player bob = namedPlayer(helper, new BlockPos(1, 1, 1), bobId, "Bob", false, bar, chat);
+        Player op = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Admin", true, bar, chat);
+        Player dave = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Dave", false, bar, chat);
+        java.util.function.BiFunction<Player, com.reiko.signaltower.network.SetFrequencyPrivacyPayload, Boolean> apply =
+                com.reiko.signaltower.network.SetFrequencyPrivacyPayload::apply;
+        BlockPos far = new BlockPos(62_000, 100, 62_000);
+        int limit = com.reiko.signaltower.Config.PRIVATE_FREQUENCIES_PER_PLAYER.get();
+        try {
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "")), "Only with a tuner in hand");
+            for (Player player : List.of(alice, bob, op, dave)) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+            }
+            check(apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "")), "Alice makes it private");
+            check(lastKey(bar).endsWith("private_set") && claims.get(1806).owner().equals(aliceId), "Hers: " + lastKey(bar));
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "")), "Again: nothing changes");
+
+            check(!apply.apply(bob, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, false, "")), "Bob can't make it public");
+            check(lastKey(bar).endsWith("private_not_yours"), "Told it's hers: " + lastKey(bar));
+            check(!apply.apply(bob, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "Bob")), "Nor take it over");
+
+            check(!com.reiko.signaltower.network.SetFrequencyNamePayload.apply(bob,
+                    new com.reiko.signaltower.network.SetFrequencyNamePayload(1806, "Bob's")), "Bob can't rename it");
+            check(lastKey(bar).endsWith("private_refused_name"), "Told why: " + lastKey(bar));
+            check(com.reiko.signaltower.network.SetFrequencyNamePayload.apply(alice,
+                    new com.reiko.signaltower.network.SetFrequencyNamePayload(1806, "Alice's Gate")), "Alice can");
+
+            chat.clear();
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "Zed, alice")),
+                    "Nobody online called Zed, and Alice isn't her own friend: nothing changes");
+            check(lastKey(chat).endsWith("private_friends_missing") && chat.get(0).getString().contains("Zed"), "Zed reported: " + chat);
+
+            claims.put(1806, aliceId, "Alice", java.util.Map.of(bobId, "Bob"));
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "bob")),
+                    "Bob is offline but already a friend: kept by name");
+            check(claims.get(1806).friends().containsKey(bobId), "Still a friend");
+            check(com.reiko.signaltower.network.SetFrequencyNamePayload.apply(bob,
+                    new com.reiko.signaltower.network.SetFrequencyNamePayload(1806, "Our Gate")), "A friend can rename it");
+            check(apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, true, "")), "Bob taken off");
+            check(claims.get(1806).friends().isEmpty(), "No friends now");
+
+            check(apply.apply(op, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, false, "")), "An operator makes it public");
+            check(claims.get(1806) == null && lastKey(bar).endsWith("private_removed"), "Public: " + lastKey(bar));
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1806, false, "")), "Already public");
+
+            for (int i = 0; i < limit; i++) {
+                claims.put(19_000 + i, dave.getUUID(), "Dave", java.util.Map.of());
+            }
+            check(!apply.apply(dave, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1807, true, "")), "Over the limit");
+            check(lastKey(bar).endsWith(limit == 0 ? "private_disabled" : "private_limit"), "Told about the limit: " + lastKey(bar));
+
+            SignalNetwork.get(level).updateTransmitter(far, 1808, 0, 10, bobId);
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1808, true, "")),
+                    "Bob's transmitter already sends on 1808");
+            check(lastKey(bar).endsWith("private_in_use"), "Told it's in use: " + lastKey(bar));
+            check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.otherSenders(level.getServer(), 1808, aliceId) == 1
+                    && com.reiko.signaltower.network.SetFrequencyPrivacyPayload.otherSenders(level.getServer(), 1808, bobId) == 0,
+                    "Counted per player, in every dimension (friends-to-be count too, so listing them can't get round it)");
+            if (limit > 0) {
+                check(apply.apply(bob, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(1808, true, "")), "Bob himself can claim it");
+            }
+        } finally {
+            for (int i = 0; i < limit; i++) {
+                claims.remove(19_000 + i);
+            }
+            claims.remove(1806);
+            claims.remove(1808);
+            com.reiko.signaltower.radio.FrequencyNames.get(level.getServer()).set(1806, "");
+            SignalNetwork.get(level).removeTransmitter(far);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Tuning and placing: someone else can't tune a transmitter or converter onto a private
+     * frequency (a receiver is fine, it only listens). A block placed with a private frequency
+     * on it by someone else stays silent and says so, in its readout and in Jade. Whoever tunes or
+     * places a block becomes its tuner, saved with it.
+     */
+    @GameTest(template = PLATFORM)
+    public static void privateFrequencyTunerAndPlacement(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID aliceId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player alice = namedPlayer(helper, new BlockPos(2, 1, 2), aliceId, "Alice", false, bar, new java.util.ArrayList<>());
+        Player bob = namedPlayer(helper, new BlockPos(2, 1, 2), UUID.randomUUID(), "Bob", false, bar, new java.util.ArrayList<>());
+        claims.put(1810, aliceId, "Alice", java.util.Map.of());
+        try {
+            BlockPos tx = new BlockPos(1, 1, 1);
+            BlockPos rx = new BlockPos(4, 1, 1);
+            BlockPos conv = new BlockPos(1, 1, 3);
+            place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 1811);
+            place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 1811);
+            place(helper, conv, ModRegistry.RADIO_CONVERTER.get(), 1811);
+            java.util.function.BiConsumer<Player, BlockPos> tune = (player, pos) -> {
+                ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+                FrequencyTunerItem.setFrequency(tuner, 1810);
+                player.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+                BlockPos abs = helper.absolutePos(pos);
+                tuner.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                        new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false)));
+            };
+            tune.accept(bob, tx);
+            check(frequencyAt(helper, tx) == 1811 && lastKey(bar).endsWith("private_refused_block"), "Bob can't tune the transmitter: " + lastKey(bar));
+            tune.accept(bob, rx);
+            check(frequencyAt(helper, rx) == 1810, "But can tune a receiver to listen");
+            tune.accept(alice, tx);
+            RadioBlockEntity transmitter = helper.getBlockEntity(tx);
+            check(frequencyAt(helper, tx) == 1810 && aliceId.equals(transmitter.getTunedBy()), "Alice can, and is its tuner now");
+            CompoundTag saved = transmitter.saveWithoutMetadata(level.registryAccess());
+            check(saved.hasUUID("tuned_by") && saved.getUUID("tuned_by").equals(aliceId), "Saved with the block: " + saved);
+
+            check(!com.reiko.signaltower.network.ConfigureConverterPayload.apply(bob,
+                    new com.reiko.signaltower.network.ConfigureConverterPayload(helper.absolutePos(conv), 1811, 1810)), "Bob can't make a converter send on it");
+            check(lastKey(bar).endsWith("private_refused_block"), "Told why: " + lastKey(bar));
+            check(com.reiko.signaltower.network.ConfigureConverterPayload.apply(alice,
+                    new com.reiko.signaltower.network.ConfigureConverterPayload(helper.absolutePos(conv), 1811, 1810)), "Alice can");
+
+            // Bob places a transmitter that already carries 1810 (as if from its item): it's silent and says so.
+            BlockPos placed = new BlockPos(1, 1, 5);
+            place(helper, placed, ModRegistry.RADIO_TRANSMITTER.get(), 1810);
+            BlockPos abs = helper.absolutePos(placed);
+            bar.clear();
+            helper.getBlockState(placed).getBlock().setPlacedBy(level, abs, helper.getBlockState(placed), bob, ItemStack.EMPTY);
+            RadioBlockEntity placedBe = helper.getBlockEntity(placed);
+            check(placedBe.getTunedBy() != null && placedBe.getTunedBy().equals(bob.getUUID()), "Bob is its tuner");
+            check(SignalNetwork.get(level).isSilenced(level, abs), "Silenced in the network");
+            check(lastKey(bar).endsWith("private_silenced"), "Bob is told: " + lastKey(bar));
+            CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+            check(info != null && "Alice".equals(info.getString("private_to")) && info.getBoolean("silenced"), "Jade's data: " + info);
+            List<Component> lines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(placed), info);
+            check(keyOf(lines.get(lines.size() - 1)).equals("jade." + SignalTower.MOD_ID + ".silenced"), "Jade's last line: " + lineKeys(lines));
+            CompoundTag aliceInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx));
+            List<Component> aliceLines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), aliceInfo);
+            check(keyOf(aliceLines.get(aliceLines.size() - 1)).endsWith(".private")
+                    && aliceLines.get(aliceLines.size() - 1).getString().equals("Private to Alice"), "Alice's: " + lineKeys(aliceLines));
+        } finally {
+            claims.remove(1810);
+            SignalNetwork.get(level).invalidate(1810);
+        }
+        helper.succeed();
+    }
 }
