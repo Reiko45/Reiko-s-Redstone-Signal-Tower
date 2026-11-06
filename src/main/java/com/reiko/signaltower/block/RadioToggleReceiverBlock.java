@@ -35,11 +35,13 @@ public class RadioToggleReceiverBlock extends RadioReceiverBlock {
     protected Component describe(ServerLevel level, BlockPos pos, BlockState state) {
         int frequency = 0;
         boolean on = false;
+        java.util.UUID tunedBy = null;
         if (level.getBlockEntity(pos) instanceof RadioReceiverBlockEntity rx) {
             frequency = rx.getFrequency();
             on = rx.isToggledOn();
+            tunedBy = rx.getTunedBy();
         }
-        SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
+        SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos, tunedBy);
         String key = "message." + SignalTower.MOD_ID + ".";
         Component state1 = on
                 ? Component.translatable(key + "toggle_on").withStyle(ChatFormatting.GREEN)

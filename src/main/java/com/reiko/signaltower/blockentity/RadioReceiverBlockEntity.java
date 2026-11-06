@@ -2,6 +2,7 @@ package com.reiko.signaltower.blockentity;
 
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioToggleReceiverBlock;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
@@ -11,6 +12,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Listens to the network. It re-scans only when something on its frequency changed (so changes
@@ -21,6 +26,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * its frequency turns on (goes from silent to any strength) where it stands. It starts listening
  * without flipping when it's placed, loaded or re-tuned, so an already-on frequency doesn't count
  * as a turn-on. Its on/off state is saved.
+ * <p>
+ * On someone else's encrypted frequency (one whose owner and members don't include whoever tuned
+ * or placed it) it hears nothing. Becoming able to hear it, or losing that, isn't a turn-on either.
  */
 public class RadioReceiverBlockEntity extends RadioBlockEntity {
     private static final int RECHECK_INTERVAL = 20;
@@ -34,6 +42,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     /** Toggle receiver: whether it heard its frequency at the last check, and whether that's been set yet. Not saved. */
     private boolean lastHeard;
     private boolean primed;
+    /** Whether it was deaf (on someone else's encrypted frequency) at the last check, and who it was tracked as tuned by. Not saved. */
+    private boolean wasDeaf;
+    private @Nullable UUID trackedTuner;
 
     public RadioReceiverBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.RADIO_RECEIVER_BE.get(), pos, state);
@@ -53,6 +64,11 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     protected void onFrequencyChanged() {
         seenRevision = -1;
         primed = false; // the new frequency's current state isn't a turn-on
+    }
+
+    @Override
+    protected void onTunedByChanged() {
+        seenRevision = -1; // check again at once: it may hear an encrypted frequency now, or not any more
     }
 
     /** Broken, or its chunk unloaded: stop counting it as a listener. */
@@ -97,12 +113,19 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         }
         be.timer = RECHECK_INTERVAL;
         be.seenRevision = revision;
-        if (frequency != be.seenFrequency) {
-            network.trackReceiver(pos, frequency); // first tick after loading, or just re-tuned
+        UUID tunedBy = be.getTunedBy();
+        if (frequency != be.seenFrequency || !Objects.equals(tunedBy, be.trackedTuner)) {
+            network.trackReceiver(pos, frequency, tunedBy); // first tick after loading, or just re-tuned
+            be.trackedTuner = tunedBy;
         }
         be.seenFrequency = frequency;
 
-        int power = be.outputFor(network.listen(serverLevel, frequency, pos).power());
+        boolean deaf = !FrequencyClaims.mayHear(serverLevel, frequency, tunedBy);
+        if (deaf != be.wasDeaf) {
+            be.wasDeaf = deaf;
+            be.primed = false; // starting or stopping hearing an encrypted frequency isn't a turn-on
+        }
+        int power = be.outputFor(deaf ? 0 : network.listen(serverLevel, frequency, pos).power());
         if (state.getValue(RadioReceiverBlock.POWER) != power) {
             // UPDATE_ALL also notifies neighbors, so wires and lamps next to us react right away.
             BlockState newState = state.setValue(RadioReceiverBlock.POWER, power);

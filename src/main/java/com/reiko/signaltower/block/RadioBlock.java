@@ -2,6 +2,8 @@ package com.reiko.signaltower.block;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
+import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
+import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -20,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
@@ -61,8 +64,8 @@ public abstract class RadioBlock extends BaseEntityBlock {
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                BlockHitResult hitResult) {
         if (level instanceof ServerLevel serverLevel) {
-            Component silenced = silencedNotice(serverLevel, pos);
-            player.displayClientMessage(silenced != null ? silenced : describe(serverLevel, pos, state), true);
+            Component quiet = quietNotice(serverLevel, pos);
+            player.displayClientMessage(quiet != null ? quiet : describe(serverLevel, pos, state), true);
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
@@ -81,9 +84,30 @@ public abstract class RadioBlock extends BaseEntityBlock {
     }
 
     /**
+     * If the receiver or converter at {@code pos} hears nothing because it listens on someone
+     * else's encrypted frequency (whoever tuned or placed it isn't a member), the red line saying
+     * so; else null.
+     */
+    public static @Nullable Component deafNotice(ServerLevel level, BlockPos pos) {
+        BlockEntity entity = level.getBlockEntity(pos);
+        if (entity instanceof RadioReceiverBlockEntity
+                || entity instanceof RadioRepeaterBlockEntity relay && relay.isConverter()) {
+            RadioBlockEntity radio = (RadioBlockEntity) entity;
+            return FrequencyClaims.deafness(level, radio.getFrequency(), radio.getTunedBy(), "encrypted_deaf");
+        }
+        return null;
+    }
+
+    /** {@link #silencedNotice}, or else {@link #deafNotice}: why the block at {@code pos} does nothing, or null. */
+    public static @Nullable Component quietNotice(ServerLevel level, BlockPos pos) {
+        Component silenced = silencedNotice(level, pos);
+        return silenced != null ? silenced : deafNotice(level, pos);
+    }
+
+    /**
      * Whoever places the block becomes its tuner (see {@link RadioBlockEntity#getTunedBy()}). If
-     * that means it won't broadcast, because it's tuned to someone else's private frequency, they're
-     * told.
+     * that means it won't broadcast, because it's tuned to someone else's private frequency, or
+     * won't hear, because it's tuned to someone else's encrypted one, they're told.
      */
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
@@ -91,9 +115,9 @@ public abstract class RadioBlock extends BaseEntityBlock {
         if (level instanceof ServerLevel serverLevel && placer instanceof Player player
                 && level.getBlockEntity(pos) instanceof RadioBlockEntity radio) {
             radio.setTunedBy(player.getUUID());
-            Component silenced = silencedNotice(serverLevel, pos);
-            if (silenced != null) {
-                player.displayClientMessage(silenced, true);
+            Component quiet = quietNotice(serverLevel, pos);
+            if (quiet != null) {
+                player.displayClientMessage(quiet, true);
             }
         }
     }

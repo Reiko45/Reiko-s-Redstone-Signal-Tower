@@ -79,8 +79,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
     /**
      * Every named or private frequency, in order, with how strong it is anywhere in the player's
      * dimension and where they stand. Someone else's private frequency only says whether it's heard
-     * where the player stands (anywhere = -1), so the directory can't be used to watch it from afar.
-     * Public for the GameTests.
+     * where the player stands (anywhere = -1), so the directory can't be used to watch it from afar;
+     * someone else's encrypted frequency not even that (here = -1 too). Public for the GameTests.
      */
     public static List<DirectoryResultPayload.Entry> entriesFor(Player player) {
         List<DirectoryResultPayload.Entry> entries = new ArrayList<>();
@@ -99,7 +99,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
             FrequencyClaims.Claim claim = claims.get(frequency);
             boolean member = claim == null || claim.allows(player.getUUID());
             int anywhere = member ? network.strongestAnywhere(level, frequency) : -1;
-            int here = network.listen(level, frequency, player.blockPosition()).power();
+            int here = claim == null || claim.hears(player.getUUID())
+                    ? network.listen(level, frequency, player.blockPosition()).power() : -1;
             entries.add(new DirectoryResultPayload.Entry(frequency, anywhere, here));
         }
         return entries;

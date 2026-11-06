@@ -3,6 +3,7 @@ package com.reiko.signaltower.item;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -25,6 +26,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.loading.FMLEnvironment;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -149,6 +151,9 @@ public class PagerItem extends Item {
             pager.remove(ModRegistry.PAGER_AWAY_SINCE.get());
             pagersBack++;
             int frequency = FrequencyTunerItem.getFrequency(pager);
+            if (!FrequencyClaims.mayHear(level, frequency, player.getUUID())) {
+                continue; // someone else's encrypted frequency: the pager heard nothing
+            }
             List<SignalNetwork.TurnOn> heard = network.turnOnsSince(frequency, since, player.blockPosition());
             if (heard.isEmpty()) {
                 continue;
@@ -196,12 +201,13 @@ public class PagerItem extends Item {
     }
 
     /**
-     * Listens on the pager's frequency where {@code holder} is. If the signal just turned on, starts
-     * the beeps, shows the alert to the holder, and returns the alert. Otherwise returns null.
+     * Listens on the pager's frequency where {@code holder} is (nothing, on someone else's
+     * encrypted frequency). If the signal just turned on, starts the beeps, shows the alert to the
+     * holder, and returns the alert. Otherwise returns null.
      */
     public static @Nullable Component checkSignal(ServerLevel level, Entity holder, ItemStack stack) {
         int frequency = FrequencyTunerItem.getFrequency(stack);
-        int power = SignalNetwork.get(level).listen(level, frequency, holder.blockPosition()).power();
+        int power = SignalNetwork.get(level).listen(level, frequency, holder.blockPosition(), holder.getUUID()).power();
         int previous = lastSignal(stack);
         if (power == previous) {
             return null;
@@ -238,10 +244,11 @@ public class PagerItem extends Item {
 
     /**
      * How many pagers on {@code frequency} the player carries, if the player is inside
-     * {@code coverage}. Used for a remote's "Heard by" count.
+     * {@code coverage} (and can hear it, if it's encrypted). Used for a remote's "Heard by" count.
      */
     public static int pagersHeard(Player player, int frequency, List<SignalNetwork.Coverage> coverage) {
-        if (!SignalNetwork.covers(coverage, player.blockPosition())) {
+        if (!SignalNetwork.covers(coverage, player.blockPosition())
+                || !FrequencyClaims.mayHear(player.level(), frequency, player.getUUID())) {
             return 0;
         }
         Container inventory = player.getInventory();
@@ -317,6 +324,12 @@ public class PagerItem extends Item {
         tooltip.add(signal > 0
                 ? Component.translatable(prefix + "pager_status_on", signal).withStyle(ChatFormatting.GREEN)
                 : Component.translatable(prefix + "pager_status_quiet").withStyle(ChatFormatting.DARK_GREEN));
+        int frequency = FrequencyTunerItem.getFrequency(stack);
+        if (FMLEnvironment.dist.isClient() && !ClientHooks.localPlayerMayHear(frequency)) {
+            FrequencyClaims.ClaimInfo claim = FrequencyClaims.clientInfo(frequency);
+            tooltip.add(Component.translatable(prefix + "pager_encrypted", claim == null ? "?" : claim.ownerName())
+                    .withStyle(ChatFormatting.RED));
+        }
         tooltip.add(Component.translatable(prefix + (isSilent(stack) ? "pager_silent" : "pager_beeping"))
                 .withStyle(ChatFormatting.AQUA));
         tooltip.add(Component.translatable(prefix + (isChatLog(stack) ? "pager_chat_on" : "pager_chat_off"))

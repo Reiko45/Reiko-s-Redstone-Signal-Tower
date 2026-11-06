@@ -3347,4 +3347,315 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Encrypted frequencies ----
+
+    /**
+     * An encrypted claim: only its owner and members hear it (a block with no recorded tuner does
+     * too); it's saved, survives the network (claim info and the tuner's packet), and changing or
+     * renaming a group it uses keeps it encrypted.
+     */
+    @GameTest(template = PLATFORM)
+    public static void encryptedClaimsSavedAndSynced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID owner = UUID.randomUUID();
+        UUID friend = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        var claims = new com.reiko.signaltower.radio.FrequencyClaims();
+        claims.putGroup(owner, null, "Crew", java.util.Map.of(member, "Member"));
+        var claim = claims.put(2201, owner, "Owner", java.util.Map.of(friend, "Friend"), List.of("crew"), true);
+        check(claim.encrypted() && claim.groups().equals(List.of("Crew")), "Encrypted, with its group: " + claim);
+        check(claim.hears(owner) && claim.hears(friend) && claim.hears(member), "Owner, friend and group member hear it");
+        check(!claim.hears(UUID.randomUUID()) && !claim.hears(null), "Nobody else (the claim itself counts null as nobody)");
+        var plain = claims.put(2202, owner, "Owner", java.util.Map.of());
+        check(!plain.encrypted() && plain.hears(UUID.randomUUID()), "A private one that isn't encrypted: anyone hears it");
+
+        claims.putGroup(owner, "Crew", "Base crew", java.util.Map.of(member, "Member"));
+        check(claims.get(2201).encrypted() && claims.get(2201).groups().equals(List.of("Base crew")), "Renaming the group keeps it encrypted");
+        claims.removeGroup(owner, "Base crew");
+        check(claims.get(2201).encrypted() && !claims.get(2201).hears(member), "Deleting it too, and its member can't hear any more");
+
+        var loaded = com.reiko.signaltower.radio.FrequencyClaims.load(claims.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(loaded.get(2201).encrypted() && !loaded.get(2202).encrypted(), "Saved and loaded");
+        CompoundTag old = claims.save(new CompoundTag(), level.registryAccess());
+        old.getList("claims", net.minecraft.nbt.Tag.TAG_COMPOUND).forEach(t -> ((CompoundTag) t).remove("encrypted"));
+        check(!com.reiko.signaltower.radio.FrequencyClaims.load(old, level.registryAccess()).get(2201).encrypted(),
+                "A claim saved before v0.29.0 isn't encrypted");
+
+        var info = com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.of(claims.get(2201));
+        check(info.encrypted() && info.isMember(owner, "Owner") && info.isMember(UUID.randomUUID(), "friend")
+                && !info.isMember(UUID.randomUUID(), "Zed"), "Client info: encrypted, members by UUID or name");
+        var buffer = Unpooled.buffer();
+        var one = new com.reiko.signaltower.network.FrequencyClaimPayload(2201, java.util.Optional.of(info));
+        com.reiko.signaltower.network.FrequencyClaimPayload.STREAM_CODEC.encode(buffer, one);
+        check(com.reiko.signaltower.network.FrequencyClaimPayload.STREAM_CODEC.decode(buffer).equals(one), "Claim info survives the network");
+        var packet = new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2201, true, "Friend", true);
+        com.reiko.signaltower.network.SetFrequencyPrivacyPayload.STREAM_CODEC.encode(buffer, packet);
+        check(com.reiko.signaltower.network.SetFrequencyPrivacyPayload.STREAM_CODEC.decode(buffer).equals(packet), "So does the tuner's packet");
+        check(!new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2201, true, "").encrypted(), "Not encrypted unless asked");
+        helper.succeed();
+    }
+
+    /**
+     * On an encrypted frequency, listeners tuned by someone who isn't a member hear nothing at all:
+     * receivers (no signal, no towers), the scanner (the frequency isn't listed), converters (they
+     * don't pass it on, not even a remote press) and the remotes' count and locator (their
+     * receivers don't count). Members' and old blocks hear it. Just private: everyone hears it.
+     */
+    @GameTest(template = PLATFORM)
+    public static void encryptedFrequencyDeafensOtherPlayersListeners(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID owner = UUID.randomUUID();
+        UUID friend = UUID.randomUUID();
+        UUID stranger = UUID.randomUUID();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos here = new BlockPos(65_000, 100, 65_000); // far away and never loaded
+        claims.put(2203, owner, "Owner", java.util.Map.of(friend, "Friend"), List.of(), true);
+        network.invalidate(2203);
+        try {
+            network.updateTransmitter(here, 2203, 9, 30, owner);
+            BlockPos spot = here.east(5);
+            var strangers = network.listen(level, 2203, spot, stranger);
+            check(strangers.power() == 0 && strangers.transmittersInReach() == 0, "A stranger's receiver hears nothing: " + strangers);
+            check(network.listen(level, 2203, spot, friend).power() == 9, "A friend's hears it");
+            check(network.listen(level, 2203, spot, null).power() == 9 && network.listen(level, 2203, spot).power() == 9,
+                    "So does an old one with no tuner");
+            check(com.reiko.signaltower.radio.FrequencyClaims.mayHear(level, 2203, friend)
+                    && !com.reiko.signaltower.radio.FrequencyClaims.mayHear(level, 2203, stranger)
+                    && com.reiko.signaltower.radio.FrequencyClaims.mayHear(level, 2203, null)
+                    && com.reiko.signaltower.radio.FrequencyClaims.mayHear(level, 2204, stranger), "mayHear");
+            check(network.scanAt(level, spot, stranger).stream().noneMatch(h -> h.frequency() == 2203), "The stranger's scanner doesn't list it");
+            check(network.scanAt(level, spot, friend).stream().anyMatch(h -> h.frequency() == 2203 && h.power() == 9), "The friend's does");
+
+            // A stranger's converter listening on it (sending on public 2204) hears nothing; a friend's passes it on.
+            BlockPos converter = here.east(20);
+            network.updateRepeater(converter, 2203, 2204, 30, stranger);
+            check(network.isDeaf(level, converter) && network.repeaterPower(level, converter) == 0, "The stranger's converter is deaf");
+            check(network.listen(level, 2204, converter.east(25)).power() == 0, "So 2204 stays quiet");
+            List<SignalNetwork.Coverage> press = SignalNetwork.ownCoverage(here, 30);
+            check(network.carried(level, 2203, press).on(2204).isEmpty(), "A press on 2203 isn't carried onto 2204 by it");
+            network.updateRepeater(converter, 2203, 2204, 30, friend);
+            check(!network.isDeaf(level, converter) && network.listen(level, 2204, converter.east(25)).power() == 9, "The friend's converter passes it on");
+            check(!network.carried(level, 2203, press).on(2204).isEmpty(), "And carries presses");
+
+            // Remotes count only receivers that can hear it.
+            network.trackReceiver(here.south(2), 2203, stranger);
+            network.trackReceiver(here.south(4), 2203, friend);
+            network.trackReceiver(here.south(6), 2203, null);
+            check(network.countReceivers(2203, press) == 2, "The stranger's receiver isn't counted: " + network.countReceivers(2203, press));
+            check(network.scanReceivers(2203, here, 30).inRange() == 2, "Nor shown by the locator");
+
+            // Only private (not encrypted): everyone hears it again.
+            claims.put(2203, owner, "Owner", java.util.Map.of(friend, "Friend"));
+            network.invalidate(2203);
+            network.updateRepeater(converter, 2203, 2204, 30, stranger);
+            check(network.listen(level, 2203, spot, stranger).power() == 9, "Private only: the stranger hears it");
+            check(network.listen(level, 2204, converter.east(25)).power() == 9, "And their converter passes it on");
+            check(network.countReceivers(2203, press) == 3, "All three receivers count");
+            check(network.scanAt(level, spot, stranger).stream().anyMatch(h -> h.frequency() == 2203), "The scanner lists it");
+        } finally {
+            claims.remove(2203);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Real blocks: a stranger's receiver and toggle receiver on an encrypted frequency stay off and
+     * say why (readout, the tuner's message, Jade); the friend's and an old one light up. Making it
+     * just private lets the stranger's hear it, and becoming able to hear isn't a turn-on for the
+     * toggle receiver.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void encryptedFrequencyReceiverBlocks(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player stranger = namedPlayer(helper, new BlockPos(2, 1, 2), UUID.randomUUID(), "Stranger", false, bar, new java.util.ArrayList<>());
+        claims.put(2205, ownerId, "Owner", java.util.Map.of(friendId, "Friend"), List.of(), true);
+        SignalNetwork.get(level).invalidate(2205);
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos strangers = new BlockPos(3, 1, 1);
+        BlockPos friends = new BlockPos(5, 1, 1);
+        BlockPos old = new BlockPos(7, 1, 1);
+        BlockPos toggle = new BlockPos(3, 1, 3);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 2205);
+        ((RadioBlockEntity) helper.getBlockEntity(tx)).setTunedBy(ownerId);
+        place(helper, friends, ModRegistry.RADIO_RECEIVER.get(), 2205);
+        ((RadioBlockEntity) helper.getBlockEntity(friends)).setTunedBy(friendId);
+        place(helper, old, ModRegistry.RADIO_RECEIVER.get(), 2205);
+        place(helper, strangers, ModRegistry.RADIO_RECEIVER.get(), 1);
+        place(helper, toggle, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 2205);
+        ((RadioBlockEntity) helper.getBlockEntity(toggle)).setTunedBy(stranger.getUUID());
+        helper.setBlock(tx.above(), Blocks.REDSTONE_BLOCK);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    // The stranger tunes their receiver to it: tuned, but told it won't hear anything.
+                    ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+                    FrequencyTunerItem.setFrequency(tuner, 2205);
+                    stranger.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+                    BlockPos abs = helper.absolutePos(strangers);
+                    tuner.getItem().useOn(new UseOnContext(stranger, InteractionHand.MAIN_HAND,
+                            new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false)));
+                    check(frequencyAt(helper, strangers) == 2205 && lastKey(bar).endsWith("encrypted_deaf"), "Tuned, and told: " + lastKey(bar));
+                })
+                .thenWaitUntil(() -> {
+                    assertOutput(helper, friends, 15);
+                    assertOutput(helper, old, 15);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, strangers, 0);
+                    assertOutput(helper, toggle, 0);
+                    BlockPos abs = helper.absolutePos(strangers);
+                    Component notice = com.reiko.signaltower.block.RadioBlock.quietNotice(level, abs);
+                    check(notice != null && keyOf(notice).endsWith("encrypted_deaf") && notice.getString().contains("Owner"), "Readout says why: " + notice);
+                    check(com.reiko.signaltower.block.RadioBlock.quietNotice(level, helper.absolutePos(friends)) == null, "The friend's is fine");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(info != null && "Owner".equals(info.getString("deaf_to")) && info.getBoolean("encrypted") && info.getInt("towers") == 0,
+                            "Jade's data: " + info);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(strangers), info));
+                    check(keys.get(keys.size() - 1).equals("deaf") && !keys.contains("encrypted"),
+                            "One line says it's deaf: " + keys);
+                    CompoundTag txInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx));
+                    List<String> txKeys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), txInfo));
+                    check(txKeys.get(txKeys.size() - 1).equals("encrypted"), "The transmitter says it's encrypted: " + txKeys);
+
+                    claims.put(2205, ownerId, "Owner", java.util.Map.of(friendId, "Friend"));
+                    SignalNetwork.get(level).invalidate(2205);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, strangers, 15))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, toggle, 0); // it can hear the frequency now, but that isn't a turn-on
+                    check(com.reiko.signaltower.block.RadioBlock.quietNotice(level, helper.absolutePos(strangers)) == null, "No longer deaf");
+                    helper.setBlock(tx.above(), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, strangers, 0))
+                .thenExecute(() -> helper.setBlock(tx.above(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, toggle, 15)) // a real turn-on flips it
+                .thenExecute(() -> {
+                    claims.remove(2205);
+                    SignalNetwork.get(level).invalidate(2205);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Pagers and scanners carried by someone who isn't a member don't hear an encrypted frequency:
+     * no alert, no "Heard by" count, nothing in the catch-up, nothing to track (and a target is
+     * dropped once it's encrypted), and the directory shows nothing about it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void encryptedFrequencyPagersScannerAndDirectory(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player stranger = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Stranger", false, bar, new java.util.ArrayList<>());
+        Player friend = namedPlayer(helper, new BlockPos(1, 1, 1), friendId, "Friend", false, bar, new java.util.ArrayList<>());
+        BlockPos far = new BlockPos(66_000, 100, 66_000);
+        for (Player player : List.of(stranger, friend)) {
+            player.moveTo(far.getX() + 3.5, far.getY(), far.getZ() + 0.5);
+        }
+        ItemStack strangersPager = pagerFor(stranger, 2206);
+        ItemStack friendsPager = pagerFor(friend, 2206);
+        SignalNetwork network = SignalNetwork.get(level);
+        claims.put(2206, ownerId, "Owner", java.util.Map.of(friendId, "Friend"), List.of(), true);
+        network.invalidate(2206);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    PagerItem.markAway(stranger, level.getGameTime());
+                    PagerItem.markAway(friend, level.getGameTime());
+                })
+                .thenIdle(2)
+                .thenExecute(() -> network.updateTransmitter(far, 2206, 12, 30, ownerId))
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    check(PagerItem.checkSignal(level, stranger, strangersPager) == null && PagerItem.lastSignal(strangersPager) == 0,
+                            "The stranger's pager stays quiet");
+                    check(PagerItem.checkSignal(level, friend, friendsPager) != null && PagerItem.lastSignal(friendsPager) == 12,
+                            "The friend's goes off");
+                    List<SignalNetwork.Coverage> coverage = SignalNetwork.ownCoverage(far, 30);
+                    check(PagerItem.pagersHeard(stranger, 2206, coverage) == 0 && PagerItem.pagersHeard(friend, 2206, coverage) == 1,
+                            "Only the friend's counts for Heard by");
+                    List<Component> strangersCatchUp = PagerItem.catchUp(level, stranger, true);
+                    check(strangersCatchUp.size() == 1 && keyOf(strangersCatchUp.get(0)).endsWith("pager_catchup_none_one"),
+                            "The stranger's catch-up heard nothing: " + strangersCatchUp);
+                    List<Component> friendsCatchUp = PagerItem.catchUp(level, friend, true);
+                    check(friendsCatchUp.size() == 1 && keyOf(friendsCatchUp.get(0)).endsWith("pager_catchup_once"),
+                            "The friend's heard it once: " + friendsCatchUp);
+
+                    ItemStack scanner = new ItemStack(ModRegistry.SIGNAL_SCANNER.get());
+                    check(keyOf(SignalScannerItem.track(level, stranger, scanner, 2206)).endsWith("scanner_cant_track")
+                            && SignalScannerItem.getTarget(scanner) == null, "The stranger can't track it");
+                    check(keyOf(SignalScannerItem.track(level, friend, scanner, 2206)).endsWith("scanner_tracking"), "The friend can");
+                    check(SignalScannerItem.checkTarget(level, scanner, friendId) == null, "And keeps it");
+                    Component lost = SignalScannerItem.checkTarget(level, scanner, stranger.getUUID());
+                    check(lost != null && keyOf(lost).endsWith("scanner_lost_encrypted") && SignalScannerItem.getTarget(scanner) == null,
+                            "In a non-member's hands it's dropped: " + lost);
+
+                    for (Player player : List.of(stranger, friend)) {
+                        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+                    }
+                    var strangersEntry = com.reiko.signaltower.network.DirectoryRequestPayload.entriesFor(stranger).stream()
+                            .filter(e -> e.frequency() == 2206).findFirst().orElseThrow();
+                    check(strangersEntry.hidden() && strangersEntry.encrypted() && strangersEntry.here() == -1 && !strangersEntry.on(),
+                            "The stranger's directory shows nothing, even standing next to it: " + strangersEntry);
+                    var friendsEntry = com.reiko.signaltower.network.DirectoryRequestPayload.entriesFor(friend).stream()
+                            .filter(e -> e.frequency() == 2206).findFirst().orElseThrow();
+                    check(friendsEntry.anywhere() == 12 && friendsEntry.here() == 12 && !friendsEntry.encrypted(), "The friend's shows it: " + friendsEntry);
+                })
+                .thenExecute(() -> {
+                    claims.remove(2206);
+                    network.removeTransmitter(far);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The tuner's privacy packet: Encrypted makes a new claim encrypted (or encrypts or decrypts
+     * an existing one), and says so; asking for what it already is changes nothing; only the owner
+     * changes it, though an operator can still make it public.
+     */
+    @GameTest(template = PLATFORM)
+    public static void encryptButtonInTunerPacket(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID aliceId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player alice = namedPlayer(helper, new BlockPos(1, 1, 1), aliceId, "Alice", false, bar, new java.util.ArrayList<>());
+        Player bob = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Bob", false, bar, new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Admin", true, bar, new java.util.ArrayList<>());
+        for (Player player : List.of(alice, bob, op)) {
+            player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+        }
+        java.util.function.BiFunction<Player, com.reiko.signaltower.network.SetFrequencyPrivacyPayload, Boolean> apply =
+                com.reiko.signaltower.network.SetFrequencyPrivacyPayload::apply;
+        try {
+            if (com.reiko.signaltower.Config.PRIVATE_FREQUENCIES_PER_PLAYER.get() <= 0) {
+                helper.succeed(); // private frequencies are switched off in this config
+                return;
+            }
+            check(apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", true)), "Alice encrypts 2207");
+            check(claims.get(2207).encrypted() && lastKey(bar).endsWith("encrypted_set"), "Encrypted: " + lastKey(bar));
+            check(!apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", true)), "Again: nothing changes");
+            check(!apply.apply(bob, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", false)), "Bob can't decrypt it");
+            check(claims.get(2207).encrypted(), "Still encrypted");
+            check(apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", false)), "Alice decrypts it");
+            check(!claims.get(2207).encrypted() && claims.get(2207).owner().equals(aliceId) && lastKey(bar).endsWith("private_set"),
+                    "Still private, not encrypted: " + lastKey(bar));
+            check(apply.apply(alice, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", true)), "And encrypts it again");
+            check(!apply.apply(op, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, true, "", false)),
+                    "An operator can't just decrypt it");
+            check(apply.apply(op, new com.reiko.signaltower.network.SetFrequencyPrivacyPayload(2207, false, "", false)), "But can make it public");
+            check(claims.get(2207) == null, "Public");
+        } finally {
+            claims.remove(2207);
+        }
+        helper.succeed();
+    }
 }

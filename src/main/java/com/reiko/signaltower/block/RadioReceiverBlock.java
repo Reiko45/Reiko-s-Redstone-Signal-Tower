@@ -67,8 +67,9 @@ public class RadioReceiverBlock extends RadioBlock {
 
     @Override
     protected Component describe(ServerLevel level, BlockPos pos, BlockState state) {
-        int frequency = level.getBlockEntity(pos) instanceof RadioReceiverBlockEntity rx ? rx.getFrequency() : 0;
-        SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
+        RadioReceiverBlockEntity rx = level.getBlockEntity(pos) instanceof RadioReceiverBlockEntity found ? found : null;
+        int frequency = rx != null ? rx.getFrequency() : 0;
+        SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos, rx != null ? rx.getTunedBy() : null);
         return Component.translatable("message." + SignalTower.MOD_ID + ".receiver_status",
                 FrequencyNames.label(level, frequency), reception.power(), reception.transmittersInReach());
     }

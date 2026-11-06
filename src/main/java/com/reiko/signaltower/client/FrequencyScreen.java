@@ -67,10 +67,11 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** True once the player typed in the name box, so changing the frequency doesn't overwrite it. */
     private boolean nameEdited;
     private boolean fillingName;
-    /** Tuner only: whether the typed frequency is to be private, and the friends typed for it. */
+    /** Tuner only: whether the typed frequency is to be private (and encrypted), and the friends typed for it. */
     private @Nullable Button privateButton;
     private @Nullable EditBox friendsBox;
     private boolean privateOn;
+    private boolean encryptedOn;
     /** True once the player clicked Private or typed friends, so changing the frequency doesn't undo it. */
     private boolean privacyEdited;
     private boolean fillingPrivacy;
@@ -166,7 +167,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             }
 
             privateButton = addRenderableWidget(Button.builder(Component.empty(), button -> {
-                privateOn = !privateOn;
+                cyclePrivacy(Screen.hasShiftDown());
                 privacyEdited = true;
                 updatePrivacyWidgets();
             }).tooltip(Tooltip.create(Component.translatable(KEY + ".private_tooltip")))
@@ -304,6 +305,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         if (!privacyEdited || !editable) {
             privacyEdited = false;
             privateOn = claim != null;
+            encryptedOn = claim != null && claim.encrypted();
             fillingPrivacy = true;
             friendsBox.setValue(claim == null ? "" : FrequencyClaims.friendsText(claim.groups(), claim.friends()));
             friendsBox.moveCursorToStart(false); // so a long list shows its start
@@ -318,14 +320,33 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         }
         FrequencyClaims.ClaimInfo claim = claim();
         boolean editable = claim == null || mine(claim);
-        privateButton.setMessage(Component.translatable(KEY + (privateOn ? ".private_on" : ".private_off"))
-                .withStyle(privateOn ? ChatFormatting.GOLD : ChatFormatting.WHITE));
+        privateButton.setMessage(Component.translatable(KEY + (!privateOn ? ".private_off" : encryptedOn ? ".encrypted_on" : ".private_on"))
+                .withStyle(!privateOn ? ChatFormatting.WHITE : encryptedOn ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GOLD));
         privateButton.active = parsed().isPresent() && (editable || isOperator());
         friendsBox.setEditable(editable && privateOn);
         if (nameBox != null) {
             // A private frequency's name is up to its owner and friends (and operators).
             nameBox.setEditable(claim == null || mine(claim) || isFriend(claim) || isOperator());
         }
+    }
+
+    /**
+     * The privacy button: Public, Private, Encrypted, then Public again (sneak-click goes back). On
+     * someone else's frequency (only an operator's button works there) it switches between how it
+     * is and Public, since that's all an operator may do.
+     */
+    private void cyclePrivacy(boolean back) {
+        FrequencyClaims.ClaimInfo claim = claim();
+        if (claim != null && !mine(claim)) {
+            boolean wasPublic = !privateOn;
+            privateOn = wasPublic;
+            encryptedOn = wasPublic && claim.encrypted();
+            return;
+        }
+        int state = !privateOn ? 0 : encryptedOn ? 2 : 1;
+        state = Math.floorMod(state + (back ? -1 : 1), 3);
+        privateOn = state > 0;
+        encryptedOn = state == 2;
     }
 
     private boolean isFriend(FrequencyClaims.ClaimInfo claim) {
@@ -341,7 +362,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             return false;
         }
         String text = friendsBox.getValue();
-        return !lower(SetFrequencyPrivacyPayload.parseNames(text)).equals(lower(claim.friends()))
+        return encryptedOn != claim.encrypted()
+                || !lower(SetFrequencyPrivacyPayload.parseNames(text)).equals(lower(claim.friends()))
                 || !lower(SetFrequencyPrivacyPayload.parseGroups(text)).equals(lower(claim.groups()));
     }
 
@@ -356,22 +378,28 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         FrequencyClaims.ClaimInfo claim = claim();
         String key = KEY + ".privacy_";
         if (privacyChanged(claim)) {
-            return Component.translatable(key + (privateOn ? (claim == null ? "will_claim" : "will_update") : "will_release"))
-                    .withStyle(ChatFormatting.YELLOW);
+            String change = !privateOn ? "will_release"
+                    : claim == null ? (encryptedOn ? "will_claim_encrypted" : "will_claim")
+                    : encryptedOn != claim.encrypted() ? (encryptedOn ? "will_encrypt" : "will_decrypt")
+                    : "will_update";
+            return Component.translatable(key + change).withStyle(ChatFormatting.YELLOW);
         }
         if (claim == null) {
             return Component.translatable(key + "public").withStyle(ChatFormatting.GRAY);
         }
+        // An encrypted frequency's lines say "send and hear" where a private one's say "send".
+        String enc = claim.encrypted() ? "_encrypted" : "";
+        ChatFormatting color = claim.encrypted() ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GOLD;
         if (mine(claim)) {
             return claim.members().isEmpty()
-                    ? Component.translatable(key + "mine").withStyle(ChatFormatting.GOLD)
+                    ? Component.translatable(key + "mine" + enc).withStyle(color)
                     : claim.members().size() == 1
-                    ? Component.translatable(key + "mine_one_friend").withStyle(ChatFormatting.GOLD)
-                    : Component.translatable(key + "mine_friends", claim.members().size()).withStyle(ChatFormatting.GOLD);
+                    ? Component.translatable(key + "mine_one_friend" + enc).withStyle(color)
+                    : Component.translatable(key + "mine_friends" + enc, claim.members().size()).withStyle(color);
         }
         return isFriend(claim)
-                ? Component.translatable(key + "friend", claim.ownerName()).withStyle(ChatFormatting.GOLD)
-                : Component.translatable(key + "other", claim.ownerName()).withStyle(ChatFormatting.RED);
+                ? Component.translatable(key + "friend" + enc, claim.ownerName()).withStyle(color)
+                : Component.translatable(key + "other" + enc, claim.ownerName()).withStyle(ChatFormatting.RED);
     }
 
     /** Click: use a saved favorite, or save the frequency above into an empty one. Sneak-click: replace. */
@@ -511,7 +539,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 }
             }
             if (friendsBox != null && privacyChanged(FrequencyClaims.clientInfo(frequency))) {
-                PacketDistributor.sendToServer(new SetFrequencyPrivacyPayload(frequency, privateOn, friendsBox.getValue()));
+                PacketDistributor.sendToServer(new SetFrequencyPrivacyPayload(frequency, privateOn, friendsBox.getValue(),
+                        privateOn && encryptedOn));
             }
             onClose();
         });

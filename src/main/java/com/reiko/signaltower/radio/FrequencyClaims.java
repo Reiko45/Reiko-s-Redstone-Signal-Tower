@@ -44,6 +44,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Friends can be listed one by one, or as <b>friend groups</b> (v0.27.0): a player's named lists
  * of players ("Base crew") that any of their private frequencies can use. A claim keeps the names
  * of the groups it uses, so changing a group changes who can send on every frequency using it.
+ * <p>
+ * An <b>encrypted</b> private frequency (v0.29.0) is also closed for listening: only receivers,
+ * toggle receivers and converters tuned or placed by a member, and pagers and scanners carried by
+ * one, hear it ({@link #mayHear}). Everyone else's stay deaf to it.
  */
 public final class FrequencyClaims extends SavedData {
     private static final String DATA_NAME = SignalTower.MOD_ID + "_frequency_claims";
@@ -78,15 +82,20 @@ public final class FrequencyClaims extends SavedData {
 
     /**
      * One private frequency: its owner, the friends listed one by one, the owner's groups it uses
-     * (by name), and everyone in those groups ({@code groupMembers}, worked out from the groups and
-     * kept up to date when they change).
+     * (by name), everyone in those groups ({@code groupMembers}, worked out from the groups and
+     * kept up to date when they change), and whether only members can hear it ({@code encrypted}).
      */
     public record Claim(UUID owner, String ownerName, Map<UUID, String> friends, List<String> groups,
-                        Map<UUID, String> groupMembers) {
+                        Map<UUID, String> groupMembers, boolean encrypted) {
         public Claim {
             friends = Collections.unmodifiableMap(new LinkedHashMap<>(friends)); // keeps the order they were added in
             groups = List.copyOf(groups);
             groupMembers = Collections.unmodifiableMap(new LinkedHashMap<>(groupMembers));
+        }
+
+        public Claim(UUID owner, String ownerName, Map<UUID, String> friends, List<String> groups,
+                     Map<UUID, String> groupMembers) {
+            this(owner, ownerName, friends, groups, groupMembers, false);
         }
 
         public Claim(UUID owner, String ownerName, Map<UUID, String> friends) {
@@ -96,6 +105,16 @@ public final class FrequencyClaims extends SavedData {
         /** True for the owner, their friends and the members of the groups it uses. */
         public boolean allows(@Nullable UUID player) {
             return player != null && (player.equals(owner) || friends.containsKey(player) || groupMembers.containsKey(player));
+        }
+
+        /** True if a receiver tuned by {@code listener} hears it: always unless it's encrypted and they aren't a member. */
+        public boolean hears(@Nullable UUID listener) {
+            return !encrypted || allows(listener);
+        }
+
+        /** This claim with other friends, groups and members, keeping its owner and encryption. */
+        Claim with(Map<UUID, String> friends, List<String> groups, Map<UUID, String> groupMembers) {
+            return new Claim(owner, ownerName, friends, groups, groupMembers, encrypted);
         }
 
         /** The friends listed one by one, in the order they were added. */
@@ -115,23 +134,36 @@ public final class FrequencyClaims extends SavedData {
 
     /**
      * What every client is told about a claim: the owner, the friends listed one by one, the groups
-     * it uses and everyone who can send (friends and group members together).
+     * it uses, everyone who can send (friends and group members together), and whether only they
+     * can hear it.
      */
-    public record ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members) {
+    public record ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members,
+                            boolean encrypted) {
         public static final StreamCodec<ByteBuf, ClaimInfo> STREAM_CODEC = StreamCodec.composite(
                 UUIDUtil.STREAM_CODEC, ClaimInfo::owner,
                 ByteBufCodecs.stringUtf8(64), ClaimInfo::ownerName,
                 ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_FRIENDS)), ClaimInfo::friends,
                 ByteBufCodecs.stringUtf8(MAX_GROUP_NAME * 4).apply(ByteBufCodecs.list(MAX_GROUPS_PER_CLAIM)), ClaimInfo::groups,
                 ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_MEMBERS)), ClaimInfo::members,
+                ByteBufCodecs.BOOL, ClaimInfo::encrypted,
                 ClaimInfo::new);
+
+        public ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members) {
+            this(owner, ownerName, friends, groups, members, false);
+        }
 
         public ClaimInfo(UUID owner, String ownerName, List<String> friends) {
             this(owner, ownerName, friends, List.of(), friends);
         }
 
         public static ClaimInfo of(Claim claim) {
-            return new ClaimInfo(claim.owner(), claim.ownerName(), claim.friendNames(), claim.groups(), claim.memberNames());
+            return new ClaimInfo(claim.owner(), claim.ownerName(), claim.friendNames(), claim.groups(), claim.memberNames(),
+                    claim.encrypted());
+        }
+
+        /** True if the player with this UUID and name is the owner or can send on it. */
+        public boolean isMember(UUID player, String name) {
+            return owner.equals(player) || hasMember(name);
         }
 
         /** True if {@code name} (ignoring case) can send on it besides the owner. */
@@ -199,6 +231,37 @@ public final class FrequencyClaims extends SavedData {
         }
         Claim claim = get(serverLevel.getServer()).claims.get(frequency);
         return claim == null || claim.allows(tunedBy);
+    }
+
+    /**
+     * True if a receiver, toggle receiver or converter tuned (or placed) by {@code listener}, or a
+     * pager or scanner carried by {@code listener}, hears {@code frequency} in {@code level}'s
+     * world: always, unless the frequency is encrypted and {@code listener} is neither its owner
+     * nor a member. A block with no recorded tuner ({@code null}) hears, like it may send.
+     */
+    public static boolean mayHear(Level level, int frequency, @Nullable UUID listener) {
+        if (listener == null || !(level instanceof ServerLevel serverLevel)) {
+            return true;
+        }
+        Claim claim = get(serverLevel.getServer()).claims.get(frequency);
+        return claim == null || claim.hears(listener);
+    }
+
+    /**
+     * A red "{@code key}" message if {@code listener} can't hear {@code frequency} (it's someone
+     * else's encrypted frequency), else null. The message gets the frequency's label and the
+     * owner's name.
+     */
+    public static @Nullable Component deafness(Level level, int frequency, @Nullable UUID listener, String key) {
+        if (listener == null || !(level instanceof ServerLevel serverLevel)) {
+            return null;
+        }
+        Claim claim = get(serverLevel.getServer()).claims.get(frequency);
+        if (claim == null || claim.hears(listener)) {
+            return null;
+        }
+        return Component.translatable("message." + SignalTower.MOD_ID + "." + key,
+                FrequencyNames.label(level, frequency), claim.ownerName()).withStyle(ChatFormatting.RED);
     }
 
     /**
@@ -282,7 +345,7 @@ public final class FrequencyClaims extends SavedData {
                 for (String g : claim.groups()) {
                     renamed.add(g.equalsIgnoreCase(oldName) ? name : g);
                 }
-                claims.put(frequency, new Claim(claim.owner(), claim.ownerName(), claim.friends(), renamed, Map.of()));
+                claims.put(frequency, claim.with(claim.friends(), renamed, Map.of()));
             }
         }
         mine.put(key(name), new Group(name, limited));
@@ -307,7 +370,7 @@ public final class FrequencyClaims extends SavedData {
         for (int frequency : affected) {
             Claim claim = claims.get(frequency);
             List<String> left = claim.groups().stream().filter(g -> !g.equalsIgnoreCase(name)).toList();
-            claims.put(frequency, withMembers(new Claim(claim.owner(), claim.ownerName(), claim.friends(), left, Map.of())));
+            claims.put(frequency, withMembers(claim.with(claim.friends(), left, Map.of())));
         }
         setDirty();
         return affected;
@@ -325,7 +388,7 @@ public final class FrequencyClaims extends SavedData {
             }
         }
         members.remove(claim.owner());
-        return new Claim(claim.owner(), claim.ownerName(), claim.friends(), names, members);
+        return claim.with(claim.friends(), names, members);
     }
 
     /** {@code owner}'s groups as their client is told about them. */
@@ -340,19 +403,25 @@ public final class FrequencyClaims extends SavedData {
         return put(frequency, owner, ownerName, friends, List.of());
     }
 
+    /** {@link #put(int, UUID, String, Map, List, boolean)}, not encrypted. */
+    public Claim put(int frequency, UUID owner, String ownerName, Map<UUID, String> friends, List<String> groupNames) {
+        return put(frequency, owner, ownerName, friends, groupNames, false);
+    }
+
     /**
      * Makes {@code frequency} private to {@code owner}, keeping {@code friends} and using the
-     * owner's groups named in {@code groupNames} (ones they don't have are left out). Replaces any
-     * claim on it.
+     * owner's groups named in {@code groupNames} (ones they don't have are left out), and
+     * {@code encrypted} (only members hear it) or not. Replaces any claim on it.
      */
-    public Claim put(int frequency, UUID owner, String ownerName, Map<UUID, String> friends, List<String> groupNames) {
+    public Claim put(int frequency, UUID owner, String ownerName, Map<UUID, String> friends, List<String> groupNames,
+                     boolean encrypted) {
         Map<UUID, String> limited = new LinkedHashMap<>();
         for (Map.Entry<UUID, String> friend : friends.entrySet()) {
             if (limited.size() < MAX_FRIENDS && !friend.getKey().equals(owner)) {
                 limited.put(friend.getKey(), friend.getValue());
             }
         }
-        Claim claim = withMembers(new Claim(owner, ownerName, limited, groupNames, Map.of()));
+        Claim claim = withMembers(new Claim(owner, ownerName, limited, groupNames, Map.of(), encrypted));
         claims.put(Frequency.clamp(frequency), claim);
         setDirty();
         return claim;
@@ -452,6 +521,9 @@ public final class FrequencyClaims extends SavedData {
                 claim.groups().forEach(name -> names.add(StringTag.valueOf(name)));
                 entry.put("groups", names);
             }
+            if (claim.encrypted()) {
+                entry.putBoolean("encrypted", true);
+            }
             list.add(entry);
         });
         tag.put("claims", list);
@@ -467,7 +539,7 @@ public final class FrequencyClaims extends SavedData {
         return tag;
     }
 
-    /** Reads what {@link #save} wrote (claims saved before v0.27.0 have no groups). Public for the GameTests. */
+    /** Reads what {@link #save} wrote (claims saved before v0.27.0 have no groups, before v0.29.0 none are encrypted). Public for the GameTests. */
     public static FrequencyClaims load(CompoundTag tag, HolderLookup.Provider registries) {
         FrequencyClaims result = new FrequencyClaims();
         ListTag groupList = tag.getList("groups", Tag.TAG_COMPOUND);
@@ -491,7 +563,7 @@ public final class FrequencyClaims extends SavedData {
                 groupNames.add(names.getString(j));
             }
             result.put(entry.getInt("frequency"), entry.getUUID("owner"), entry.getString("owner_name"),
-                    loadPlayers(entry.getList("friends", Tag.TAG_COMPOUND)), groupNames);
+                    loadPlayers(entry.getList("friends", Tag.TAG_COMPOUND)), groupNames, entry.getBoolean("encrypted"));
         }
         result.setDirty(false);
         return result;

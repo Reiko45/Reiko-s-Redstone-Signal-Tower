@@ -265,6 +265,9 @@ public class DirectoryScreen extends Screen {
         if (entry == null) {
             return Component.literal(answered ? "-" : "...").withStyle(ChatFormatting.DARK_GRAY);
         }
+        if (entry.encrypted()) {
+            return Component.translatable(KEY + "encrypted").withStyle(ChatFormatting.DARK_PURPLE);
+        }
         if (entry.hidden()) {
             return entry.here() > 0
                     ? Component.translatable(KEY + "here", entry.here()).withStyle(ChatFormatting.GREEN)
@@ -298,8 +301,12 @@ public class DirectoryScreen extends Screen {
         } else {
             lines.add(Component.translatable(KEY + "tip_other", claim.ownerName()).withStyle(ChatFormatting.RED));
         }
+        if (claim != null && claim.encrypted()) {
+            lines.add(Component.translatable(KEY + (mine(claim) || friendOf(claim) ? "tip_encrypted_member" : "tip_encrypted"))
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
         DirectoryResultPayload.Entry entry = status.get(row.frequency());
-        if (entry != null) {
+        if (entry != null && !entry.encrypted()) {
             String key = entry.hidden()
                     ? (entry.here() > 0 ? "tip_hidden_here" : "tip_hidden")
                     : entry.anywhere() > 0 ? (entry.here() > 0 ? "tip_on_here" : "tip_on") : "tip_off";

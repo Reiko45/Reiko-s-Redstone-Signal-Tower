@@ -167,6 +167,8 @@ public final class SignalNetwork extends SavedData {
     private final Map<Integer, RemoteSignal> pulses = new HashMap<>();
     private final Map<Integer, RemoteSignal> latches = new HashMap<>();
     private final Map<BlockPos, Integer> receivers = new HashMap<>();
+    /** Who tuned or placed each tracked receiver (only those with a known tuner), for encrypted frequencies. */
+    private final Map<BlockPos, UUID> receiverTuners = new HashMap<>();
     private final Map<Integer, Set<BlockPos>> receiversByFrequency = new HashMap<>();
     /** Recent times each frequency turned on, oldest first, for the pagers' catch-up. Saved. */
     private final Map<Integer, ArrayDeque<TurnOn>> history = new HashMap<>();
@@ -202,6 +204,25 @@ public final class SignalNetwork extends SavedData {
         }
         ServerLevel at = level != null ? level : world;
         return at != null && !FrequencyClaims.maySend(at, frequency, tunedBy);
+    }
+
+    /**
+     * True if a receiver or converter tuned or placed by {@code listener} can't hear
+     * {@code frequency}, because it's encrypted and {@code listener} is neither its owner nor a
+     * member. Blocks with no recorded tuner always hear.
+     */
+    private boolean deaf(@Nullable ServerLevel level, int frequency, @Nullable UUID listener) {
+        if (listener == null) {
+            return false;
+        }
+        ServerLevel at = level != null ? level : world;
+        return at != null && !FrequencyClaims.mayHear(at, frequency, listener);
+    }
+
+    /** True if the converter (or repeater) at {@code pos} hears nothing, because it listens on someone else's encrypted frequency. */
+    public boolean isDeaf(ServerLevel level, BlockPos pos) {
+        Repeater repeater = repeaters.get(pos);
+        return repeater != null && deaf(level, repeater.frequency(), repeater.tunedBy());
     }
 
     /**
@@ -421,8 +442,9 @@ public final class SignalNetwork extends SavedData {
         Set<BlockPos> silenced = new HashSet<>();
         for (BlockPos pos : positions) {
             Repeater repeater = repeaters.get(pos);
-            if (blocked(level, repeater.output(), repeater.tunedBy())) {
-                silenced.add(pos); // it sends on someone else's private frequency: it stays quiet
+            if (blocked(level, repeater.output(), repeater.tunedBy()) || deaf(level, repeater.frequency(), repeater.tunedBy())) {
+                // It sends on someone else's private frequency, or listens on someone else's encrypted one: it stays quiet.
+                silenced.add(pos);
                 power.put(pos, 0);
             } else {
                 power.put(pos, listenDirect(level, repeater.frequency(), pos).power());
@@ -508,7 +530,8 @@ public final class SignalNetwork extends SavedData {
                 BlockPos pos = entry.getKey();
                 Repeater repeater = entry.getValue();
                 if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos)
-                        || blocked(level, repeater.output(), repeater.tunedBy())) {
+                        || blocked(level, repeater.output(), repeater.tunedBy())
+                        || deaf(level, repeater.frequency(), repeater.tunedBy())) {
                     continue;
                 }
                 reached.add(pos);
@@ -746,7 +769,17 @@ public final class SignalNetwork extends SavedData {
 
     /** A loaded receiver says which frequency it's on. Called on its first tick and when re-tuned. */
     public void trackReceiver(BlockPos pos, int frequency) {
+        trackReceiver(pos, frequency, null);
+    }
+
+    /** {@link #trackReceiver(BlockPos, int)}, with who tuned or placed it (it isn't counted on an encrypted frequency it can't hear). */
+    public void trackReceiver(BlockPos pos, int frequency, @Nullable UUID tunedBy) {
         BlockPos key = pos.immutable();
+        if (tunedBy == null) {
+            receiverTuners.remove(key);
+        } else {
+            receiverTuners.put(key, tunedBy);
+        }
         Integer previous = receivers.put(key, frequency);
         if (previous != null && previous != frequency) {
             removeReceiverFromIndex(key, previous);
@@ -756,6 +789,7 @@ public final class SignalNetwork extends SavedData {
 
     /** A receiver was broken or its chunk unloaded. */
     public void untrackReceiver(BlockPos pos) {
+        receiverTuners.remove(pos);
         Integer previous = receivers.remove(pos);
         if (previous != null) {
             removeReceiverFromIndex(pos, previous);
@@ -785,7 +819,7 @@ public final class SignalNetwork extends SavedData {
         }
         int count = 0;
         for (BlockPos pos : onFrequency) {
-            if (covers(coverage, pos)) {
+            if (covers(coverage, pos) && !deaf(null, frequency, receiverTuners.get(pos))) {
                 count++;
             }
         }
@@ -821,6 +855,9 @@ public final class SignalNetwork extends SavedData {
         long bestDz = 0;
         boolean bestInRange = false;
         for (BlockPos pos : onFrequency) {
+            if (deaf(null, frequency, receiverTuners.get(pos))) {
+                continue; // it can't hear this encrypted frequency, so it isn't listening
+            }
             long dx = pos.getX() - origin.getX();
             long dz = pos.getZ() - origin.getZ();
             long distSq = dx * dx + dz * dz;
@@ -947,6 +984,14 @@ public final class SignalNetwork extends SavedData {
      * covering it. Strongest first, then lowest frequency, at most {@link #MAX_SCAN_RESULTS}.
      */
     public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos) {
+        return scanAt(level, pos, null);
+    }
+
+    /**
+     * {@link #scanAt(ServerLevel, BlockPos)} for a scanner carried by {@code viewer}: encrypted
+     * frequencies they aren't a member of are left out ({@code null}: none are).
+     */
+    public List<HeardFrequency> scanAt(ServerLevel level, BlockPos pos, @Nullable UUID viewer) {
         Map<Integer, BestTransmitter> best = bestTransmitters(level, pos);
 
         Map<Integer, Source> remotes = new HashMap<>();
@@ -959,6 +1004,7 @@ public final class SignalNetwork extends SavedData {
 
         Set<Integer> frequencies = new HashSet<>(best.keySet());
         frequencies.addAll(remotes.keySet());
+        frequencies.removeIf(frequency -> deaf(level, frequency, viewer));
         List<HeardFrequency> heard = new ArrayList<>();
         for (int frequency : frequencies) {
             BestTransmitter tx = best.get(frequency);
@@ -986,6 +1032,18 @@ public final class SignalNetwork extends SavedData {
      * {@code transmittersInReach} counts repeaters and converters too.
      */
     public Reception listen(ServerLevel level, int frequency, BlockPos receiverPos) {
+        return listen(level, frequency, receiverPos, null);
+    }
+
+    /**
+     * {@link #listen(ServerLevel, int, BlockPos)} for a receiver tuned (or placed) by
+     * {@code listener}, or a pager carried by them: nothing at all (no signal, no towers) on
+     * someone else's encrypted frequency. {@code null} listens like anyone could.
+     */
+    public Reception listen(ServerLevel level, int frequency, BlockPos receiverPos, @Nullable UUID listener) {
+        if (deaf(level, frequency, listener)) {
+            return new Reception(0, 0);
+        }
         Reception direct = listenDirect(level, frequency, receiverPos);
         if (!repeatersByOutput.containsKey(frequency)) {
             return direct;

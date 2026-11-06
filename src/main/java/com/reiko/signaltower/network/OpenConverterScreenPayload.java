@@ -13,10 +13,15 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * Server to client: open a Radio Converter's screen, with its two frequencies and what it's
  * sending right now (the client doesn't know any of that, since block entities aren't synced).
- * {@code silenced}: it stays quiet because it sends on someone else's private frequency.
+ * {@code quiet}: {@link #SILENCED} if it stays quiet because it sends on someone else's private
+ * frequency, plus {@link #DEAF} if it hears nothing because it listens on someone else's encrypted
+ * one (0: neither).
  */
-public record OpenConverterScreenPayload(BlockPos pos, int listen, int send, int power, int reach, boolean silenced)
+public record OpenConverterScreenPayload(BlockPos pos, int listen, int send, int power, int reach, int quiet)
         implements CustomPacketPayload {
+    public static final int SILENCED = 1;
+    public static final int DEAF = 2;
+
     public static final Type<OpenConverterScreenPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "open_converter_screen"));
 
@@ -26,8 +31,18 @@ public record OpenConverterScreenPayload(BlockPos pos, int listen, int send, int
             ByteBufCodecs.VAR_INT, OpenConverterScreenPayload::send,
             ByteBufCodecs.VAR_INT, OpenConverterScreenPayload::power,
             ByteBufCodecs.VAR_INT, OpenConverterScreenPayload::reach,
-            ByteBufCodecs.BOOL, OpenConverterScreenPayload::silenced,
+            ByteBufCodecs.VAR_INT, OpenConverterScreenPayload::quiet,
             OpenConverterScreenPayload::new);
+
+    /** True if it stays quiet because it sends on someone else's private frequency. */
+    public boolean silenced() {
+        return (quiet & SILENCED) != 0;
+    }
+
+    /** True if it hears nothing because it listens on someone else's encrypted frequency. */
+    public boolean deaf() {
+        return (quiet & DEAF) != 0;
+    }
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

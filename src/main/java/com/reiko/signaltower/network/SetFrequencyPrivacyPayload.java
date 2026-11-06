@@ -30,10 +30,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Client to server: the Frequency Tuner screen's Private button and Friends box for a frequency.
- * {@code friends} is the names typed, separated by commas or spaces.
+ * Client to server: the Frequency Tuner screen's privacy button (Public, Private or Encrypted) and
+ * Friends box for a frequency. {@code friends} is the names typed, separated by commas or spaces;
+ * {@code encrypted} only counts when {@code makePrivate} is true.
  */
-public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, String friends) implements CustomPacketPayload {
+public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, String friends, boolean encrypted)
+        implements CustomPacketPayload {
     /** The longest friends list the box takes. */
     public static final int MAX_FRIENDS_TEXT = 400;
 
@@ -44,7 +46,13 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
             ByteBufCodecs.VAR_INT, SetFrequencyPrivacyPayload::frequency,
             ByteBufCodecs.BOOL, SetFrequencyPrivacyPayload::makePrivate,
             ByteBufCodecs.stringUtf8(MAX_FRIENDS_TEXT * 4), SetFrequencyPrivacyPayload::friends,
+            ByteBufCodecs.BOOL, SetFrequencyPrivacyPayload::encrypted,
             SetFrequencyPrivacyPayload::new);
+
+    /** Private (or public again), not encrypted. */
+    public SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, String friends) {
+        this(frequency, makePrivate, friends, false);
+    }
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -225,16 +233,18 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
                 tell(player, Component.translatable(key + "private_in_use", label, others).withStyle(ChatFormatting.RED));
                 return false;
             }
-        } else if (claim.friends().equals(friends) && claim.groups().equals(groups)) {
+        } else if (claim.friends().equals(friends) && claim.groups().equals(groups) && claim.encrypted() == payload.encrypted()) {
             reportFriends(player, key, missing, tooMany);
             return false;
         }
 
-        FrequencyClaims.Claim stored = claims.put(frequency, player.getUUID(), player.getGameProfile().getName(), friends, groups);
+        FrequencyClaims.Claim stored = claims.put(frequency, player.getUUID(), player.getGameProfile().getName(), friends, groups,
+                payload.encrypted());
         changed(server, frequency, stored);
+        String kind = stored.encrypted() ? "encrypted_set" : "private_set";
         tell(player, stored.friends().isEmpty() && stored.groups().isEmpty()
-                ? Component.translatable(key + "private_set", label).withStyle(ChatFormatting.GOLD)
-                : Component.translatable(key + "private_set_friends", label,
+                ? Component.translatable(key + kind, label).withStyle(ChatFormatting.GOLD)
+                : Component.translatable(key + kind + "_friends", label,
                         FrequencyClaims.friendsText(stored.groups(), stored.friendNames())).withStyle(ChatFormatting.GOLD));
         reportFriends(player, key, missing, tooMany);
         return true;
@@ -271,8 +281,8 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
     }
 
     /**
-     * After a claim changed: every dimension works out again who may send on the frequency, and
-     * every player is told ({@code claim} null: it's public now).
+     * After a claim changed: every dimension works out again who may send on (and, if it's
+     * encrypted, hear) the frequency, and every player is told ({@code claim} null: it's public now).
      */
     public static void changed(MinecraftServer server, int frequency, @Nullable FrequencyClaims.Claim claim) {
         for (ServerLevel level : server.getAllLevels()) {

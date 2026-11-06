@@ -48,8 +48,10 @@ public final class RadioInfo {
      * The server's data for the block at {@code pos}, or null if it isn't one of the mod's radio
      * blocks or masts. The frequencies' names (if they have any) come along as "name" and
      * "output_name", since the client might not know them. If the frequency it sends on (or a
-     * receiver's) is private, its owner comes along as "private_to", and "silenced" says whether
-     * this block is kept quiet because its tuner isn't the owner or a friend.
+     * receiver's) is private, its owner comes along as "private_to", "encrypted" says whether only
+     * members hear it, and "silenced" says whether this block is kept quiet because its tuner
+     * isn't the owner or a friend. A receiver or converter that can't hear the frequency it
+     * listens on (someone else's encrypted one) gets its owner as "deaf_to".
      */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos) {
         CompoundTag tag = gather(level, pos);
@@ -61,8 +63,18 @@ public final class RadioInfo {
                 FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
                 if (claim != null) {
                     tag.putString("private_to", claim.ownerName());
+                    if (claim.encrypted()) {
+                        tag.putBoolean("encrypted", true);
+                    }
                     if (SignalNetwork.get(level).isSilenced(level, pos)) {
                         tag.putBoolean("silenced", true);
+                    }
+                }
+                if (level.getBlockEntity(pos) instanceof RadioBlockEntity radio
+                        && (radio instanceof RadioReceiverBlockEntity || radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter())) {
+                    FrequencyClaims.Claim heard = FrequencyClaims.get(level.getServer()).get(radio.getFrequency());
+                    if (heard != null && !heard.hears(radio.getTunedBy()) && radio.getTunedBy() != null) {
+                        tag.putString("deaf_to", heard.ownerName());
                     }
                 }
             }
@@ -116,7 +128,7 @@ public final class RadioInfo {
                 tag.putInt("output", converter.getOutputFrequency());
             }
         } else if (block instanceof RadioReceiverBlock) {
-            SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos);
+            SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos, radio.getTunedBy());
             tag.putInt("power", state.getValue(RadioReceiverBlock.POWER));
             tag.putInt("towers", reception.transmittersInReach());
             if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
@@ -133,11 +145,19 @@ public final class RadioInfo {
      */
     public static List<Component> lines(BlockState state, @Nullable CompoundTag data) {
         List<Component> lines = blockLines(state, data);
-        if (data != null && data.contains("private_to")) {
+        boolean deaf = data != null && data.contains("deaf_to");
+        boolean receiver = state.getBlock() instanceof RadioReceiverBlock;
+        // A deaf receiver's own frequency is the one it can't hear: one line says both.
+        if (data != null && data.contains("private_to") && !(deaf && receiver)) {
             Component owner = Component.literal(data.getString("private_to"));
             lines.add(data.getBoolean("silenced")
                     ? Component.translatable(LANG + "silenced", owner).withStyle(ChatFormatting.RED)
+                    : data.getBoolean("encrypted")
+                    ? Component.translatable(LANG + "encrypted", owner).withStyle(ChatFormatting.GOLD)
                     : Component.translatable(LANG + "private", owner).withStyle(ChatFormatting.GOLD));
+        }
+        if (deaf) {
+            lines.add(Component.translatable(LANG + "deaf", Component.literal(data.getString("deaf_to"))).withStyle(ChatFormatting.RED));
         }
         return lines;
     }

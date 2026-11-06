@@ -61,9 +61,12 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                                                BlockHitResult hitResult) {
         if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof RadioRepeaterBlockEntity converter) {
+            SignalNetwork network = SignalNetwork.get(serverLevel);
+            int quiet = (network.isSilenced(serverLevel, pos) ? OpenConverterScreenPayload.SILENCED : 0)
+                    | (network.isDeaf(serverLevel, pos) ? OpenConverterScreenPayload.DEAF : 0);
             PacketDistributor.sendToPlayer(serverPlayer, new OpenConverterScreenPayload(pos, converter.getFrequency(),
-                    converter.getOutputFrequency(), SignalNetwork.get(serverLevel).repeaterPower(serverLevel, pos),
-                    RadioHelper.reachAt(serverLevel, pos), SignalNetwork.get(serverLevel).isSilenced(serverLevel, pos)));
+                    converter.getOutputFrequency(), network.repeaterPower(serverLevel, pos),
+                    RadioHelper.reachAt(serverLevel, pos), quiet));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

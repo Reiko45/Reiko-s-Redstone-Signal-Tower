@@ -3,6 +3,7 @@ package com.reiko.signaltower.item;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
@@ -22,6 +23,7 @@ import net.minecraft.world.level.Level;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.UUID;
 
 /**
  * A handheld radio direction-finder. Right-click opens a live list of every frequency a receiver
@@ -58,10 +60,12 @@ public class SignalScannerItem extends Item {
     /**
      * Starts tracking the transmitter the scanner points to for {@code frequency} where the
      * player stands (the strongest one reaching them, the nearest among equals). Remote signals
-     * can't be tracked. Returns the message to show.
+     * can't be tracked, and nor can someone else's encrypted frequency. Returns the message to show.
      */
     public static Component track(ServerLevel level, Player player, ItemStack scanner, int frequency) {
-        Optional<BlockPos> found = SignalNetwork.get(level).strongestTransmitter(level, player.blockPosition(), frequency);
+        Optional<BlockPos> found = FrequencyClaims.mayHear(level, frequency, player.getUUID())
+                ? SignalNetwork.get(level).strongestTransmitter(level, player.blockPosition(), frequency)
+                : Optional.empty();
         if (found.isEmpty()) {
             return Component.translatable(MESSAGE + "scanner_cant_track", FrequencyNames.label(level, frequency)).withStyle(ChatFormatting.YELLOW);
         }
@@ -79,8 +83,24 @@ public class SignalScannerItem extends Item {
      * checked in the target's own dimension). Returns the message to show, or null if it's fine.
      */
     public static @Nullable Component checkTarget(ServerLevel level, ItemStack scanner) {
+        return checkTarget(level, scanner, null);
+    }
+
+    /**
+     * {@link #checkTarget(ServerLevel, ItemStack)} for a scanner carried by {@code holder}: the
+     * target is also dropped if its frequency is now someone else's encrypted one.
+     */
+    public static @Nullable Component checkTarget(ServerLevel level, ItemStack scanner, @Nullable UUID holder) {
         ScannerTarget target = getTarget(scanner);
-        if (target == null || !target.dimension().equals(level.dimension())) {
+        if (target == null) {
+            return null;
+        }
+        if (!FrequencyClaims.mayHear(level, target.frequency(), holder)) {
+            scanner.remove(ModRegistry.SCANNER_TARGET.get());
+            return Component.translatable(MESSAGE + "scanner_lost_encrypted", FrequencyNames.label(level, target.frequency()))
+                    .withStyle(ChatFormatting.YELLOW);
+        }
+        if (!target.dimension().equals(level.dimension())) {
             return null;
         }
         boolean blockGone = level.isLoaded(target.pos())
@@ -97,7 +117,7 @@ public class SignalScannerItem extends Item {
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
         if (level instanceof ServerLevel serverLevel && serverLevel.getGameTime() % 20 == 0 && getTarget(stack) != null) {
-            Component lost = checkTarget(serverLevel, stack);
+            Component lost = checkTarget(serverLevel, stack, entity.getUUID());
             if (lost != null && entity instanceof Player player) {
                 player.displayClientMessage(lost, true);
             }

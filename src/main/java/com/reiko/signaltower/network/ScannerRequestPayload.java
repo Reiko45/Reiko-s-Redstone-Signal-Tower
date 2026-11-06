@@ -38,7 +38,7 @@ public record ScannerRequestPayload() implements CustomPacketPayload {
         if (!holding || !(player.level() instanceof ServerLevel level) || !(player instanceof ServerPlayer serverPlayer)) {
             return;
         }
-        List<SignalNetwork.HeardFrequency> heard = SignalNetwork.get(level).scanAt(level, player.blockPosition());
+        List<SignalNetwork.HeardFrequency> heard = SignalNetwork.get(level).scanAt(level, player.blockPosition(), player.getUUID());
         PacketDistributor.sendToPlayer(serverPlayer, new ScannerResultPayload(heard.stream()
                 .map(h -> new ScannerResultPayload.Entry(h.frequency(), h.power(), h.source().ordinal(),
                         h.transmitters(), h.distance(), h.direction()))

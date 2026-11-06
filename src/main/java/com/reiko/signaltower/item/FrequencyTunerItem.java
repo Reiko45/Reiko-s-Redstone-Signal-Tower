@@ -1,6 +1,7 @@
 package com.reiko.signaltower.item;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioBlock;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
@@ -12,6 +13,7 @@ import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -79,7 +81,10 @@ public class FrequencyTunerItem extends Item {
                 } else {
                     radio.setTunedBy(player == null ? null : player.getUUID());
                     radio.setFrequency(frequency);
-                    message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
+                    // Tuned, but on someone else's encrypted frequency a receiver or converter won't hear anything: say so.
+                    Component deaf = level instanceof ServerLevel serverLevel ? RadioBlock.deafNotice(serverLevel, pos) : null;
+                    message = deaf != null ? deaf
+                            : Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
                     level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
                 }
             }

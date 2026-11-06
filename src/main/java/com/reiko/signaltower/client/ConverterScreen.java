@@ -4,6 +4,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.network.ConfigureConverterPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.radio.Frequency;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -136,8 +137,12 @@ public class ConverterScreen extends Screen {
         graphics.drawString(font, sends, centerX - 12 - font.width(sends), top + 66, 0xFFFFFF);
         drawName(graphics, listenBox, top + 40);
         drawName(graphics, sendBox, top + 66);
+        FrequencyClaims.ClaimInfo listenClaim = FrequencyClaims.clientInfo(state.listen());
         Component status = state.silenced()
                 ? Component.translatable(KEY + "silenced", FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.RED)
+                : state.deaf()
+                ? Component.translatable(KEY + "deaf", FrequencyNames.label(null, state.listen()),
+                        listenClaim != null ? listenClaim.ownerName() : "?").withStyle(ChatFormatting.RED)
                 : state.power() > 0
                 ? Component.translatable(KEY + "converting", state.power(), FrequencyNames.label(null, state.listen()),
                         FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GREEN)

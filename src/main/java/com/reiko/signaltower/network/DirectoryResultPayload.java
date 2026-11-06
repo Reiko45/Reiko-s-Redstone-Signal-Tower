@@ -20,7 +20,8 @@ public record DirectoryResultPayload(List<Entry> entries) implements CustomPacke
 
     /**
      * One frequency: the strongest signal on it anywhere in the player's dimension ({@code -1}:
-     * someone else's private frequency, not shown), and what the player hears where they stand.
+     * someone else's private frequency, not shown), and what the player hears where they stand
+     * ({@code -1}: someone else's encrypted frequency, which they can't hear).
      */
     public record Entry(int frequency, int anywhere, int here) {
         public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
@@ -31,6 +32,11 @@ public record DirectoryResultPayload(List<Entry> entries) implements CustomPacke
 
         public boolean hidden() {
             return anywhere < 0;
+        }
+
+        /** Someone else's encrypted frequency: nothing about it is shown. */
+        public boolean encrypted() {
+            return here < 0;
         }
 
         /** On somewhere this player may know about: anywhere (if shown) or where they stand. */

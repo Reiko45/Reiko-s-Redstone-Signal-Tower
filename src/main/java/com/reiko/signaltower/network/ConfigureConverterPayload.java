@@ -1,6 +1,7 @@
 package com.reiko.signaltower.network;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.RadioBlock;
 import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.Frequency;
@@ -9,6 +10,7 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -56,7 +58,9 @@ public record ConfigureConverterPayload(BlockPos pos, int listen, int send) impl
         }
         converter.setTunedBy(player.getUUID());
         converter.setFrequencies(payload.listen(), payload.send());
-        player.displayClientMessage(Component.translatable("message." + SignalTower.MOD_ID + ".converter_set",
+        // Set, but on someone else's encrypted frequency it won't hear anything: say so instead.
+        Component deaf = player.level() instanceof ServerLevel level ? RadioBlock.deafNotice(level, pos) : null;
+        player.displayClientMessage(deaf != null ? deaf : Component.translatable("message." + SignalTower.MOD_ID + ".converter_set",
                 converter.getFrequency(), converter.getOutputFrequency()).withStyle(ChatFormatting.AQUA), true);
         return true;
     }

@@ -6,6 +6,7 @@ import com.reiko.signaltower.network.DirectoryResultPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
+import com.reiko.signaltower.radio.FrequencyClaims;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
@@ -49,6 +50,17 @@ public final class ClientHooks {
         if (Minecraft.getInstance().screen instanceof ScannerScreen screen) {
             screen.onResult(result);
         }
+    }
+
+    /**
+     * True if this client's player can hear {@code frequency}: anything but someone else's
+     * encrypted frequency (as far as this client knows). For item tooltips.
+     */
+    public static boolean localPlayerMayHear(int frequency) {
+        FrequencyClaims.ClaimInfo claim = FrequencyClaims.clientInfo(frequency);
+        var player = Minecraft.getInstance().player;
+        return claim == null || !claim.encrypted() || player == null
+                || claim.isMember(player.getUUID(), player.getGameProfile().getName());
     }
 
     /** A directory answer arrived: hand it to the open directory screen, if there is one. */

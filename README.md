@@ -72,26 +72,36 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   ![Naming 2026 "Front Gate" in the tuner, and the name in the remote's screen, Jade, the tuner's tooltip, the scanner and a remote press](docs/images/frequency-names.png)
 
 **Private frequencies:**
-- **Making one private:** in the Frequency Tuner's screen, type the frequency and click **Private: Off** so it says **Private: On**, then press Done: "2026 (Front Gate) is now private: only you can send on it". The line under the button says who can send on the typed frequency, or what Done will change.
+- **Making one private:** in the Frequency Tuner's screen, type the frequency and click the button under the Name box so it says **Private** instead of **Public**, then press Done: "2026 (Front Gate) is now private: only you can send on it". The line under the button says who can send on the typed frequency, or what Done will change.
 - **Friends:** type players' names in the box next to the button, separated by commas (up to 16), and press Done: "only you and Steve can send on it". A friend must be online the first time you add them; after that they stay a friend by their account, online or not. Delete a name and press Done to take them off.
 - **What private means:** only you and your friends can send on it.
   - Other players' remote presses are refused, with a red light: "Can't send: 2026 (Front Gate) is private to Dev".
   - Transmitters, repeaters and converters only broadcast on it if you or a friend tuned or placed them (each block remembers who last tuned or placed it). Anyone else trying to tune one onto it is refused: "Can't do that: it would send on 2026 (Front Gate), which is private to Dev". One they place with that frequency already on it stays silent: "Silent: 2026 (Front Gate) is private to Dev, so this won't broadcast".
   - Taking a friend off silences their blocks on it at once; adding them back brings them back.
   - Only you and your friends can rename it.
-- **Listening stays open:** anyone's receivers, toggle receivers, pagers and scanners still hear it, and anyone can tune a receiver to it.
+- **Listening stays open:** anyone's receivers, toggle receivers, pagers and scanners still hear it, and anyone can tune a receiver to it. To close that too, encrypt it (below).
 - **Claiming fairly:** you can't make a frequency private while other players' transmitters, repeaters or converters send on it ("other players' blocks already send on it"). Pick one nobody else uses.
 - **Older blocks:** blocks tuned before version 0.25 don't know who tuned them, so they keep working on a private frequency. Tune one again to make it yours.
-- **Who can change it:** only the owner can change the friends or make it public again (click **Private: On** so it says Off, then Done). Server operators can make anyone's private frequency public the same way. Other players see the button greyed out: "Private to Dev: you can't send on it".
+- **Who can change it:** only the owner can change the friends or make it public again (click the button until it says **Public**, then Done). Server operators can make anyone's private frequency public the same way. Other players see the button greyed out: "Private to Dev: you can't send on it".
 - **Friend groups:** click **Groups** next to the Friends box to manage your own named lists of players, like "Base crew".
   - In the Groups screen, click **+ New group**, type a name and its members (separated by commas), and press **Save**: "Group Base crew created with 1 member". Pick a group on the left to change it; **Delete** (click twice) removes it.
   - Use a group on a frequency by typing `#Base crew` in the Friends box (on its own, or with single names: `#Base crew, Alex`), or click **Use here** in the Groups screen to add it to the frequency in the tuner. Done: "only you and #Base crew can send on it".
   - Changing a group changes every frequency using it at once: add someone and they can send on all of them; take them out and their blocks on all of them go silent. The Groups screen shows which frequencies use the selected group ("Used by: 2026 (Front Gate), 4242 (Vault)"). Renaming a group keeps it on those frequencies; deleting it takes its members off them.
   - Members must be online the first time you add them, like friends. Up to 16 groups per player, 32 members per group, and 4 groups per frequency.
+- **Encrypted frequencies:** click the button once more so it says **Encrypted** (it goes Public, Private, Encrypted; sneak-click goes back) and press Done: "2026 (Front Gate) is now encrypted: only you and #Base crew can send on it or hear it". An encrypted frequency is private, and listening is closed too:
+  - Only receivers, toggle receivers and converters that you or a friend (or a member of a group it uses) tuned or placed hear it. Anyone else's stay off. Jade shows "Deaf: encrypted by Dev" on them, and tuning or placing one says "Deaf: 2026 (Front Gate) is encrypted by Dev, so this won't hear it".
+  - Only pagers and scanners carried by you or a friend hear it. Anyone else's pager stays quiet (its tooltip says "Encrypted by Dev: this pager can't hear it") and reports nothing about it after logging in. Their scanner doesn't list it, can't track its towers, and stops tracking one once the frequency is encrypted.
+  - In anyone else's directory it just says "Encrypted", even standing next to its tower.
+  - Remotes' "Heard by" counts and locator lines only count receivers and pagers that can hear it.
+  - Adding a friend (or a group member) lets their receivers hear it at once; taking them off makes them deaf again. A toggle receiver doesn't count becoming able to hear (or deaf) as a turn-on.
+  - Changing it back to **Private** opens listening again, without changing who can send.
+  - Old blocks tuned before version 0.25 (no recorded tuner) still hear it, like they can still send. Tune one again to make it yours.
 - **Limits:** up to 32 private frequencies per player (`privateFrequenciesPerPlayer` in the server config; 0 turns the feature off), and 4,096 per world.
-- **Jade** shows "Private to Dev" on a private frequency's blocks, and "Silent: private to Dev" on ones kept quiet. The empty-hand readout and the converter's screen also say when a block is kept quiet.
+- **Jade** shows "Private to Dev" (or "Encrypted by Dev") on a private frequency's blocks, "Silent: private to Dev" on ones kept quiet, and "Deaf: encrypted by Dev" on receivers and converters that can't hear. The empty-hand readout and the converter's screen also say when a block is kept quiet.
 
   ![Dev adding Steve as a friend on private frequency 2026; Steve's tuner screen before that ("Private to Dev: you can't send on it"); Jade on a friend's and on a silenced transmitter; and the messages for claiming, a refused remote press, a refused tuning and a silent placement](docs/images/private-frequencies.png)
+
+  ![Encrypting 2026 in Dev's tuner ("Done encrypts it: only members will hear it"); Steve's receiver on 2026 deaf ("Deaf: encrypted by Dev", lamp off); and lit once Dev added Steve to Base crew ("Encrypted by Dev", Output 15)](docs/images/encrypted-frequencies.png)
 
   ![Dev's Groups screen with "Base crew" (Steve), used by 2026 and 4242; Steve's tuner on 4242 ("Private to Dev: you're a friend, so you can send"); and the messages: 4242 made private for #Base crew, Steve's press working, and refused once Dev took him out of the group](docs/images/friend-groups.png)
 
@@ -101,7 +111,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - **Frequency** and **Name**. The one typed in the screen you came from is marked "»".
   - **Who sends:** "Anyone" for a public frequency; "You" or "You + 2" (friends) for your own private one; "Dev + you" for one where you're a friend; "Dev" (red) for someone else's.
   - **Now:** "On 15" if something is sending on it anywhere in your dimension, "On 15, here" if you also hear it where you stand, "Off" if nothing is.
-- **Others' private frequencies stay private:** for someone else's private frequency the directory only says "Here 15" when you can hear it where you stand, and "?" otherwise, so it can't be used to watch their base from afar.
+- **Others' private frequencies stay private:** for someone else's private frequency the directory only says "Here 15" when you can hear it where you stand, and "?" otherwise, so it can't be used to watch their base from afar. Someone else's encrypted frequency only says "Encrypted".
 - **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's; into that button's or that box's frequency in the keypad and the converter's screen), so you just press Done. **Back** returns with what you'd typed.
 - **Finding one:** type in the search box to match a name, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
 - It updates every second while open.
@@ -498,9 +508,14 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 104. friend groups leave out their owner and cap their members; a claim uses its owner's groups by name (ignoring case, unknown ones left out) and lets their members send; renaming carries the frequencies along, changing members or deleting the group changes who can send; all of it survives saving and the network; the Friends box tells "#groups" from names;
 105. a group member's transmitter broadcasts on a frequency using the group, goes silent as soon as they're taken out, and comes back when they're put back;
 106. the Groups screen's packet needs a tuner in hand and a name that isn't already one of the player's groups; unknown members are reported and offline ones kept by name; renaming carries a frequency along; the per-player limit; deleting; and the Friends box takes "#group" and reports unknown ones;
-107. the directory answers a player with nothing in hand who opened it from a converter's screen within reach, but not for a converter out of reach or a block that isn't one; a Multi-Button Remote in hand counts; the request survives the network.
+107. the directory answers a player with nothing in hand who opened it from a converter's screen within reach, but not for a converter out of reach or a block that isn't one; a Multi-Button Remote in hand counts; the request survives the network;
+108. an encrypted claim is heard only by its owner, friends and group members (and blocks with no recorded tuner); it's saved (older saves load unencrypted), survives the network along with the tuner's packet, and stays encrypted when a group it uses is renamed or deleted;
+109. on an encrypted frequency, a non-member's receiver hears nothing (no signal, no towers), their scanner doesn't list it, their converter neither passes it on nor carries presses, and their receivers aren't counted by remotes or the locator; members' and old blocks hear it; made just private, everyone hears it again;
+110. real blocks: a stranger's receiver and toggle receiver stay off and say why (the tuner's message, the readout, Jade), the friend's and an old one light up; just private, the stranger's lights up, and becoming able to hear isn't a turn-on for the toggle receiver;
+111. a non-member's pager doesn't alert, isn't counted for "Heard by" and reports nothing in the catch-up; their scanner can't track it and drops a target on it; their directory shows only "Encrypted"; the friend's do all of that;
+112. the tuner's packet encrypts a new claim, decrypts and re-encrypts it, says so, changes nothing when asked for what it already is, refuses anyone but the owner, and lets an operator only make it public.
 
-All 107 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 112 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
