@@ -1,20 +1,23 @@
 package com.reiko.signaltower;
 
 import com.mojang.logging.LogUtils;
+import com.reiko.signaltower.item.PagerItem;
+import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ConfigureMultiRemotePayload;
 import com.reiko.signaltower.network.ConfigurePagerPayload;
 import com.reiko.signaltower.network.ConfigureRadioItemPayload;
-import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
 import com.reiko.signaltower.network.RemoteScanResultPayload;
 import com.reiko.signaltower.network.ScannerRequestPayload;
-import com.reiko.signaltower.network.ScrollFrequencyPayload;
-import com.reiko.signaltower.network.TrackTransmitterPayload;
-import com.reiko.signaltower.network.ConfigureFavoritesPayload;
 import com.reiko.signaltower.network.ScannerResultPayload;
+import com.reiko.signaltower.network.ScrollFrequencyPayload;
+import com.reiko.signaltower.network.SelectRemoteButtonPayload;
+import com.reiko.signaltower.network.TrackTransmitterPayload;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
+
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -22,9 +25,11 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+
 import org.slf4j.Logger;
 
 /**
@@ -45,6 +50,8 @@ public final class SignalTower {
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLevelTick);
+        NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedOut);
+        NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -77,9 +84,23 @@ public final class SignalTower {
     }
 
     /** Ends Remote Control pulses on time. */
+    /** Pagers note when their owner left, for the catch-up at the next login. */
+    private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        PagerItem.markAway(event.getEntity(), event.getEntity().level().getGameTime());
+    }
+
+    /** Pagers say what turned on while their owner was away. */
+    private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            // A singleplayer world is paused while its owner is away, so there's nothing to report then.
+            boolean worldRan = !player.server.isSingleplayerOwner(player.getGameProfile());
+            PagerItem.catchUp(player.serverLevel(), player, worldRan);
+        }
+    }
+
     private static void onLevelTick(LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
-            SignalNetwork.get(serverLevel).tick(serverLevel.getGameTime());
+            SignalNetwork.get(serverLevel).tick(serverLevel.getGameTime(), serverLevel.getDayTime());
         }
     }
 

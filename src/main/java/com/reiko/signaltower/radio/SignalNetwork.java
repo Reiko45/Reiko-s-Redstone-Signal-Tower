@@ -10,6 +10,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -112,6 +113,11 @@ public final class SignalNetwork extends SavedData {
     private final Map<Integer, RemoteSignal> latches = new HashMap<>();
     private final Map<BlockPos, Integer> receivers = new HashMap<>();
     private final Map<Integer, Set<BlockPos>> receiversByFrequency = new HashMap<>();
+    /** Recent times each frequency turned on, oldest first, for the pagers' catch-up. Saved. */
+    private final Map<Integer, ArrayDeque<TurnOn>> history = new HashMap<>();
+    /** The game time and day time of the last tick, used to stamp {@link TurnOn}s. */
+    private long now;
+    private long nowDayTime;
 
     public static SignalNetwork get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
@@ -125,6 +131,9 @@ public final class SignalNetwork extends SavedData {
         Transmitter previous = transmitters.put(key, next);
         if (next.equals(previous)) {
             return;
+        }
+        if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)) {
+            recordTurnOn(frequency, ownCoverage(key, reach));
         }
         if (previous != null && previous.frequency() != frequency) {
             removeFromIndex(key, previous.frequency());
@@ -220,6 +229,7 @@ public final class SignalNetwork extends SavedData {
             areas = new ArrayList<>(merged);
         }
         pulses.put(frequency, new RemoteSignal(areas, until));
+        recordTurnOn(frequency, coverage);
         bump(frequency);
     }
 
@@ -233,6 +243,7 @@ public final class SignalNetwork extends SavedData {
             nowOn = false;
         } else {
             latches.put(frequency, new RemoteSignal(coverage, Long.MAX_VALUE));
+            recordTurnOn(frequency, coverage);
             nowOn = true;
         }
         bump(frequency);
@@ -240,8 +251,49 @@ public final class SignalNetwork extends SavedData {
         return nowOn;
     }
 
+    // ---- History, for the pagers' catch-up ----
+
+    /** The most turn-ons remembered per frequency. */
+    public static final int MAX_HISTORY = 32;
+
+    /** One time a frequency turned on: when, and where it could be heard. */
+    public record TurnOn(long gameTime, long dayTime, List<Coverage> coverage) {
+        public TurnOn {
+            coverage = List.copyOf(coverage);
+        }
+    }
+
+    private void recordTurnOn(int frequency, List<Coverage> coverage) {
+        ArrayDeque<TurnOn> list = history.computeIfAbsent(frequency, f -> new ArrayDeque<>());
+        list.addLast(new TurnOn(now, nowDayTime, coverage));
+        while (list.size() > MAX_HISTORY) {
+            list.removeFirst();
+        }
+        setDirty();
+    }
+
+    /**
+     * The times {@code frequency} turned on after {@code sinceGameTime} where a receiver at
+     * {@code pos} would have heard it, oldest first. At most {@link #MAX_HISTORY}.
+     */
+    public List<TurnOn> turnOnsSince(int frequency, long sinceGameTime, BlockPos pos) {
+        ArrayDeque<TurnOn> list = history.get(frequency);
+        if (list == null) {
+            return List.of();
+        }
+        List<TurnOn> heard = new ArrayList<>();
+        for (TurnOn turnOn : list) {
+            if (turnOn.gameTime() > sinceGameTime && covers(turnOn.coverage(), pos)) {
+                heard.add(turnOn);
+            }
+        }
+        return heard;
+    }
+
     /** Ends pulses whose time is up. Called every server tick for each dimension. */
-    public void tick(long gameTime) {
+    public void tick(long gameTime, long dayTime) {
+        now = gameTime;
+        nowDayTime = dayTime;
         if (pulses.isEmpty()) {
             return;
         }
@@ -548,6 +600,26 @@ public final class SignalNetwork extends SavedData {
             latchList.add(entry);
         });
         tag.put("remote_latches", latchList);
+
+        ListTag turnOns = new ListTag();
+        history.forEach((frequency, recent) -> {
+            for (TurnOn turnOn : recent) {
+                CompoundTag entry = new CompoundTag();
+                entry.putInt("frequency", frequency);
+                entry.putLong("time", turnOn.gameTime());
+                entry.putLong("day_time", turnOn.dayTime());
+                ListTag areas = new ListTag();
+                for (Coverage area : turnOn.coverage()) {
+                    CompoundTag areaTag = new CompoundTag();
+                    areaTag.putLong("pos", area.origin().asLong());
+                    areaTag.putInt("reach", area.reach());
+                    areas.add(areaTag);
+                }
+                entry.put("coverage", areas);
+                turnOns.add(entry);
+            }
+        });
+        tag.put("turn_ons", turnOns);
         return tag;
     }
 
@@ -578,6 +650,21 @@ public final class SignalNetwork extends SavedData {
                 coverage.add(new Coverage(BlockPos.of(entry.getLong("pos")), entry.getInt("reach"), false));
             }
             network.latches.put(Frequency.clamp(entry.getInt("frequency")), new RemoteSignal(coverage, Long.MAX_VALUE));
+        }
+        ListTag turnOns = tag.getList("turn_ons", Tag.TAG_COMPOUND);
+        for (int i = 0; i < turnOns.size(); i++) {
+            CompoundTag entry = turnOns.getCompound(i);
+            List<Coverage> coverage = new ArrayList<>();
+            ListTag areas = entry.getList("coverage", Tag.TAG_COMPOUND);
+            for (int j = 0; j < areas.size(); j++) {
+                CompoundTag area = areas.getCompound(j);
+                coverage.add(new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), false));
+            }
+            ArrayDeque<TurnOn> recent = network.history.computeIfAbsent(Frequency.clamp(entry.getInt("frequency")), f -> new ArrayDeque<>());
+            recent.addLast(new TurnOn(entry.getLong("time"), entry.getLong("day_time"), coverage));
+            while (recent.size() > MAX_HISTORY) {
+                recent.removeFirst();
+            }
         }
         return network;
     }

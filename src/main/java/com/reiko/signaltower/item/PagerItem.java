@@ -40,6 +40,9 @@ import java.util.List;
  * Renaming it in an anvil changes the name its messages use ("Front Door: frequency 5 is ON").
  * Alerts also go in chat with the in-game day and time ("[Day 12, 06:30] Front Door: ..."), so
  * you can scroll back to see what went off; the pager's screen switches that off.
+ * <p>
+ * Catch-up: when its owner logs out, each pager notes the time; at the next login it says in chat
+ * how many times its frequency turned on where the player is standing while they were away.
  */
 public class PagerItem extends Item {
     private static final String KEY = "message." + SignalTower.MOD_ID + ".";
@@ -90,12 +93,82 @@ public class PagerItem extends Item {
      * by the next day's 00:00.
      */
     public static Component chatLine(long dayTime, Component alert) {
-        long sinceMidnight = dayTime + 6000; // day time 0 is 06:00
+        Object[] when = dayAndTime(dayTime);
+        return Component.translatable(KEY + "pager_log", when[0], when[1]).withStyle(ChatFormatting.GRAY)
+                .append(alert.copy());
+    }
+
+    /** {day number, "HH:MM"} for a world day time, with days starting at midnight (day time 0 is 06:00). */
+    public static Object[] dayAndTime(long dayTime) {
+        long sinceMidnight = dayTime + 6000;
         long day = Math.floorDiv(sinceMidnight, 24000L) + 1;
         long ticks = Math.floorMod(sinceMidnight, 24000L);
         String time = String.format(java.util.Locale.ROOT, "%02d:%02d", ticks / 1000, ticks % 1000 * 60 / 1000);
-        return Component.translatable(KEY + "pager_log", day, time).withStyle(ChatFormatting.GRAY)
-                .append(alert.copy());
+        return new Object[]{day, time};
+    }
+
+    // ---- Catch-up ----
+
+    /** Every pager in the player's inventory (main slots, armor, off-hand). */
+    private static List<ItemStack> pagersOf(Player player) {
+        List<ItemStack> pagers = new java.util.ArrayList<>();
+        Container inventory = player.getInventory();
+        for (int i = 0; i < inventory.getContainerSize(); i++) {
+            ItemStack stack = inventory.getItem(i);
+            if (stack.getItem() instanceof PagerItem) {
+                pagers.add(stack);
+            }
+        }
+        return pagers;
+    }
+
+    /** At logout: each pager notes the time, so the next login can say what it missed. */
+    public static void markAway(Player player, long gameTime) {
+        for (ItemStack pager : pagersOf(player)) {
+            pager.set(ModRegistry.PAGER_AWAY_SINCE.get(), gameTime);
+        }
+    }
+
+    /**
+     * At login: for each pager that noted a logout time, how many times its frequency turned on
+     * where the player is standing since then, and when the last one was. Pagers that heard
+     * nothing say nothing, unless none of them heard anything; then one line says so (except for
+     * the owner of a singleplayer world, which doesn't run while they're away). The lines are
+     * shown in chat and returned.
+     */
+    public static List<Component> catchUp(ServerLevel level, Player player, boolean worldRanWhileAway) {
+        SignalNetwork network = SignalNetwork.get(level);
+        List<Component> lines = new java.util.ArrayList<>();
+        int pagersBack = 0;
+        for (ItemStack pager : pagersOf(player)) {
+            Long since = pager.get(ModRegistry.PAGER_AWAY_SINCE.get());
+            if (since == null) {
+                continue;
+            }
+            pager.remove(ModRegistry.PAGER_AWAY_SINCE.get());
+            pagersBack++;
+            int frequency = FrequencyTunerItem.getFrequency(pager);
+            List<SignalNetwork.TurnOn> heard = network.turnOnsSince(frequency, since, player.blockPosition());
+            if (heard.isEmpty()) {
+                continue;
+            }
+            Object[] when = dayAndTime(heard.get(heard.size() - 1).dayTime());
+            int times = heard.size();
+            lines.add((times == 1
+                    ? Component.translatable(KEY + "pager_catchup_once", label(pager), frequency, when[0], when[1])
+                    : Component.translatable(KEY + (times >= SignalNetwork.MAX_HISTORY ? "pager_catchup_lots" : "pager_catchup_many"),
+                            label(pager), frequency, times, when[0], when[1]))
+                    .withStyle(ChatFormatting.GOLD));
+        }
+        if (lines.isEmpty() && pagersBack > 0 && worldRanWhileAway) {
+            lines.add((pagersBack == 1
+                    ? Component.translatable(KEY + "pager_catchup_none_one")
+                    : Component.translatable(KEY + "pager_catchup_none_many", pagersBack)).withStyle(ChatFormatting.GRAY));
+        }
+        for (Component line : lines) {
+            player.displayClientMessage(line, false);
+        }
+        return lines;
     }
     /** "Radio Pager", or the name it was given in an anvil. */
     public static Component label(ItemStack stack) {

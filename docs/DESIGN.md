@@ -55,6 +55,7 @@
   - The last strength is kept in a `pager_signal` component (saved, so reloading with the signal on doesn't re-alert; synced, so the client's `pager_on` item property can light the screen). Only a change from 0 to more than 0 alerts.
   - An alert shows an action-bar message (the anvil name if it has one) and plays `NOTE_BLOCK_BIT` with `ServerPlayer.playNotifySound`, so only the owner hears it. The other two beeps come from a `pager_beeps` component (synced, never saved), one every 4 ticks. `pager_silent` turns the beeps off.
   - Chat log: on by default (`pager_chat_log` component, only stored as `false`). An alert also goes to chat as `PagerItem.chatLine(dayTime, alert)`: "[Day N, HH:MM] " from `level.getDayTime()`, shifted 6000 ticks so days start at midnight (day time 0 is 06:00), then the alert. The pager's screen has Sound and Chat log buttons and saves with `ConfigurePagerPayload`, which only re-tunes (re-arming the alert) if the frequency really changed.
+  - Catch-up: `SignalNetwork` keeps, per frequency, the last 32 `TurnOn`s (game time, day time, coverage), recorded when a transmitter goes from off (or absent, or another frequency) to on, on every remote pulse, and when a toggle switches on; saved as `turn_ons`. Stamps come from `tick(gameTime, dayTime)`. `PlayerLoggedOutEvent` → `PagerItem.markAway` stamps every pager with `pager_away_since` (it fires before the player is saved). `PlayerLoggedInEvent` → `PagerItem.catchUp` asks `turnOnsSince(frequency, since, player position)` for each stamped pager, removes the stamp and posts one chat line per pager that missed something, or one "heard nothing" line (skipped for a singleplayer world's owner, since that world is paused while they're away).
   - Re-tuning (`PagerItem.setFrequency`, used by the screen packet, scrolling and copying) clears the stored signal, so the new frequency alerts if it's already on.
   - `RemoteControlItem.sendSignal` adds `PagerItem.countPagers` (pagers on that frequency carried by players inside the coverage) to "Heard by". The locator doesn't include pagers, so it can't track players.
 - **Signal Scanner:**
@@ -98,12 +99,13 @@
 
 ## Verified
 
-- 67 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
+- 71 GameTests pass (`./gradlew runGameTestServer`). They cover linking, signal strength, frequency isolation, reach growing with height, masts carrying the signal, the tuner's tune and copy actions, and drops keeping their frequency.
 - In the real client:
   - models, the glowing warning light and items render correctly;
   - typing a frequency into the Tuner screen updates the held tuner on the server;
   - tuning a receiver links it and lights its lamps;
   - the status readout shows the right values;
+  - on a dedicated server: logged out holding three pagers; switched transmitter 42 off and on twice and 301 on once from the console; after a server restart and logging back in, chat said "Gate: while you were away, frequency 42 turned on 2 times, last on Day 1 at 18:34" and "Workshop: ... frequency 301 turned on once, on Day 1 at 20:07" (the third pager stayed quiet); logging out and in again with nothing happening said "Your 3 pagers heard nothing while you were away";
   - the scanner tracked frequency 42 (row in green with "»"); the arrow pointed behind-left facing north, ahead facing south and right facing east, matching the target a little west of due south, 27 blocks away; tracking the tower showed "3 blocks, 30 up"; breaking its transmitter showed "Lost track of frequency 77" and removed the arrow;
   - three remote presses put three "[Day 1, 12:00] Radio Pager: frequency 12 is ON (strength 15)" lines in chat; after `/time set 74500` and `/time add 15700` the stamps read Day 4, 08:30 and Day 5, 00:12; a pager with its chat log switched off in its screen only showed the alert above the hotbar;
   - sneak + scroll took a Remote Control from 9 to 10 and a pager from 5 to 4; favorites saved in the remote's screen (which fits the locator lines, favorites, Mode/Length and Done); Ctrl-scrolling wrapped from 42 to favorite 1; a tuner kept the favorites it saved in v0.15.0;
@@ -115,6 +117,7 @@
 
 ## History
 
+- **v0.19.0:** pager catch-up.
 - **v0.18.0:** scanner tracking arrow.
 - **v0.17.0:** pager chat log.
 - **v0.16.0:** scroll and favorites for the Remote Control and Radio Pager.

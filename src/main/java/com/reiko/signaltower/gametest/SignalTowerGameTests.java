@@ -1775,4 +1775,132 @@ public final class SignalTowerGameTests {
         check(Math.abs(Math.abs(behind) - 180F) < 0.5F, "north while facing south: behind, got " + behind);
         helper.succeed();
     }
+
+    // ---- Pager catch-up ----
+
+    /**
+     * The network remembers each time a frequency turns on: a transmitter going from off to on, a
+     * remote pulse, a toggle switched on. Staying on, changing strength or switching off doesn't
+     * count. It keeps the last 32 per frequency.
+     */
+    @GameTest(template = PLATFORM)
+    public static void networkRemembersTurnOns(GameTestHelper helper) {
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        BlockPos tx = here.east(10);
+        network.tick(100, 1000);
+        network.updateTransmitter(tx, 991, 0, 50);  // placed, silent
+        network.updateTransmitter(tx, 991, 15, 50); // on: 1
+        network.updateTransmitter(tx, 991, 9, 50);  // still on, weaker
+        network.tick(200, 1100);
+        network.updateTransmitter(tx, 991, 0, 50);  // off
+        network.updateTransmitter(tx, 991, 15, 50); // on again: 2
+        network.pulse(991, SignalNetwork.ownCoverage(here, 10), 300); // 3
+        check(network.toggleLatch(991, SignalNetwork.ownCoverage(here, 10)), "toggle on"); // 4
+        check(!network.toggleLatch(991, SignalNetwork.ownCoverage(here, 10)), "toggle off");
+        List<SignalNetwork.TurnOn> all = network.turnOnsSince(991, 0, here);
+        check(all.size() == 4, "Should remember 4 turn-ons, got " + all.size());
+        check(all.get(0).gameTime() == 100 && all.get(0).dayTime() == 1000 && all.get(1).gameTime() == 200,
+                "Each should be stamped with the time it happened");
+        check(network.turnOnsSince(991, 100, here).size() == 3, "Only the ones after the given time");
+        check(network.turnOnsSince(991, 0, here.west(500)).isEmpty(), "Somewhere none of them reached");
+        check(network.turnOnsSince(992, 0, here).isEmpty(), "Another frequency");
+        for (int i = 0; i < 40; i++) {
+            network.pulse(995, SignalNetwork.ownCoverage(here, 10), 300);
+        }
+        check(network.turnOnsSince(995, 0, here).size() == SignalNetwork.MAX_HISTORY, "Only the last 32 are kept");
+        helper.succeed();
+    }
+
+    /** The remembered turn-ons are saved with the world. */
+    @GameTest(template = PLATFORM)
+    public static void turnOnsSurviveSaveAndLoad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork();
+        BlockPos here = new BlockPos(5_000_000, 64, -5_000_000);
+        network.tick(500, 7000);
+        network.updateTransmitter(here.north(20), 996, 15, 40);
+        network.tick(600, 7100);
+        network.pulse(996, List.of(new SignalNetwork.Coverage(here, 10, false), new SignalNetwork.Coverage(here.south(30), 25, false)), 700);
+        SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(loaded.turnOnsSince(996, 0, here).equals(network.turnOnsSince(996, 0, here)),
+                "Loading changed the turn-ons: " + loaded.turnOnsSince(996, 0, here));
+        check(loaded.turnOnsSince(996, 0, here.south(50)).size() == 1, "The pulse's second area should still reach 50 blocks south");
+        helper.succeed();
+    }
+
+    /**
+     * At login, each pager says how often its frequency turned on where the player is while they
+     * were away, and when the last time was. If none heard anything, one line says so (but not in
+     * a singleplayer world, which is paused while you're away).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void pagerCatchUpReportsWhatTurnedOn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        List<Component> bar = new java.util.ArrayList<>(), chat = new java.util.ArrayList<>();
+        Player player = listeningPlayer(helper, new BlockPos(1, 1, 1), bar, chat);
+        ItemStack heard = pagerFor(player, 993);
+        heard.set(DataComponents.CUSTOM_NAME, Component.literal("Front Door"));
+        ItemStack quiet = new ItemStack(ModRegistry.PAGER.get());
+        PagerItem.setFrequency(quiet, 994);
+        player.getInventory().setItem(6, quiet);
+        SignalNetwork network = SignalNetwork.get(level);
+        List<SignalNetwork.Coverage> here = SignalNetwork.ownCoverage(player.blockPosition(), 10);
+
+        helper.startSequence()
+                .thenExecute(() -> PagerItem.markAway(player, level.getGameTime()))
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    network.pulse(993, here, level.getGameTime() + 2);
+                    network.pulse(993, here, level.getGameTime() + 2);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    List<Component> lines = PagerItem.catchUp(level, player, true);
+                    check(lines.size() == 1, "Only the pager that heard something should report, got " + lines.size());
+                    var line = (TranslatableContents) lines.get(0).getContents();
+                    check(line.getKey().endsWith("pager_catchup_many") && ((Component) line.getArgs()[0]).getString().equals("Front Door")
+                                    && Integer.valueOf(993).equals(line.getArgs()[1]) && Integer.valueOf(2).equals(line.getArgs()[2]),
+                            "Should say Front Door's frequency 993 turned on 2 times: " + lines.get(0).getString());
+                    check(chat.size() == 1, "The report should go in chat");
+                    check(!heard.has(ModRegistry.PAGER_AWAY_SINCE.get()) && !quiet.has(ModRegistry.PAGER_AWAY_SINCE.get()),
+                            "Both pagers should forget the logout time");
+                    check(PagerItem.catchUp(level, player, true).isEmpty(), "A second login check has nothing new");
+                    PagerItem.markAway(player, level.getGameTime());
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    List<Component> none = PagerItem.catchUp(level, player, true);
+                    check(none.size() == 1 && keyOf(none.get(0)).endsWith("pager_catchup_none_many"),
+                            "Nothing happened, so one line should say so");
+                    PagerItem.markAway(player, level.getGameTime());
+                    check(PagerItem.catchUp(level, player, false).isEmpty(), "In singleplayer, nothing is said");
+                    PagerItem.markAway(player, level.getGameTime());
+                })
+                .thenIdle(2)
+                .thenExecute(() -> network.pulse(993, here, level.getGameTime() + 2))
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    List<Component> once = PagerItem.catchUp(level, player, true);
+                    check(once.size() == 1 && keyOf(once.get(0)).endsWith("pager_catchup_once"), "A single turn-on says \"once\"");
+                })
+                .thenSucceed();
+    }
+
+    /** Logging out stamps every pager in the inventory (off-hand too), and nothing else. */
+    @GameTest(template = PLATFORM)
+    public static void logoutStampsEveryPager(GameTestHelper helper) {
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 1));
+        ItemStack inPocket = pagerFor(player, 1);
+        ItemStack inOffhand = new ItemStack(ModRegistry.PAGER.get());
+        player.setItemInHand(InteractionHand.OFF_HAND, inOffhand);
+        ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+        player.getInventory().setItem(7, tuner);
+        PagerItem.markAway(player, 12345L);
+        check(Long.valueOf(12345L).equals(inPocket.get(ModRegistry.PAGER_AWAY_SINCE.get()))
+                && Long.valueOf(12345L).equals(player.getOffhandItem().get(ModRegistry.PAGER_AWAY_SINCE.get())),
+                "Both pagers should note the logout time");
+        check(!tuner.has(ModRegistry.PAGER_AWAY_SINCE.get()), "Other items aren't touched");
+        helper.succeed();
+    }
 }

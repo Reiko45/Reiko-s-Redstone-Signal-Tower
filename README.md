@@ -97,6 +97,9 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Chat log:** each alert also goes into chat, with the in-game day and time in front: "[Day 4, 08:30] Front Door: frequency 5 is ON (strength 15)". Open chat to scroll back and see what went off while you weren't looking. It's on for every pager by default; switch it off for one pager (say, one on a fast clock) with the **Chat log** button in its screen. The time comes from the world's clock, with each day starting at midnight.
 
   ![Pager alerts in chat with their day and time, and the pager's Sound and Chat log buttons](docs/images/pager-chat-log.png)
+- **Catch-up (on servers):** when you log out, each pager in your inventory notes the time. When you log back in, each one that missed something tells you in chat: "Gate: while you were away, frequency 42 turned on 2 times, last on Day 1 at 18:34". It counts every time its frequency turned on where you're standing (a transmitter being powered, a remote press, a toggle switched on), even across server restarts. If none of your pagers missed anything, you get one line saying so. Each frequency remembers its last 32 turn-ons, so after a long time away it may say "at least 32 times". A singleplayer world is paused while you're out of it, so there's nothing to catch up on there and the pagers stay quiet.
+
+  ![Pagers catching up after logging back in to a server, and the line when nothing happened](docs/images/pager-catch-up.png)
 - Right-click: switch the sound on or off. With the sound off it still shows the message.
 - Sneak + scroll, Sneak + Ctrl + scroll and the 5 favorites in its screen work just like the tuner's. After a change it alerts if the new frequency is already on.
 - Sneak + right-click the air: change its frequency, and switch its **Sound** and **Chat log** on or off. Sneak + right-click a transmitter or receiver: copy its frequency.
@@ -315,7 +318,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 64. the chat log is on by default, can be switched off and on, and the tooltip says which;
 65. the scanner tracks the same transmitter its row points to (strongest, then nearest), and can't track one whose reach doesn't cover you;
 66. tracking a placed transmitter stores where it is; re-tuning or breaking it loses the track; remote-only and empty frequencies can't be tracked; stopping clears it;
-67. the target survives saving and sync, and the arrow points ahead, left, right or behind correctly for each facing.
+67. the target survives saving and sync, and the arrow points ahead, left, right or behind correctly for each facing;
+68. the network remembers each turn-on (a transmitter going from off to on, a remote pulse, a toggle switched on), not staying on, strength changes or switching off, and keeps the last 32 per frequency;
+69. the remembered turn-ons are saved with the world;
+70. at login, each pager reports how often its frequency turned on where the player is while they were away ("once", "N times"), one line says so if nothing happened, and singleplayer stays quiet;
+71. logging out stamps every pager in the inventory, off-hand included, and nothing else.
 
 ## License
 

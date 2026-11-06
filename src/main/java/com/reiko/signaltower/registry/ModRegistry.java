@@ -98,6 +98,12 @@ public final class ModRegistry {
                     .persistent(Codec.BOOL)
                     .networkSynchronized(ByteBufCodecs.BOOL));
 
+    /** The game time a Radio Pager's owner logged out, for the catch-up at the next login. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> PAGER_AWAY_SINCE =
+            DATA_COMPONENTS.registerComponentType("pager_away_since", builder -> builder
+                    .persistent(Codec.LONG)
+                    .networkSynchronized(ByteBufCodecs.VAR_LONG));
+
     /** The transmitter a Signal Scanner is tracking with its on-screen arrow. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<ScannerTarget>> SCANNER_TARGET =
             DATA_COMPONENTS.registerComponentType("scanner_target", builder -> builder
