@@ -33,7 +33,12 @@ public final class FrequencyLog {
      * converter carried it over (0 if it started on this one or isn't known).
      */
     public record Entry(SignalNetwork.CauseKind kind, String dimension, Optional<BlockPos> pos, String who,
-                        FrequencyAudit.Who whoKind, long gameTime, long dayTime, int from) {
+                        FrequencyAudit.Who whoKind, long gameTime, long dayTime, int from, String detail) {
+        /** No detail. ({@code detail}, v0.38.0: the keypad guest code used, or "".) */
+        public Entry(SignalNetwork.CauseKind kind, String dimension, Optional<BlockPos> pos, String who,
+                     FrequencyAudit.Who whoKind, long gameTime, long dayTime, int from) {
+            this(kind, dimension, pos, who, whoKind, gameTime, dayTime, from, "");
+        }
     }
 
     /** {@code frequency}'s turn-ons, newest first, at most {@link #MAX_ENTRIES}. Empty if it isn't private. */
@@ -74,6 +79,6 @@ public final class FrequencyLog {
                 : cause.kind() == SignalNetwork.CauseKind.TRANSMITTER && whoKind != FrequencyAudit.Who.OTHER ? Optional.of(cause.pos())
                 : Optional.empty();
         int from = turnOn.from() != 0 && turnOn.from() != frequency ? turnOn.from() : 0;
-        return new Entry(cause.kind(), dimension, pos, who, whoKind, turnOn.gameTime(), turnOn.dayTime(), from);
+        return new Entry(cause.kind(), dimension, pos, who, whoKind, turnOn.gameTime(), turnOn.dayTime(), from, cause.detail());
     }
 }

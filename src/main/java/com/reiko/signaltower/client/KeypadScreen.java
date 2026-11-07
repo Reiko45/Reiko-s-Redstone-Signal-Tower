@@ -22,7 +22,8 @@ import org.lwjgl.glfw.GLFW;
 /**
  * A Code Keypad's screen (v0.37.0): a display and twelve keys (1-9, C, 0, OK). Digits can also
  * be typed on the keyboard (Backspace deletes, Enter is OK). The owner also gets **Set code**
- * (saves the digits typed as the new code) and **Pulse** (how long the pulse lasts). The display
+ * (saves the digits typed as the new code), **Pulse** (how long the pulse lasts) and, since
+ * v0.38.0, **Guest codes...** ({@link KeypadGuestsScreen}). The display
  * only shows stars; the code is never sent to the client.
  */
 public class KeypadScreen extends Screen {
@@ -73,7 +74,7 @@ public class KeypadScreen extends Screen {
     @Override
     protected void init() {
         int centerX = width / 2;
-        int panelHeight = state.mayConfigure() ? 218 : 194;
+        int panelHeight = state.mayConfigure() ? 242 : 194;
         top = Math.max(4, height / 2 - panelHeight / 2);
         int left = centerX - GRID_WIDTH / 2;
         int gridTop = top + 52;
@@ -103,6 +104,15 @@ public class KeypadScreen extends Screen {
             pulseButton = addRenderableWidget(Button.builder(pulseLabel(), b -> cyclePulse())
                     .tooltip(Tooltip.create(Component.translatable(KEY + "pulse_tooltip")))
                     .bounds(left + half + GAP, rowY, half, 20).build());
+            rowY += 24;
+            // v0.38.0: extra codes for visitors.
+            addRenderableWidget(Button.builder(Component.translatable(KEY + "guest_codes"), b -> {
+                        if (minecraft != null) {
+                            minecraft.setScreen(new KeypadGuestsScreen(this, state.pos()));
+                        }
+                    })
+                    .tooltip(Tooltip.create(Component.translatable(KEY + "guest_codes_tooltip")))
+                    .bounds(left, rowY, GRID_WIDTH, 20).build());
             rowY += 24;
         }
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())

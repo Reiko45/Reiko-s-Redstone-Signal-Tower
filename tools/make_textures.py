@@ -355,6 +355,31 @@ def code_keypad(lit):
     return img
 
 
+def compact_transmitter(lit):
+    """Button-sized transmitter (v0.38.0), same layout as the compact receiver: a red light with
+    broadcast arcs on both sides of it, over a little mast."""
+    r = ON if lit else OFF
+    img = blank(M)
+    px = img.load()
+    for x in range(5, 11):
+        px[x, 6] = H
+        px[x, 9] = D
+    for y in range(6, 10):
+        px[5, y] = L
+        px[10, y] = O
+    px[5, 6] = H
+    px[10, 9] = O
+    arc = r[1] if lit else D
+    px[6, 7] = px[6, 8] = arc
+    px[9, 7] = px[9, 8] = arc
+    px[7, 7] = px[8, 7] = r[2]
+    px[7, 8] = px[8, 8] = O
+    for x in range(0, 16):
+        px[x, 14] = L
+        px[x, 15] = D
+    return img
+
+
 def wall_redstone_item():
     """A strip of wall with redstone dust running up it and branching sideways."""
     img = blank()
@@ -564,6 +589,8 @@ def scanner_arrow():
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
+    "compact_radio_transmitter": compact_transmitter(False),
+    "compact_radio_transmitter_on": compact_transmitter(True),
     "code_keypad": code_keypad(False),
     "code_keypad_on": code_keypad(True),
     "radio_transmitter_side": transmitter_side(False),

@@ -117,6 +117,16 @@ public final class ClientHooks {
         }
     }
 
+    /** A keypad's guest codes (v0.38.0): to the open Guest codes screen, else just what the change said. */
+    public static void onKeypadGuestList(com.reiko.signaltower.network.KeypadGuestListPayload payload) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof KeypadGuestsScreen screen && screen.pos().equals(payload.pos())) {
+            screen.onList(payload);
+        } else if (!payload.notice().getString().isEmpty()) {
+            minecraft.gui.setOverlayMessage(payload.notice(), false);
+        }
+    }
+
     /** The server's answer for the reach preview ring (v0.37.0). */
     public static void onReachPreview(com.reiko.signaltower.network.ReachPreviewPayload answer) {
         ReachRing.onAnswer(answer);

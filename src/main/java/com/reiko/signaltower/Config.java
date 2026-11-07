@@ -23,6 +23,10 @@ public final class Config {
             .comment("Upper limit on any transmitter's reach, in blocks. 0 means no limit.")
             .defineInRange("maxReach", 0, 0, 30_000_000);
 
+    public static final ModConfigSpec.IntValue COMPACT_TRANSMITTER_REACH = BUILDER
+            .comment("Reach, in blocks, of a Compact Radio Transmitter. It's the same at any height (still capped by maxReach).")
+            .defineInRange("compactTransmitterReach", 16, 1, 1_000_000);
+
     public static final ModConfigSpec.BooleanValue TOWERS_RELAY_REMOTES = BUILDER
             .comment("If true, every Radio Transmitter and Radio Repeater within a Remote Control's reach relays",
                     "its presses: the signal goes out again from the tower with the tower's reach.",

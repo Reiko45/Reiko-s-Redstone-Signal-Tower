@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -100,7 +100,7 @@ public final class FrequencyAudit {
             String dimension = level.dimension().location().toString();
             List<Entry> found = new ArrayList<>();
 
-            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, Kind.TRANSMITTER,
+            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, tx.compact() ? Kind.COMPACT_TRANSMITTER : Kind.TRANSMITTER,
                     dimension, pos, tx.tunedBy(), network.isSilenced(level, pos) ? Status.SILENT : Status.WORKING, tx.power())));
 
             network.relaysOn(level, frequency).forEach((pos, relay) -> {

@@ -54,10 +54,17 @@ public final class SignalNetwork extends SavedData {
     private static final SavedData.Factory<SignalNetwork> FACTORY =
             new SavedData.Factory<>(SignalNetwork::new, SignalNetwork::load, null);
 
-    /** What a transmitter is currently broadcasting. */
-    public record Transmitter(int frequency, int power, int reach, @Nullable UUID tunedBy) {
+    /**
+     * What a transmitter is currently broadcasting. {@code compact}: a Compact Radio Transmitter
+     * (v0.38.0), which has a short fixed reach and doesn't relay remote presses.
+     */
+    public record Transmitter(int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact) {
         public Transmitter(int frequency, int power, int reach) {
-            this(frequency, power, reach, null);
+            this(frequency, power, reach, null, false);
+        }
+
+        public Transmitter(int frequency, int power, int reach, @Nullable UUID tunedBy) {
+            this(frequency, power, reach, tunedBy, false);
         }
     }
 
@@ -274,8 +281,13 @@ public final class SignalNetwork extends SavedData {
      * or placed it (null if unknown), which decides whether it may broadcast on a private frequency.
      */
     public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy) {
+        updateTransmitter(pos, frequency, power, reach, tunedBy, false);
+    }
+
+    /** {@link #updateTransmitter(BlockPos, int, int, int, UUID)} for a compact transmitter ({@code compact}) or a normal one. */
+    public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact) {
         BlockPos key = pos.immutable();
-        Transmitter next = new Transmitter(frequency, power, reach, tunedBy);
+        Transmitter next = new Transmitter(frequency, power, reach, tunedBy, compact);
         Transmitter previous = transmitters.put(key, next);
         if (next.equals(previous)) {
             return;
@@ -648,7 +660,8 @@ public final class SignalNetwork extends SavedData {
     /**
      * Where a remote press from {@code origin} goes out: the player's own reach first, then, if
      * {@code relayThroughTowers}, every Radio Transmitter and Radio Repeater within that reach
-     * (horizontally, on any frequency), each with its own reach. A tower only relays a press it
+     * (horizontally, on any frequency), each with its own reach. Compact transmitters aren't towers
+     * and don't relay. A tower only relays a press it
      * heard directly; towers don't pass it on to each other. (Repeaters on the press's own
      * frequency do pass it on, through {@link #resolve}.)
      */
@@ -662,7 +675,7 @@ public final class SignalNetwork extends SavedData {
         List<BlockPos> stale = null;
         for (Map.Entry<BlockPos, Transmitter> entry : transmitters.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (!own.reaches(pos)) {
+            if (!own.reaches(pos) || entry.getValue().compact()) {
                 continue;
             }
             if (level.isLoaded(pos) && !(level.getBlockState(pos).getBlock() instanceof RadioTransmitterBlock)) {
@@ -780,8 +793,13 @@ public final class SignalNetwork extends SavedData {
      * recorded) or a remote press (whose, by UUID and name; never where they stood, so the log
      * can't be used to find players). {@link #UNKNOWN} for turn-ons saved before v0.35.0.
      */
-    public record Cause(CauseKind kind, @Nullable BlockPos pos, @Nullable UUID who, String name) {
+    public record Cause(CauseKind kind, @Nullable BlockPos pos, @Nullable UUID who, String name, String detail) {
         public static final Cause UNKNOWN = new Cause(CauseKind.UNKNOWN, null, null, "");
+
+        /** No detail. ({@code detail}, v0.38.0: the keypad guest code used, or "".) */
+        public Cause(CauseKind kind, @Nullable BlockPos pos, @Nullable UUID who, String name) {
+            this(kind, pos, who, name, "");
+        }
 
         public static Cause transmitter(BlockPos pos, @Nullable UUID tunedBy) {
             return new Cause(CauseKind.TRANSMITTER, pos.immutable(), tunedBy, "");
@@ -793,7 +811,12 @@ public final class SignalNetwork extends SavedData {
 
         /** The right code typed on a Code Keypad (v0.37.0): where the keypad is, and who typed it. */
         public static Cause keypad(BlockPos pos, UUID player, String name) {
-            return new Cause(CauseKind.KEYPAD, pos.immutable(), player, name);
+            return keypad(pos, player, name, "");
+        }
+
+        /** {@link #keypad(BlockPos, UUID, String)} with the guest code's name (v0.38.0), or "" for the keypad's own code. */
+        public static Cause keypad(BlockPos pos, UUID player, String name, String guestCode) {
+            return new Cause(CauseKind.KEYPAD, pos.immutable(), player, name, guestCode == null ? "" : guestCode);
         }
     }
 
@@ -1226,6 +1249,9 @@ public final class SignalNetwork extends SavedData {
             if (tx.tunedBy() != null) {
                 entry.putUUID("tuned_by", tx.tunedBy());
             }
+            if (tx.compact()) {
+                entry.putBoolean("compact", true);
+            }
             list.add(entry);
         });
         tag.put("transmitters", list);
@@ -1296,6 +1322,9 @@ public final class SignalNetwork extends SavedData {
                     if (!cause.name().isEmpty()) {
                         causeTag.putString("name", cause.name());
                     }
+                    if (!cause.detail().isEmpty()) {
+                        causeTag.putString("detail", cause.detail());
+                    }
                     entry.put("cause", causeTag);
                 }
                 if (turnOn.from() != 0) {
@@ -1319,7 +1348,8 @@ public final class SignalNetwork extends SavedData {
                     Frequency.clamp(entry.getInt("frequency")),
                     entry.getInt("power"),
                     entry.getInt("reach"),
-                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
+                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null,
+                    entry.getBoolean("compact"));
             network.transmitters.put(pos, tx);
             network.byFrequency.computeIfAbsent(tx.frequency(), f -> new HashMap<>()).put(pos, tx);
         }
@@ -1365,7 +1395,7 @@ public final class SignalNetwork extends SavedData {
                 cause = new Cause(CauseKind.named(causeTag.getString("kind")),
                         causeTag.contains("pos") ? BlockPos.of(causeTag.getLong("pos")) : null,
                         causeTag.hasUUID("who") ? causeTag.getUUID("who") : null,
-                        causeTag.getString("name"));
+                        causeTag.getString("name"), causeTag.getString("detail"));
             }
             recent.addLast(new TurnOn(entry.getLong("time"), entry.getLong("day_time"), coverage, cause, entry.getInt("from")));
             while (recent.size() > MAX_HISTORY) {

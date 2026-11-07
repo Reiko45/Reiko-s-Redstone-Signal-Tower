@@ -118,7 +118,8 @@ public final class RadioInfo {
                 cursor.move(Direction.UP);
             }
             Block top = level.getBlockState(cursor).getBlock();
-            if ((top instanceof RadioTransmitterBlock || top instanceof RadioRepeaterBlock)
+            if ((top instanceof RadioTransmitterBlock && !(top instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock)
+                    || top instanceof RadioRepeaterBlock)
                     && level.getBlockEntity(cursor) instanceof RadioBlockEntity radio) {
                 tag.putString("top", top instanceof RadioConverterBlock ? "converter"
                         : top instanceof RadioRepeaterBlock ? "repeater" : "transmitter");
@@ -136,8 +137,9 @@ public final class RadioInfo {
         int frequency = radio.getFrequency();
         tag.putInt("frequency", frequency);
         if (block instanceof RadioTransmitterBlock) {
-            tag.putInt("power", RadioHelper.readTransmitterInput(level, pos));
-            tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            // A compact one (v0.38.0) reads only what's around it and has its fixed reach.
+            tag.putInt("power", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, pos, state));
+            tag.putInt("reach", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, pos, state));
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
             tag.putInt("reach", RadioHelper.reachAt(level, pos));

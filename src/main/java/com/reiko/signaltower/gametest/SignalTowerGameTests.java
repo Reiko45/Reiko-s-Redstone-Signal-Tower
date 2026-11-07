@@ -4866,4 +4866,193 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---------------------------------------------------------------- v0.38.0: Compact Radio Transmitter
+
+    /**
+     * The Compact Radio Transmitter: stuck to a wall, it broadcasts the signal around it over its
+     * short fixed reach (heard inside, not outside), whatever its height; it isn't a relay tower;
+     * the ring, Jade and the audit know it; its flag survives saving; and it pops off with its
+     * frequency when its wall goes.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void compactTransmitter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        BlockPos at = new BlockPos(2, 1, 1);
+        BlockPos big = new BlockPos(8, 1, 1);
+        helper.setBlock(at.south(), Blocks.STONE);
+        helper.setBlock(at, ModRegistry.COMPACT_RADIO_TRANSMITTER.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.FACING, Direction.NORTH));
+        com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity tx = helper.getBlockEntity(at);
+        tx.setTunedBy(devId);
+        tx.setFrequency(3301);
+        place(helper, big, ModRegistry.RADIO_TRANSMITTER.get(), 3302);
+        try {
+            claims.put(3301, devId, "Dev", java.util.Map.of());
+            helper.setBlock(at.west(), Blocks.REDSTONE_BLOCK);
+            tx.refresh();
+            BlockPos absolute = helper.absolutePos(at);
+            SignalNetwork network = SignalNetwork.get(level);
+            int reach = com.reiko.signaltower.Config.COMPACT_TRANSMITTER_REACH.get();
+            check(reach == 16, "16 blocks by default: " + reach);
+            check(helper.getBlockState(at).getValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.POWERED), "Lit while sending");
+            check(network.listen(level, 3301, absolute.offset(reach, 0, 0), null).power() == 15, "Heard at the edge of its reach");
+            check(network.listen(level, 3301, absolute.offset(reach + 1, 0, 0), null).power() == 0, "Not a block past it");
+            check(network.listen(level, 3301, absolute.offset(0, 200, reach), null).power() == 15, "At any height");
+            check(RadioHelper.reachAt(level, absolute) > reach, "A normal transmitter there would reach farther");
+
+            List<SignalNetwork.Coverage> towers = network.remoteCoverage(level, absolute.offset(1, 0, 0), 32, true);
+            check(towers.stream().noneMatch(c -> c.origin().equals(absolute)), "Not a relay tower");
+            check(towers.stream().anyMatch(c -> c.origin().equals(helper.absolutePos(big))), "A normal transmitter next to it is");
+
+            Player dev = namedPlayer(helper, new BlockPos(1, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+            dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+            var answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(dev, absolute);
+            check(answer.reach() == reach && answer.kind() == com.reiko.signaltower.network.ReachPreviewPayload.COMPACT_TRANSMITTER
+                    && answer.frequency() == 3301, "The ring: " + answer);
+            CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absolute);
+            check(info != null && info.getInt("reach") == reach && info.getInt("power") == 15, "Jade data: " + info);
+            check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at), info))
+                    .equals(List.of("frequency", "sending", "reach", "private")), "Jade lines");
+            var audit = com.reiko.signaltower.radio.FrequencyAudit.audit(server, 3301, dev, 512);
+            check(audit.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.COMPACT_TRANSMITTER
+                    && e.pos().equals(java.util.Optional.of(absolute))), "In the audit as a compact transmitter: " + audit);
+
+            SignalNetwork fresh = new SignalNetwork().attachTo(level);
+            BlockPos far = new BlockPos(8_300_000, 70, 0);
+            fresh.updateTransmitter(far, 3303, 15, reach, null, true);
+            SignalNetwork loaded = SignalNetwork.load(fresh.save(new CompoundTag(), level.registryAccess()), level.registryAccess()).attachTo(level);
+            check(loaded.remoteCoverage(level, far.offset(1, 0, 0), 32, true).size() == 1, "Still not a tower after saving");
+            check(loaded.listen(level, 3303, far.offset(reach, 0, 0), null).power() == 15, "And still sending");
+
+            helper.setBlock(at.south(), Blocks.AIR);
+        } finally {
+            claims.remove(3301);
+        }
+        helper.succeedWhen(() -> {
+            check(helper.getBlockState(at).isAir(), "Pops off without its wall");
+            check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                    .anyMatch(stack -> stack.is(ModRegistry.COMPACT_RADIO_TRANSMITTER_ITEM.get())
+                            && Integer.valueOf(3301).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its frequency");
+        });
+    }
+
+    // ---------------------------------------------------------------- v0.38.0: keypad guest codes
+
+    /**
+     * Guest codes: only the owner adds them (a name, 4 to 8 digits, not a code already on the keypad
+     * nor a name already used, at most 8); each works its number of uses or until its time runs
+     * out, then says it has run out without counting as a wrong code; one with no limits keeps
+     * working; removing one makes it a wrong code. The list packet carries them (never the main
+     * code), they're saved, and the log names the guest code used.
+     */
+    @GameTest(template = PLATFORM)
+    public static void keypadGuestCodes(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        BlockPos at = new BlockPos(2, 1, 1);
+        BlockPos absolute = helper.absolutePos(at);
+        Player dev = namedPlayer(helper, new BlockPos(1, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player alex = namedPlayer(helper, new BlockPos(3, 1, 0), alexId, "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var keypad = keypadAt(helper, at, 3401, devId, "Dev");
+        try {
+            claims.put(3401, devId, "Dev", java.util.Map.of());
+            keypad.configure(dev, "4242", 20);
+            long now = 1_000_000_000L;
+            var refused = com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.REFUSED;
+            var saved = com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.SAVED;
+            check(keypad.addGuestCode(alex, "Me", "1111", 1, 0, now).outcome() == refused, "Only the owner adds them");
+            check(keypad.addGuestCode(dev, "  ", "1111", 1, 0, now).outcome() == refused, "A name is needed");
+            check(keypad.addGuestCode(dev, "Bad", "12", 1, 0, now).outcome() == refused, "4 to 8 digits");
+            check(keypad.addGuestCode(dev, "Main", "4242", 1, 0, now).outcome() == refused, "Not the keypad's own code");
+            var added = keypad.addGuestCode(dev, "Plumber", "1357", 3, 86400, now);
+            check(added.outcome() == saved && keyOf(added.message()).endsWith("keypad_guest_added")
+                    && !added.message().getString().contains("1357"), "Added: " + added.message().getString());
+            check(keypad.addGuestCode(dev, "Other", "1357", 1, 0, now).outcome() == refused, "Not a code already used");
+            check(keypad.addGuestCode(dev, "plumber", "2222", 1, 0, now).outcome() == refused, "Nor a name already used");
+            check(keypad.configure(dev, "1357", 20).outcome() == refused, "The main code can't become a guest code");
+            check(keypad.addGuestCode(dev, "Hourly", "2468", -1, 3600, now).outcome() == saved, "Unlimited uses for an hour");
+            check(keypad.addGuestCode(dev, "Family", "9999", -1, 0, now).outcome() == saved, "No limits at all");
+
+            var list = com.reiko.signaltower.network.KeypadGuestCodesPayload.apply(dev,
+                    com.reiko.signaltower.network.KeypadGuestCodesPayload.list(absolute), now);
+            check(list != null && list.codes().size() == 3 && list.codes().get(0).label().equals("Plumber")
+                    && list.codes().get(0).usesLeft() == 3 && list.codes().get(0).secondsLeft() == 86400
+                    && list.codes().get(2).secondsLeft() == -1 && list.codes().stream().noneMatch(c -> c.code().equals("4242")),
+                    "The owner's list (never the main code): " + list);
+            var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), level.registryAccess());
+            com.reiko.signaltower.network.KeypadGuestListPayload.STREAM_CODEC.encode(buffer, list);
+            check(com.reiko.signaltower.network.KeypadGuestListPayload.STREAM_CODEC.decode(buffer).codes().equals(list.codes()),
+                    "The list survives the network");
+            var alexList = com.reiko.signaltower.network.KeypadGuestCodesPayload.apply(alex,
+                    com.reiko.signaltower.network.KeypadGuestCodesPayload.list(absolute), now);
+            check(alexList != null && alexList.codes().isEmpty(), "Alex gets nothing");
+
+            var accepted = com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.ACCEPTED;
+            var runOut = com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.RUN_OUT;
+            var result = keypad.enter(level, alex, "1357", level.getGameTime(), now + 1000);
+            Component sent = (Component) ((TranslatableContents) result.message().getContents()).getArgs()[0];
+            check(result.outcome() == accepted && keyOf(sent).endsWith("keypad_guest_accepted") && firstArg(sent).equals("Plumber"),
+                    "Plumber's code works: " + result.message().getString());
+            var guest = keypad.guestCodes().get(0);
+            check(guest.usesLeft() == 2 && guest.used() == 1 && guest.lastUser().equals("Alex"), "One use counted: " + guest);
+            SignalNetwork.TurnOn last = SignalNetwork.get(level).history(3401).get(SignalNetwork.get(level).history(3401).size() - 1);
+            check(last.cause().kind() == SignalNetwork.CauseKind.KEYPAD && last.cause().detail().equals("Plumber"), "Recorded with its name");
+            var log = com.reiko.signaltower.radio.FrequencyLog.log(server, 3401);
+            check(log.get(0).detail().equals("Plumber") && log.get(0).who().equals("Alex"), "In the log: " + log.get(0));
+            var logBuffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), level.registryAccess());
+            com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.encode(logBuffer,
+                    new com.reiko.signaltower.network.LogResultPayload(3401, true, log, level.getGameTime()));
+            check(com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.decode(logBuffer).entries().get(0).detail().equals("Plumber"),
+                    "The name survives the network");
+            CompoundTag savedTag = SignalNetwork.get(level).save(new CompoundTag(), level.registryAccess());
+            var reloaded = SignalNetwork.load(savedTag, level.registryAccess());
+            var reloadedHistory = reloaded.history(3401);
+            check(reloadedHistory.get(reloadedHistory.size() - 1).cause().detail().equals("Plumber"), "And saving");
+
+            keypad.enter(level, alex, "1357", level.getGameTime(), now + 2000);
+            keypad.enter(level, alex, "1357", level.getGameTime(), now + 3000);
+            check(keypad.guestCodes().get(0).usedUp(), "Three uses, then used up");
+            for (int i = 0; i < 4; i++) {
+                result = keypad.enter(level, alex, "1357", level.getGameTime(), now + 4000);
+                check(result.outcome() == runOut && keyOf(result.message()).endsWith("keypad_guest_used_up"), "Used up: " + result.message().getString());
+            }
+            check(keypad.lockedSeconds(alexId, level.getGameTime()) == 0, "Not counted as wrong codes");
+
+            check(keypad.enter(level, alex, "2468", level.getGameTime(), now + 3_599_000).outcome() == accepted, "The hourly one within the hour");
+            result = keypad.enter(level, alex, "2468", level.getGameTime(), now + 3_600_000);
+            check(result.outcome() == runOut && keyOf(result.message()).endsWith("keypad_guest_expired"), "Expired after it");
+            for (int i = 0; i < 12; i++) {
+                check(keypad.enter(level, alex, "9999", level.getGameTime(), now + 1_000_000_000L).outcome() == accepted, "Family's works every time");
+            }
+            check(keypad.guestCodes().get(2).used() == 12 && keypad.guestCodes().get(2).usesLeft() == -1, "Counted, still no limit");
+
+            CompoundTag keypadTag = keypad.saveWithoutMetadata(level.registryAccess());
+            var copy = new com.reiko.signaltower.blockentity.CodeKeypadBlockEntity(absolute, helper.getBlockState(at));
+            copy.loadWithComponents(keypadTag, level.registryAccess());
+            check(copy.guestCodes().equals(keypad.guestCodes()), "Saved with the keypad");
+
+            for (int i = 0; i < 5; i++) {
+                check(keypad.addGuestCode(dev, "Guest " + i, "50" + i + "0", 1, 0, now).outcome() == saved, "Room for 8");
+            }
+            check(keypad.addGuestCode(dev, "Ninth", "8888", 1, 0, now).outcome() == refused, "Not a ninth");
+            var removed = com.reiko.signaltower.network.KeypadGuestCodesPayload.apply(dev,
+                    new com.reiko.signaltower.network.KeypadGuestCodesPayload(absolute, com.reiko.signaltower.network.KeypadGuestCodesPayload.REMOVE,
+                            "plumber", "", 0, 0), now);
+            check(removed != null && removed.codes().size() == 7 && keyOf(removed.notice()).endsWith("keypad_guest_removed"),
+                    "Removed (name ignoring case): " + removed);
+            check(keypad.enter(level, alex, "1357", level.getGameTime(), now).outcome()
+                    == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.WRONG, "Then it's just a wrong code");
+        } finally {
+            claims.remove(3401);
+        }
+        helper.succeed();
+    }
 }

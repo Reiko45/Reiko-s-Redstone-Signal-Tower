@@ -35,6 +35,7 @@ public record LogResultPayload(int frequency, boolean allowed, List<FrequencyLog
                 ByteBufCodecs.VAR_LONG.encode(buffer, entry.gameTime());
                 ByteBufCodecs.VAR_LONG.encode(buffer, entry.dayTime());
                 ByteBufCodecs.VAR_INT.encode(buffer, entry.from());
+                ByteBufCodecs.stringUtf8(64).encode(buffer, entry.detail());
             },
             buffer -> new FrequencyLog.Entry(
                     SignalNetwork.CauseKind.of(ByteBufCodecs.VAR_INT.decode(buffer)),
@@ -44,7 +45,8 @@ public record LogResultPayload(int frequency, boolean allowed, List<FrequencyLog
                     FrequencyAudit.Who.of(ByteBufCodecs.VAR_INT.decode(buffer)),
                     ByteBufCodecs.VAR_LONG.decode(buffer),
                     ByteBufCodecs.VAR_LONG.decode(buffer),
-                    ByteBufCodecs.VAR_INT.decode(buffer)));
+                    ByteBufCodecs.VAR_INT.decode(buffer),
+                    ByteBufCodecs.stringUtf8(64).decode(buffer)));
 
     public static final StreamCodec<ByteBuf, LogResultPayload> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_INT, LogResultPayload::frequency,

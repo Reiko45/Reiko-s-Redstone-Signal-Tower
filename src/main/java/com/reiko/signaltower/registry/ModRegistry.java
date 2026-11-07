@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.CodeKeypadBlock;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
+import com.reiko.signaltower.block.CompactRadioTransmitterBlock;
 import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
@@ -184,6 +185,17 @@ public final class ModRegistry {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 3 : 0)));
 
+    /** Button-sized transmitter with a short fixed reach (v0.38.0). Breaks quickly like a button and gets knocked off by pistons. */
+    public static final DeferredBlock<CompactRadioTransmitterBlock> COMPACT_RADIO_TRANSMITTER = BLOCKS.register("compact_radio_transmitter",
+            () -> new CompactRadioTransmitterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(0.5F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(CompactRadioTransmitterBlock.POWERED) ? 3 : 0)));
+
     /** A thin keypad panel: the right code sends a pulse on its frequency (v0.37.0). Knocked off by pistons, like a button. */
     public static final DeferredBlock<CodeKeypadBlock> CODE_KEYPAD = BLOCKS.register("code_keypad",
             () -> new CodeKeypadBlock(BlockBehaviour.Properties.of()
@@ -225,6 +237,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_converter", RADIO_CONVERTER);
     public static final DeferredItem<BlockItem> COMPACT_RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> COMPACT_RADIO_TRANSMITTER_ITEM =
+            ITEMS.registerSimpleBlockItem("compact_radio_transmitter", COMPACT_RADIO_TRANSMITTER);
     public static final DeferredItem<BlockItem> CODE_KEYPAD_ITEM =
             ITEMS.registerSimpleBlockItem("code_keypad", CODE_KEYPAD);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
@@ -246,7 +260,7 @@ public final class ModRegistry {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioTransmitterBlockEntity>> RADIO_TRANSMITTER_BE =
             BLOCK_ENTITIES.register("radio_transmitter",
-                    () -> BlockEntityType.Builder.of(RadioTransmitterBlockEntity::new, RADIO_TRANSMITTER.get()).build(null));
+                    () -> BlockEntityType.Builder.of(RadioTransmitterBlockEntity::new, RADIO_TRANSMITTER.get(), COMPACT_RADIO_TRANSMITTER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER_BE =
             BLOCK_ENTITIES.register("radio_receiver",

@@ -168,7 +168,9 @@ public class LogScreen extends Screen {
     }
 
     private static Component what(FrequencyLog.Entry entry) {
-        Component kind = Component.translatable(KEY + "kind_" + entry.kind().name().toLowerCase(java.util.Locale.ROOT));
+        Component kind = entry.kind() == SignalNetwork.CauseKind.KEYPAD && !entry.detail().isEmpty()
+                ? Component.translatable(KEY + "kind_keypad_guest", entry.detail())
+                : Component.translatable(KEY + "kind_" + entry.kind().name().toLowerCase(java.util.Locale.ROOT));
         return entry.from() != 0 ? Component.translatable(KEY + "kind_from", kind, entry.from()).withStyle(ChatFormatting.AQUA) : kind;
     }
 
@@ -253,6 +255,9 @@ public class LogScreen extends Screen {
                 lines.add(Component.translatable(KEY + "tip_remote_where").withStyle(ChatFormatting.DARK_GRAY));
             }
             case KEYPAD -> {
+                if (!entry.detail().isEmpty()) {
+                    lines.add(Component.translatable(KEY + "tip_keypad_guest", entry.detail(), entry.who()).withStyle(ChatFormatting.AQUA));
+                }
                 lines.add((entry.whoKind() == FrequencyAudit.Who.OTHER
                         ? Component.translatable(KEY + "tip_other_keypad", entry.who()).withStyle(ChatFormatting.RED)
                         : Component.translatable(KEY + "tip_keypad", entry.who()).withStyle(ChatFormatting.YELLOW)));

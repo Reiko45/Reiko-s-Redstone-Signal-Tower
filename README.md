@@ -14,6 +14,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
+| **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
@@ -168,6 +169,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![Dev's Guests screen giving Alex an hour on 2026; Alex's receiver hearing 2026 during the pass and his chat line; the alert Dev got when Alex pressed a remote after the pass was taken back; and the login summary of a tune Alex tried while Dev was away](docs/images/guests-and-alerts.png)
 
+  ![A Compact Radio Transmitter's 16-block ring passing between two lamps, the near one lit and the far one dark; Dev's Guest codes screen with Plumber and Family; Alex opening the door with Plumber's code; Dev's chat line for each use; the fourth try "That guest code is used up"; and Dev's log with "Guest code: Plumber"](docs/images/compact-transmitter-and-guest-codes.png)
+
   ![The reach ring: a transmitter's red ring seen from 7 blocks outside it, and a repeater's 88-block ring from above; Dev's log with the Code Keypad's turn-ons typed by Alex; Alex locked out after three wrong codes; Dev's alert in chat with where the keypad is; and the right code opening the iron door](docs/images/reach-ring-and-keypad.png)
 
   ![Dev handing 4242 (Vault) over to Steve, a member through the Base crew group ("Click again"); Dev's directory afterwards ("Steve + you"); Steve's tuner on 4242 (Private, friend Dev) and his chat line](docs/images/hand-over.png)
@@ -320,10 +323,24 @@ A **Code Keypad** is a thin panel you put on a wall, floor or ceiling. Type its 
 - **Private frequencies:** like a transmitter, it only sends on someone else's private frequency if you're a member. Otherwise it stays silent, you're told when you place it, and the frequency's owner gets an intruder alert. Anyone who knows the code can use your keypad, though, even if they aren't on the frequency themselves: that's what the code is for.
 - **The log** lists its turn-ons as **Code Keypad**, with who typed the code and where the keypad is (click the row for a beam over it).
 - **Jade** shows its frequency, owner, whether a code is set (never the code itself), "Waiting for the code" or "Code accepted: on", and its reach.
+- **Guest codes (since 0.38):** the owner's keypad screen has a **Guest codes...** button for extra codes to hand out, up to 8 per keypad. Type a name (who it's for, like "Plumber") and a 4 to 8 digit code, pick **Uses** (1, 3, 10 or any) and **Time** (1 hour, 1 day, 1 week or any), then **Add**.
+  - The list shows each one's code, uses left and time left (time runs in real time, so it keeps counting while the server is off). Hover a row to see how often it was used and by whom; click it, then **Remove** to end it.
+  - A guest code works just like the keypad's own code ("Guest code "Plumber" accepted: 1s pulse on 2026 (Front Gate)") until its uses or time run out. After that it says "That guest code is used up" or "has expired", without counting as a wrong code.
+  - If you're online, you're told each time one is used: "Code Keypad at 406, -59, -9: Alex used the guest code "Plumber" (2 uses left)". The frequency log shows "Guest code: Plumber" with who typed it.
+  - A guest code can't be the keypad's own code or another guest code, and names must be different.
+
+### Compact Radio Transmitter
+
+A **Compact Radio Transmitter** is a button-sized transmitter. It sticks to walls, floors and ceilings like a button (and pops off, keeping its frequency, if that block goes).
+
+- **Input:** it broadcasts the strongest redstone signal around it: a lever or button next to it, redstone dust running to it, or a block it's next to that's strongly powered. It doesn't read a mast column.
+- **Reach:** a short fixed reach, 16 blocks by default (`compactTransmitterReach` in the server config), whatever its height. That's enough for a base, and it keeps your signal from spreading over the whole area.
+- **Not a tower:** it doesn't relay remote presses the way a full transmitter does.
+- Otherwise it's a transmitter: tune it with the tuner, its red light glows while it's sending, it works on private frequencies like any sender, and Jade, the readout ("Compact Transmitter | Frequency 55 | Sending 15 | Reach 16 blocks"), the audit, the scanner and the reach ring all know it.
 
 ### Reach preview ring
 
-Hold a Frequency Tuner (either hand) and look at a Radio Transmitter, Repeater, Converter or Code Keypad, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, or green for a keypad), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
+Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size or compact), Repeater, Converter or Code Keypad, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, or green for a keypad), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
 
 - The ring stays on that tower while you keep holding the tuner, so you can walk out to the edge to see where to put the next repeater or receiver. Look at another tower to move it; put the tuner away to clear it.
 - The dots follow the ground, and far ones are drawn bigger so the ring still shows from a hilltop. Only you see it, and only the part within your render distance.
@@ -368,6 +385,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 **Radio Toggle Receiver:** a Radio Receiver and a Lever, in any arrangement in the crafting grid. Put a toggle receiver in the grid on its own to get the Radio Receiver back.
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
+
+**Compact Radio Transmitter:** put one Radio Transmitter in the crafting grid to get a Compact Radio Transmitter, and back again the same way.
 
 **Remote Control:**
 
@@ -463,6 +482,9 @@ src/main/java/com/reiko/signaltower/
   block/CodeKeypadBlock.java             the Code Keypad: attaches like a button, opens its screen, powers the block it's on
   blockentity/CodeKeypadBlockEntity.java its owner, code (server only), pulse length, lockouts, and sending the pulse
   client/KeypadScreen.java               the keypad's screen
+  client/KeypadGuestsScreen.java         the keypad owner's Guest codes screen
+  network/KeypadGuestCodesPayload.java, KeypadGuestListPayload.java  guest codes screen <-> server
+  block/CompactRadioTransmitterBlock.java  button-sized transmitter with a short fixed reach
   network/OpenKeypadScreenPayload.java, KeypadEnterPayload.java, KeypadConfigurePayload.java, KeypadResultPayload.java  keypad screen <-> server
   client/ReachRing.java, ReachRingShape.java  the reach preview ring and its two lines above the hotbar
   network/ReachPreviewRequestPayload.java, ReachPreviewPayload.java  asking the server how far a tower reaches
@@ -614,8 +636,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 127. the ring's shape: "inside" follows the network's own rule for every offset and reach, the distance to the edge counts down to 0 and goes negative outside, the dots sit 1.5 blocks apart half a block outside the reach, and huge rings are capped;
 128. the Code Keypad: only its owner sets a code (4 to 8 digits; an operator may too) and the message doesn't repeat it; a remote in hand still opens it and only the owner re-tunes it; three wrong codes lock that player (not others) out for 30 seconds, even for the right code, and alert the owner (kept with where the keypad is, surviving saving), but not for the owner's own mistakes; afterwards the right code sends the pulse (heard nearby, recorded as the keypad with who typed it), lights it and powers the block it's on until the pulse ends; the code is saved, but only the frequency goes on the item, and the screen's packet never carries it;
 129. a keypad placed on someone else's private frequency says it's silent, alerts that frequency's owner and sends nothing for the right code (Jade says silent); a member's keypad shows in Jade (owner, no code yet, waiting, reach, never the code) and in the frequency log (the keypad's position, typed by a stranger who knew the code), and the log's new kind survives the network.
+130. the Compact Radio Transmitter: on a wall, it broadcasts the signal around it over its 16-block reach (heard at 16 blocks, not at 17, at any height, where a full transmitter would reach farther); it isn't a relay tower (a full transmitter next to it is), even after saving; the reach ring, Jade and the audit know it; and it pops off with its frequency when its wall goes;
+131. keypad guest codes: only the owner adds them (with a name, 4 to 8 digits, not the keypad's code nor one already used, names different, at most 8) and the main code can't be changed to one; the owner's list carries them (never the main code) and survives the network, Alex's is empty; a code with 3 uses works 3 times (counted, with who used it last), then says it's used up without counting as wrong codes; an hourly one works within the hour and then has expired; one with no limits keeps working; they're saved with the keypad; the frequency log names the guest code (surviving the network and saving); removing one (name ignoring case) makes it a wrong code.
 
-All 129 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 131 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

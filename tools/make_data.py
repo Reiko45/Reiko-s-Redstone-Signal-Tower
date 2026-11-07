@@ -110,12 +110,12 @@ for lit in (False, True):
     write(models / f"radio_toggle_receiver{suffix}.json", receiver_model(lit, "radio_toggle_receiver_side"))
 
 
-def compact_receiver_model(lit):
+def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
     """Same shape and UV layout as a vanilla button (lying on the floor, front facing up)."""
     t = "#texture"
     return {
         "parent": "minecraft:block/block",
-        "textures": {"particle": tex("radio_receiver_side"), "texture": tex("compact_radio_receiver" + ("_on" if lit else ""))},
+        "textures": {"particle": tex(particle), "texture": tex(name + ("_on" if lit else ""))},
         "elements": [{
             "from": [5, 0, 6], "to": [11, 2, 10],
             "faces": {
@@ -132,6 +132,9 @@ def compact_receiver_model(lit):
 
 for lit in (False, True):
     write(models / ("compact_radio_receiver" + ("_on" if lit else "") + ".json"), compact_receiver_model(lit))
+    # v0.38.0: the Compact Radio Transmitter, same shape.
+    write(models / ("compact_radio_transmitter" + ("_on" if lit else "") + ".json"),
+          compact_receiver_model(lit, "compact_radio_transmitter", "radio_transmitter_side"))
 
 def keypad_model(lit):
     """An 8 x 10 plate, 1 pixel thick, lying on the floor with its front up (rotated like a button)."""
@@ -176,6 +179,30 @@ write(models / "code_keypad_inventory.json", {
 })
 
 # Inventory version: stood up on its edge so the front shows, like a wall-mounted one.
+def compact_inventory_model(name, particle):
+    return {
+        "parent": "minecraft:block/block",
+        "display": {
+            "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [1.2, 1.2, 1.2]},
+            "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]},
+        },
+        "textures": {"particle": tex(particle), "texture": tex(name)},
+        "elements": [{
+            "from": [5, 6, 7], "to": [11, 10, 9],
+            "faces": {
+                "north": {"uv": [5, 6, 11, 10], "texture": "#texture"},
+                "south": {"uv": [5, 6, 11, 10], "texture": "#texture"},
+                "up": {"uv": [5, 14, 11, 16], "texture": "#texture"},
+                "down": {"uv": [5, 14, 11, 16], "texture": "#texture"},
+                "west": {"uv": [6, 14, 8, 16], "texture": "#texture", "rotation": 90},
+                "east": {"uv": [6, 14, 8, 16], "texture": "#texture", "rotation": 90},
+            },
+        }],
+    }
+
+
+write(models / "compact_radio_transmitter_inventory.json",
+      compact_inventory_model("compact_radio_transmitter", "radio_transmitter_side"))
 write(models / "compact_radio_receiver_inventory.json", {
     "parent": "minecraft:block/block",
     "display": {
@@ -264,6 +291,7 @@ items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
+write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
 write(items / "code_keypad.json", {"parent": f"{MOD}:block/code_keypad_inventory"})
 write(items / "wall_redstone.json", {
     "parent": "minecraft:item/generated",
@@ -361,6 +389,12 @@ for (face, facing), rot in BUTTON_ROTATIONS.items():
         variant = {"model": f"{MOD}:block/compact_radio_receiver" + ("_on" if p > 0 else ""), **rot}
         compact_variants[f"face={face},facing={facing},power={p}"] = variant
 write(states / "compact_radio_receiver.json", {"variants": compact_variants})
+compact_tx_variants = {}
+for (face, facing), rot in BUTTON_ROTATIONS.items():
+    for powered in ("false", "true"):
+        compact_tx_variants[f"face={face},facing={facing},powered={powered}"] = {
+            "model": f"{MOD}:block/compact_radio_transmitter" + ("_on" if powered == "true" else ""), **rot}
+write(states / "compact_radio_transmitter.json", {"variants": compact_tx_variants})
 keypad_variants = {}
 for (face, facing), rot in BUTTON_ROTATIONS.items():
     for powered in ("false", "true"):
@@ -968,6 +1002,62 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.keypad_no_code": "No code set yet",
     f"jade.{MOD}.keypad_open": "Code accepted: on",
     f"jade.{MOD}.keypad_waiting": "Waiting for the code",
+    # v0.38.0: the Compact Radio Transmitter and keypad guest codes
+    f"block.{MOD}.compact_radio_transmitter": "Compact Radio Transmitter",
+    f"block.{MOD}.compact_radio_transmitter.tooltip": "A button-sized transmitter. Sticks to walls, floors and ceilings and broadcasts the redstone signal around it, but only over a short reach (16 blocks by default), whatever its height.",
+    f"message.{MOD}.compact_transmitter_status": "Compact Transmitter | Frequency %s | Sending %s | Reach %s blocks",
+    f"screen.{MOD}.audit.kind_compact_transmitter": "Compact Transmitter",
+    f"message.{MOD}.keypad_guest_accepted": "Guest code \"%1$s\" accepted: %2$s pulse on %3$s",
+    f"message.{MOD}.keypad_guest_used_up": "That guest code is used up",
+    f"message.{MOD}.keypad_guest_expired": "That guest code has expired",
+    f"message.{MOD}.keypad_guest_used": "%1$s at %2$s: %3$s used the guest code \"%4$s\" (%5$s)",
+    f"message.{MOD}.keypad_guest_left_many": "%s uses left",
+    f"message.{MOD}.keypad_guest_left_one": "1 use left",
+    f"message.{MOD}.keypad_guest_left_none": "now used up",
+    f"message.{MOD}.keypad_guest_left_unlimited": "no limit",
+    f"message.{MOD}.keypad_guest_added": "Guest code \"%1$s\" added: %2$s, %3$s",
+    f"message.{MOD}.keypad_guest_uses_many": "%s uses",
+    f"message.{MOD}.keypad_guest_uses_one": "1 use",
+    f"message.{MOD}.keypad_guest_uses_unlimited": "any number of uses",
+    f"message.{MOD}.keypad_guest_for": "for %s",
+    f"message.{MOD}.keypad_guest_no_time": "no time limit",
+    f"message.{MOD}.keypad_guest_removed": "Guest code \"%s\" removed",
+    f"message.{MOD}.keypad_guest_bad_label": "Give the guest code a name (up to 16 characters)",
+    f"message.{MOD}.keypad_guest_code_taken": "That code is already used on this keypad",
+    f"message.{MOD}.keypad_guest_label_taken": "There's already a guest code called \"%s\"",
+    f"message.{MOD}.keypad_guest_full": "A keypad holds at most %s guest codes",
+    f"message.{MOD}.keypad_guest_unknown": "No guest code called \"%s\"",
+    f"duration.{MOD}.hour": "1 hour",
+    f"duration.{MOD}.day": "1 day",
+    f"duration.{MOD}.week": "1 week",
+    f"screen.{MOD}.keypad.guest_codes": "Guest codes...",
+    f"screen.{MOD}.keypad.guest_codes_tooltip": "Extra codes for visitors, each working a set number of times or for a set time",
+    f"screen.{MOD}.keypad_guests.title": "Guest codes",
+    f"screen.{MOD}.keypad_guests.subtitle": "Extra codes for visitors: each works a set number of times, or until its time runs out",
+    f"screen.{MOD}.keypad_guests.col_name": "Name",
+    f"screen.{MOD}.keypad_guests.col_code": "Code",
+    f"screen.{MOD}.keypad_guests.col_uses": "Uses left",
+    f"screen.{MOD}.keypad_guests.col_time": "Time left",
+    f"screen.{MOD}.keypad_guests.no_limit": "No limit",
+    f"screen.{MOD}.keypad_guests.any": "Any",
+    f"screen.{MOD}.keypad_guests.used_up": "Used up",
+    f"screen.{MOD}.keypad_guests.expired": "Expired",
+    f"screen.{MOD}.keypad_guests.days": "%sd %sh",
+    f"screen.{MOD}.keypad_guests.hours": "%sh %sm",
+    f"screen.{MOD}.keypad_guests.minutes": "%s min",
+    f"screen.{MOD}.keypad_guests.name_hint": "Name",
+    f"screen.{MOD}.keypad_guests.code_hint": "Code",
+    f"screen.{MOD}.keypad_guests.uses": "Uses: %s",
+    f"screen.{MOD}.keypad_guests.time": "Time: %s",
+    f"screen.{MOD}.keypad_guests.add": "Add",
+    f"screen.{MOD}.keypad_guests.remove": "Remove",
+    f"screen.{MOD}.keypad_guests.empty": "No guest codes yet",
+    f"screen.{MOD}.keypad_guests.hint": "Type a name and a 4 to 8 digit code, pick the uses and time, then Add",
+    f"screen.{MOD}.keypad_guests.selected": "\"%s\" selected: Remove ends it now",
+    f"screen.{MOD}.keypad_guests.tip_used": "Used %s times, last by %s",
+    f"screen.{MOD}.keypad_guests.tip_unused": "Not used yet",
+    f"screen.{MOD}.log.kind_keypad_guest": "Guest code: %s",
+    f"screen.{MOD}.log.tip_keypad_guest": "Guest code \"%s\", typed by %s",
 })
 
 # ---------------------------------------------------------------- recipes
@@ -1021,6 +1111,8 @@ recipes["wall_redstone"] = (shapeless_any("minecraft:redstone", f"{MOD}:wall_red
 recipes["redstone_from_wall_redstone"] = (shapeless_any(f"{MOD}:wall_redstone", "minecraft:redstone"), f"{MOD}:wall_redstone")
 recipes["compact_radio_receiver"] = (shapeless("radio_receiver", "compact_radio_receiver"), f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_compact"] = (shapeless("compact_radio_receiver", "radio_receiver"), f"{MOD}:compact_radio_receiver")
+recipes["compact_radio_transmitter"] = (shapeless("radio_transmitter", "compact_radio_transmitter"), f"{MOD}:radio_transmitter")
+recipes["radio_transmitter_from_compact"] = (shapeless("compact_radio_transmitter", "radio_transmitter"), f"{MOD}:compact_radio_transmitter")
 
 recipes["remote_control"] = (shaped([" T ", "IBI", "IEI"], {
     "T": "minecraft:redstone_torch", "I": "minecraft:iron_ingot",
@@ -1097,7 +1189,7 @@ for name, (recipe, trigger) in recipes.items():
 # ---------------------------------------------------------------- loot tables
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter",
-             "compact_radio_receiver", "code_keypad", "radio_mast", "wall_redstone"):
+             "compact_radio_receiver", "compact_radio_transmitter", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
@@ -1121,7 +1213,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
-               f"{MOD}:compact_radio_receiver", f"{MOD}:code_keypad", f"{MOD}:radio_mast"]
+               f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:code_keypad", f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

@@ -13,13 +13,15 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * Server to client (v0.37.0): how far the sender at {@code pos} reaches, for the reach preview
  * ring; {@code reach} -1 if there's nothing to show. {@code kind}: {@link #TRANSMITTER},
- * {@link #REPEATER}, {@link #CONVERTER} or {@link #KEYPAD}; {@code frequency} is the one it sends on.
+ * {@link #REPEATER}, {@link #CONVERTER}, {@link #KEYPAD} or {@link #COMPACT_TRANSMITTER}; {@code frequency} is the one it sends on.
  */
 public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency) implements CustomPacketPayload {
     public static final int TRANSMITTER = 0;
     public static final int REPEATER = 1;
     public static final int CONVERTER = 2;
     public static final int KEYPAD = 3;
+    /** A Compact Radio Transmitter (v0.38.0). */
+    public static final int COMPACT_TRANSMITTER = 4;
 
     public static final Type<ReachPreviewPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "reach_preview"));
