@@ -60,7 +60,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         @Override
         public void appendServerData(CompoundTag data, BlockAccessor accessor) {
             if (accessor.getLevel() instanceof ServerLevel level) {
-                CompoundTag info = RadioInfo.read(level, accessor.getPosition());
+                CompoundTag info = RadioInfo.read(level, accessor.getPosition(), accessor.getPlayer());
                 if (info != null) {
                     data.put(RadioInfo.KEY, info);
                 }

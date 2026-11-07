@@ -21,6 +21,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -56,12 +57,20 @@ public final class RadioInfo {
      * listens on (someone else's encrypted one) gets its owner as "deaf_to".
      */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos) {
+        return read(level, pos, null);
+    }
+
+    /**
+     * {@link #read(ServerLevel, BlockPos)} for {@code viewer}: a note kept to a private
+     * frequency's members only comes along if they may see it ({@code null}: open notes only).
+     */
+    public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos, @Nullable Player viewer) {
         CompoundTag tag = gather(level, pos);
         if (tag != null) {
             addName(level, tag, "frequency", "name");
             addName(level, tag, "output", "output_name");
-            addNote(level, tag, "frequency", "note");
-            addNote(level, tag, "output", "output_note");
+            addNote(level, tag, "frequency", "note", viewer);
+            addNote(level, tag, "output", "output_note", viewer);
             if (!tag.contains("top") && tag.contains("frequency")) {
                 int frequency = tag.contains("output") ? tag.getInt("output") : tag.getInt("frequency");
                 FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
@@ -256,12 +265,16 @@ public final class RadioInfo {
         return Component.translatable(LANG + "frequency", number(data, "frequency", "name"));
     }
 
-    /** Puts the note on the frequency under {@code frequencyKey} (if it has one) under {@code noteKey}. */
-    private static void addNote(ServerLevel level, CompoundTag tag, String frequencyKey, String noteKey) {
+    /** Puts the note on the frequency under {@code frequencyKey} (if it has one that {@code viewer} may see) under {@code noteKey}. */
+    private static void addNote(ServerLevel level, CompoundTag tag, String frequencyKey, String noteKey, @Nullable Player viewer) {
         if (tag.contains(frequencyKey)) {
-            String note = FrequencyNotes.noteOf(level, tag.getInt(frequencyKey));
+            int frequency = tag.getInt(frequencyKey);
+            String note = FrequencyNotes.noteFor(level.getServer(), frequency, viewer);
             if (note != null) {
                 tag.putString(noteKey, note);
+                if (FrequencyNotes.get(level.getServer()).isMembersOnly(frequency)) {
+                    tag.putBoolean(noteKey + "_members", true);
+                }
             }
         }
     }
@@ -269,7 +282,7 @@ public final class RadioInfo {
     /** Adds the note under {@code noteKey} (if there is one) as a grey line. */
     private static void addNoteLine(List<Component> lines, CompoundTag data, String noteKey) {
         if (data.contains(noteKey)) {
-            lines.add(FrequencyNotes.line(data.getString(noteKey)));
+            lines.add(FrequencyNotes.line(data.getString(noteKey), data.getBoolean(noteKey + "_members")));
         }
     }
 

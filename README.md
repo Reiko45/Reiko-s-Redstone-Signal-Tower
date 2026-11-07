@@ -74,6 +74,10 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 **Frequency notes:**
 - **Adding one:** in the Frequency Tuner's screen, type the frequency and click **Note** (next to the Name box). Type a short note on what it's for, like "lever by the front door; also lights the hall" (up to 64 characters), and press **Save** or Enter: "Note for frequency 2026 (Front Gate) saved". Clear the box and save to remove it. The Note button turns yellow when the typed frequency has a note, and hovering it shows the note.
 - **Shared:** like names, notes belong to the world: everyone on a server sees them, they're saved with the world, and they count in every dimension. Anyone holding a tuner can change one, except on a private frequency (only its owner, their friends and server operators can; others see it read-only).
+- **Members only:** on a private frequency, the Note screen's **Who sees it** button switches between Everyone and **Members only**; press Save: "Note for frequency 2026 (Front Gate) saved, for members only". Then only the owner, their friends, members of groups the frequency uses and server operators get the note. Everyone else's game never receives it, so it's missing from their directory, Jade and tooltips. Members see it marked "(members only)", and the tuner's Note button tooltip says "Note (members only): …".
+  - Adding or taking off friends or group members gives them the note or takes it away at once.
+  - Making the frequency public makes the note everyone's again for good (the tuner warns "Done makes it public again, and its note visible to everyone"); claiming it later doesn't hide it again.
+  - On a public frequency the button is greyed out: only a private frequency's note can be kept to its members.
 - **Where they show**, in grey italics:
   - the frequency directory: after the name in the Name column, in the row's tooltip, and the search box matches notes too ("hall" finds 2026);
   - Jade, under the frequency line (a converter shows both its frequencies' notes);
@@ -81,6 +85,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - A frequency with only a note (no name, public) is listed in the directory too. A world holds up to 4,096 notes.
 
   ![The Note screen for 2026 (Front Gate); Jade showing the note under the frequency; the directory finding it by searching "hall", with the note in the tooltip; and the tuner's item tooltip](docs/images/frequency-notes.png)
+
+  ![The Note screen with "Who sees it: Members only", the tuner's "Note (members only)" tooltip, Steve's Jade showing the note marked "(members only)", and Alex's Jade on the same frequency without it](docs/images/members-only-notes.png)
 
 **Private frequencies:**
 - **Making one private:** in the Frequency Tuner's screen, type the frequency and click the button under the Name box so it says **Private** instead of **Public**, then press Done: "2026 (Front Gate) is now private: only you can send on it". The line under the button says who can send on the typed frequency, or what Done will change.
@@ -535,9 +541,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 114. the Note screen's packet needs a tuner in hand, sets and removes a note and says so, changes nothing when nothing changed, and on a private frequency refuses non-members but lets a friend and an operator change it;
 115. Jade's data carries the note and shows it right under the frequency line (under both lines for a converter, none without a note), and the directory lists frequencies that only have a note;
 116. the audit of an encrypted frequency lists the owner's transmitter (sending 15), an old one with no recorded tuner, a friend's receiver and the owner's toggle receiver and listening converter with their positions; a stranger's silent transmitter, two deaf receivers (one row, counted) and deaf converter without positions; the owner's rows first; nothing for a public frequency; the row limit;
-117. only the owner or an operator may audit a frequency (not a friend, not a public frequency), and the request and answer survive the network.
+117. only the owner or an operator may audit a frequency (not a friend, not a public frequency), and the request and answer survive the network;
+118. a note kept to members is saved (older saves load open), saving without the switch or removing the note drops it, releasing keeps the note, the three note packets carry the switch, and the client's copy (with "(members only)" on the tooltip line) follows each change;
+119. a members-only note reaches the owner, a friend, a group member and an operator but not a stranger (nor nobody): the stranger's one-note packet is empty and their join list leaves it out; made public, everyone sees it, and claiming it again doesn't hide it;
+120. the Note screen's packet keeps a note to members on a private frequency and says so, counts a change of only the switch, ignores the switch on a public frequency, and Jade's data leaves the note out for a stranger and marks it for the owner.
 
-All 117 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 120 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

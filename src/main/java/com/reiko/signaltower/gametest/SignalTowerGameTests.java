@@ -3814,6 +3814,192 @@ public final class SignalTowerGameTests {
                 .thenSucceed();
     }
 
+    // ---- Members-only notes ----
+
+    /**
+     * A note can be kept to members: the switch is saved (old saves load without it), removing the
+     * note or saving it without the switch drops it, and it survives the network (all three packets)
+     * and the client's copy, whose tooltip line says "(members only)".
+     */
+    @GameTest(template = PLATFORM)
+    public static void membersOnlyNotesStoredAndSynced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var notes = new com.reiko.signaltower.radio.FrequencyNotes();
+        notes.set(2311, "vault door", true);
+        check(notes.isMembersOnly(2311) && "vault door".equals(notes.get(2311)), "Kept to members");
+        notes.set(2311, "vault door");
+        check(!notes.isMembersOnly(2311), "Saved without the switch: open again");
+        notes.set(2311, "vault door", true);
+        notes.set(2311, "");
+        check(notes.get(2311) == null && !notes.isMembersOnly(2311), "Removing the note drops the switch");
+        notes.set(2312, "vault door", true);
+        notes.set(2313, "barn");
+        CompoundTag saved = notes.save(new CompoundTag(), level.registryAccess());
+        var loaded = com.reiko.signaltower.radio.FrequencyNotes.load(saved, level.registryAccess());
+        check(loaded.isMembersOnly(2312) && !loaded.isMembersOnly(2313) && loaded.all().size() == 2, "Saved and loaded");
+        saved.remove("members_only");
+        var old = com.reiko.signaltower.radio.FrequencyNotes.load(saved, level.registryAccess());
+        check(!old.isMembersOnly(2312) && "vault door".equals(old.get(2312)), "A save from before v0.32.0 loads open");
+        loaded.release(2312);
+        check(!loaded.isMembersOnly(2312) && "vault door".equals(loaded.get(2312)), "Released, the note stays");
+
+        var buffer = Unpooled.buffer();
+        var one = new com.reiko.signaltower.network.FrequencyNotePayload(2312, "vault door", true);
+        com.reiko.signaltower.network.FrequencyNotePayload.STREAM_CODEC.encode(buffer, one);
+        check(com.reiko.signaltower.network.FrequencyNotePayload.STREAM_CODEC.decode(buffer).equals(one), "One note survives the network");
+        var list = new com.reiko.signaltower.network.FrequencyNotesPayload(java.util.Map.of(2312, "vault door", 2313, "barn"), List.of(2312));
+        com.reiko.signaltower.network.FrequencyNotesPayload.STREAM_CODEC.encode(buffer, list);
+        var listBack = com.reiko.signaltower.network.FrequencyNotesPayload.STREAM_CODEC.decode(buffer);
+        check(listBack.notes().equals(list.notes()) && listBack.membersOnly().equals(List.of(2312)), "So does the list");
+        var set = new com.reiko.signaltower.network.SetFrequencyNotePayload(2312, "vault door", true);
+        com.reiko.signaltower.network.SetFrequencyNotePayload.STREAM_CODEC.encode(buffer, set);
+        check(com.reiko.signaltower.network.SetFrequencyNotePayload.STREAM_CODEC.decode(buffer).equals(set), "And the tuner's packet");
+        check(!new com.reiko.signaltower.network.SetFrequencyNotePayload(2312, "barn").membersOnly(), "Open unless asked");
+
+        try {
+            com.reiko.signaltower.radio.FrequencyNotes.clientReplaceAll(java.util.Map.of(2312, "vault door", 2313, "barn"), List.of(2312));
+            check(com.reiko.signaltower.radio.FrequencyNotes.clientMembersOnly(2312)
+                    && !com.reiko.signaltower.radio.FrequencyNotes.clientMembersOnly(2313), "From the full list");
+            List<Component> tooltip = new java.util.ArrayList<>();
+            com.reiko.signaltower.radio.FrequencyNotes.addTooltipLine(2312, tooltip);
+            com.reiko.signaltower.radio.FrequencyNotes.addTooltipLine(2313, tooltip);
+            check(tooltip.size() == 2 && tooltip.get(0).getSiblings().stream().anyMatch(c -> keyOf(c).endsWith("note_members_only"))
+                    && tooltip.get(1).getSiblings().isEmpty(), "The tooltip says so: " + tooltip);
+            com.reiko.signaltower.radio.FrequencyNotes.clientSet(2312, "vault door", false);
+            check(!com.reiko.signaltower.radio.FrequencyNotes.clientMembersOnly(2312), "One change at a time");
+            com.reiko.signaltower.radio.FrequencyNotes.clientSet(2313, "barn", true);
+            com.reiko.signaltower.radio.FrequencyNotes.clientSet(2313, "", false);
+            check(com.reiko.signaltower.radio.FrequencyNotes.noteOf(null, 2313) == null
+                    && !com.reiko.signaltower.radio.FrequencyNotes.clientMembersOnly(2313), "Taken away (no longer a member)");
+        } finally {
+            com.reiko.signaltower.radio.FrequencyNotes.clientClear();
+        }
+        check(!com.reiko.signaltower.radio.FrequencyNotes.clientMembersOnly(2312), "Cleared on leaving");
+        helper.succeed();
+    }
+
+    /**
+     * Who gets a members-only note: the owner, a friend, a member of a group the frequency uses
+     * and an operator; not a stranger, nor nobody. The stranger's join list and one-note packet
+     * leave it out. Made public, everyone sees it, and claiming it again doesn't hide it.
+     */
+    @GameTest(template = PLATFORM)
+    public static void membersOnlyNoteVisibility(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var notes = com.reiko.signaltower.radio.FrequencyNotes.get(server);
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        UUID crewId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(1, 1, 1);
+        Player owner = namedPlayer(helper, at, ownerId, "Owner", false, bar, new java.util.ArrayList<>());
+        Player friend = namedPlayer(helper, at, friendId, "Friend", false, bar, new java.util.ArrayList<>());
+        Player crew = namedPlayer(helper, at, crewId, "Crewmate", false, bar, new java.util.ArrayList<>());
+        Player stranger = namedPlayer(helper, at, UUID.randomUUID(), "Stranger", false, bar, new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, at, UUID.randomUUID(), "Admin", true, bar, new java.util.ArrayList<>());
+        try {
+            claims.putGroup(ownerId, null, "Vault crew", java.util.Map.of(crewId, "Crewmate"));
+            claims.put(2315, ownerId, "Owner", java.util.Map.of(friendId, "Friend"), List.of("Vault crew"));
+            notes.set(2315, "vault door", true);
+            notes.set(2316, "barn");
+            for (Player p : List.of(owner, friend, crew, op)) {
+                check(com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2315, p), p.getName().getString() + " sees it");
+            }
+            check(!com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2315, stranger)
+                    && !com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2315, null)
+                    && com.reiko.signaltower.radio.FrequencyNotes.noteFor(server, 2315, stranger) == null, "A stranger doesn't");
+            check(com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2316, stranger)
+                    && com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2316, null), "Open notes are everyone's");
+
+            var toStranger = com.reiko.signaltower.radio.FrequencyNotes.payloadFor(server, 2315, stranger);
+            check(toStranger.note().isEmpty() && !toStranger.membersOnly(), "The stranger's packet says nothing: " + toStranger);
+            var toFriend = com.reiko.signaltower.radio.FrequencyNotes.payloadFor(server, 2315, friend);
+            check("vault door".equals(toFriend.note()) && toFriend.membersOnly(), "The friend's has it: " + toFriend);
+            var joinStranger = com.reiko.signaltower.radio.FrequencyNotes.allFor(server, stranger);
+            check(!joinStranger.notes().containsKey(2315) && "barn".equals(joinStranger.notes().get(2316))
+                    && joinStranger.membersOnly().isEmpty(), "The stranger joins without it: " + joinStranger);
+            var joinCrew = com.reiko.signaltower.radio.FrequencyNotes.allFor(server, crew);
+            check("vault door".equals(joinCrew.notes().get(2315)) && joinCrew.membersOnly().contains(2315)
+                    && !joinCrew.membersOnly().contains(2316), "The crewmate joins with it: " + joinCrew);
+
+            claims.remove(2315);
+            com.reiko.signaltower.network.SetFrequencyPrivacyPayload.changed(server, 2315, null);
+            check(!notes.isMembersOnly(2315) && com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2315, stranger),
+                    "Made public, everyone sees it");
+            var reclaimed = claims.put(2315, ownerId, "Owner", java.util.Map.of());
+            com.reiko.signaltower.network.SetFrequencyPrivacyPayload.changed(server, 2315, reclaimed);
+            check(com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2315, stranger), "Claimed again, it stays open");
+        } finally {
+            notes.set(2315, "");
+            notes.set(2316, "");
+            claims.remove(2315);
+            claims.removeGroup(ownerId, "Vault crew");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The tuner's packet keeps a note to members on a private frequency (a switch-only change
+     * counts), ignores the switch on a public one, and Jade's data leaves the note out for a
+     * stranger looking at a block on it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 60)
+    public static void membersOnlyNoteThroughTheTunerAndJade(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var notes = com.reiko.signaltower.radio.FrequencyNotes.get(server);
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID ownerId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(1, 1, 3);
+        Player owner = namedPlayer(helper, at, ownerId, "Owner", false, bar, new java.util.ArrayList<>());
+        Player stranger = namedPlayer(helper, at, UUID.randomUUID(), "Stranger", false, bar, new java.util.ArrayList<>());
+        owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+        BlockPos tx = new BlockPos(1, 1, 1);
+        claims.put(2317, ownerId, "Owner", java.util.Map.of());
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 2317);
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    try {
+                        var apply = (java.util.function.BiFunction<Player, com.reiko.signaltower.network.SetFrequencyNotePayload, Boolean>)
+                                com.reiko.signaltower.network.SetFrequencyNotePayload::apply;
+                        check(apply.apply(owner, new com.reiko.signaltower.network.SetFrequencyNotePayload(2317, "vault door", true)), "Set");
+                        check(notes.isMembersOnly(2317) && lastKey(bar).endsWith("note_set_members"), "Kept to members: " + lastKey(bar));
+                        check(!apply.apply(owner, new com.reiko.signaltower.network.SetFrequencyNotePayload(2317, "vault door", true)),
+                                "The same again changes nothing");
+
+                        CompoundTag forStranger = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx), stranger);
+                        check(forStranger != null && !forStranger.contains("note")
+                                && !lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), forStranger)).contains("note"),
+                                "Jade shows the stranger no note: " + forStranger);
+                        CompoundTag forOwner = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx), owner);
+                        check(forOwner != null && "vault door".equals(forOwner.getString("note")) && forOwner.getBoolean("note_members"),
+                                "The owner's has it, marked: " + forOwner);
+                        List<Component> lines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), forOwner);
+                        check(lines.stream().anyMatch(line -> keyOf(line).endsWith(".note")
+                                && line.getSiblings().stream().anyMatch(c -> keyOf(c).endsWith("note_members_only"))), "Its line says members only");
+
+                        check(apply.apply(owner, new com.reiko.signaltower.network.SetFrequencyNotePayload(2317, "vault door", false)),
+                                "Flipping only the switch counts");
+                        check(!notes.isMembersOnly(2317) && lastKey(bar).endsWith("note_set"), "Open again: " + lastKey(bar));
+                        CompoundTag openAgain = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx), stranger);
+                        check(openAgain != null && "vault door".equals(openAgain.getString("note")) && !openAgain.getBoolean("note_members"),
+                                "Now the stranger sees it too");
+
+                        check(apply.apply(owner, new com.reiko.signaltower.network.SetFrequencyNotePayload(2318, "barn", true)), "Public frequency");
+                        check("barn".equals(notes.get(2318)) && !notes.isMembersOnly(2318) && lastKey(bar).endsWith("note_set"),
+                                "The switch means nothing there: " + lastKey(bar));
+                    } finally {
+                        notes.set(2317, "");
+                        notes.set(2318, "");
+                        claims.remove(2317);
+                    }
+                })
+                .thenSucceed();
+    }
+
     // ---- Frequency audit ----
 
     /**

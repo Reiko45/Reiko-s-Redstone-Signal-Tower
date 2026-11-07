@@ -5,6 +5,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.FrequencyTunerItem;
 import com.reiko.signaltower.radio.Frequency;
 import com.reiko.signaltower.radio.FrequencyClaims;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.SignalNetwork;
 import io.netty.buffer.ByteBuf;
@@ -290,5 +291,14 @@ public record SetFrequencyPrivacyPayload(int frequency, boolean makePrivate, Str
         }
         PacketDistributor.sendToAllPlayers(new FrequencyClaimPayload(frequency,
                 Optional.ofNullable(claim).map(FrequencyClaims.ClaimInfo::of)));
+        // A note kept to members goes to new members and away from ones taken off. Made public, the
+        // note is everyone's again for good: the switch is dropped, so a later claim doesn't hide it.
+        FrequencyNotes notes = FrequencyNotes.get(server);
+        if (notes.isMembersOnly(frequency)) {
+            if (claim == null) {
+                notes.release(frequency);
+            }
+            FrequencyNotes.sendToAll(server, frequency);
+        }
     }
 }

@@ -319,7 +319,7 @@ public class DirectoryScreen extends Screen {
         Object label = row.name() == null ? format(row.frequency()) : FrequencyNames.named(row.frequency(), row.name());
         lines.add(Component.translatable(KEY + "tip_frequency", label));
         if (row.note() != null) {
-            lines.add(FrequencyNotes.line(row.note()));
+            lines.add(FrequencyNotes.line(row.note(), FrequencyNotes.clientMembersOnly(row.frequency())));
         }
         FrequencyClaims.ClaimInfo claim = row.claim();
         if (claim == null) {

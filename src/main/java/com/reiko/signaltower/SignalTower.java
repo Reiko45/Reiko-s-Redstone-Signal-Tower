@@ -146,7 +146,7 @@ public final class SignalTower {
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             PacketDistributor.sendToPlayer(player, new FrequencyNamesPayload(FrequencyNames.get(player.server).all()));
-            PacketDistributor.sendToPlayer(player, new FrequencyNotesPayload(FrequencyNotes.get(player.server).all()));
+            PacketDistributor.sendToPlayer(player, FrequencyNotes.allFor(player.server, player));
             PacketDistributor.sendToPlayer(player, new FrequencyClaimsPayload(FrequencyClaims.get(player.server).allInfo()));
             PacketDistributor.sendToPlayer(player, new GroupsPayload(FrequencyClaims.get(player.server).groupInfo(player.getUUID())));
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.

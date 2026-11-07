@@ -71,6 +71,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** Tuner only: opens the typed frequency's note; its tooltip shows the note ({@code shownNote}: the one it shows now). */
     private @Nullable Button noteButton;
     private @Nullable String shownNote;
+    private boolean shownKept;
     /** Tuner only: whether the typed frequency is to be private (and encrypted), and the friends typed for it. */
     private @Nullable Button privateButton;
     private @Nullable EditBox friendsBox;
@@ -386,7 +387,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         FrequencyClaims.ClaimInfo claim = claim();
         String key = KEY + ".privacy_";
         if (privacyChanged(claim)) {
-            String change = !privateOn ? "will_release"
+            String change = !privateOn
+                    ? (FrequencyNotes.clientMembersOnly(parsed().orElse(-1)) ? "will_release_note" : "will_release")
                     : claim == null ? (encryptedOn ? "will_claim_encrypted" : "will_claim")
                     : encryptedOn != claim.encrypted() ? (encryptedOn ? "will_encrypt" : "will_decrypt")
                     : "will_update";
@@ -511,11 +513,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         }
         noteButton.active = parsed().isPresent();
         String note = parsed().isPresent() ? FrequencyNotes.noteOf(null, parsed().getAsInt()) : null;
-        if (force || !java.util.Objects.equals(note, shownNote)) {
+        boolean kept = parsed().isPresent() && FrequencyNotes.clientMembersOnly(parsed().getAsInt());
+        if (force || !java.util.Objects.equals(note, shownNote) || kept != shownKept) {
             shownNote = note;
+            shownKept = kept;
             noteButton.setTooltip(Tooltip.create(note == null
                     ? Component.translatable(KEY + ".note_tooltip_empty")
-                    : Component.translatable(KEY + ".note_tooltip", note)));
+                    : Component.translatable(KEY + (kept ? ".note_tooltip_members" : ".note_tooltip"), note)));
             noteButton.setMessage(Component.translatable(KEY + ".note")
                     .withStyle(note == null ? ChatFormatting.WHITE : ChatFormatting.YELLOW));
         }
@@ -528,7 +532,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         }
         FrequencyClaims.ClaimInfo claim = claim();
         boolean mayEdit = claim == null || mine(claim) || isFriend(claim) || isOperator();
-        minecraft.setScreen(new NoteScreen(this, parsed().getAsInt(), mayEdit ? null : claim.ownerName()));
+        minecraft.setScreen(new NoteScreen(this, parsed().getAsInt(), mayEdit ? null : claim.ownerName(), claim != null));
     }
 
     private void openGroups() {
