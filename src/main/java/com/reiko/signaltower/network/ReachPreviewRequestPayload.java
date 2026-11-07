@@ -65,6 +65,7 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
         Block block = level.getBlockState(pos).getBlock();
         int kind = block instanceof RadioConverterBlock ? ReachPreviewPayload.CONVERTER
                 : block instanceof RadioRepeaterBlock ? ReachPreviewPayload.REPEATER
+                : block instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? ReachPreviewPayload.MOTION_SENSOR
                 : block instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock ? ReachPreviewPayload.COMPACT_TRANSMITTER
                 : block instanceof RadioTransmitterBlock ? ReachPreviewPayload.TRANSMITTER
                 : block instanceof CodeKeypadBlock ? ReachPreviewPayload.KEYPAD

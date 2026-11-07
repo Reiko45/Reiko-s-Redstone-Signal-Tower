@@ -31,6 +31,9 @@ AMBER_ON = [(204, 122, 10, 255), (255, 178, 40, 255), (255, 226, 140, 255)]
 # Converter teal, off and on
 TEAL_OFF = [(10, 66, 70, 255), (18, 98, 104, 255), (28, 128, 134, 255)]
 TEAL_ON = [(12, 160, 170, 255), (44, 222, 232, 255), (176, 250, 255, 255)]
+# Radio Motion Sensor (v0.39.0)
+PURPLE_OFF = [(46, 20, 66, 255), (72, 34, 104, 255), (98, 52, 138, 255)]
+PURPLE_ON = [(140, 50, 220, 255), (192, 100, 255, 255), (238, 196, 255, 255)]
 
 CLEAR = (0, 0, 0, 0)
 
@@ -139,6 +142,32 @@ def toggle_receiver_side(lit):
     knob = (8, 9, 10) if lit else (5, 6, 7)
     for x in knob:
         px[x, 8] = r[2] if lit else r[1]
+    for x in range(5, 11):
+        px[x, 10] = O
+    return img
+
+
+def inverted_receiver_side(lit):
+    """Incoming waves above a little redstone torch. "lit" is the output: the torch glows while the
+    frequency is silent (waves dark), and goes out while it's heard (waves bright)."""
+    waves = OFF if lit else ON
+    torch = ON if lit else OFF
+    img = casing(9)
+    px = img.load()
+    vents(img)
+    for p in [(6, 3), (7, 2), (8, 2), (9, 3)]:
+        px[p] = waves[1]
+    px[7, 4] = px[8, 4] = waves[2]
+    wood = (112, 82, 50, 255)
+    wood_dark = (78, 56, 34, 255)
+    for y in (8, 9):
+        px[7, y] = wood
+        px[8, y] = wood_dark
+    for p in [(7, 6), (8, 6), (7, 7), (8, 7)]:
+        px[p] = torch[1]
+    px[7, 6] = torch[2]
+    if lit:
+        px[6, 6] = px[9, 6] = torch[0]
     for x in range(5, 11):
         px[x, 10] = O
     return img
@@ -380,6 +409,31 @@ def compact_transmitter(lit):
     return img
 
 
+def motion_sensor(lit):
+    """Button-sized motion sensor (v0.39.0), same layout as the compact receiver: a round purple
+    lens in a black housing, glowing while it sees someone."""
+    r = PURPLE_ON if lit else PURPLE_OFF
+    img = blank(M)
+    px = img.load()
+    for x in range(5, 11):
+        px[x, 6] = H
+        px[x, 9] = D
+    for y in range(6, 10):
+        px[5, y] = L
+        px[10, y] = O
+    px[5, 6] = H
+    px[10, 9] = O
+    px[6, 7] = px[6, 8] = O
+    px[9, 7] = px[9, 8] = O
+    px[7, 7] = r[2]
+    px[8, 7] = px[7, 8] = r[1]
+    px[8, 8] = r[0]
+    for x in range(0, 16):
+        px[x, 14] = L
+        px[x, 15] = D
+    return img
+
+
 def wall_redstone_item():
     """A strip of wall with redstone dust running up it and branching sideways."""
     img = blank()
@@ -592,6 +646,8 @@ blocks = {
     "compact_radio_transmitter": compact_transmitter(False),
     "compact_radio_transmitter_on": compact_transmitter(True),
     "code_keypad": code_keypad(False),
+    "radio_motion_sensor": motion_sensor(False),
+    "radio_motion_sensor_on": motion_sensor(True),
     "code_keypad_on": code_keypad(True),
     "radio_transmitter_side": transmitter_side(False),
     "radio_transmitter_side_on": transmitter_side(True),
@@ -599,6 +655,8 @@ blocks = {
     "radio_transmitter_top_on": top(True, receiver=False),
     "radio_toggle_receiver_side": toggle_receiver_side(False),
     "radio_toggle_receiver_side_on": toggle_receiver_side(True),
+    "radio_inverted_receiver_side": inverted_receiver_side(False),
+    "radio_inverted_receiver_side_on": inverted_receiver_side(True),
     "radio_receiver_side": receiver_side(False),
     "radio_receiver_side_on": receiver_side(True),
     "radio_receiver_top": top(False, receiver=True),

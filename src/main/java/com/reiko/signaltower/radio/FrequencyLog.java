@@ -18,7 +18,7 @@ import java.util.UUID;
  * Like the audit, it shows where a transmitter is only if it's the owner's, a member's or one
  * with no recorded tuner; another player's is named but not located. Remote presses never have a
  * position (where someone stood isn't kept). A Code Keypad's turn-on (v0.37.0) shows the keypad and
- * who typed the code.
+ * who typed the code; a Radio Motion Sensor's (v0.39.0) shows the sensor and who it saw.
  */
 public final class FrequencyLog {
     /** The most rows shown: as many as one dimension remembers per frequency. */
@@ -69,13 +69,14 @@ public final class FrequencyLog {
                 : claim.allows(player) ? FrequencyAudit.Who.MEMBER
                 : FrequencyAudit.Who.OTHER;
         boolean remote = cause.kind() == SignalNetwork.CauseKind.REMOTE_PULSE || cause.kind() == SignalNetwork.CauseKind.REMOTE_TOGGLE
-                || cause.kind() == SignalNetwork.CauseKind.KEYPAD;
+                || cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR;
         String who = player == null ? ""
                 : remote && !cause.name().isEmpty() && whoKind == FrequencyAudit.Who.OTHER ? cause.name()
                 : FrequencyAudit.nameOf(server, claim, player);
-        // A keypad's position is shown whoever typed the code: on a private frequency only a member's keypad sends.
+        // A keypad's (or motion sensor's) position is shown whoever typed the code (or was seen): on a
+        // private frequency only a member's keypad or sensor sends.
         Optional<BlockPos> pos = cause.pos() == null ? Optional.empty()
-                : cause.kind() == SignalNetwork.CauseKind.KEYPAD ? Optional.of(cause.pos())
+                : cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR ? Optional.of(cause.pos())
                 : cause.kind() == SignalNetwork.CauseKind.TRANSMITTER && whoKind != FrequencyAudit.Who.OTHER ? Optional.of(cause.pos())
                 : Optional.empty();
         int from = turnOn.from() != 0 && turnOn.from() != frequency ? turnOn.from() : 0;

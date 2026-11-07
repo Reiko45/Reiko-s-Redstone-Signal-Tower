@@ -97,6 +97,11 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new MultiRemoteScreen(hand, buttons, title));
     }
 
+    /** Opens a Radio Motion Sensor's settings screen (sent by the server when its owner right-clicks it). */
+    public static void openSensorScreen(com.reiko.signaltower.network.OpenSensorScreenPayload state) {
+        Minecraft.getInstance().setScreen(new SensorScreen(state));
+    }
+
     /** Opens a Radio Converter's screen (sent by the server when the block is right-clicked). */
     public static void openConverterScreen(OpenConverterScreenPayload state) {
         Minecraft.getInstance().setScreen(new ConverterScreen(state));

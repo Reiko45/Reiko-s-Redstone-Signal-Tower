@@ -187,12 +187,13 @@ public final class ReachRing {
         dots = built;
     }
 
-    /** The ring's color: the sender's light (transmitter red, repeater amber, converter teal, keypad green). */
+    /** The ring's color: the sender's light (transmitter red, repeater amber, converter teal, keypad green, motion sensor purple). */
     private static int color(int kind) {
         return switch (kind) {
             case ReachPreviewPayload.REPEATER -> 0xFFB020;
             case ReachPreviewPayload.CONVERTER -> 0x2CDCE6;
             case ReachPreviewPayload.KEYPAD -> 0x50F050;
+            case ReachPreviewPayload.MOTION_SENSOR -> 0xC060FF;
             default -> 0xFF4A3A;
         };
     }
@@ -263,6 +264,7 @@ public final class ReachRing {
             case ReachPreviewPayload.CONVERTER -> "radio_converter";
             case ReachPreviewPayload.KEYPAD -> "code_keypad";
             case ReachPreviewPayload.COMPACT_TRANSMITTER -> "compact_radio_transmitter";
+            case ReachPreviewPayload.MOTION_SENSOR -> "radio_motion_sensor";
             default -> "radio_transmitter";
         };
         Component first = Component.translatable(KEY, Component.translatable("block." + SignalTower.MOD_ID + "." + block),

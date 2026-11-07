@@ -108,6 +108,7 @@ for lit in (False, True):
     write(models / f"radio_converter{suffix}.json", transmitter_model(lit, "radio_converter", "converter_tip"))
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
     write(models / f"radio_toggle_receiver{suffix}.json", receiver_model(lit, "radio_toggle_receiver_side"))
+    write(models / f"radio_inverted_receiver{suffix}.json", receiver_model(lit, "radio_inverted_receiver_side"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -135,6 +136,9 @@ for lit in (False, True):
     # v0.38.0: the Compact Radio Transmitter, same shape.
     write(models / ("compact_radio_transmitter" + ("_on" if lit else "") + ".json"),
           compact_receiver_model(lit, "compact_radio_transmitter", "radio_transmitter_side"))
+    # v0.39.0: the Radio Motion Sensor, same shape again.
+    write(models / ("radio_motion_sensor" + ("_on" if lit else "") + ".json"),
+          compact_receiver_model(lit, "radio_motion_sensor", "radio_transmitter_side"))
 
 def keypad_model(lit):
     """An 8 x 10 plate, 1 pixel thick, lying on the floor with its front up (rotated like a button)."""
@@ -203,6 +207,8 @@ def compact_inventory_model(name, particle):
 
 write(models / "compact_radio_transmitter_inventory.json",
       compact_inventory_model("compact_radio_transmitter", "radio_transmitter_side"))
+write(models / "radio_motion_sensor_inventory.json",
+      compact_inventory_model("radio_motion_sensor", "radio_transmitter_side"))
 write(models / "compact_radio_receiver_inventory.json", {
     "parent": "minecraft:block/block",
     "display": {
@@ -288,10 +294,11 @@ write(models / "radio_mast.json", {
 # ---------------------------------------------------------------- item models
 
 items = ASSETS / "models" / "item"
-for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
+write(items / "radio_motion_sensor.json", {"parent": f"{MOD}:block/radio_motion_sensor_inventory"})
 write(items / "code_keypad.json", {"parent": f"{MOD}:block/code_keypad_inventory"})
 write(items / "wall_redstone.json", {
     "parent": "minecraft:item/generated",
@@ -376,6 +383,9 @@ write(states / "radio_receiver.json", {"variants": {
 write(states / "radio_toggle_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+write(states / "radio_inverted_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_inverted_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
 BUTTON_ROTATIONS = {
     ("floor", "north"): {}, ("floor", "east"): {"y": 90}, ("floor", "south"): {"y": 180}, ("floor", "west"): {"y": 270},
     ("wall", "north"): {"x": 90}, ("wall", "east"): {"x": 90, "y": 90},
@@ -395,6 +405,10 @@ for (face, facing), rot in BUTTON_ROTATIONS.items():
         compact_tx_variants[f"face={face},facing={facing},powered={powered}"] = {
             "model": f"{MOD}:block/compact_radio_transmitter" + ("_on" if powered == "true" else ""), **rot}
 write(states / "compact_radio_transmitter.json", {"variants": compact_tx_variants})
+write(states / "radio_motion_sensor.json", {"variants": {
+    key: {**variant, "model": variant["model"].replace("compact_radio_transmitter", "radio_motion_sensor")}
+    for key, variant in compact_tx_variants.items()
+}})
 keypad_variants = {}
 for (face, facing), rot in BUTTON_ROTATIONS.items():
     for powered in ("false", "true"):
@@ -424,6 +438,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_receiver.tooltip": "Outputs the strongest signal on its frequency.",
     f"block.{MOD}.radio_toggle_receiver": "Radio Toggle Receiver",
     f"block.{MOD}.radio_toggle_receiver.tooltip": "Flips on or off each time its frequency turns on, like a light switch. Outputs full strength while on.",
+    f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
+    f"block.{MOD}.radio_inverted_receiver.tooltip": "Outputs full strength while its frequency is silent, and nothing while it's on.",
     f"block.{MOD}.radio_repeater": "Radio Repeater",
     f"block.{MOD}.radio_repeater.tooltip": "Picks up its frequency and broadcasts it again from its own height, to chain towers across long distances. Needs no redstone.",
     f"block.{MOD}.radio_converter": "Radio Converter",
@@ -505,6 +521,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.audit.kind_converter_listens": "Converter (listens)",
     f"screen.{MOD}.audit.kind_receiver": "Receiver",
     f"screen.{MOD}.audit.kind_toggle_receiver": "Toggle Receiver",
+    f"screen.{MOD}.audit.kind_inverted_receiver": "Inverted Receiver",
     f"screen.{MOD}.audit.kind_compact_receiver": "Compact Receiver",
     f"screen.{MOD}.audit.kind_count": "%s \u00d7%s",
     f"screen.{MOD}.audit.dim_overworld": "Overworld",
@@ -916,6 +933,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.receiver_status": "Receiver | Frequency %s | Output %s | Towers in range: %s",
     f"message.{MOD}.toggle_status": "Toggle Receiver | Frequency %s | %s | Hearing %s | Towers in range: %s",
     f"message.{MOD}.toggle_on": "ON",
+    f"message.{MOD}.inverted_status": "Inverted Receiver | Frequency %s | Hearing %s | Output %s | Towers in range: %s",
     f"message.{MOD}.toggle_off": "OFF",
     f"message.{MOD}.height_above": "%s blocks above sea level",
     f"message.{MOD}.height_below": "At or below sea level",
@@ -950,6 +968,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.listens": "Listens on: %s",
     f"jade.{MOD}.switched_on": "Switched on",
     f"jade.{MOD}.switched_off": "Switched off",
+    f"jade.{MOD}.inverted_on": "On (frequency silent)",
+    f"jade.{MOD}.inverted_off": "Off (frequency on)",
     f"jade.{MOD}.hearing": "Hearing: %s",
     f"jade.{MOD}.hearing_nothing": "Hearing nothing",
     f"jade.{MOD}.sends": "Sends on: %s",
@@ -1007,6 +1027,42 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.compact_radio_transmitter.tooltip": "A button-sized transmitter. Sticks to walls, floors and ceilings and broadcasts the redstone signal around it, but only over a short reach (16 blocks by default), whatever its height.",
     f"message.{MOD}.compact_transmitter_status": "Compact Transmitter | Frequency %s | Sending %s | Reach %s blocks",
     f"screen.{MOD}.audit.kind_compact_transmitter": "Compact Transmitter",
+    # v0.39.0: Radio Motion Sensor
+    f"block.{MOD}.radio_motion_sensor": "Radio Motion Sensor",
+    f"block.{MOD}.radio_motion_sensor.tooltip": "Sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner picks the range and whether it reacts to everyone or only strangers.",
+    f"message.{MOD}.sensor_status": "Motion Sensor | Frequency %s | Owner: %s | Reach %s blocks",
+    f"message.{MOD}.sensor_not_yours": "This motion sensor is %s's: only they can change it",
+    f"message.{MOD}.sensor_not_yours_tune": "This motion sensor is %s's: only they can re-tune it",
+    f"message.{MOD}.sensor_set": "Motion sensor set: looks %s blocks, reacts to %s",
+    f"message.{MOD}.sensor_mode_everyone": "everyone",
+    f"message.{MOD}.sensor_mode_strangers": "strangers only",
+    f"screen.{MOD}.audit.kind_motion_sensor": "Motion Sensor",
+    f"screen.{MOD}.log.kind_sensor": "Motion sensor",
+    f"screen.{MOD}.log.tip_sensor": "%s was seen by the sensor",
+    f"screen.{MOD}.log.tip_other_sensor": "%s (not a member) was seen by the sensor",
+    f"screen.{MOD}.log.tip_sensor_nobody": "Nobody is recorded",
+    f"screen.{MOD}.sensor.frequency": "Frequency %s | Owner: %s",
+    f"screen.{MOD}.sensor.range": "Range",
+    f"screen.{MOD}.sensor.blocks": "%s blocks",
+    f"screen.{MOD}.sensor.range_tip": "How far it looks, to the middle of a player. Shift-click or scroll to go back.",
+    f"screen.{MOD}.sensor.mode": "Reacts to",
+    f"screen.{MOD}.sensor.mode_everyone": "Everyone",
+    f"screen.{MOD}.sensor.mode_strangers": "Strangers only",
+    f"screen.{MOD}.sensor.mode_everyone_tip": "Any player it can see, you included.",
+    f"screen.{MOD}.sensor.mode_strangers_tip": "Not you, and on a private frequency not its owner or members (friends, groups and guests).",
+    f"screen.{MOD}.sensor.explain_everyone": "Sends while it sees any player in range",
+    f"screen.{MOD}.sensor.explain_strangers": "Ignores you and the frequency's members",
+    f"screen.{MOD}.sensor.sees": "Sees %s right now",
+    f"screen.{MOD}.sensor.sees_nobody": "Sees nobody right now",
+    f"screen.{MOD}.sensor.silenced": "Silent: %s is someone else's private frequency",
+    f"screen.{MOD}.sensor.reach": "Reach: %s blocks",
+    f"jade.{MOD}.sensor_owner": "Owner: %s",
+    f"jade.{MOD}.sensor_settings": "Looks %s blocks, reacts to %s",
+    f"jade.{MOD}.sensor_mode_everyone": "everyone",
+    f"jade.{MOD}.sensor_mode_strangers": "strangers only",
+    f"jade.{MOD}.sensor_idle": "Sees nobody",
+    f"jade.{MOD}.sensor_on": "Sees someone: sending",
+    f"jade.{MOD}.sensor_sees": "Sees %s: sending",
     f"message.{MOD}.keypad_guest_accepted": "Guest code \"%1$s\" accepted: %2$s pulse on %3$s",
     f"message.{MOD}.keypad_guest_used_up": "That guest code is used up",
     f"message.{MOD}.keypad_guest_expired": "That guest code has expired",
@@ -1113,6 +1169,12 @@ recipes["compact_radio_receiver"] = (shapeless("radio_receiver", "compact_radio_
 recipes["radio_receiver_from_compact"] = (shapeless("compact_radio_receiver", "radio_receiver"), f"{MOD}:compact_radio_receiver")
 recipes["compact_radio_transmitter"] = (shapeless("radio_transmitter", "compact_radio_transmitter"), f"{MOD}:radio_transmitter")
 recipes["radio_transmitter_from_compact"] = (shapeless("compact_radio_transmitter", "radio_transmitter"), f"{MOD}:compact_radio_transmitter")
+recipes["radio_motion_sensor"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:compact_radio_transmitter"}, {"item": "minecraft:observer"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_motion_sensor"},
+}, f"{MOD}:compact_radio_transmitter")
 
 recipes["remote_control"] = (shaped([" T ", "IBI", "IEI"], {
     "T": "minecraft:redstone_torch", "I": "minecraft:iron_ingot",
@@ -1140,6 +1202,14 @@ recipes["radio_toggle_receiver"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_toggle_receiver"},
 }, f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
+
+recipes["radio_inverted_receiver"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:redstone_torch"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_inverted_receiver"},
+}, f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_inverted"] = (shapeless("radio_inverted_receiver", "radio_receiver"), f"{MOD}:radio_inverted_receiver")
 
 recipes["radio_converter"] = ({
     "type": "minecraft:crafting_shapeless",
@@ -1188,8 +1258,8 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter",
-             "compact_radio_receiver", "compact_radio_transmitter", "code_keypad", "radio_mast", "wall_redstone"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_repeater", "radio_converter",
+             "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
@@ -1212,8 +1282,9 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
-               f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:code_keypad", f"{MOD}:radio_mast"]
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+               f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
+               f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

@@ -82,6 +82,12 @@ public class FrequencyTunerItem extends Item {
                     message = Component.translatable("message." + SignalTower.MOD_ID + ".keypad_not_yours_tune",
                             keypad.getOwnerName().isEmpty() ? "?" : keypad.getOwnerName()).withStyle(ChatFormatting.RED);
                     level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
+                } else if (radio instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor && player != null
+                        && !sensor.mayConfigure(player)) {
+                    // Likewise a Radio Motion Sensor's (v0.39.0).
+                    message = Component.translatable("message." + SignalTower.MOD_ID + ".sensor_not_yours_tune",
+                            sensor.ownerLabel()).withStyle(ChatFormatting.RED);
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
                 } else if (refused != null) {
                     // Someone else's private frequency: this block would send on it, so it's not tuned.
                     message = refused;

@@ -1,5 +1,6 @@
 package com.reiko.signaltower.blockentity;
 
+import com.reiko.signaltower.block.RadioInvertedReceiverBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioToggleReceiverBlock;
 import com.reiko.signaltower.radio.FrequencyClaims;
@@ -21,7 +22,9 @@ import java.util.UUID;
  * Listens to the network. It re-scans only when something on its frequency changed (so changes
  * arrive within one tick), when its own frequency changes, or once a second as a fallback.
  * <p>
- * Shared by the Radio Receiver, the Compact Radio Receiver and the Radio Toggle Receiver. A toggle
+ * Shared by the Radio Receiver, the Compact Radio Receiver, the Radio Toggle Receiver and the Radio
+ * Inverted Receiver. An inverted receiver outputs 15 while it hears nothing and 0 while it hears
+ * anything (v0.39.0). A toggle
  * receiver doesn't pass the signal through: it flips between off and on (full strength) each time
  * its frequency turns on (goes from silent to any strength) where it stands. It starts listening
  * without flipping when it's placed, loaded or re-tuned, so an already-on frequency doesn't count
@@ -55,6 +58,11 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         return getBlockState().getBlock() instanceof RadioToggleReceiverBlock;
     }
 
+    /** True if this is a Radio Inverted Receiver. */
+    public boolean isInverted() {
+        return getBlockState().getBlock() instanceof RadioInvertedReceiverBlock;
+    }
+
     /** A toggle receiver's state: true if it's switched on. Always false for the other receivers. */
     public boolean isToggledOn() {
         return toggledOn;
@@ -82,9 +90,13 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
 
     /**
      * What to output for a heard strength: the same strength for a plain receiver; for a toggle
-     * receiver, 15 or 0, flipping on each turn-on.
+     * receiver, 15 or 0, flipping on each turn-on; for an inverted receiver, 15 while silent and 0
+     * while hearing anything.
      */
     private int outputFor(int heard) {
+        if (isInverted()) {
+            return heard > 0 ? 0 : 15;
+        }
         if (!isToggle()) {
             return heard;
         }

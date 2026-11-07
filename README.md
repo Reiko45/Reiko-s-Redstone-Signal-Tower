@@ -13,8 +13,10 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
+| **Radio Inverted Receiver** | A receiver with a redstone torch built in: full strength while its frequency is silent, nothing while it's on. Turning a frequency on can then switch something off. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
+| **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
@@ -169,6 +171,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![Dev's Guests screen giving Alex an hour on 2026; Alex's receiver hearing 2026 during the pass and his chat line; the alert Dev got when Alex pressed a remote after the pass was taken back; and the login summary of a tune Alex tried while Dev was away](docs/images/guests-and-alerts.png)
 
+  ![A wall with a Radio Motion Sensor between two receivers with lamps on 4242: with nobody near, the inverted receiver's lamp is lit; with Alex walking up, the sensor glows, the alarm lamp lights and the inverted one goes out; Dev's sensor screen set to 6 blocks and Strangers only; Jade for Dev ("Looks 6 blocks, reacts to strangers only", "Sees Alex: sending"); Jade on the inverted receiver ("Off (frequency on)", "Hearing: 15"); and the log of 4242 with Alex's turn-on in red](docs/images/motion-sensor-and-inverted-receiver.png)
+
   ![A Compact Radio Transmitter's 16-block ring passing between two lamps, the near one lit and the far one dark; Dev's Guest codes screen with Plumber and Family; Alex opening the door with Plumber's code; Dev's chat line for each use; the fourth try "That guest code is used up"; and Dev's log with "Guest code: Plumber"](docs/images/compact-transmitter-and-guest-codes.png)
 
   ![The reach ring: a transmitter's red ring seen from 7 blocks outside it, and a repeater's 88-block ring from above; Dev's log with the Code Keypad's turn-ons typed by Alex; Alex locked out after three wrong codes; Dev's alert in chat with where the keypad is; and the right code opening the iron door](docs/images/reach-ring-and-keypad.png)
@@ -283,6 +287,16 @@ A **Radio Toggle Receiver** doesn't pass the signal through like a normal receiv
 
 ![Tuning it while 2026 is on leaves it off; the lever turning on switches it on; the lever turning off leaves it on; a remote pulse switches it off](docs/images/toggle-receiver.png)
 
+### Inverted receivers
+
+A **Radio Inverted Receiver** (since 0.39) is a receiver with a redstone torch built in. It outputs **full strength (15) while its frequency is silent** where it stands, and **nothing while it hears it** at any strength.
+
+- **Use it to switch something off:** a lamp that's on until a motion sensor sees someone, a door that's open until a remote closes it, or a farm that runs until a lever on the other side of the base stops it.
+- **Its lights:** it glows while it outputs (while the frequency is silent). The torch on its sides is lit then, and the incoming waves light up instead while it hears the frequency.
+- **Someone else's encrypted frequency:** it hears nothing there, so it stays on. That way it can't be used to tell when that frequency is on.
+- **Readout and Jade:** an empty-hand right-click shows "Inverted Receiver | Frequency 4242 | Hearing 15 | Output 0 | Towers in range: 1". Jade shows "On (frequency silent)" or "Off (frequency on)", and what it's hearing.
+- Otherwise it's a receiver: the tuner tunes it, it keeps its frequency when broken, and the audit lists it as an Inverted Receiver.
+
 ### Repeater towers
 
 One transmitter only reaches so far. To go farther, put a **Radio Repeater** partway out, inside the transmitter's reach, and tune it to the same frequency. The repeater picks up the signal and broadcasts it again from where it stands, with its own reach. Receivers in either circle hear it.
@@ -338,9 +352,23 @@ A **Compact Radio Transmitter** is a button-sized transmitter. It sticks to wall
 - **Not a tower:** it doesn't relay remote presses the way a full transmitter does.
 - Otherwise it's a transmitter: tune it with the tuner, its red light glows while it's sending, it works on private frequencies like any sender, and Jade, the readout ("Compact Transmitter | Frequency 55 | Sending 15 | Reach 16 blocks"), the audit, the scanner and the reach ring all know it.
 
+### Radio Motion Sensor
+
+A **Radio Motion Sensor** (since 0.39) is a button-sized eye that sticks to walls, floors and ceilings like a button (and pops off, keeping its frequency, if that block goes). While it sees a player nearby, it broadcasts full strength on its frequency, like a Compact Radio Transmitter with someone holding the lever.
+
+- **What it sees:** players within its range (measured to the middle of their body) with a clear line from its face to their eyes or body. A block in between hides them, as it would from a mob (glass too). Spectators are never seen. It looks twice a second.
+- **How long it sends:** for as long as it sees someone, plus 2 seconds after it last saw them, so a player walking past doesn't make it flicker.
+- **Reach:** the compact transmitter's short fixed reach, 16 blocks by default (`compactTransmitterReach`), whatever its height. It isn't a relay tower, and the redstone around it does nothing.
+- **Settings (its owner):** whoever places it owns it. Right-click it with an empty hand to open its screen: **Range** cycles 2, 4, 6, 8, 12 or 16 blocks (6 by default; Shift-click or scroll goes back), and **Reacts to** picks **Everyone** or **Strangers only**. The screen also says whether it sees someone right now, and who. **Done** saves ("Motion sensor set: looks 6 blocks, reacts to strangers only").
+- **Strangers only** ignores you and, on a private frequency, its owner and members (friends, group members and guests). Everyone else sets it off. Put it on your private frequency and add your friends, and it only goes off for people who aren't on your list.
+- **Anyone else** who right-clicks it just gets a readout: "Motion Sensor | Frequency 4242 (Vault) | Owner: Dev | Reach 16 blocks". Its range and mode stay the owner's business, in Jade too. Only the owner (or an operator) changes its settings or re-tunes it ("This motion sensor is Dev's: only they can re-tune it").
+- **The log** lists its turn-ons as **Motion sensor**, with the first player it saw and where the sensor is (click the row for a beam over it). On a private frequency only a member's sensor sends, like any sender.
+- **Jade** shows its owner, "Sees nobody" or "Sees someone: sending", and its reach. Its owner also sees its settings and who it sees ("Sees Alex: sending").
+- **Pair it with an inverted receiver** for a light or door that's on until someone comes, or with a normal receiver for an alarm lamp, a bell or a pager.
+
 ### Reach preview ring
 
-Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size or compact), Repeater, Converter or Code Keypad, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, or green for a keypad), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
+Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size or compact), Repeater, Converter, Code Keypad or Radio Motion Sensor, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, green for a keypad, or purple for a motion sensor), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
 
 - The ring stays on that tower while you keep holding the tuner, so you can walk out to the edge to see where to put the next repeater or receiver. Look at another tower to move it; put the tuner away to clear it.
 - The dots follow the ground, and far ones are drawn bigger so the ring still shows from a hilltop. Only you see it, and only the part within your render distance.
@@ -384,9 +412,13 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Toggle Receiver:** a Radio Receiver and a Lever, in any arrangement in the crafting grid. Put a toggle receiver in the grid on its own to get the Radio Receiver back.
 
+**Radio Inverted Receiver:** a Radio Receiver and a Redstone Torch, in any arrangement in the crafting grid. Put an inverted receiver in the grid on its own to get the Radio Receiver back.
+
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
 **Compact Radio Transmitter:** put one Radio Transmitter in the crafting grid to get a Compact Radio Transmitter, and back again the same way.
+
+**Radio Motion Sensor:** a Compact Radio Transmitter and an Observer, in any arrangement in the crafting grid.
 
 **Remote Control:**
 
@@ -436,6 +468,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
   block/RadioToggleReceiverBlock.java    receiver that flips on and off with each turn-on
+  block/RadioInvertedReceiverBlock.java  receiver that's on while its frequency is silent
   block/RadioRepeaterBlock.java          picks up its frequency and broadcasts it again
   block/RadioConverterBlock.java         a repeater that sends on another frequency; opens its screen
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
@@ -485,6 +518,10 @@ src/main/java/com/reiko/signaltower/
   client/KeypadGuestsScreen.java         the keypad owner's Guest codes screen
   network/KeypadGuestCodesPayload.java, KeypadGuestListPayload.java  guest codes screen <-> server
   block/CompactRadioTransmitterBlock.java  button-sized transmitter with a short fixed reach
+  block/RadioMotionSensorBlock.java      button-sized motion sensor: owner, screen or readout
+  blockentity/MotionSensorBlockEntity.java  its owner, range and mode, looking for players, sending
+  client/SensorScreen.java               the motion sensor owner's settings screen
+  network/OpenSensorScreenPayload.java, ConfigureSensorPayload.java  sensor screen <-> server
   network/OpenKeypadScreenPayload.java, KeypadEnterPayload.java, KeypadConfigurePayload.java, KeypadResultPayload.java  keypad screen <-> server
   client/ReachRing.java, ReachRingShape.java  the reach preview ring and its two lines above the hotbar
   network/ReachPreviewRequestPayload.java, ReachPreviewPayload.java  asking the server how far a tower reaches
@@ -637,9 +674,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 128. the Code Keypad: only its owner sets a code (4 to 8 digits; an operator may too) and the message doesn't repeat it; a remote in hand still opens it and only the owner re-tunes it; three wrong codes lock that player (not others) out for 30 seconds, even for the right code, and alert the owner (kept with where the keypad is, surviving saving), but not for the owner's own mistakes; afterwards the right code sends the pulse (heard nearby, recorded as the keypad with who typed it), lights it and powers the block it's on until the pulse ends; the code is saved, but only the frequency goes on the item, and the screen's packet never carries it;
 129. a keypad placed on someone else's private frequency says it's silent, alerts that frequency's owner and sends nothing for the right code (Jade says silent); a member's keypad shows in Jade (owner, no code yet, waiting, reach, never the code) and in the frequency log (the keypad's position, typed by a stranger who knew the code), and the log's new kind survives the network.
 130. the Compact Radio Transmitter: on a wall, it broadcasts the signal around it over its 16-block reach (heard at 16 blocks, not at 17, at any height, where a full transmitter would reach farther); it isn't a relay tower (a full transmitter next to it is), even after saving; the reach ring, Jade and the audit know it; and it pops off with its frequency when its wall goes;
-131. keypad guest codes: only the owner adds them (with a name, 4 to 8 digits, not the keypad's code nor one already used, names different, at most 8) and the main code can't be changed to one; the owner's list carries them (never the main code) and survives the network, Alex's is empty; a code with 3 uses works 3 times (counted, with who used it last), then says it's used up without counting as wrong codes; an hourly one works within the hour and then has expired; one with no limits keeps working; they're saved with the keypad; the frequency log names the guest code (surviving the network and saving); removing one (name ignoring case) makes it a wrong code.
+131. keypad guest codes: only the owner adds them (with a name, 4 to 8 digits, not the keypad's code nor one already used, names different, at most 8) and the main code can't be changed to one; the owner's list carries them (never the main code) and survives the network, Alex's is empty; a code with 3 uses works 3 times (counted, with who used it last), then says it's used up without counting as wrong codes; an hourly one works within the hour and then has expired; one with no limits keeps working; they're saved with the keypad; the frequency log names the guest code (surviving the network and saving); removing one (name ignoring case) makes it a wrong code;
+132. the inverted receiver: on (15, a lamp next to it lit) while its frequency is silent, off (0, the lamp out) while it's on, and on again once it's silent; on someone else's encrypted frequency it hears nothing and stays on; Jade (with and without server data), the readout and the audit know it;
+133. the motion sensor: placing it makes it the placer's (and tuned by them); it sees the nearest player in its 6-block range with a clear line from its face, not someone too far, behind a block or a spectator (and someone farther once the range is 12); only its owner changes the settings (7 blocks, which isn't offered, becomes 6); strangers-only ignores the owner and, on a private frequency, its friends; redstone around it doesn't make it send; seeing Rex it lights and sends over its 16-block reach (not past it, not a relay tower), and the log names Rex (red) at the sensor; Jade shows the owner its settings and who it sees, and Alex neither; the screen packet (with a round trip), the audit and the reach ring know it; it keeps sending for 2 seconds with nobody in sight, then stops; Alex can't re-tune it; it keeps its owner, range and mode when saved, and its frequency when it pops off.
 
-All 131 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 133 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

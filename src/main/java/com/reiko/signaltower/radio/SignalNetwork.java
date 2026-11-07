@@ -56,7 +56,8 @@ public final class SignalNetwork extends SavedData {
 
     /**
      * What a transmitter is currently broadcasting. {@code compact}: a Compact Radio Transmitter
-     * (v0.38.0), which has a short fixed reach and doesn't relay remote presses.
+     * (v0.38.0) or a Radio Motion Sensor (v0.39.0), which have a short fixed reach and don't relay
+     * remote presses.
      */
     public record Transmitter(int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact) {
         public Transmitter(int frequency, int power, int reach) {
@@ -286,6 +287,16 @@ public final class SignalNetwork extends SavedData {
 
     /** {@link #updateTransmitter(BlockPos, int, int, int, UUID)} for a compact transmitter ({@code compact}) or a normal one. */
     public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact) {
+        updateTransmitter(pos, frequency, power, reach, tunedBy, compact, null);
+    }
+
+    /**
+     * {@link #updateTransmitter(BlockPos, int, int, int, UUID, boolean)}, naming what turned it on
+     * for the frequency log if this turns it on ({@code cause}; null: the transmitter and its tuner).
+     * A Radio Motion Sensor (v0.39.0) names who it saw.
+     */
+    public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact,
+                                  @Nullable Cause cause) {
         BlockPos key = pos.immutable();
         Transmitter next = new Transmitter(frequency, power, reach, tunedBy, compact);
         Transmitter previous = transmitters.put(key, next);
@@ -294,7 +305,7 @@ public final class SignalNetwork extends SavedData {
         }
         if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)
                 && !blocked(null, frequency, tunedBy)) {
-            recordTurnOn(frequency, ownCoverage(key, reach), Cause.transmitter(key, tunedBy));
+            recordTurnOn(frequency, ownCoverage(key, reach), cause != null ? cause : Cause.transmitter(key, tunedBy));
         }
         if (previous != null && previous.frequency() != frequency) {
             removeFromIndex(key, previous.frequency());
@@ -771,7 +782,7 @@ public final class SignalNetwork extends SavedData {
 
     /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name, sent by ordinal: only add at the end. */
     public enum CauseKind {
-        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD;
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -817,6 +828,11 @@ public final class SignalNetwork extends SavedData {
         /** {@link #keypad(BlockPos, UUID, String)} with the guest code's name (v0.38.0), or "" for the keypad's own code. */
         public static Cause keypad(BlockPos pos, UUID player, String name, String guestCode) {
             return new Cause(CauseKind.KEYPAD, pos.immutable(), player, name, guestCode == null ? "" : guestCode);
+        }
+
+        /** A Radio Motion Sensor saw someone (v0.39.0): where the sensor is, and who it saw first. */
+        public static Cause sensor(BlockPos pos, @Nullable UUID player, String name) {
+            return new Cause(CauseKind.SENSOR, pos.immutable(), player, name == null ? "" : name);
         }
     }
 

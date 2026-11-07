@@ -68,6 +68,18 @@ public final class RadioInfo {
      */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos, @Nullable Player viewer) {
         CompoundTag tag = gather(level, pos);
+        if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor) {
+            // v0.39.0: whose it is and whether it sees someone; its range, mode and who it saw only for its owner.
+            tag.putString("sensor_owner", sensor.getOwnerName());
+            tag.putBoolean("sensing", sensor.isSensing());
+            if (viewer != null && sensor.mayConfigure(viewer)) {
+                tag.putInt("sensor_range", sensor.getRange());
+                tag.putString("sensor_mode", sensor.getMode().key());
+                if (sensor.isSensing()) {
+                    tag.putString("sensor_sees", sensor.getSeenName());
+                }
+            }
+        }
         if (tag != null) {
             addName(level, tag, "frequency", "name");
             addName(level, tag, "output", "output_name");
@@ -157,6 +169,8 @@ public final class RadioInfo {
             tag.putInt("towers", reception.transmittersInReach());
             if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
                 tag.putBoolean("toggled_on", toggle.isToggledOn());
+                tag.putInt("heard", reception.power());
+            } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {
                 tag.putInt("heard", reception.power());
             }
         }
@@ -254,7 +268,26 @@ public final class RadioInfo {
             lines.add(frequencyLine(data));
             addNoteLine(lines, data, "note");
         }
-        if (block instanceof RadioTransmitterBlock) {
+        if (block instanceof com.reiko.signaltower.block.RadioMotionSensorBlock) {
+            boolean on = state.getValue(RadioTransmitterBlock.POWERED);
+            if (hasData) {
+                String owner = data.getString("sensor_owner");
+                if (!owner.isEmpty()) {
+                    lines.add(Component.translatable(LANG + "sensor_owner", Component.literal(owner)).withStyle(ChatFormatting.GRAY));
+                }
+                if (data.contains("sensor_range")) {
+                    lines.add(Component.translatable(LANG + "sensor_settings", data.getInt("sensor_range"),
+                            Component.translatable(LANG + "sensor_mode_" + data.getString("sensor_mode"))));
+                }
+            }
+            String sees = hasData ? data.getString("sensor_sees") : "";
+            lines.add(!on ? Component.translatable(LANG + "sensor_idle").withStyle(ChatFormatting.GRAY)
+                    : !sees.isEmpty() ? Component.translatable(LANG + "sensor_sees", Component.literal(sees)).withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "sensor_on").withStyle(ChatFormatting.GREEN));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+        } else if (block instanceof RadioTransmitterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
             lines.add(!on ? Component.translatable(LANG + "sending_nothing").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "sending", value(data.getInt("power")))
@@ -275,6 +308,17 @@ public final class RadioInfo {
             boolean on = state.getValue(RadioReceiverBlock.POWER) > 0;
             lines.add(on ? Component.translatable(LANG + "switched_on").withStyle(ChatFormatting.GREEN)
                     : Component.translatable(LANG + "switched_off").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                int heard = data.getInt("heard");
+                lines.add(heard > 0 ? Component.translatable(LANG + "hearing", value(heard))
+                        : Component.translatable(LANG + "hearing_nothing").withStyle(ChatFormatting.GRAY));
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
+            }
+        } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {
+            // v0.39.0: on while silent. The block state's output says which, with or without server data.
+            boolean on = state.getValue(RadioReceiverBlock.POWER) > 0;
+            lines.add(on ? Component.translatable(LANG + "inverted_on").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "inverted_off").withStyle(ChatFormatting.GRAY));
             if (hasData) {
                 int heard = data.getInt("heard");
                 lines.add(heard > 0 ? Component.translatable(LANG + "hearing", value(heard))

@@ -5055,4 +5055,244 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---------------------------------------------------------------- v0.39.0: inverted receiver
+
+    /**
+     * The inverted receiver outputs 15 while its frequency is silent (a lamp next to it is lit) and
+     * 0 while it's on at any strength, and 15 again once it's silent; on someone else's encrypted
+     * frequency it hears nothing, so it stays on. Jade, the readout and the audit know it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void invertedReceiver(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        BlockPos rx = new BlockPos(2, 1, 1);
+        BlockPos lamp = new BlockPos(1, 1, 1);
+        BlockPos tx = new BlockPos(5, 1, 1);
+        BlockPos input = new BlockPos(5, 1, 0);
+        BlockPos deaf = new BlockPos(10, 1, 1);
+        BlockPos tx2 = new BlockPos(13, 1, 1);
+        List<Component> devBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
+        place(helper, rx, ModRegistry.RADIO_INVERTED_RECEIVER.get(), 3501);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 3501);
+        claims.put(3502, devId, "Dev", java.util.Map.of(), List.of(), true);
+        place(helper, deaf, ModRegistry.RADIO_INVERTED_RECEIVER.get(), 3502);
+        ((RadioBlockEntity) helper.getBlockEntity(deaf)).setTunedBy(rexId);
+        place(helper, tx2, ModRegistry.RADIO_TRANSMITTER.get(), 3502);
+        ((RadioBlockEntity) helper.getBlockEntity(tx2)).setTunedBy(devId);
+        helper.setBlock(tx2.north(), Blocks.REDSTONE_BLOCK);
+        BlockPos absolute = helper.absolutePos(rx);
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "On while 3501 is silent");
+                    check(helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT), "So the lamp next to it is lit");
+                    check(SignalNetwork.get(level).listen(level, 3502, helper.absolutePos(deaf), null).power() == 15, "3502 is on there");
+                    check(helper.getBlockState(deaf).getValue(RadioReceiverBlock.POWER) == 15,
+                            "Someone else's encrypted frequency: it hears nothing, so it stays on");
+                })
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absolute);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("frequency", "inverted_on", "hearing_nothing", "towers")), "Jade while silent");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), null))
+                            .equals(List.of("inverted_on")), "Jade without server data");
+                    helper.getBlockState(rx).useWithoutItem(level, dev, new BlockHitResult(Vec3.atCenterOf(absolute), Direction.NORTH, absolute, false));
+                    check(lastKey(devBar).endsWith("inverted_status"), "The readout: " + lastKey(devBar));
+                    helper.setBlock(input, Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "Off while 3501 is on");
+                    check(!helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT), "So the lamp goes out");
+                })
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absolute);
+                    check(info != null && info.getInt("heard") == 15 && info.getInt("power") == 0, "Jade data: " + info);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("frequency", "inverted_off", "hearing", "towers")), "Jade while on");
+                    claims.put(3501, devId, "Dev", java.util.Map.of());
+                    var audit = com.reiko.signaltower.radio.FrequencyAudit.audit(server, 3501, dev, 512);
+                    check(audit.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.INVERTED_RECEIVER
+                            && e.pos().equals(java.util.Optional.of(absolute))), "In the audit as an inverted receiver: " + audit);
+                    claims.remove(3501);
+                    helper.setBlock(input, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "On again once 3501 is silent");
+                    check(helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT), "And the lamp with it");
+                })
+                .thenExecute(() -> claims.remove(3502))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.39.0: motion sensor
+
+    /**
+     * The motion sensor: whoever places it owns it (and tunes it); it sees the nearest player within
+     * its range (6 by default) with a clear line from its face, never a spectator or someone behind
+     * a block; strangers-only mode ignores its owner and the private frequency's members. While it
+     * sees someone it sends full strength over the compact reach (not a relay tower), the log names
+     * who it saw, and it keeps sending for 2 seconds after; the redstone around it does nothing.
+     * Only its owner changes its settings (a range it doesn't offer becomes the default) or
+     * re-tunes it; the screen packet, Jade (settings for the owner only), the audit and the reach
+     * ring know it; it keeps its settings when saved, and its frequency when it pops off.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void motionSensor(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> alexBar = new java.util.ArrayList<>();
+        List<Component> chat = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(10, 1, 1);
+        helper.setBlock(at.south(), Blocks.STONE);
+        helper.setBlock(at, ModRegistry.RADIO_MOTION_SENSOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.FACING, Direction.NORTH));
+        BlockPos absolute = helper.absolutePos(at);
+        Player dev = namedPlayer(helper, new BlockPos(10, 1, 0), devId, "Dev", false, devBar, chat);
+        Player alex = namedPlayer(helper, new BlockPos(13, 1, 0), alexId, "Alex", false, alexBar, chat);
+        Player rex = namedPlayer(helper, new BlockPos(12, 1, 0), rexId, "Rex", false, new java.util.ArrayList<>(), chat);
+        Player far = namedPlayer(helper, new BlockPos(0, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), chat);
+        Player hidden = namedPlayer(helper, new BlockPos(15, 1, 1), UUID.randomUUID(), "Hidden", false, new java.util.ArrayList<>(), chat);
+        for (int y = 1; y <= 3; y++) {
+            helper.setBlock(new BlockPos(14, y, 1), Blocks.STONE); // a pillar between the sensor and Hidden
+        }
+        Player ghost = new Player(level, BlockPos.ZERO, 0.0F, new GameProfile(UUID.randomUUID(), "Ghost")) {
+            @Override
+            public boolean isSpectator() {
+                return true;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+        Vec3 ghostFeet = helper.absoluteVec(Vec3.atBottomCenterOf(new BlockPos(11, 1, 0)));
+        ghost.moveTo(ghostFeet.x, ghostFeet.y, ghostFeet.z);
+
+        ModRegistry.RADIO_MOTION_SENSOR.get().setPlacedBy(level, absolute, helper.getBlockState(at), dev,
+                new ItemStack(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get()));
+        com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor = helper.getBlockEntity(at);
+        sensor.setFrequency(3601);
+        int reach = com.reiko.signaltower.Config.COMPACT_TRANSMITTER_REACH.get();
+        SignalNetwork network = SignalNetwork.get(level);
+        var everyone = com.reiko.signaltower.blockentity.MotionSensorBlockEntity.Mode.EVERYONE;
+        var strangers = com.reiko.signaltower.blockentity.MotionSensorBlockEntity.Mode.STRANGERS;
+        long[] since = new long[1];
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    check(devId.equals(sensor.getOwner()) && "Dev".equals(sensor.getOwnerName()) && devId.equals(sensor.getTunedBy()),
+                            "Placed by Dev: theirs and tuned by them");
+                    check(sensor.getRange() == 6 && sensor.getMode() == everyone, "6 blocks, everyone, by default");
+                    check(sensor.nearestSeen(level, List.of(alex, rex, dev, far, hidden, ghost)) == dev, "The nearest: Dev, its owner");
+                    check(sensor.nearestSeen(level, List.of(alex, far, hidden, ghost)) == alex, "Then Alex");
+                    check(sensor.nearestSeen(level, List.of(far, hidden, ghost)) == null,
+                            "Not someone too far, behind a block, or a spectator");
+
+                    check(keyOf(sensor.configure(dev, 12, everyone)).endsWith("sensor_set") && sensor.getRange() == 12, "Dev sets 12 blocks");
+                    check(sensor.nearestSeen(level, List.of(far)) == far, "Now it sees Far");
+                    Component refused = com.reiko.signaltower.network.ConfigureSensorPayload.apply(alex,
+                            new com.reiko.signaltower.network.ConfigureSensorPayload(absolute, 2, strangers.ordinal()));
+                    check(refused != null && keyOf(refused).endsWith("sensor_not_yours") && sensor.getRange() == 12
+                            && sensor.getMode() == everyone, "Alex can't change it");
+                    com.reiko.signaltower.network.ConfigureSensorPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureSensorPayload(absolute, 7, strangers.ordinal()));
+                    check(lastKey(devBar).endsWith("sensor_set") && sensor.getRange() == 6 && sensor.getMode() == strangers,
+                            "Dev sets strangers only (and 7, which isn't offered, becomes 6)");
+
+                    check(sensor.nearestSeen(level, List.of(dev, alex)) == alex, "Strangers only on a public frequency: not Dev");
+                    claims.put(3601, devId, "Dev", java.util.Map.of(alexId, "Alex"));
+                    check(sensor.nearestSeen(level, List.of(dev, alex)) == null, "Nor Alex once he's a friend on its private frequency");
+                    check(sensor.nearestSeen(level, List.of(dev, alex, rex)) == rex, "But Rex");
+
+                    // Redstone around it does nothing.
+                    helper.setBlock(at.below(), Blocks.REDSTONE_BLOCK);
+                    check(!helper.getBlockState(at).getValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.POWERED)
+                            && network.listen(level, 3601, absolute.offset(1, 0, 0), null).power() == 0, "Redstone doesn't make it send");
+
+                    since[0] = level.getGameTime();
+                    check(sensor.lookAround(level, since[0], List.of(dev, alex, rex)) == rex && sensor.isSensing(), "It sees Rex");
+                    check(helper.getBlockState(at).getValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.POWERED), "Lit");
+                    check(network.listen(level, 3601, absolute.offset(reach, 0, 0), null).power() == 15, "Sending at the edge of its reach");
+                    check(network.listen(level, 3601, absolute.offset(reach + 1, 0, 0), null).power() == 0, "Not past it");
+                    check(network.remoteCoverage(level, absolute.offset(1, 0, 0), 32, true).stream().noneMatch(c -> c.origin().equals(absolute)),
+                            "Not a relay tower");
+                    var log = com.reiko.signaltower.radio.FrequencyLog.log(server, 3601);
+                    check(!log.isEmpty() && log.get(0).kind() == SignalNetwork.CauseKind.SENSOR && log.get(0).who().equals("Rex")
+                            && log.get(0).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER
+                            && log.get(0).pos().equals(java.util.Optional.of(absolute)), "The log names Rex at the sensor: " + log);
+
+                    CompoundTag devInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absolute, dev);
+                    List<Component> devLines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at), devInfo);
+                    check(lineKeys(devLines).equals(List.of("frequency", "sensor_owner", "sensor_settings", "sensor_sees", "reach", "private")),
+                            "Jade for Dev: " + lineKeys(devLines));
+                    check(firstArg(devLines.get(3)).equals("Rex"), "Dev sees who it saw");
+                    CompoundTag alexInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absolute, alex);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at), alexInfo))
+                            .equals(List.of("frequency", "sensor_owner", "sensor_on", "reach", "private")), "Jade for Alex: no settings, no name");
+
+                    var screen = com.reiko.signaltower.network.OpenSensorScreenPayload.of(level, sensor, false);
+                    check(screen.frequency() == 3601 && screen.ownerName().equals("Dev") && screen.range() == 6 && screen.modeValue() == strangers
+                            && screen.sensing() && screen.seenName().equals("Rex") && screen.reach() == reach && !screen.silenced(), "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+
+                    var audit = com.reiko.signaltower.radio.FrequencyAudit.audit(server, 3601, dev, 512);
+                    check(audit.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.MOTION_SENSOR
+                            && e.pos().equals(java.util.Optional.of(absolute))), "In the audit as a motion sensor: " + audit);
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+                    var ring = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(dev, absolute);
+                    check(ring.kind() == com.reiko.signaltower.network.ReachPreviewPayload.MOTION_SENSOR && ring.reach() == reach, "The ring: " + ring);
+
+                    helper.getBlockState(at).useWithoutItem(level, alex, new BlockHitResult(Vec3.atCenterOf(absolute), Direction.NORTH, absolute, false));
+                    check(lastKey(alexBar).endsWith("sensor_status"), "Alex gets the readout: " + lastKey(alexBar));
+                })
+                .thenIdle(20)
+                .thenExecute(() -> check(sensor.isSensing(), "Still sending a second later with nobody in sight"))
+                .thenWaitUntil(() -> check(!sensor.isSensing(), "Then it stops"))
+                .thenExecute(() -> {
+                    long held = level.getGameTime() - since[0];
+                    check(held >= com.reiko.signaltower.blockentity.MotionSensorBlockEntity.HOLD_TICKS && held <= 45, "Held for 2 seconds: " + held);
+                    check(!helper.getBlockState(at).getValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.POWERED)
+                            && network.listen(level, 3601, absolute.offset(1, 0, 0), null).power() == 0, "Off, sending nothing");
+                    CompoundTag devInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absolute, dev);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at), devInfo))
+                            .contains("sensor_idle"), "Jade: sees nobody");
+
+                    BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolute), Direction.NORTH, absolute, false);
+                    ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+                    FrequencyTunerItem.setFrequency(tuner, 3699);
+                    alex.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+                    tuner.useOn(new UseOnContext(alex, InteractionHand.MAIN_HAND, hit));
+                    check(sensor.getFrequency() == 3601 && lastKey(alexBar).endsWith("sensor_not_yours_tune"), "Only Dev re-tunes it: " + lastKey(alexBar));
+
+                    CompoundTag saved = sensor.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.MotionSensorBlockEntity(absolute, helper.getBlockState(at));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(devId.equals(copy.getOwner()) && copy.getOwnerName().equals("Dev") && copy.getRange() == 6
+                            && copy.getMode() == strangers && copy.getFrequency() == 3601, "Saved");
+                    claims.remove(3601);
+                    helper.setBlock(at.south(), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(at).isAir(), "Pops off without its wall");
+                    check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                            .anyMatch(stack -> stack.is(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get())
+                                    && Integer.valueOf(3601).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its frequency");
+                })
+                .thenSucceed();
+    }
 }

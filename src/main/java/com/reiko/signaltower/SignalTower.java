@@ -161,6 +161,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.KeypadGuestCodesPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestCodesPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.KeypadGuestListPayload.TYPE,
                 com.reiko.signaltower.network.KeypadGuestListPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestListPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSensorScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureSensorPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureSensorPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureSensorPayload::handle);
     }
 
     /** Pagers note when their owner left, for the catch-up at the next login. */
@@ -207,11 +211,13 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_TOGGLE_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.RADIO_INVERTED_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.CODE_KEYPAD_ITEM.get());
+            event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());

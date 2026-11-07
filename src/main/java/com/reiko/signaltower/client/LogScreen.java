@@ -263,6 +263,13 @@ public class LogScreen extends Screen {
                         : Component.translatable(KEY + "tip_keypad", entry.who()).withStyle(ChatFormatting.YELLOW)));
                 entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
             }
+            case SENSOR -> {
+                lines.add(entry.who().isEmpty() ? Component.translatable(KEY + "tip_sensor_nobody").withStyle(ChatFormatting.GRAY)
+                        : entry.whoKind() == FrequencyAudit.Who.OTHER
+                        ? Component.translatable(KEY + "tip_other_sensor", entry.who()).withStyle(ChatFormatting.RED)
+                        : Component.translatable(KEY + "tip_sensor", entry.who()).withStyle(ChatFormatting.YELLOW));
+                entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
+            }
         }
         if (entry.pos().isPresent()) {
             int secondsLeft = AuditBeams.secondsLeft(entry.dimension(), entry.pos().get());

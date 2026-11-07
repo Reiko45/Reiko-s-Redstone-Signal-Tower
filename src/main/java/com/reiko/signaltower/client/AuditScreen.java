@@ -269,7 +269,8 @@ public class AuditScreen extends Screen {
                     .withStyle(ChatFormatting.RED);
         });
         boolean sends = entry.kind() == FrequencyAudit.Kind.TRANSMITTER || entry.kind() == FrequencyAudit.Kind.REPEATER
-                || entry.kind() == FrequencyAudit.Kind.CONVERTER_SENDS || entry.kind() == FrequencyAudit.Kind.COMPACT_TRANSMITTER;
+                || entry.kind() == FrequencyAudit.Kind.CONVERTER_SENDS || entry.kind() == FrequencyAudit.Kind.COMPACT_TRANSMITTER
+                || entry.kind() == FrequencyAudit.Kind.MOTION_SENSOR;
         lines.add(switch (entry.status()) {
             case SILENT -> Component.translatable(KEY + "tip_silent").withStyle(ChatFormatting.RED);
             case DEAF -> Component.translatable(KEY + "tip_deaf").withStyle(ChatFormatting.RED);

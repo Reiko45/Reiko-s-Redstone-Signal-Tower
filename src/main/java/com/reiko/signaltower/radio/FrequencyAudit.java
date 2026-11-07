@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -100,7 +100,9 @@ public final class FrequencyAudit {
             String dimension = level.dimension().location().toString();
             List<Entry> found = new ArrayList<>();
 
-            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, tx.compact() ? Kind.COMPACT_TRANSMITTER : Kind.TRANSMITTER,
+            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, !tx.compact() ? Kind.TRANSMITTER
+                    : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? Kind.MOTION_SENSOR
+                    : Kind.COMPACT_TRANSMITTER,
                     dimension, pos, tx.tunedBy(), network.isSilenced(level, pos) ? Status.SILENT : Status.WORKING, tx.power())));
 
             network.relaysOn(level, frequency).forEach((pos, relay) -> {
@@ -130,6 +132,7 @@ public final class FrequencyAudit {
                 UUID tunedBy = level.getBlockEntity(receiver.pos()) instanceof RadioBlockEntity radio
                         ? radio.getTunedBy() : receiver.tunedBy();
                 Kind kind = block instanceof RadioToggleReceiverBlock ? Kind.TOGGLE_RECEIVER
+                        : block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock ? Kind.INVERTED_RECEIVER
                         : block instanceof CompactRadioReceiverBlock ? Kind.COMPACT_RECEIVER : Kind.RECEIVER;
                 Status status = FrequencyClaims.mayHear(level, frequency, tunedBy) ? Status.WORKING : Status.DEAF;
                 found.add(row(server, claim, kind, dimension, receiver.pos(), tunedBy, status,

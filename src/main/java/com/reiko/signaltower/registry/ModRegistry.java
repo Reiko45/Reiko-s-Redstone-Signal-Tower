@@ -10,6 +10,9 @@ import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioToggleReceiverBlock;
+import com.reiko.signaltower.block.RadioInvertedReceiverBlock;
+import com.reiko.signaltower.block.RadioMotionSensorBlock;
+import com.reiko.signaltower.blockentity.MotionSensorBlockEntity;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
 import com.reiko.signaltower.blockentity.CodeKeypadBlockEntity;
@@ -156,6 +159,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** A receiver that's on while its frequency is silent and off while it's on (v0.39.0). */
+    public static final DeferredBlock<RadioInvertedReceiverBlock> RADIO_INVERTED_RECEIVER = BLOCKS.register("radio_inverted_receiver",
+            () -> new RadioInvertedReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
     /** Listens for its frequency and broadcasts it again from its own height. */
     public static final DeferredBlock<RadioRepeaterBlock> RADIO_REPEATER = BLOCKS.register("radio_repeater",
             () -> new RadioRepeaterBlock(BlockBehaviour.Properties.of()
@@ -188,6 +200,17 @@ public final class ModRegistry {
     /** Button-sized transmitter with a short fixed reach (v0.38.0). Breaks quickly like a button and gets knocked off by pistons. */
     public static final DeferredBlock<CompactRadioTransmitterBlock> COMPACT_RADIO_TRANSMITTER = BLOCKS.register("compact_radio_transmitter",
             () -> new CompactRadioTransmitterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(0.5F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(CompactRadioTransmitterBlock.POWERED) ? 3 : 0)));
+
+    /** A button-sized eye that sends while it sees a player nearby (v0.39.0). Knocked off by pistons, like a button. */
+    public static final DeferredBlock<RadioMotionSensorBlock> RADIO_MOTION_SENSOR = BLOCKS.register("radio_motion_sensor",
+            () -> new RadioMotionSensorBlock(BlockBehaviour.Properties.of()
                     .mapColor(MapColor.METAL)
                     .strength(0.5F)
                     .sound(SoundType.METAL)
@@ -231,6 +254,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_receiver", RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_TOGGLE_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_toggle_receiver", RADIO_TOGGLE_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_INVERTED_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_inverted_receiver", RADIO_INVERTED_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -239,6 +264,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
     public static final DeferredItem<BlockItem> COMPACT_RADIO_TRANSMITTER_ITEM =
             ITEMS.registerSimpleBlockItem("compact_radio_transmitter", COMPACT_RADIO_TRANSMITTER);
+    public static final DeferredItem<BlockItem> RADIO_MOTION_SENSOR_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_motion_sensor", RADIO_MOTION_SENSOR);
     public static final DeferredItem<BlockItem> CODE_KEYPAD_ITEM =
             ITEMS.registerSimpleBlockItem("code_keypad", CODE_KEYPAD);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
@@ -265,11 +292,16 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER_BE =
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
-                            RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get()).build(null));
+                            RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get(),
+                            RADIO_INVERTED_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",
                     () -> BlockEntityType.Builder.of(RadioRepeaterBlockEntity::new, RADIO_REPEATER.get(), RADIO_CONVERTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MotionSensorBlockEntity>> MOTION_SENSOR_BE =
+            BLOCK_ENTITIES.register("radio_motion_sensor",
+                    () -> BlockEntityType.Builder.of(MotionSensorBlockEntity::new, RADIO_MOTION_SENSOR.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CodeKeypadBlockEntity>> CODE_KEYPAD_BE =
             BLOCK_ENTITIES.register("code_keypad",
