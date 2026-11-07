@@ -126,8 +126,14 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's; into that button's or that box's frequency in the keypad and the converter's screen), so you just press Done. **Back** returns with what you'd typed.
 - **Finding one:** type in the search box to match a name, a note, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
 - It updates every second while open.
+- **Auditing one of yours:** sneak-click one of your own private frequencies (an operator: anyone's) to list every block on it, in every dimension: transmitters, repeaters and converters sending on it, converters listening on it, and receivers (only while their chunk is loaded).
+  - Each row says what it is, where it is, who tuned or placed it, and its status: "On 15" or "Off" when it works, **Silent** for a sender whose tuner can't send on it, **Deaf** for a listener whose tuner can't hear it (encrypted). Hover a row for the distance and direction and what the status means. The line under the list sums it up ("10 blocks: 1 silent, 1 deaf, 5 with no recorded tuner").
+  - Your blocks and your friends' show their position. So do old blocks with **no record** of who tuned them (set up before version 0.25): they still work on a private frequency, so the audit helps you find them; tuning one again with the Frequency Tuner makes it yours.
+  - Other players' blocks are only counted ("Receiver ×2, Alex, Deaf"), without positions, so the audit can't be used to find someone's base.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
+
+  ![The audit of 2026: Dev's re-tuned transmitter first, Steve's (a friend's) blocks, old blocks with no record, and Alex's silent transmitter counted without a position; the tooltips for an old block and for Alex's](docs/images/frequency-audit.png)
 
   ![The Multi-Button Remote's keypad with a directory button after each frequency (3001 picked for button 2, which now finds a receiver), and a Radio Converter's screen with one after each box (42, Farm Door, picked for Sends on)](docs/images/directory-everywhere.png)
 
@@ -527,9 +533,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 112. the tuner's packet encrypts a new claim, decrypts and re-encrypts it, says so, changes nothing when asked for what it already is, refuses anyone but the owner, and lets an operator only make it public;
 113. notes are tidied (spaces trimmed, formatting codes dropped, cut to 64 characters), an empty one removes the note, frequencies are clamped, a world keeps at most 4,096 (existing ones can still change), they're saved, the three note packets survive the network, and the client's copy (with its tooltip line) is kept up to date and cleared on leaving;
 114. the Note screen's packet needs a tuner in hand, sets and removes a note and says so, changes nothing when nothing changed, and on a private frequency refuses non-members but lets a friend and an operator change it;
-115. Jade's data carries the note and shows it right under the frequency line (under both lines for a converter, none without a note), and the directory lists frequencies that only have a note.
+115. Jade's data carries the note and shows it right under the frequency line (under both lines for a converter, none without a note), and the directory lists frequencies that only have a note;
+116. the audit of an encrypted frequency lists the owner's transmitter (sending 15), an old one with no recorded tuner, a friend's receiver and the owner's toggle receiver and listening converter with their positions; a stranger's silent transmitter, two deaf receivers (one row, counted) and deaf converter without positions; the owner's rows first; nothing for a public frequency; the row limit;
+117. only the owner or an operator may audit a frequency (not a friend, not a public frequency), and the request and answer survive the network.
 
-All 115 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 117 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
