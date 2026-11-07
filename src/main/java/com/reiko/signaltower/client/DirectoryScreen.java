@@ -182,6 +182,12 @@ public class DirectoryScreen extends Screen {
         return minecraft != null && minecraft.player != null && claim.owner().equals(minecraft.player.getUUID());
     }
 
+    /** True for your own private frequencies (and, for an operator, anyone's): sneak-click lists their blocks. */
+    private boolean mayAudit(Row row) {
+        return row.claim() != null && (mine(row.claim())
+                || minecraft != null && minecraft.player != null && minecraft.player.hasPermissions(2));
+    }
+
     private boolean friendOf(FrequencyClaims.ClaimInfo claim) {
         return minecraft != null && minecraft.player != null
                 && claim.hasMember(minecraft.player.getGameProfile().getName());
@@ -220,7 +226,13 @@ public class DirectoryScreen extends Screen {
         int row = button == 0 ? rowAt(mouseX, mouseY) : -1;
         if (row >= 0 && minecraft != null) {
             minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-            onPick.accept(shown.get(scroll + row).frequency());
+            Row clicked = shown.get(scroll + row);
+            if (Screen.hasShiftDown() && mayAudit(clicked)) {
+                // Sneak-click one of your private frequencies: list every block on it.
+                minecraft.setScreen(new AuditScreen(this, clicked.frequency()));
+                return true;
+            }
+            onPick.accept(clicked.frequency());
             minecraft.setScreen(parent);
             return true;
         }
@@ -336,6 +348,9 @@ public class DirectoryScreen extends Screen {
             lines.add(Component.translatable(KEY + key, entry.anywhere(), entry.here()).withStyle(ChatFormatting.GRAY));
         }
         lines.add(Component.translatable(KEY + "tip_click").withStyle(ChatFormatting.DARK_GRAY));
+        if (mayAudit(row)) {
+            lines.add(Component.translatable(KEY + "tip_audit").withStyle(ChatFormatting.DARK_GRAY));
+        }
         List<FormattedCharSequence> out = new ArrayList<>();
         for (Component line : lines) {
             out.addAll(font.split(line, 260));

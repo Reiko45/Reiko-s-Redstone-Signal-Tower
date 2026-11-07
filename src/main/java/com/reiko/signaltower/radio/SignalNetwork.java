@@ -502,6 +502,44 @@ public final class SignalNetwork extends SavedData {
         return level != null && level.isLoaded(pos) && !isTower(level.getBlockState(pos).getBlock());
     }
 
+    // ---- For the frequency audit (read-only copies) ----
+
+    /** Every transmitter on {@code frequency} whose block is still there (or not loaded), by position. */
+    public Map<BlockPos, Transmitter> transmittersOn(ServerLevel level, int frequency) {
+        Map<BlockPos, Transmitter> result = new java.util.TreeMap<>();
+        byFrequency.getOrDefault(frequency, Map.of()).forEach((pos, tx) -> {
+            if (!isStale(level, pos)) {
+                result.put(pos, tx);
+            }
+        });
+        return result;
+    }
+
+    /** Every repeater or converter that listens on or sends on {@code frequency}, by position. */
+    public Map<BlockPos, Repeater> relaysOn(ServerLevel level, int frequency) {
+        Map<BlockPos, Repeater> result = new java.util.TreeMap<>();
+        for (Map<Integer, Map<BlockPos, Repeater>> index : List.of(repeatersByInput, repeatersByOutput)) {
+            index.getOrDefault(frequency, Map.of()).forEach((pos, relay) -> {
+                if (!isStale(level, pos)) {
+                    result.put(pos, relay);
+                }
+            });
+        }
+        return result;
+    }
+
+    /** One loaded receiver: where it is and who tuned or placed it (null: no recorded tuner). */
+    public record TrackedReceiver(BlockPos pos, @Nullable UUID tunedBy) {}
+
+    /** Every loaded receiver on {@code frequency} (receivers in unloaded chunks aren't known). */
+    public List<TrackedReceiver> receiversOn(int frequency) {
+        List<TrackedReceiver> result = new ArrayList<>();
+        for (BlockPos pos : new java.util.TreeSet<>(receiversByFrequency.getOrDefault(frequency, Set.of()))) {
+            result.add(new TrackedReceiver(pos, receiverTuners.get(pos)));
+        }
+        return result;
+    }
+
     /**
      * Where a signal on {@code frequency} over {@code coverage} gets to, by frequency: the
      * coverage itself (first), plus the area of every repeater and converter it reaches, then of

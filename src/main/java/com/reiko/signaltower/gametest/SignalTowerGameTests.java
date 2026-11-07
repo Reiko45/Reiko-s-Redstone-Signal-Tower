@@ -3813,4 +3813,143 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---- Frequency audit ----
+
+    /**
+     * The audit lists every block on a private frequency: the owner's, a friend's and an old one
+     * with no recorded tuner with their positions; another player's only counted (per player, kind
+     * and status), with no position. Silent senders, deaf listeners (receivers and a converter on
+     * an encrypted frequency) and what each sends or outputs are reported; the owner's come first.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void auditListsBlocksAndHidesOthers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        claims.put(2401, ownerId, "Owner", java.util.Map.of(friendId, "Friend"), List.of(), true);
+        SignalNetwork.get(level).invalidate(2401);
+        BlockPos ownTx = new BlockPos(1, 1, 1);
+        BlockPos strangerTx = new BlockPos(3, 1, 1);
+        BlockPos oldTx = new BlockPos(5, 1, 1);
+        BlockPos friendRx = new BlockPos(7, 1, 1);
+        BlockPos strangerRx1 = new BlockPos(9, 1, 1);
+        BlockPos strangerRx2 = new BlockPos(11, 1, 1);
+        BlockPos ownToggle = new BlockPos(13, 1, 1);
+        BlockPos ownConverter = new BlockPos(15, 1, 1);
+        BlockPos strangerConverter = new BlockPos(17, 1, 1);
+        java.util.Map<BlockPos, UUID> tuners = new java.util.LinkedHashMap<>();
+        tuners.put(ownTx, ownerId);
+        tuners.put(strangerTx, strangerId);
+        tuners.put(friendRx, friendId);
+        tuners.put(strangerRx1, strangerId);
+        tuners.put(strangerRx2, strangerId);
+        tuners.put(ownToggle, ownerId);
+        tuners.put(ownConverter, ownerId);
+        tuners.put(strangerConverter, strangerId);
+        place(helper, ownTx, ModRegistry.RADIO_TRANSMITTER.get(), 2401);
+        place(helper, strangerTx, ModRegistry.RADIO_TRANSMITTER.get(), 2401);
+        place(helper, oldTx, ModRegistry.RADIO_TRANSMITTER.get(), 2401);
+        place(helper, friendRx, ModRegistry.RADIO_RECEIVER.get(), 2401);
+        place(helper, strangerRx1, ModRegistry.RADIO_RECEIVER.get(), 2401);
+        place(helper, strangerRx2, ModRegistry.RADIO_RECEIVER.get(), 2401);
+        place(helper, ownToggle, ModRegistry.RADIO_TOGGLE_RECEIVER.get(), 2401);
+        place(helper, ownConverter, ModRegistry.RADIO_CONVERTER.get(), 2401);
+        place(helper, strangerConverter, ModRegistry.RADIO_CONVERTER.get(), 2401);
+        ((com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity) helper.getBlockEntity(ownConverter)).setFrequencies(2401, 2402);
+        ((com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity) helper.getBlockEntity(strangerConverter)).setFrequencies(2401, 2403);
+        tuners.forEach((pos, uuid) -> ((RadioBlockEntity) helper.getBlockEntity(pos)).setTunedBy(uuid));
+        helper.setBlock(ownTx.north(), Blocks.REDSTONE_BLOCK);
+        helper.startSequence()
+                .thenWaitUntil(() -> assertOutput(helper, friendRx, 15))
+                .thenExecute(() -> {
+                    try {
+                        var rows = com.reiko.signaltower.radio.FrequencyAudit.audit(level.getServer(), 2401, null, 512);
+                        java.util.function.Function<BlockPos, com.reiko.signaltower.radio.FrequencyAudit.Entry> at = pos -> rows.stream()
+                                .filter(e -> e.pos().isPresent() && e.pos().get().equals(helper.absolutePos(pos))).findFirst().orElse(null);
+                        var own = at.apply(ownTx);
+                        check(own != null && own.who() == com.reiko.signaltower.radio.FrequencyAudit.Who.OWNER && "Owner".equals(own.tuner())
+                                && own.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.TRANSMITTER && own.power() == 15
+                                && own.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.WORKING
+                                && own.dimension().equals("minecraft:overworld"), "The owner's transmitter: " + own);
+                        var old = at.apply(oldTx);
+                        check(old != null && old.who() == com.reiko.signaltower.radio.FrequencyAudit.Who.UNKNOWN && old.tuner().isEmpty()
+                                && old.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.WORKING, "The old one, with its position: " + old);
+                        var friend = at.apply(friendRx);
+                        check(friend != null && friend.who() == com.reiko.signaltower.radio.FrequencyAudit.Who.MEMBER && "Friend".equals(friend.tuner())
+                                && friend.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.RECEIVER && friend.power() == 15,
+                                "The friend's receiver: " + friend);
+                        var toggle = at.apply(ownToggle);
+                        check(toggle != null && toggle.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.TOGGLE_RECEIVER, "The toggle receiver: " + toggle);
+                        var converter = at.apply(ownConverter);
+                        check(converter != null && converter.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.CONVERTER_LISTENS
+                                && converter.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.WORKING, "The owner's converter: " + converter);
+                        for (BlockPos hidden : List.of(strangerTx, strangerRx1, strangerRx2, strangerConverter)) {
+                            check(at.apply(hidden) == null, "A stranger's block has no position: " + hidden);
+                        }
+                        var others = rows.stream().filter(e -> e.who() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER).toList();
+                        check(others.stream().allMatch(e -> e.pos().isEmpty() && e.dimension().isEmpty() && e.power() == -1
+                                && e.tuner().equals(strangerId.toString().substring(0, 8))), "Others: counted, no position or power: " + others);
+                        check(others.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.TRANSMITTER
+                                && e.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.SILENT && e.count() == 1), "The silent transmitter: " + others);
+                        check(others.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.RECEIVER
+                                && e.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.DEAF && e.count() == 2), "Two deaf receivers in one row: " + others);
+                        check(others.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.CONVERTER_LISTENS
+                                && e.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.DEAF), "The deaf converter: " + others);
+                        check(rows.size() == 9 - 4 + 3, "Rows: " + rows.size());
+                        check(rows.get(0).who() == com.reiko.signaltower.radio.FrequencyAudit.Who.OWNER
+                                && rows.get(rows.size() - 1).who() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER, "The owner's first, others last");
+                        check(com.reiko.signaltower.radio.FrequencyAudit.audit(level.getServer(), 2402, null, 512).isEmpty(), "A public frequency has no audit");
+                        check(com.reiko.signaltower.radio.FrequencyAudit.audit(level.getServer(), 2401, null, 2).size() == 2, "The limit holds");
+                    } finally {
+                        claims.remove(2401);
+                        SignalNetwork.get(level).invalidate(2401);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Only the owner (or an operator) may audit a frequency; a friend, a stranger and anyone on a
+     * public frequency get "not allowed". The answer survives the network.
+     */
+    @GameTest(template = PLATFORM)
+    public static void auditOnlyForTheOwner(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player owner = namedPlayer(helper, new BlockPos(1, 1, 1), ownerId, "Owner", false, bar, new java.util.ArrayList<>());
+        Player friend = namedPlayer(helper, new BlockPos(1, 1, 1), friendId, "Friend", false, bar, new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Admin", true, bar, new java.util.ArrayList<>());
+        claims.put(2404, ownerId, "Owner", java.util.Map.of(friendId, "Friend"));
+        try {
+            check(com.reiko.signaltower.network.AuditRequestPayload.answer(owner, 2404).allowed(), "The owner may");
+            check(com.reiko.signaltower.network.AuditRequestPayload.answer(op, 2404).allowed(), "An operator may");
+            var refused = com.reiko.signaltower.network.AuditRequestPayload.answer(friend, 2404);
+            check(!refused.allowed() && refused.entries().isEmpty(), "A friend may not");
+            check(!com.reiko.signaltower.network.AuditRequestPayload.answer(owner, 2405).allowed(), "Nor anyone on a public frequency");
+            check(!com.reiko.signaltower.network.AuditRequestPayload.answer(op, 2405).allowed(), "Not even an operator");
+
+            var payload = new com.reiko.signaltower.network.AuditResultPayload(2404, true, List.of(
+                    new com.reiko.signaltower.radio.FrequencyAudit.Entry(com.reiko.signaltower.radio.FrequencyAudit.Kind.CONVERTER_SENDS,
+                            "minecraft:the_nether", java.util.Optional.of(new BlockPos(1, -60, 3)), "Owner",
+                            com.reiko.signaltower.radio.FrequencyAudit.Who.OWNER, com.reiko.signaltower.radio.FrequencyAudit.Status.WORKING, 1, 15),
+                    new com.reiko.signaltower.radio.FrequencyAudit.Entry(com.reiko.signaltower.radio.FrequencyAudit.Kind.RECEIVER,
+                            "", java.util.Optional.empty(), "Zed", com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER,
+                            com.reiko.signaltower.radio.FrequencyAudit.Status.DEAF, 3, -1)));
+            var buffer = Unpooled.buffer();
+            com.reiko.signaltower.network.AuditResultPayload.STREAM_CODEC.encode(buffer, payload);
+            check(com.reiko.signaltower.network.AuditResultPayload.STREAM_CODEC.decode(buffer).equals(payload), "The answer survives the network");
+            var request = new com.reiko.signaltower.network.AuditRequestPayload(2404);
+            com.reiko.signaltower.network.AuditRequestPayload.STREAM_CODEC.encode(buffer, request);
+            check(com.reiko.signaltower.network.AuditRequestPayload.STREAM_CODEC.decode(buffer).equals(request), "So does the request");
+        } finally {
+            claims.remove(2404);
+        }
+        helper.succeed();
+    }
 }

@@ -112,6 +112,10 @@ public final class SignalTower {
         registrar.playToClient(GroupsPayload.TYPE, GroupsPayload.STREAM_CODEC, GroupsPayload::handle);
         registrar.playToServer(DirectoryRequestPayload.TYPE, DirectoryRequestPayload.STREAM_CODEC,
                 DirectoryRequestPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.AuditRequestPayload.TYPE,
+                com.reiko.signaltower.network.AuditRequestPayload.STREAM_CODEC, com.reiko.signaltower.network.AuditRequestPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.AuditResultPayload.TYPE,
+                com.reiko.signaltower.network.AuditResultPayload.STREAM_CODEC, com.reiko.signaltower.network.AuditResultPayload::handle);
         registrar.playToClient(DirectoryResultPayload.TYPE, DirectoryResultPayload.STREAM_CODEC,
                 DirectoryResultPayload::handle);
         registrar.playToServer(SetFrequencyPrivacyPayload.TYPE, SetFrequencyPrivacyPayload.STREAM_CODEC,

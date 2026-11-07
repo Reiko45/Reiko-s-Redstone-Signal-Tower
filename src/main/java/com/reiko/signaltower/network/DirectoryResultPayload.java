@@ -15,8 +15,9 @@ import java.util.List;
 
 /** The server's answer to {@link DirectoryRequestPayload}: which named and private frequencies are on. */
 public record DirectoryResultPayload(List<Entry> entries) implements CustomPacketPayload {
-    /** Every name and every claim, with room to spare. */
-    public static final int MAX_ENTRIES = FrequencyNames.MAX_NAMES + FrequencyClaims.MAX_CLAIMS;
+    /** Every name, note and claim, with room to spare. */
+    public static final int MAX_ENTRIES = FrequencyNames.MAX_NAMES + com.reiko.signaltower.radio.FrequencyNotes.MAX_NOTES
+            + FrequencyClaims.MAX_CLAIMS;
 
     /**
      * One frequency: the strongest signal on it anywhere in the player's dimension ({@code -1}:

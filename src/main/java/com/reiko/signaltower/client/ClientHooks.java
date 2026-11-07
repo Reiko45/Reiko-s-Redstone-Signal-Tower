@@ -70,6 +70,13 @@ public final class ClientHooks {
         }
     }
 
+    /** An audit answer arrived: hand it to the open audit screen, if there is one. */
+    public static void onAuditResult(com.reiko.signaltower.network.AuditResultPayload result) {
+        if (Minecraft.getInstance().screen instanceof AuditScreen screen) {
+            screen.onResult(result);
+        }
+    }
+
     public static void openMultiRemoteScreen(InteractionHand hand, RemoteButtons buttons, Component title) {
         Minecraft.getInstance().setScreen(new MultiRemoteScreen(hand, buttons, title));
     }
