@@ -143,6 +143,19 @@ public final class SignalTower {
                 ScannerResultPayload::handle);
         registrar.playToClient(RemoteScanResultPayload.TYPE, RemoteScanResultPayload.STREAM_CODEC,
                 RemoteScanResultPayload::handle);
+        // v0.37.0: the reach preview ring and the Code Keypad.
+        registrar.playToServer(com.reiko.signaltower.network.ReachPreviewRequestPayload.TYPE,
+                com.reiko.signaltower.network.ReachPreviewRequestPayload.STREAM_CODEC, com.reiko.signaltower.network.ReachPreviewRequestPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.ReachPreviewPayload.TYPE,
+                com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC, com.reiko.signaltower.network.ReachPreviewPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenKeypadScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenKeypadScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenKeypadScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.KeypadEnterPayload.TYPE,
+                com.reiko.signaltower.network.KeypadEnterPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadEnterPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.KeypadConfigurePayload.TYPE,
+                com.reiko.signaltower.network.KeypadConfigurePayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadConfigurePayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.KeypadResultPayload.TYPE,
+                com.reiko.signaltower.network.KeypadResultPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadResultPayload::handle);
     }
 
     /** Pagers note when their owner left, for the catch-up at the next login. */
@@ -192,6 +205,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.CODE_KEYPAD_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());

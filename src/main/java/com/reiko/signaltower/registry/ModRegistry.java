@@ -2,6 +2,7 @@ package com.reiko.signaltower.registry;
 
 import com.mojang.serialization.Codec;
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.CodeKeypadBlock;
 import com.reiko.signaltower.block.CompactRadioReceiverBlock;
 import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
@@ -10,6 +11,7 @@ import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioToggleReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
 import com.reiko.signaltower.block.WallRedstoneBlock;
+import com.reiko.signaltower.blockentity.CodeKeypadBlockEntity;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
@@ -182,6 +184,17 @@ public final class ModRegistry {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 3 : 0)));
 
+    /** A thin keypad panel: the right code sends a pulse on its frequency (v0.37.0). Knocked off by pistons, like a button. */
+    public static final DeferredBlock<CodeKeypadBlock> CODE_KEYPAD = BLOCKS.register("code_keypad",
+            () -> new CodeKeypadBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(1.0F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(CodeKeypadBlock.POWERED) ? 4 : 0)));
+
     public static final DeferredBlock<RadioMastBlock> RADIO_MAST = BLOCKS.register("radio_mast",
             () -> new RadioMastBlock(BlockBehaviour.Properties.of()
                     .mapColor(MapColor.METAL)
@@ -212,6 +225,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_converter", RADIO_CONVERTER);
     public static final DeferredItem<BlockItem> COMPACT_RADIO_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("compact_radio_receiver", COMPACT_RADIO_RECEIVER);
+    public static final DeferredItem<BlockItem> CODE_KEYPAD_ITEM =
+            ITEMS.registerSimpleBlockItem("code_keypad", CODE_KEYPAD);
     public static final DeferredItem<BlockItem> RADIO_MAST_ITEM =
             ITEMS.registerSimpleBlockItem("radio_mast", RADIO_MAST);
     public static final DeferredItem<BlockItem> WALL_REDSTONE_ITEM =
@@ -241,6 +256,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",
                     () -> BlockEntityType.Builder.of(RadioRepeaterBlockEntity::new, RADIO_REPEATER.get(), RADIO_CONVERTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CodeKeypadBlockEntity>> CODE_KEYPAD_BE =
+            BLOCK_ENTITIES.register("code_keypad",
+                    () -> BlockEntityType.Builder.of(CodeKeypadBlockEntity::new, CODE_KEYPAD.get()).build(null));
 
     public static void register(IEventBus modEventBus) {
         DATA_COMPONENTS.register(modEventBus);

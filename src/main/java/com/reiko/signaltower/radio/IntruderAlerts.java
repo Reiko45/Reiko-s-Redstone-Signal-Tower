@@ -3,6 +3,7 @@ package com.reiko.signaltower.radio;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.item.PagerItem;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -28,7 +29,9 @@ import java.util.UUID;
  * Intruder alerts (v0.36.0): when someone who isn't on a private frequency tries to use it, its
  * owner is told in chat: a refused remote press, a sender they tried to tune onto it (refused), a
  * block they placed on it that stays silent, or one they set to it that can't hear it (encrypted).
- * Like the audit, an alert never says where. One alert per intruder, frequency and kind a minute.
+ * Like the audit, an alert never says where the intruder or their blocks are. Since v0.37.0 a Code
+ * Keypad's owner is also told when someone types three wrong codes in a row on it (with where the
+ * keypad is, since it's theirs). One alert per intruder, frequency and kind a minute.
  * <p>
  * An owner who's offline gets them at their next login (the last {@link #MAX_STORED}, with the
  * in-game day and time, and how many there were). Saved in the Overworld's data.
@@ -45,13 +48,19 @@ public final class IntruderAlerts extends SavedData {
     /** The same intruder, frequency and kind only alerts once in this many ticks (a minute). */
     public static final int QUIET_TICKS = 1200;
 
-    /** What the intruder tried. Saved by name. */
+    /** What the intruder tried. Saved by name. KEYPAD (v0.37.0): three wrong codes in a row on the owner's Code Keypad. */
     public enum Kind {
-        REMOTE, TUNE, SILENT, DEAF
+        REMOTE, TUNE, SILENT, DEAF, KEYPAD
     }
 
-    /** One alert: what, on which frequency, by whom, with which block (its description id, or ""), and when (day time). */
-    public record Alert(Kind kind, int frequency, String intruder, String block, long dayTime) {
+    /**
+     * One alert: what, on which frequency, by whom, with which block (its description id, or ""),
+     * and when (day time). {@code at} is only set for a keypad alert: where the owner's own keypad is.
+     */
+    public record Alert(Kind kind, int frequency, String intruder, String block, long dayTime, @Nullable BlockPos at) {
+        public Alert(Kind kind, int frequency, String intruder, String block, long dayTime) {
+            this(kind, frequency, intruder, block, dayTime, null);
+        }
     }
 
     private final Map<UUID, ArrayDeque<Alert>> missed = new HashMap<>();
@@ -76,21 +85,37 @@ public final class IntruderAlerts extends SavedData {
         if (claim == null || claim.allows(intruder.getUUID())) {
             return;
         }
+        send(server, claim.owner(), new Alert(kind, Frequency.clamp(frequency), intruder.getGameProfile().getName(),
+                block == null ? "" : block.getDescriptionId(), server.overworld().getDayTime()), intruder);
+    }
+
+    /**
+     * {@code intruder} typed three wrong codes in a row on {@code owner}'s Code Keypad at {@code at}
+     * (v0.37.0), on any frequency, private or not. The keypad is the owner's own, so the alert says where it is.
+     */
+    public static void reportKeypad(@Nullable MinecraftServer server, UUID owner, int frequency, Player intruder, Block block, BlockPos at) {
+        if (server == null || owner.equals(intruder.getUUID())) {
+            return;
+        }
+        send(server, owner, new Alert(Kind.KEYPAD, Frequency.clamp(frequency), intruder.getGameProfile().getName(),
+                block.getDescriptionId(), server.overworld().getDayTime(), at.immutable()), intruder);
+    }
+
+    /** Tells {@code owner} now, or keeps it for their next login; once a minute per intruder, frequency and kind. */
+    private static void send(MinecraftServer server, UUID ownerId, Alert alert, Player intruder) {
         IntruderAlerts alerts = get(server);
-        String key = claim.owner() + "|" + frequency + "|" + intruder.getUUID() + "|" + kind;
+        String key = ownerId + "|" + alert.frequency() + "|" + intruder.getUUID() + "|" + alert.kind();
         Integer last = alerts.lastAlert.get(key);
         int now = server.getTickCount();
         if (last != null && now - last < QUIET_TICKS) {
             return;
         }
         alerts.lastAlert.put(key, now);
-        Alert alert = new Alert(kind, Frequency.clamp(frequency), intruder.getGameProfile().getName(),
-                block == null ? "" : block.getDescriptionId(), server.overworld().getDayTime());
-        ServerPlayer owner = server.getPlayerList().getPlayer(claim.owner());
+        ServerPlayer owner = server.getPlayerList().getPlayer(ownerId);
         if (owner != null) {
             owner.displayClientMessage(line(server.overworld(), alert, false), false);
         } else {
-            alerts.store(claim.owner(), alert);
+            alerts.store(ownerId, alert);
         }
     }
 
@@ -113,8 +138,9 @@ public final class IntruderAlerts extends SavedData {
         }
         line.append(Component.translatable(KEY + "intruder_prefix").withStyle(ChatFormatting.GOLD));
         Component block = alert.block().isEmpty() ? Component.empty() : Component.translatable(alert.block());
+        String where = alert.at() == null ? "" : alert.at().getX() + ", " + alert.at().getY() + ", " + alert.at().getZ();
         line.append(Component.translatable(KEY + "intruder_" + alert.kind().name().toLowerCase(java.util.Locale.ROOT),
-                alert.intruder(), block, FrequencyNames.label(level, alert.frequency())).withStyle(ChatFormatting.RED));
+                alert.intruder(), block, FrequencyNames.label(level, alert.frequency()), where).withStyle(ChatFormatting.RED));
         return line;
     }
 
@@ -167,6 +193,9 @@ public final class IntruderAlerts extends SavedData {
                 alertTag.putString("intruder", alert.intruder());
                 alertTag.putString("block", alert.block());
                 alertTag.putLong("day_time", alert.dayTime());
+                if (alert.at() != null) {
+                    alertTag.putLong("at", alert.at().asLong());
+                }
                 alertList.add(alertTag);
             }
             entry.put("alerts", alertList);
@@ -197,7 +226,8 @@ public final class IntruderAlerts extends SavedData {
                     continue;
                 }
                 list.addLast(new Alert(kind, alertTag.getInt("frequency"), alertTag.getString("intruder"),
-                        alertTag.getString("block"), alertTag.getLong("day_time")));
+                        alertTag.getString("block"), alertTag.getLong("day_time"),
+                        alertTag.contains("at") ? BlockPos.of(alertTag.getLong("at")) : null));
             }
             if (!list.isEmpty()) {
                 result.missed.put(owner, list);

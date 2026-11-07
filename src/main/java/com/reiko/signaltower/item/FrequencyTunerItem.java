@@ -2,6 +2,7 @@ package com.reiko.signaltower.item;
 
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.RadioBlock;
+import com.reiko.signaltower.blockentity.CodeKeypadBlockEntity;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
@@ -76,7 +77,12 @@ public class FrequencyTunerItem extends Item {
             } else {
                 int frequency = getFrequency(stack);
                 Component refused = refusal(level, radio, frequency, player);
-                if (refused != null) {
+                if (radio instanceof CodeKeypadBlockEntity keypad && player != null && !keypad.mayConfigure(player)) {
+                    // Only a Code Keypad's owner (or an operator) re-tunes it (v0.37.0).
+                    message = Component.translatable("message." + SignalTower.MOD_ID + ".keypad_not_yours_tune",
+                            keypad.getOwnerName().isEmpty() ? "?" : keypad.getOwnerName()).withStyle(ChatFormatting.RED);
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
+                } else if (refused != null) {
                     // Someone else's private frequency: this block would send on it, so it's not tuned.
                     message = refused;
                     if (player != null) {
@@ -107,7 +113,7 @@ public class FrequencyTunerItem extends Item {
 
     /**
      * Why {@code player} may not tune {@code radio} to {@code frequency}, or null if they may. A
-     * transmitter or repeater would send on that frequency, and a converter on its output
+     * transmitter, repeater or Code Keypad would send on that frequency, and a converter on its output
      * frequency, so they're refused if that's someone else's private frequency. Receivers only
      * listen, so they can always be tuned.
      */
@@ -121,7 +127,7 @@ public class FrequencyTunerItem extends Item {
 
     /** The frequency {@code radio} would send on if tuned to {@code frequency} (a converter: its output), or -1 for a receiver. */
     private static int sendsOn(RadioBlockEntity radio, int frequency) {
-        if (radio instanceof RadioTransmitterBlockEntity) {
+        if (radio instanceof RadioTransmitterBlockEntity || radio instanceof CodeKeypadBlockEntity) {
             return frequency;
         }
         if (radio instanceof RadioRepeaterBlockEntity relay) {
@@ -149,6 +155,7 @@ public class FrequencyTunerItem extends Item {
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_air").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_block").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_copy").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_ring").withStyle(ChatFormatting.GRAY));
         RadioFavorites.addScrollHint(tooltip);
 
     }

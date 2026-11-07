@@ -6,6 +6,7 @@
     "reikos_signal_tower:radio_repeater",
     "reikos_signal_tower:radio_converter",
     "reikos_signal_tower:compact_radio_receiver",
+    "reikos_signal_tower:code_keypad",
     "reikos_signal_tower:radio_mast"
   ]
 }

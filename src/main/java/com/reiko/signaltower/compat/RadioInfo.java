@@ -1,12 +1,14 @@
 package com.reiko.signaltower.compat;
 
 import com.reiko.signaltower.SignalTower;
+import com.reiko.signaltower.block.CodeKeypadBlock;
 import com.reiko.signaltower.block.RadioConverterBlock;
 import com.reiko.signaltower.block.RadioMastBlock;
 import com.reiko.signaltower.block.RadioReceiverBlock;
 import com.reiko.signaltower.block.RadioRepeaterBlock;
 import com.reiko.signaltower.block.RadioToggleReceiverBlock;
 import com.reiko.signaltower.block.RadioTransmitterBlock;
+import com.reiko.signaltower.blockentity.CodeKeypadBlockEntity;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
@@ -79,7 +81,9 @@ public final class RadioInfo {
                     if (claim.encrypted()) {
                         tag.putBoolean("encrypted", true);
                     }
-                    if (SignalNetwork.get(level).isSilenced(level, pos)) {
+                    boolean silentKeypad = level.getBlockEntity(pos) instanceof CodeKeypadBlockEntity keypad
+                            && !FrequencyClaims.maySend(level, frequency, keypad.getTunedBy());
+                    if (SignalNetwork.get(level).isSilenced(level, pos) || silentKeypad) {
                         tag.putBoolean("silenced", true);
                     }
                 }
@@ -140,6 +144,11 @@ public final class RadioInfo {
             if (block instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
                 tag.putInt("output", converter.getOutputFrequency());
             }
+        } else if (block instanceof CodeKeypadBlock && radio instanceof CodeKeypadBlockEntity keypad) {
+            // v0.37.0: whose it is, whether it has a code (never the code) and how far its pulse reaches.
+            tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            tag.putString("keypad_owner", keypad.getOwnerName());
+            tag.putBoolean("has_code", keypad.hasCode());
         } else if (block instanceof RadioReceiverBlock) {
             SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos, radio.getTunedBy());
             tag.putInt("power", state.getValue(RadioReceiverBlock.POWER));
@@ -197,6 +206,26 @@ public final class RadioInfo {
             } else {
                 lines.add(frequencyLine(data));
                 addNoteLine(lines, data, "note");
+            }
+            return lines;
+        }
+        if (block instanceof CodeKeypadBlock) {
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                String owner = data.getString("keypad_owner");
+                if (!owner.isEmpty()) {
+                    lines.add(Component.translatable(LANG + "keypad_owner", Component.literal(owner)).withStyle(ChatFormatting.GRAY));
+                }
+                if (!data.getBoolean("has_code")) {
+                    lines.add(Component.translatable(LANG + "keypad_no_code").withStyle(ChatFormatting.YELLOW));
+                }
+            }
+            lines.add(state.getValue(CodeKeypadBlock.POWERED)
+                    ? Component.translatable(LANG + "keypad_open").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "keypad_waiting").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }
             return lines;
         }

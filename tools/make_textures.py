@@ -326,6 +326,35 @@ def compact_receiver(lit):
     return img
 
 
+def code_keypad(lit):
+    """The Code Keypad's 8 x 10 front (uv 4..12 x 3..13): a display with a light, then 3 x 3 keys.
+    Its edges come from rows 14-15, like the compact receiver's."""
+    img = blank(M)
+    px = img.load()
+    for x in range(4, 12):
+        px[x, 3] = H
+        px[x, 12] = O
+    for y in range(3, 13):
+        px[4, y] = L
+        px[11, y] = O
+    px[4, 3] = H
+    # Display, and its light (green while the code was accepted)
+    for x in range(5, 10):
+        px[x, 4] = (20, 60, 28, 255) if not lit else (70, 210, 90, 255)
+    px[10, 4] = (60, 230, 80, 255) if lit else (110, 30, 26, 255)
+    # 3 x 3 keys, each with a shadow under it
+    for row in range(3):
+        for col in range(3):
+            x, y = 5 + col * 2, 6 + row * 2
+            px[x, y] = H
+            px[x, y + 1] = D
+    # Edges
+    for x in range(0, 16):
+        px[x, 14] = L
+        px[x, 15] = D
+    return img
+
+
 def wall_redstone_item():
     """A strip of wall with redstone dust running up it and branching sideways."""
     img = blank()
@@ -535,6 +564,8 @@ def scanner_arrow():
 blocks = {
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
+    "code_keypad": code_keypad(False),
+    "code_keypad_on": code_keypad(True),
     "radio_transmitter_side": transmitter_side(False),
     "radio_transmitter_side_on": transmitter_side(True),
     "radio_transmitter_top": top(False, receiver=False),

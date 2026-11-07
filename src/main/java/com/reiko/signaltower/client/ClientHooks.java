@@ -101,4 +101,24 @@ public final class ClientHooks {
     public static void openConverterScreen(OpenConverterScreenPayload state) {
         Minecraft.getInstance().setScreen(new ConverterScreen(state));
     }
+
+    /** Opens a Code Keypad's screen (v0.37.0). */
+    public static void openKeypadScreen(com.reiko.signaltower.network.OpenKeypadScreenPayload state) {
+        Minecraft.getInstance().setScreen(new KeypadScreen(state));
+    }
+
+    /** What the keypad said: shown in its screen if that's still open, else above the hotbar. */
+    public static void onKeypadResult(com.reiko.signaltower.network.KeypadResultPayload result) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof KeypadScreen screen && screen.pos().equals(result.pos())) {
+            screen.onResult(result);
+        } else {
+            minecraft.gui.setOverlayMessage(result.message(), false);
+        }
+    }
+
+    /** The server's answer for the reach preview ring (v0.37.0). */
+    public static void onReachPreview(com.reiko.signaltower.network.ReachPreviewPayload answer) {
+        ReachRing.onAnswer(answer);
+    }
 }

@@ -133,6 +133,48 @@ def compact_receiver_model(lit):
 for lit in (False, True):
     write(models / ("compact_radio_receiver" + ("_on" if lit else "") + ".json"), compact_receiver_model(lit))
 
+def keypad_model(lit):
+    """An 8 x 10 plate, 1 pixel thick, lying on the floor with its front up (rotated like a button)."""
+    t = "#texture"
+    return {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": tex("code_keypad"), "texture": tex("code_keypad" + ("_on" if lit else ""))},
+        "elements": [{
+            "from": [4, 0, 3], "to": [12, 1, 13],
+            "faces": {
+                "down": {"uv": [4, 3, 12, 13], "texture": t, "cullface": "down"},
+                "up": {"uv": [4, 3, 12, 13], "texture": t, "rotation": 180},
+                "north": {"uv": [4, 15, 12, 16], "texture": t},
+                "south": {"uv": [4, 15, 12, 16], "texture": t},
+                "west": {"uv": [3, 15, 13, 16], "texture": t},
+                "east": {"uv": [3, 15, 13, 16], "texture": t},
+            },
+        }],
+    }
+
+
+for lit in (False, True):
+    write(models / ("code_keypad" + ("_on" if lit else "") + ".json"), keypad_model(lit))
+write(models / "code_keypad_inventory.json", {
+    "parent": "minecraft:block/block",
+    "display": {
+        "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [1.1, 1.1, 1.1]},
+        "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]},
+    },
+    "textures": {"particle": tex("code_keypad"), "texture": tex("code_keypad")},
+    "elements": [{
+        "from": [4, 3, 7.5], "to": [12, 13, 8.5],
+        "faces": {
+            "north": {"uv": [4, 3, 12, 13], "texture": "#texture"},
+            "south": {"uv": [4, 3, 12, 13], "texture": "#texture"},
+            "up": {"uv": [4, 15, 12, 16], "texture": "#texture"},
+            "down": {"uv": [4, 15, 12, 16], "texture": "#texture"},
+            "west": {"uv": [3, 15, 4, 16], "texture": "#texture"},
+            "east": {"uv": [3, 15, 4, 16], "texture": "#texture"},
+        },
+    }],
+})
+
 # Inventory version: stood up on its edge so the front shows, like a wall-mounted one.
 write(models / "compact_radio_receiver_inventory.json", {
     "parent": "minecraft:block/block",
@@ -222,6 +264,7 @@ items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
+write(items / "code_keypad.json", {"parent": f"{MOD}:block/code_keypad_inventory"})
 write(items / "wall_redstone.json", {
     "parent": "minecraft:item/generated",
     "textures": {"layer0": tex("wall_redstone", "item")},
@@ -318,6 +361,12 @@ for (face, facing), rot in BUTTON_ROTATIONS.items():
         variant = {"model": f"{MOD}:block/compact_radio_receiver" + ("_on" if p > 0 else ""), **rot}
         compact_variants[f"face={face},facing={facing},power={p}"] = variant
 write(states / "compact_radio_receiver.json", {"variants": compact_variants})
+keypad_variants = {}
+for (face, facing), rot in BUTTON_ROTATIONS.items():
+    for powered in ("false", "true"):
+        keypad_variants[f"face={face},facing={facing},powered={powered}"] = {
+            "model": f"{MOD}:block/code_keypad" + ("_on" if powered == "true" else ""), **rot}
+write(states / "code_keypad.json", {"variants": keypad_variants})
 WALL_ROTATION = {"south": 0, "west": 90, "north": 180, "east": 270}
 wall_parts = []
 for facing, y in WALL_ROTATION.items():
@@ -537,9 +586,9 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.intruder_tune": "%1$s tried to tune a %2$s onto %3$s: refused",
     f"message.{MOD}.intruder_silent": "%1$s placed a %2$s on %3$s: it stays silent",
     f"message.{MOD}.intruder_deaf": "%1$s set a %2$s to %3$s: it can't hear it (encrypted)",
-    f"message.{MOD}.intruder_missed": "While you were away, someone tried to use your private frequencies (%s times):",
+    f"message.{MOD}.intruder_missed": "While you were away, someone tried your private frequencies or keypads (%s times):",
     f"message.{MOD}.intruder_missed_more": "...and %s more",
-    f"message.{MOD}.intruder_missed_one": "While you were away, someone tried to use one of your private frequencies:",
+    f"message.{MOD}.intruder_missed_one": "While you were away, someone tried one of your private frequencies or keypads:",
     f"screen.{MOD}.hand_over.title": "Hand over frequency %s",
     f"screen.{MOD}.hand_over.subtitle": "Pick who will own it. You stay on it as their friend",
     f"screen.{MOD}.hand_over.heading": "Its friends and group members",
@@ -877,6 +926,48 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.encrypted": "Encrypted by %s",
     f"jade.{MOD}.deaf": "Deaf: encrypted by %s",
     f"jade.{MOD}.silenced": "Silent: private to %s",
+    # v0.37.0: the reach preview ring and the Code Keypad
+    f"hud.{MOD}.reach_ring": "Reach ring: %s on %s, %s blocks",
+    f"hud.{MOD}.reach_ring_inside": "You're inside: %s blocks to the edge",
+    f"hud.{MOD}.reach_ring_edge": "You're right at the edge",
+    f"hud.{MOD}.reach_ring_outside": "You're %s blocks outside",
+    f"tooltip.{MOD}.tuner_ring": "Hold it and look at a transmitter, repeater, converter or keypad: a ring on the ground shows its reach",
+    f"block.{MOD}.code_keypad": "Code Keypad",
+    f"block.{MOD}.code_keypad.tooltip": "Goes on a wall, floor or ceiling. The right code sends a pulse on its frequency and powers the block it's on.",
+    f"message.{MOD}.keypad_placed": "Code Keypad placed: right-click it to set its code",
+    f"message.{MOD}.keypad_not_yours": "This Code Keypad is %s's: only they can change it",
+    f"message.{MOD}.keypad_not_yours_tune": "This Code Keypad is %s's: only they can tune it",
+    f"message.{MOD}.keypad_bad_code": "A code is %s to %s digits",
+    f"message.{MOD}.keypad_code_saved": "New code saved (%s digits). Pulse: %s",
+    f"message.{MOD}.keypad_pulse_saved": "Pulse length: %s",
+    f"message.{MOD}.keypad_nothing_changed": "Nothing changed",
+    f"message.{MOD}.keypad_locked": "Locked: try again in %s seconds",
+    f"message.{MOD}.keypad_no_code": "No code set yet: %s hasn't set one",
+    f"message.{MOD}.keypad_wrong": "Wrong code (%s of %s tries)",
+    f"message.{MOD}.keypad_wrong_locked": "Wrong code: locked for %s seconds",
+    f"message.{MOD}.keypad_silent": "Silent: this keypad can't send on that frequency",
+    f"message.{MOD}.keypad_accepted": "Code accepted: %1$s pulse on %2$s",
+    f"message.{MOD}.intruder_keypad": "%1$s typed the wrong code 3 times on your %2$s at %4$s, on %3$s: locked out for 30 seconds",
+    f"screen.{MOD}.keypad.set_first": "No code yet: type %s to %s digits, then Set code",
+    f"screen.{MOD}.keypad.no_code": "No code set yet",
+    f"screen.{MOD}.keypad.type_code": "Type the code, then OK",
+    f"screen.{MOD}.keypad.clear": "Clear",
+    f"screen.{MOD}.keypad.ok": "Send the code (Enter)",
+    f"screen.{MOD}.keypad.set_code": "Set code",
+    f"screen.{MOD}.keypad.set_code_tooltip": "Saves the digits typed (%s to %s) as the new code. Only you can change it",
+    f"screen.{MOD}.keypad.pulse": "Pulse: %s",
+    f"screen.{MOD}.keypad.pulse_tooltip": "How long the pulse (and the power to the block it's on) lasts. Sneak-click: shorter",
+    f"screen.{MOD}.keypad.frequency": "Frequency %s",
+    f"screen.{MOD}.keypad.frequency_owner": "Frequency %s, %s's keypad",
+    f"screen.{MOD}.keypad.display_empty": "- - - -",
+    f"screen.{MOD}.keypad.display_locked": "LOCKED",
+    f"screen.{MOD}.log.kind_keypad": "Code Keypad",
+    f"screen.{MOD}.log.tip_keypad": "Code typed by %s",
+    f"screen.{MOD}.log.tip_other_keypad": "Code typed by %s, who isn't on it",
+    f"jade.{MOD}.keypad_owner": "Owner: %s",
+    f"jade.{MOD}.keypad_no_code": "No code set yet",
+    f"jade.{MOD}.keypad_open": "Code accepted: on",
+    f"jade.{MOD}.keypad_waiting": "Waiting for the code",
 })
 
 # ---------------------------------------------------------------- recipes
@@ -973,6 +1064,13 @@ recipes["signal_scanner"] = ({
     "result": {"count": 1, "id": f"{MOD}:signal_scanner"},
 }, f"{MOD}:radio_receiver")
 
+recipes["code_keypad"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:remote_control"}, {"item": "minecraft:iron_ingot"}, {"item": "minecraft:stone_button"}],
+    "result": {"count": 1, "id": f"{MOD}:code_keypad"},
+}, f"{MOD}:remote_control")
+
 recipes["pager"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -999,7 +1097,7 @@ for name, (recipe, trigger) in recipes.items():
 # ---------------------------------------------------------------- loot tables
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_repeater", "radio_converter",
-             "compact_radio_receiver", "radio_mast", "wall_redstone"):
+             "compact_radio_receiver", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
@@ -1023,7 +1121,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
-               f"{MOD}:compact_radio_receiver", f"{MOD}:radio_mast"]
+               f"{MOD}:compact_radio_receiver", f"{MOD}:code_keypad", f"{MOD}:radio_mast"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

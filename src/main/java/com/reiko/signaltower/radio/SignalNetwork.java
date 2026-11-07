@@ -756,9 +756,9 @@ public final class SignalNetwork extends SavedData {
     /** The most turn-ons remembered per frequency. */
     public static final int MAX_HISTORY = 32;
 
-    /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name. */
+    /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name, sent by ordinal: only add at the end. */
     public enum CauseKind {
-        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE;
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -789,6 +789,11 @@ public final class SignalNetwork extends SavedData {
 
         public static Cause remote(boolean toggle, UUID player, String name) {
             return new Cause(toggle ? CauseKind.REMOTE_TOGGLE : CauseKind.REMOTE_PULSE, null, player, name);
+        }
+
+        /** The right code typed on a Code Keypad (v0.37.0): where the keypad is, and who typed it. */
+        public static Cause keypad(BlockPos pos, UUID player, String name) {
+            return new Cause(CauseKind.KEYPAD, pos.immutable(), player, name);
         }
     }
 

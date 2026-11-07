@@ -197,19 +197,29 @@ public class RemoteControlItem extends Item {
             result = Component.translatable(key + "pulse", PulseLength.format(ticks), FrequencyNames.label(level, frequency), reach);
         }
 
-        // Pagers in players' pockets count as receivers too.
+        int heardBy = heardBy(level, network, carried);
+        remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(heardBy > 0, level.getGameTime() + RemoteLight.SHOW_TICKS));
+        return Component.translatable(key + "result", result, heardLine(heardBy));
+    }
+
+    /** How many loaded receivers, and pagers in players' pockets, a signal carried over {@code carried} reaches. */
+    public static int heardBy(ServerLevel level, SignalNetwork network, SignalNetwork.Carried carried) {
         int heardBy = 0;
         for (var entry : carried.areas().entrySet()) {
             heardBy += network.countReceivers(entry.getKey(), entry.getValue())
                     + PagerItem.countPagers(level, entry.getKey(), entry.getValue());
         }
-        remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(heardBy > 0, level.getGameTime() + RemoteLight.SHOW_TICKS));
-        Component heard = heardBy == 0
+        return heardBy;
+    }
+
+    /** "Heard by 3 receivers", "Heard by 1 receiver" or "No receiver in range". */
+    public static Component heardLine(int heardBy) {
+        String key = "message." + SignalTower.MOD_ID + ".remote_";
+        return heardBy == 0
                 ? Component.translatable(key + "not_heard").withStyle(ChatFormatting.RED)
                 : heardBy == 1
                     ? Component.translatable(key + "heard_one").withStyle(ChatFormatting.GREEN)
                     : Component.translatable(key + "heard_many", heardBy).withStyle(ChatFormatting.GREEN);
-        return Component.translatable(key + "result", result, heard);
     }
 
     /** Lighting the status light changes the item; don't replay the "pull out" animation for that. */

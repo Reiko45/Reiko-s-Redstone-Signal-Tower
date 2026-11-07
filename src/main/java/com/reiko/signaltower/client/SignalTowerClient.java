@@ -49,6 +49,8 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onClientTick);
+        NeoForge.EVENT_BUS.addListener(ReachRing::onRenderLevel);
+        NeoForge.EVENT_BUS.addListener(ReachRing::onClientTick);
     }
 
     /**
@@ -102,9 +104,10 @@ public final class SignalTowerClient {
     }
 
     /** Wall Redstone glows brighter red the stronger its signal, exactly like normal dust. */
-    /** The Signal Scanner's tracking arrow, drawn just above the boss bars' layer. */
+    /** The Signal Scanner's tracking arrow, drawn just above the boss bars' layer, and the reach ring's lines (v0.37.0). */
     private static void registerGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.BOSS_OVERLAY, ScannerHud.LAYER_ID, ScannerHud::render);
+        event.registerAbove(ScannerHud.LAYER_ID, ReachRing.LAYER_ID, ReachRing::renderHud);
     }
 
     /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */
@@ -123,6 +126,7 @@ public final class SignalTowerClient {
         com.reiko.signaltower.radio.FrequencyNames.clientClear();
         com.reiko.signaltower.radio.FrequencyNotes.clientClear();
         AuditBeams.clear();
+        ReachRing.clear();
         com.reiko.signaltower.radio.FrequencyClaims.clientClear();
     }
 }

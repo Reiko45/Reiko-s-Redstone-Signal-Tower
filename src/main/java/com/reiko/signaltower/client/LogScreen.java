@@ -252,6 +252,12 @@ public class LogScreen extends Screen {
                         : Component.translatable(KEY + "tip_remote", entry.who()).withStyle(ChatFormatting.YELLOW)));
                 lines.add(Component.translatable(KEY + "tip_remote_where").withStyle(ChatFormatting.DARK_GRAY));
             }
+            case KEYPAD -> {
+                lines.add((entry.whoKind() == FrequencyAudit.Who.OTHER
+                        ? Component.translatable(KEY + "tip_other_keypad", entry.who()).withStyle(ChatFormatting.RED)
+                        : Component.translatable(KEY + "tip_keypad", entry.who()).withStyle(ChatFormatting.YELLOW)));
+                entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
+            }
         }
         if (entry.pos().isPresent()) {
             int secondsLeft = AuditBeams.secondsLeft(entry.dimension(), entry.pos().get());

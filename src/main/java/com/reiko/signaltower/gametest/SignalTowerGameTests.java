@@ -4548,4 +4548,322 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---------------------------------------------------------------- v0.37.0: reach preview ring
+
+    /**
+     * The reach preview: the server answers a player holding a tuner (either hand) with the reach
+     * of the transmitter, repeater, converter (on the frequency it sends on) or keypad they look
+     * at; anything else, no tuner, or too far away gets "nothing to show". The answer survives
+     * the network.
+     */
+    @GameTest(template = PLATFORM)
+    public static void reachPreviewAnswers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos repeater = new BlockPos(4, 1, 1);
+        BlockPos converter = new BlockPos(6, 1, 1);
+        BlockPos keypad = new BlockPos(8, 1, 1);
+        BlockPos receiver = new BlockPos(10, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 3101);
+        place(helper, repeater, ModRegistry.RADIO_REPEATER.get(), 3102);
+        place(helper, converter, ModRegistry.RADIO_CONVERTER.get(), 3103);
+        ((com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity) helper.getBlockEntity(converter)).setFrequencies(3103, 3104);
+        helper.setBlock(keypad.south(), Blocks.STONE);
+        helper.setBlock(keypad, ModRegistry.CODE_KEYPAD.get().defaultBlockState());
+        setFrequency(helper, keypad, 3105);
+        place(helper, receiver, ModRegistry.RADIO_RECEIVER.get(), 3106);
+        Player player = namedPlayer(helper, new BlockPos(1, 1, 0), UUID.randomUUID(), "Ringo", false,
+                new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(tx));
+        check(answer.reach() == -1, "No tuner in hand: nothing to show");
+
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+        int reach = RadioHelper.reachAt(level, helper.absolutePos(tx));
+        answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(tx));
+        check(answer.reach() == reach && answer.kind() == com.reiko.signaltower.network.ReachPreviewPayload.TRANSMITTER
+                && answer.frequency() == 3101 && answer.pos().equals(helper.absolutePos(tx)), "Transmitter: " + answer);
+        answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(repeater));
+        check(answer.reach() == reach && answer.kind() == com.reiko.signaltower.network.ReachPreviewPayload.REPEATER
+                && answer.frequency() == 3102, "Repeater: " + answer);
+        answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(converter));
+        check(answer.kind() == com.reiko.signaltower.network.ReachPreviewPayload.CONVERTER && answer.frequency() == 3104,
+                "Converter, on the frequency it sends on: " + answer);
+        answer = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(keypad));
+        check(answer.reach() == reach && answer.kind() == com.reiko.signaltower.network.ReachPreviewPayload.KEYPAD
+                && answer.frequency() == 3105, "Keypad: " + answer);
+        check(com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(receiver)).reach() == -1,
+                "A receiver has no reach");
+        check(com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(keypad.south())).reach() == -1,
+                "Nor a stone block");
+
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+        check(com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(tx)).reach() == reach,
+                "A tuner in the off-hand works too");
+        Vec3 far = helper.absoluteVec(new Vec3(1, 1, 0)).add(com.reiko.signaltower.network.ReachPreviewRequestPayload.MAX_DISTANCE + 10, 0, 0);
+        player.moveTo(far.x, far.y, far.z);
+        check(com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(player, helper.absolutePos(tx)).reach() == -1,
+                "Too far away: nothing to show");
+
+        var original = new com.reiko.signaltower.network.ReachPreviewPayload(helper.absolutePos(tx), reach, 2, 3104);
+        var buffer = Unpooled.buffer();
+        com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.encode(buffer, original);
+        check(com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.decode(buffer).equals(original), "Survives the network");
+        var none = new com.reiko.signaltower.network.ReachPreviewPayload(helper.absolutePos(tx), -1, 0, 0);
+        buffer = Unpooled.buffer();
+        com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.encode(buffer, none);
+        check(com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.decode(buffer).reach() == -1, "So does \"nothing to show\"");
+        helper.succeed();
+    }
+
+    /**
+     * The ring's shape: "inside" is the network's own rule, the edge distance counts down to 0 at
+     * the edge and goes negative outside, and the dots sit 1.5 blocks apart, half a block outside
+     * the reach.
+     */
+    @GameTest(template = PLATFORM)
+    public static void reachRingShape(GameTestHelper helper) {
+        int[][] offsets = {{0, 0}, {88, 0}, {89, 0}, {0, -88}, {62, 62}, {63, 62}, {-40, 77}, {-50, 80}};
+        for (int reach : new int[]{0, 32, 56, 88, 2080}) {
+            SignalNetwork.Coverage area = new SignalNetwork.Coverage(BlockPos.ZERO, reach, false);
+            for (int[] offset : offsets) {
+                check(com.reiko.signaltower.client.ReachRingShape.inside(offset[0], offset[1], reach)
+                                == area.reaches(new BlockPos(offset[0], 70, offset[1])),
+                        "Same rule as the network for " + offset[0] + "," + offset[1] + " at reach " + reach);
+            }
+        }
+        check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(0, 0, 88) == 88, "At the sender: 88 to the edge");
+        check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(88, 0, 88) == 0, "At the last block: at the edge");
+        check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(89, 0, 88) == -1, "One block out");
+        check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(100, 0, 88) == -12, "Twelve out");
+        check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(62, 62, 88) >= 0
+                && com.reiko.signaltower.client.ReachRingShape.edgeDistance(63, 62, 88) < 0, "Diagonals follow the circle");
+        int count = com.reiko.signaltower.client.ReachRingShape.dotCount(88);
+        check(count == (int) Math.ceil(2 * Math.PI * 88.5 / com.reiko.signaltower.client.ReachRingShape.SPACING), "Dots 1.5 blocks apart: " + count);
+        for (int i = 0; i < count; i += 37) {
+            double[] dot = com.reiko.signaltower.client.ReachRingShape.dot(88, i, count);
+            check(Math.abs(Math.hypot(dot[0], dot[1]) - 88.5) < 1e-6, "Each dot half a block outside the reach");
+        }
+        check(com.reiko.signaltower.client.ReachRingShape.dotCount(0) >= 16, "Even a tiny ring has some dots");
+        check(com.reiko.signaltower.client.ReachRingShape.dotCount(1_000_000) == com.reiko.signaltower.client.ReachRingShape.MAX_DOTS,
+                "A huge one is capped");
+        helper.succeed();
+    }
+
+    // ---------------------------------------------------------------- v0.37.0: Code Keypad
+
+    /** A keypad on the north face of a stone block at {@code at.south()}, tuned to {@code frequency}, owned by Dev. */
+    private static com.reiko.signaltower.blockentity.CodeKeypadBlockEntity keypadAt(GameTestHelper helper, BlockPos at, int frequency,
+                                                                                    UUID owner, String ownerName) {
+        helper.setBlock(at.south(), Blocks.STONE);
+        helper.setBlock(at, ModRegistry.CODE_KEYPAD.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.CodeKeypadBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.CodeKeypadBlock.FACING, Direction.NORTH));
+        com.reiko.signaltower.blockentity.CodeKeypadBlockEntity keypad = helper.getBlockEntity(at);
+        keypad.setFrequency(frequency);
+        keypad.setTunedBy(owner);
+        keypad.setOwner(owner, ownerName);
+        return keypad;
+    }
+
+    /**
+     * The Code Keypad: only its owner sets a code (4 to 8 digits) and the pulse; three wrong codes
+     * lock a player out for 30 seconds and alert the owner (with where the keypad is); the right
+     * code sends a pulse from the keypad (heard there, recorded with who typed it) and powers the
+     * block it's on, until the pulse ends. The code is saved, but never put on the item nor sent to
+     * a client.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void codeKeypad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var alerts = com.reiko.signaltower.radio.IntruderAlerts.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        BlockPos at = new BlockPos(2, 1, 1);
+        BlockPos absolute = helper.absolutePos(at);
+        List<Component> alexBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(1, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player alex = namedPlayer(helper, new BlockPos(3, 1, 0), alexId, "Alex", false, alexBar, new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, new BlockPos(3, 1, 0), UUID.randomUUID(), "Opal", true, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var keypad = keypadAt(helper, at, 3201, devId, "Dev");
+        alerts.resetQuiet();
+        try {
+            var enter = (java.util.function.BiFunction<Player, String, com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Result>) (player, digits) ->
+                    com.reiko.signaltower.network.KeypadEnterPayload.apply(player, new com.reiko.signaltower.network.KeypadEnterPayload(absolute, digits));
+            var result = enter.apply(alex, "1234");
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.NO_CODE, "No code yet: " + result);
+
+            var configure = (java.util.function.BiFunction<Player, String, com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Result>) (player, code) ->
+                    com.reiko.signaltower.network.KeypadConfigurePayload.apply(player, new com.reiko.signaltower.network.KeypadConfigurePayload(absolute, code, 40));
+            check(configure.apply(alex, "4242").outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.REFUSED,
+                    "Only the owner sets the code");
+            for (String bad : new String[]{"12", "123456789", "12a4"}) {
+                check(!com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.validCode(bad), "Not a code: " + bad);
+            }
+            check(configure.apply(dev, "123").outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.REFUSED, "Too short");
+            result = configure.apply(dev, "4242");
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.SAVED
+                    && keyOf(result.message()).endsWith("keypad_code_saved") && firstArg(result.message()).equals("4")
+                    && !result.message().getString().contains("4242"), "Saved, without repeating the code: " + result.message().getString());
+            check(keypad.hasCode() && keypad.getPulseTicks() == 40, "Code and a 2-second pulse");
+
+            // A remote (or anything but the tuner) in hand still opens the keypad; only its owner re-tunes it.
+            BlockState keypadState = helper.getBlockState(at);
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolute), Direction.NORTH, absolute, false);
+            check(keypadState.useItemOn(new ItemStack(ModRegistry.REMOTE_CONTROL.get()), level, alex, InteractionHand.MAIN_HAND, hit)
+                    == net.minecraft.world.ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION, "A remote in hand opens the keypad");
+            check(keypadState.useItemOn(new ItemStack(ModRegistry.FREQUENCY_TUNER.get()), level, alex, InteractionHand.MAIN_HAND, hit)
+                    == net.minecraft.world.ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION, "The tuner tunes it instead");
+            ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+            FrequencyTunerItem.setFrequency(tuner, 3299);
+            alex.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+            tuner.useOn(new UseOnContext(alex, InteractionHand.MAIN_HAND, hit));
+            check(keypad.getFrequency() == 3201 && lastKey(alexBar).endsWith("keypad_not_yours_tune"),
+                    "Alex can't re-tune Dev's keypad: " + lastKey(alexBar));
+            alex.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            check(keypad.mayConfigure(op) && !keypad.mayConfigure(alex), "Operators may change it too");
+
+            var open = com.reiko.signaltower.network.OpenKeypadScreenPayload.of(keypad, alex, level.getGameTime());
+            check(open.hasCode() && !open.mayConfigure() && open.ownerName().equals("Dev") && open.pulseTicks() == 40
+                    && open.lockedSeconds() == 0, "Alex's screen: " + open);
+            var buffer = Unpooled.buffer();
+            com.reiko.signaltower.network.OpenKeypadScreenPayload.STREAM_CODEC.encode(buffer, open);
+            check(com.reiko.signaltower.network.OpenKeypadScreenPayload.STREAM_CODEC.decode(buffer).equals(open), "Survives the network");
+
+            check(enter.apply(alex, "1111").outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.WRONG, "Wrong once");
+            result = enter.apply(alex, "2222");
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.WRONG
+                    && firstArg(result.message()).equals("2"), "Twice: " + result.message().getString());
+            check(alerts.missedFor(devId).isEmpty(), "No alert yet");
+            result = enter.apply(alex, "3333");
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.LOCKED && result.lockedSeconds() == 30,
+                    "Three times: locked for 30 seconds: " + result);
+            var kept = alerts.missedFor(devId);
+            check(kept.size() == 1 && kept.get(0).kind() == com.reiko.signaltower.radio.IntruderAlerts.Kind.KEYPAD
+                    && kept.get(0).intruder().equals("Alex") && absolute.equals(kept.get(0).at()) && kept.get(0).frequency() == 3201
+                    && kept.get(0).block().equals(ModRegistry.CODE_KEYPAD.get().getDescriptionId()), "Dev is told, with where: " + kept);
+            var line = com.reiko.signaltower.radio.IntruderAlerts.line(level, kept.get(0), false);
+            check(line.getSiblings().stream().anyMatch(c -> keyOf(c).endsWith("intruder_keypad"))
+                    && line.getString().contains(absolute.getX() + ", " + absolute.getY() + ", " + absolute.getZ()), "The alert line: " + line.getString());
+            var loaded = com.reiko.signaltower.radio.IntruderAlerts.load(alerts.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+            check(loaded.missedFor(devId).equals(kept), "Kept with where it is");
+            check(enter.apply(alex, "4242").outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.LOCKED,
+                    "Even the right code while locked");
+            check(com.reiko.signaltower.network.OpenKeypadScreenPayload.of(keypad, alex, level.getGameTime()).lockedSeconds() == 30,
+                    "Alex's screen says how long");
+            check(enter.apply(dev, "4242").outcome() != com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.LOCKED,
+                    "Only Alex is locked out");
+
+            // Dev's own wrong codes don't alert Dev.
+            for (int i = 0; i < 3; i++) {
+                keypad.enter(level, dev, "0000", level.getGameTime() + 2000);
+            }
+            check(alerts.missedFor(devId).size() == 1, "No alert for the owner's own mistakes");
+
+            long later = level.getGameTime() + com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.LOCK_TICKS + 1;
+            result = keypad.enter(level, alex, "4242", later);
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.ACCEPTED
+                    && keyOf(result.message()).endsWith("remote_result"),
+                    "After 30 seconds the right code works: " + result.message().getString());
+            check(SignalNetwork.get(level).listen(level, 3201, helper.absolutePos(new BlockPos(20, 1, 1)), null).power() == 15,
+                    "The pulse is heard nearby");
+            SignalNetwork.TurnOn last = SignalNetwork.get(level).history(3201).get(SignalNetwork.get(level).history(3201).size() - 1);
+            check(last.cause().kind() == SignalNetwork.CauseKind.KEYPAD && absolute.equals(last.cause().pos())
+                    && alexId.equals(last.cause().who()) && last.cause().name().equals("Alex"), "Recorded as the keypad, typed by Alex: " + last.cause());
+            check(helper.getBlockState(at).getValue(com.reiko.signaltower.block.CodeKeypadBlock.POWERED), "Lit");
+            check(level.getDirectSignalTo(helper.absolutePos(at.south())) == 15, "Strongly powers the block it's on");
+
+            CompoundTag saved = keypad.saveWithoutMetadata(level.registryAccess());
+            check(saved.getString("code").equals("4242") && saved.getUUID("owner").equals(devId) && saved.getInt("pulse_ticks") == 40,
+                    "Saved with the world: " + saved);
+            var components = keypad.collectComponents();
+            check(components.size() == 1 && components.has(ModRegistry.FREQUENCY.get()), "Only the frequency goes on the item: " + components);
+        } finally {
+            com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, devId);
+            alerts.resetQuiet();
+        }
+        // The pulse is 2 seconds: then it goes dark again.
+        helper.runAfterDelay(50, () -> {
+            check(!helper.getBlockState(at).getValue(com.reiko.signaltower.block.CodeKeypadBlock.POWERED), "Dark again after the pulse");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A keypad on someone else's private frequency: placing it says it's silent (and alerts that
+     * frequency's owner), and the right code then sends nothing. A member's keypad shows in the
+     * frequency log (with where it is and who typed the code), and Jade shows the owner, whether a
+     * code is set (never the code) and its reach.
+     */
+    @GameTest(template = PLATFORM)
+    public static void codeKeypadPrivate(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        var alerts = com.reiko.signaltower.radio.IntruderAlerts.get(server);
+        UUID zedId = UUID.randomUUID();
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(1, 1, 0), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player alex = namedPlayer(helper, new BlockPos(5, 1, 0), alexId, "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos silent = new BlockPos(2, 1, 1);
+        BlockPos member = new BlockPos(6, 1, 1);
+        alerts.resetQuiet();
+        try {
+            claims.put(3202, zedId, "Zed", java.util.Map.of());
+            claims.put(3203, devId, "Dev", java.util.Map.of());
+            helper.setBlock(silent.south(), Blocks.STONE);
+            BlockState state = ModRegistry.CODE_KEYPAD.get().defaultBlockState();
+            helper.setBlock(silent, state);
+            setFrequency(helper, silent, 3202);
+            state.getBlock().setPlacedBy(level, helper.absolutePos(silent), helper.getBlockState(silent), dev,
+                    new ItemStack(ModRegistry.CODE_KEYPAD_ITEM.get()));
+            com.reiko.signaltower.blockentity.CodeKeypadBlockEntity keypad = helper.getBlockEntity(silent);
+            check(devId.equals(keypad.getOwner()) && devId.equals(keypad.getTunedBy()) && keypad.getOwnerName().equals("Dev"),
+                    "Whoever places it owns it");
+            check(lastKey(devBar).endsWith("private_silenced"), "Dev is told it's silent: " + lastKey(devBar));
+            var kept = alerts.missedFor(zedId);
+            check(kept.size() == 1 && kept.get(0).kind() == com.reiko.signaltower.radio.IntruderAlerts.Kind.SILENT, "Zed is told: " + kept);
+            keypad.configure(dev, "1357", 20);
+            var result = keypad.enter(level, dev, "1357", level.getGameTime());
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.SILENT, "Right code, but silent: " + result);
+            check(SignalNetwork.get(level).listen(level, 3202, helper.absolutePos(silent), null).power() == 0, "Nothing sent");
+            CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(silent));
+            check(info != null && info.getBoolean("silenced") && info.getString("private_to").equals("Zed"), "Jade says silent: " + info);
+
+            var memberKeypad = keypadAt(helper, member, 3203, devId, "Dev");
+            info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(member));
+            check(info != null && info.getString("keypad_owner").equals("Dev") && !info.getBoolean("has_code")
+                    && info.getInt("reach") == RadioHelper.reachAt(level, helper.absolutePos(member)) && !info.getBoolean("silenced"),
+                    "Jade data: " + info);
+            List<Component> lines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(member), info);
+            check(lineKeys(lines).equals(List.of("frequency", "keypad_owner", "keypad_no_code", "keypad_waiting", "reach", "private")),
+                    "Jade lines: " + lineKeys(lines));
+            memberKeypad.configure(dev, "24680", 20);
+            info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(member));
+            check(info.getBoolean("has_code") && !info.toString().contains("24680"), "Never the code itself: " + info);
+            result = memberKeypad.enter(level, alex, "24680", level.getGameTime());
+            check(result.outcome() == com.reiko.signaltower.blockentity.CodeKeypadBlockEntity.Outcome.ACCEPTED,
+                    "Alex knows the code: Dev's keypad sends on Dev's frequency: " + result.message().getString());
+            var log = com.reiko.signaltower.radio.FrequencyLog.log(server, 3203);
+            check(!log.isEmpty() && log.get(0).kind() == SignalNetwork.CauseKind.KEYPAD
+                    && log.get(0).pos().equals(java.util.Optional.of(helper.absolutePos(member)))
+                    && log.get(0).who().equals("Alex") && log.get(0).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER,
+                    "In the log: the keypad, typed by Alex: " + log);
+            var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), level.registryAccess());
+            var logResult = new com.reiko.signaltower.network.LogResultPayload(3203, true, log, level.getGameTime());
+            com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.encode(buffer, logResult);
+            var decoded = com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.decode(buffer);
+            check(decoded.entries().get(0).kind() == SignalNetwork.CauseKind.KEYPAD, "The log's kind survives the network");
+        } finally {
+            claims.remove(3202);
+            claims.remove(3203);
+            com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, zedId);
+            alerts.resetQuiet();
+        }
+        helper.succeed();
+    }
 }
