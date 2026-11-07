@@ -78,22 +78,31 @@ public class AuditScreen extends Screen {
         FrequencyClaims.ClaimInfo claim = FrequencyClaims.clientInfo(frequency);
         boolean owner = claim != null && minecraft != null && minecraft.player != null
                 && claim.owner().equals(minecraft.player.getUUID());
-        int x = owner ? width / 2 - 154 : width / 2 - 104;
+        // Back, Close and Log (v0.35.0); the owner also gets Hand over.
+        int buttonWidth = owner ? 90 : 100;
+        int step = buttonWidth + 4;
+        int x = width / 2 - ((owner ? 4 : 3) * step - 4) / 2;
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
-                .bounds(x, buttonsY, 100, 20).build());
+                .bounds(x, buttonsY, buttonWidth, 20).build());
         addRenderableWidget(Button.builder(Component.translatable(KEY + "close"), button -> {
             if (minecraft != null) {
                 minecraft.setScreen(null);
             }
         }).tooltip(Tooltip.create(Component.translatable(KEY + "close_tooltip")))
-                .bounds(x + 104, buttonsY, 100, 20).build());
+                .bounds(x + step, buttonsY, buttonWidth, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable(KEY + "log"), button -> {
+            if (minecraft != null) {
+                minecraft.setScreen(new LogScreen(this, frequency));
+            }
+        }).tooltip(Tooltip.create(Component.translatable(KEY + "log_tooltip")))
+                .bounds(x + 2 * step, buttonsY, buttonWidth, 20).build());
         if (owner) {
             addRenderableWidget(Button.builder(Component.translatable(KEY + "hand_over"), button -> {
                 if (minecraft != null) {
                     minecraft.setScreen(new HandOverScreen(this, parent, frequency));
                 }
             }).tooltip(Tooltip.create(Component.translatable(KEY + "hand_over_tooltip")))
-                    .bounds(x + 208, buttonsY, 100, 20).build());
+                    .bounds(x + 3 * step, buttonsY, buttonWidth, 20).build());
         }
         requestTimer = 0;
     }

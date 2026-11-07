@@ -180,7 +180,8 @@ public class RemoteControlItem extends Item {
         String key = "message." + SignalTower.MOD_ID + ".remote_";
         Component result;
         if (toggle) {
-            boolean on = network.toggleLatch(frequency, coverage);
+            boolean on = network.toggleLatch(frequency, coverage,
+                    SignalNetwork.Cause.remote(true, player.getUUID(), player.getGameProfile().getName()));
             level.playSound(null, origin, on ? SoundEvents.STONE_BUTTON_CLICK_ON : SoundEvents.STONE_BUTTON_CLICK_OFF,
                     SoundSource.PLAYERS, 0.6F, on ? 1.3F : 1.0F);
             result = on
@@ -188,7 +189,8 @@ public class RemoteControlItem extends Item {
                     : Component.translatable(key + "off", FrequencyNames.label(level, frequency)).withStyle(ChatFormatting.RED);
         } else {
             int ticks = PulseLength.clamp(pulseTicks);
-            network.pulse(frequency, coverage, level.getGameTime() + ticks);
+            network.pulse(frequency, coverage, level.getGameTime() + ticks,
+                    SignalNetwork.Cause.remote(false, player.getUUID(), player.getGameProfile().getName()));
             level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_ON, SoundSource.PLAYERS, 0.6F, 1.3F);
             result = Component.translatable(key + "pulse", PulseLength.format(ticks), FrequencyNames.label(level, frequency), reach);
         }

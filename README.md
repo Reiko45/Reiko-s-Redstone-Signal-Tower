@@ -144,12 +144,18 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
     - Everyone else on it, you included, stays on it as a friend, so no block goes silent. It keeps its name, note and encryption.
     - Groups belong to their owner, so their members become single friends of the new owner.
     - It's refused if the new owner already has the most private frequencies a player may have, or if it has more members than a frequency's 16 friends (take some off first). Only the owner can hand it over; operators can't.
+  - **Its log:** the audit's **Log** button (for the owner and server operators) lists the frequency's last turn-ons, newest first, from every dimension. Each row says when (in-game day and time), what turned it on (a **Transmitter**, a **Remote pulse** or a **Remote toggle**) and who (who tuned the transmitter, or whose remote).
+    - A transmitter that's yours, a friend's or has no record shows where it is; click its row for a beam of light over it, as in the audit. Another player's transmitter is named but not located, and where someone pressed a remote is never kept.
+    - Hover a row for how long ago it was ("47 seconds ago"). A turn-on carried over from another frequency by a converter says so ("Transmitter on 2026").
+    - Each dimension keeps the last 32 turn-ons of each frequency (the same ones the pager catch-up uses). Ones from before version 0.35 show as "Turned on", without a cause.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
 
   ![The audit of 2026: Dev's re-tuned transmitter first, Steve's (a friend's) blocks, old blocks with no record, and Alex's silent transmitter counted without a position; the tooltips for an old block and for Alex's](docs/images/frequency-audit.png)
 
   ![The audit with beams on over Steve's receiver and a repeater 135 blocks east (gold edges, "Beam on for 58 more seconds"), and the two gold beams in the evening sky](docs/images/audit-beams.png)
+
+  ![The log of 2026: Dev's and Steve's remote pulses, Steve's transmitter twice (with its position, and its tooltip: "Tuned by Steve, a friend", 5 blocks south-east), older turn-ons without a cause; and a remote pulse's tooltip ("Where they stood isn't kept")](docs/images/frequency-log.png)
 
   ![Dev handing 4242 (Vault) over to Steve, a member through the Base crew group ("Click again"); Dev's directory afterwards ("Steve + you"); Steve's tuner on 4242 (Private, friend Dev) and his chat line](docs/images/hand-over.png)
 
@@ -558,9 +564,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 119. a members-only note reaches the owner, a friend, a group member and an operator but not a stranger (nor nobody): the stranger's one-note packet is empty and their join list leaves it out; made public, everyone sees it, and claiming it again doesn't hide it;
 120. the Note screen's packet keeps a note to members on a private frequency and says so, counts a change of only the switch, ignores the switch on a public frequency, and Jade's data leaves the note out for a stranger and marks it for the owner;
 121. audit beams turn on for a minute (in their own dimension only) and off when clicked again, burn down tick by tick and go when spent, a ninth drops the one with the least time left, and leaving the world clears them;
-122. handing a frequency over: only its owner may (not a friend or an operator), only to one of its members (a group member counts, the name ignoring case), not to someone at their limit nor when it has more members than 16 friends; the new owner gets it with everyone else as single friends (the old owner first), still encrypted, with its note; the old owner's blocks still send and a stranger's don't; a public one has nothing to hand over; the packet survives the network.
+122. handing a frequency over: only its owner may (not a friend or an operator), only to one of its members (a group member counts, the name ignoring case), not to someone at their limit nor when it has more members than 16 friends; the new owner gets it with everyone else as single friends (the old owner first), still encrypted, with its note; the old owner's blocks still send and a stranger's don't; a public one has nothing to hand over; the packet survives the network;
+123. the frequency log lists the owner's transmitter (with its position), one with no recorded tuner (with its position), a friend's remote pulse and a stranger's toggle (named, no position), newest first; a silenced stranger's transmitter isn't a turn-on; someone no longer on it is named but not located; a converter's output frequency shows them carried over; only the owner and operators get it, not for a public frequency; causes are saved and old saves load without them; the answer survives the network.
 
-All 122 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 123 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

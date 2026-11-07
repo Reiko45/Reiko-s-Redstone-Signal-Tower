@@ -4284,4 +4284,113 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Frequency log ----
+
+    /**
+     * The frequency log: a transmitter's turn-on (the owner's, with its position), one with no
+     * recorded tuner (position shown), a friend's remote pulse and a stranger's toggle (named, no
+     * position), newest first; a silenced stranger's transmitter isn't a turn-on; another
+     * player's transmitter is named without a position; a converter's output frequency shows them
+     * as carried over. Only the owner and operators get it. Causes survive saving; old saves
+     * load without one. The answer survives the network.
+     */
+    @GameTest(template = PLATFORM)
+    public static void frequencyLogShowsTurnOns(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        SignalNetwork network = SignalNetwork.get(level);
+        UUID devId = UUID.randomUUID();
+        UUID steveId = UUID.randomUUID();
+        UUID zedId = UUID.randomUUID();
+        BlockPos at = new BlockPos(1, 1, 1);
+        Player dev = namedPlayer(helper, at, devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player steve = namedPlayer(helper, at, steveId, "Steve", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, at, UUID.randomUUID(), "Admin", true, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos tx = new BlockPos(8_100_000, 64, 8_100_000);
+        BlockPos strangers = tx.south(3);
+        BlockPos old = tx.north(3);
+        BlockPos converter = tx.east(10);
+        BlockPos steves = tx.west(3);
+        List<SignalNetwork.Coverage> here = List.of(new SignalNetwork.Coverage(tx, 32, false));
+        try {
+            claims.put(2801, devId, "Dev", java.util.Map.of(steveId, "Steve"));
+            claims.put(2802, devId, "Dev", java.util.Map.of());
+            network.updateRepeater(converter, 2801, 2802, 40, devId);
+            network.updateTransmitter(tx, 2801, 15, 32, devId);
+            network.updateTransmitter(strangers, 2801, 15, 32, zedId); // silenced: not a turn-on
+            network.updateTransmitter(old, 2801, 15, 32, null);
+            network.pulse(2801, here, level.getGameTime() + 20, SignalNetwork.Cause.remote(false, steveId, "Steve"));
+            network.toggleLatch(2801, here, SignalNetwork.Cause.remote(true, zedId, "Zed"));
+
+            var log = com.reiko.signaltower.radio.FrequencyLog.log(server, 2801);
+            check(log.size() == 4, "Four turn-ons: " + log);
+            check(log.get(0).kind() == SignalNetwork.CauseKind.REMOTE_TOGGLE && "Zed".equals(log.get(0).who())
+                    && log.get(0).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER && log.get(0).pos().isEmpty(),
+                    "Newest first: the stranger's toggle, named, no position: " + log.get(0));
+            check(log.get(1).kind() == SignalNetwork.CauseKind.REMOTE_PULSE && "Steve".equals(log.get(1).who())
+                    && log.get(1).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.MEMBER && log.get(1).pos().isEmpty(),
+                    "The friend's pulse: " + log.get(1));
+            check(log.get(2).kind() == SignalNetwork.CauseKind.TRANSMITTER && log.get(2).who().isEmpty()
+                    && log.get(2).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.UNKNOWN
+                    && log.get(2).pos().equals(java.util.Optional.of(old)), "The old transmitter, with its position: " + log.get(2));
+            check(log.get(3).kind() == SignalNetwork.CauseKind.TRANSMITTER && "Dev".equals(log.get(3).who())
+                    && log.get(3).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.OWNER
+                    && log.get(3).pos().equals(java.util.Optional.of(tx)) && log.get(3).from() == 0, "Dev's transmitter: " + log.get(3));
+            check(log.stream().allMatch(e -> "minecraft:overworld".equals(e.dimension())), "In the Overworld");
+
+            var carried = com.reiko.signaltower.radio.FrequencyLog.log(server, 2802);
+            check(carried.size() == 4 && carried.stream().allMatch(e -> e.from() == 2801)
+                    && carried.get(3).pos().equals(java.util.Optional.of(tx)), "The converter's output shows them carried over: " + carried);
+
+            claims.put(2803, devId, "Dev", java.util.Map.of(steveId, "Steve"));
+            network.updateTransmitter(steves, 2803, 15, 32, steveId);
+            claims.put(2803, devId, "Dev", java.util.Map.of()); // Steve taken off
+            var former = com.reiko.signaltower.radio.FrequencyLog.log(server, 2803);
+            // No longer in the claim's records and never seen by this test server's name cache: the start of the UUID.
+            check(former.size() == 1 && steveId.toString().substring(0, 8).equals(former.get(0).who()) && former.get(0).pos().isEmpty()
+                    && former.get(0).whoKind() == com.reiko.signaltower.radio.FrequencyAudit.Who.OTHER,
+                    "Someone no longer on it: named, not located: " + former);
+
+            var forDev = com.reiko.signaltower.network.LogRequestPayload.answer(dev, 2801);
+            check(forDev.allowed() && forDev.entries().size() == 4 && forDev.gameTime() == level.getGameTime(), "The owner gets it");
+            var forSteve = com.reiko.signaltower.network.LogRequestPayload.answer(steve, 2801);
+            check(!forSteve.allowed() && forSteve.entries().isEmpty(), "A friend doesn't");
+            check(com.reiko.signaltower.network.LogRequestPayload.answer(op, 2801).allowed(), "An operator does");
+            check(!com.reiko.signaltower.network.LogRequestPayload.answer(dev, 2804).allowed(), "A public frequency has no log");
+
+            var buffer = Unpooled.buffer();
+            com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.encode(buffer, forDev);
+            check(com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC.decode(buffer).equals(forDev), "Survives the network");
+
+            SignalNetwork fresh = new SignalNetwork().attachTo(level);
+            BlockPos far = new BlockPos(8_200_000, 64, 8_200_000);
+            fresh.updateTransmitter(far, 2805, 15, 32, devId);
+            fresh.pulse(2805, List.of(new SignalNetwork.Coverage(far, 32, false)), 20, SignalNetwork.Cause.remote(false, steveId, "Steve"));
+            CompoundTag saved = fresh.save(new CompoundTag(), level.registryAccess());
+            var loaded = SignalNetwork.load(saved, level.registryAccess()).history(2805);
+            check(loaded.size() == 2 && loaded.get(0).cause().equals(SignalNetwork.Cause.transmitter(far, devId))
+                    && loaded.get(1).cause().equals(SignalNetwork.Cause.remote(false, steveId, "Steve"))
+                    && loaded.get(1).from() == 2805, "Causes are saved: " + loaded);
+            var turnOns = saved.getList("turn_ons", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            for (int i = 0; i < turnOns.size(); i++) {
+                turnOns.getCompound(i).remove("cause");
+                turnOns.getCompound(i).remove("from");
+            }
+            var oldSave = SignalNetwork.load(saved, level.registryAccess()).history(2805);
+            check(oldSave.size() == 2 && oldSave.stream().allMatch(t -> t.cause().equals(SignalNetwork.Cause.UNKNOWN) && t.from() == 0),
+                    "A save from before v0.35.0 loads without causes");
+        } finally {
+            network.toggleLatch(2801, here); // off again
+            for (BlockPos pos : List.of(tx, strangers, old, steves)) {
+                network.removeTransmitter(pos);
+            }
+            network.removeRepeater(converter);
+            for (int f = 2801; f <= 2803; f++) {
+                claims.remove(f);
+            }
+        }
+        helper.succeed();
+    }
 }

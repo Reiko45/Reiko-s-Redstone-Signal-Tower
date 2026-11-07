@@ -71,6 +71,12 @@ public final class ClientHooks {
     }
 
     /** An audit answer arrived: hand it to the open audit screen, if there is one. */
+    public static void onLogResult(com.reiko.signaltower.network.LogResultPayload result) {
+        if (Minecraft.getInstance().screen instanceof LogScreen screen) {
+            screen.onResult(result);
+        }
+    }
+
     public static void onAuditResult(com.reiko.signaltower.network.AuditResultPayload result) {
         if (Minecraft.getInstance().screen instanceof AuditScreen screen) {
             screen.onResult(result);

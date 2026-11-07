@@ -282,7 +282,7 @@ public final class SignalNetwork extends SavedData {
         }
         if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)
                 && !blocked(null, frequency, tunedBy)) {
-            recordTurnOn(frequency, ownCoverage(key, reach));
+            recordTurnOn(frequency, ownCoverage(key, reach), Cause.transmitter(key, tunedBy));
         }
         if (previous != null && previous.frequency() != frequency) {
             removeFromIndex(key, previous.frequency());
@@ -709,6 +709,11 @@ public final class SignalNetwork extends SavedData {
      * {@code untilGameTime}. Pressing again while a pulse is still on adds the new areas to it.
      */
     public void pulse(int frequency, List<Coverage> coverage, long untilGameTime) {
+        pulse(frequency, coverage, untilGameTime, Cause.UNKNOWN);
+    }
+
+    /** {@link #pulse(int, List, long)}, remembering who pressed for the frequency log. */
+    public void pulse(int frequency, List<Coverage> coverage, long untilGameTime, Cause cause) {
         RemoteSignal previous = pulses.get(frequency);
         long until = untilGameTime;
         List<Coverage> areas = coverage;
@@ -719,7 +724,7 @@ public final class SignalNetwork extends SavedData {
             areas = new ArrayList<>(merged);
         }
         pulses.put(frequency, new RemoteSignal(areas, until));
-        recordTurnOn(frequency, coverage);
+        recordTurnOn(frequency, coverage, cause);
         bump(frequency);
     }
 
@@ -728,12 +733,17 @@ public final class SignalNetwork extends SavedData {
      * is now on. The areas are fixed when it's switched on; moving afterwards doesn't change them.
      */
     public boolean toggleLatch(int frequency, List<Coverage> coverage) {
+        return toggleLatch(frequency, coverage, Cause.UNKNOWN);
+    }
+
+    /** {@link #toggleLatch(int, List)}, remembering who switched it on for the frequency log. */
+    public boolean toggleLatch(int frequency, List<Coverage> coverage, Cause cause) {
         boolean nowOn;
         if (latches.remove(frequency) != null) {
             nowOn = false;
         } else {
             latches.put(frequency, new RemoteSignal(coverage, Long.MAX_VALUE));
-            recordTurnOn(frequency, coverage);
+            recordTurnOn(frequency, coverage, cause);
             nowOn = true;
         }
         bump(frequency);
@@ -746,10 +756,54 @@ public final class SignalNetwork extends SavedData {
     /** The most turn-ons remembered per frequency. */
     public static final int MAX_HISTORY = 32;
 
-    /** One time a frequency turned on: when, and where it could be heard. */
-    public record TurnOn(long gameTime, long dayTime, List<Coverage> coverage) {
+    /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name. */
+    public enum CauseKind {
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE;
+
+        public static CauseKind of(int ordinal) {
+            CauseKind[] all = values();
+            return all[Math.max(0, Math.min(all.length - 1, ordinal))];
+        }
+
+        static CauseKind named(String name) {
+            for (CauseKind kind : values()) {
+                if (kind.name().equalsIgnoreCase(name)) {
+                    return kind;
+                }
+            }
+            return UNKNOWN;
+        }
+    }
+
+    /**
+     * What turned a frequency on: a transmitter (where it is and who tuned it, null if nobody is
+     * recorded) or a remote press (whose, by UUID and name; never where they stood, so the log
+     * can't be used to find players). {@link #UNKNOWN} for turn-ons saved before v0.35.0.
+     */
+    public record Cause(CauseKind kind, @Nullable BlockPos pos, @Nullable UUID who, String name) {
+        public static final Cause UNKNOWN = new Cause(CauseKind.UNKNOWN, null, null, "");
+
+        public static Cause transmitter(BlockPos pos, @Nullable UUID tunedBy) {
+            return new Cause(CauseKind.TRANSMITTER, pos.immutable(), tunedBy, "");
+        }
+
+        public static Cause remote(boolean toggle, UUID player, String name) {
+            return new Cause(toggle ? CauseKind.REMOTE_TOGGLE : CauseKind.REMOTE_PULSE, null, player, name);
+        }
+    }
+
+    /**
+     * One time a frequency turned on: when, where it could be heard, what did it, and the
+     * frequency it started on ({@code from}; another one if a converter carried it over, 0 if
+     * not known).
+     */
+    public record TurnOn(long gameTime, long dayTime, List<Coverage> coverage, Cause cause, int from) {
         public TurnOn {
             coverage = List.copyOf(coverage);
+        }
+
+        public TurnOn(long gameTime, long dayTime, List<Coverage> coverage) {
+            this(gameTime, dayTime, coverage, Cause.UNKNOWN, 0);
         }
     }
 
@@ -757,10 +811,10 @@ public final class SignalNetwork extends SavedData {
      * Remembers a turn-on, over {@code coverage} plus every repeater it reaches. Converters it
      * reaches pass it on, so it's also remembered on the frequencies they send on.
      */
-    private void recordTurnOn(int frequency, List<Coverage> coverage) {
+    private void recordTurnOn(int frequency, List<Coverage> coverage, Cause cause) {
         carried(null, frequency, coverage).areas().forEach((onFrequency, areas) -> {
             ArrayDeque<TurnOn> list = history.computeIfAbsent(onFrequency, f -> new ArrayDeque<>());
-            list.addLast(new TurnOn(now, nowDayTime, areas));
+            list.addLast(new TurnOn(now, nowDayTime, areas, cause, frequency));
             while (list.size() > MAX_HISTORY) {
                 list.removeFirst();
             }
@@ -772,6 +826,12 @@ public final class SignalNetwork extends SavedData {
      * The times {@code frequency} turned on after {@code sinceGameTime} where a receiver at
      * {@code pos} would have heard it, oldest first. At most {@link #MAX_HISTORY}.
      */
+    /** Every remembered turn-on of {@code frequency} in this dimension, oldest first (for the log). */
+    public List<TurnOn> history(int frequency) {
+        ArrayDeque<TurnOn> list = history.get(frequency);
+        return list == null ? List.of() : List.copyOf(list);
+    }
+
     public List<TurnOn> turnOnsSince(int frequency, long sinceGameTime, BlockPos pos) {
         ArrayDeque<TurnOn> list = history.get(frequency);
         if (list == null) {
@@ -1218,6 +1278,24 @@ public final class SignalNetwork extends SavedData {
                     areas.add(areaTag);
                 }
                 entry.put("coverage", areas);
+                Cause cause = turnOn.cause();
+                if (cause.kind() != CauseKind.UNKNOWN) {
+                    CompoundTag causeTag = new CompoundTag();
+                    causeTag.putString("kind", cause.kind().name().toLowerCase(java.util.Locale.ROOT));
+                    if (cause.pos() != null) {
+                        causeTag.putLong("pos", cause.pos().asLong());
+                    }
+                    if (cause.who() != null) {
+                        causeTag.putUUID("who", cause.who());
+                    }
+                    if (!cause.name().isEmpty()) {
+                        causeTag.putString("name", cause.name());
+                    }
+                    entry.put("cause", causeTag);
+                }
+                if (turnOn.from() != 0) {
+                    entry.putInt("from", turnOn.from());
+                }
                 turnOns.add(entry);
             }
         });
@@ -1276,7 +1354,15 @@ public final class SignalNetwork extends SavedData {
                 coverage.add(new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), false));
             }
             ArrayDeque<TurnOn> recent = network.history.computeIfAbsent(Frequency.clamp(entry.getInt("frequency")), f -> new ArrayDeque<>());
-            recent.addLast(new TurnOn(entry.getLong("time"), entry.getLong("day_time"), coverage));
+            Cause cause = Cause.UNKNOWN; // turn-ons saved before v0.35.0 have none
+            if (entry.contains("cause", Tag.TAG_COMPOUND)) {
+                CompoundTag causeTag = entry.getCompound("cause");
+                cause = new Cause(CauseKind.named(causeTag.getString("kind")),
+                        causeTag.contains("pos") ? BlockPos.of(causeTag.getLong("pos")) : null,
+                        causeTag.hasUUID("who") ? causeTag.getUUID("who") : null,
+                        causeTag.getString("name"));
+            }
+            recent.addLast(new TurnOn(entry.getLong("time"), entry.getLong("day_time"), coverage, cause, entry.getInt("from")));
             while (recent.size() > MAX_HISTORY) {
                 recent.removeFirst();
             }

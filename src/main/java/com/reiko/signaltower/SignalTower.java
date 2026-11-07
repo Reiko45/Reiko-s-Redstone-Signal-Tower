@@ -114,6 +114,10 @@ public final class SignalTower {
                 DirectoryRequestPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.AuditRequestPayload.TYPE,
                 com.reiko.signaltower.network.AuditRequestPayload.STREAM_CODEC, com.reiko.signaltower.network.AuditRequestPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.LogRequestPayload.TYPE,
+                com.reiko.signaltower.network.LogRequestPayload.STREAM_CODEC, com.reiko.signaltower.network.LogRequestPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.LogResultPayload.TYPE,
+                com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC, com.reiko.signaltower.network.LogResultPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.HandOverFrequencyPayload.TYPE,
                 com.reiko.signaltower.network.HandOverFrequencyPayload.STREAM_CODEC, com.reiko.signaltower.network.HandOverFrequencyPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.AuditResultPayload.TYPE,
