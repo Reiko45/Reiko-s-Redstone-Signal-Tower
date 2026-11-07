@@ -136,10 +136,16 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - Each row says what it is, where it is, who tuned or placed it, and its status: "On 15" or "Off" when it works, **Silent** for a sender whose tuner can't send on it, **Deaf** for a listener whose tuner can't hear it (encrypted). Hover a row for the distance and direction and what the status means. The line under the list sums it up ("10 blocks: 1 silent, 1 deaf, 5 with no recorded tuner").
   - Your blocks and your friends' show their position. So do old blocks with **no record** of who tuned them (set up before version 0.25): they still work on a private frequency, so the audit helps you find them; tuning one again with the Frequency Tuner makes it yours.
   - Other players' blocks are only counted ("Receiver ×2, Alex, Deaf"), without positions, so the audit can't be used to find someone's base.
+  - **Finding one:** click a row that shows a position to put a gold beam of light over that block for a minute ("Beam on: Repeater at 535, −60, −15, for a minute. Close to see it"). The row gets a gold edge and its tooltip counts down; click it again to turn the beam off. Press **Close** (next to Back) to close every screen and look around. You can have up to 8 beams on at once.
+    - Only your own game draws the beams, so nobody else sees them.
+    - They show from far away, even past your render distance's fog where the block itself isn't drawn. Far beams are drawn wider so they stay easy to spot.
+    - A beam in another dimension shows when you're there. Beams go away when you leave the world.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
 
   ![The audit of 2026: Dev's re-tuned transmitter first, Steve's (a friend's) blocks, old blocks with no record, and Alex's silent transmitter counted without a position; the tooltips for an old block and for Alex's](docs/images/frequency-audit.png)
+
+  ![The audit with beams on over Steve's receiver and a repeater 135 blocks east (gold edges, "Beam on for 58 more seconds"), and the two gold beams in the evening sky](docs/images/audit-beams.png)
 
   ![The Multi-Button Remote's keypad with a directory button after each frequency (3001 picked for button 2, which now finds a receiver), and a Radio Converter's screen with one after each box (42, Farm Door, picked for Sends on)](docs/images/directory-everywhere.png)
 
@@ -544,9 +550,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 117. only the owner or an operator may audit a frequency (not a friend, not a public frequency), and the request and answer survive the network;
 118. a note kept to members is saved (older saves load open), saving without the switch or removing the note drops it, releasing keeps the note, the three note packets carry the switch, and the client's copy (with "(members only)" on the tooltip line) follows each change;
 119. a members-only note reaches the owner, a friend, a group member and an operator but not a stranger (nor nobody): the stranger's one-note packet is empty and their join list leaves it out; made public, everyone sees it, and claiming it again doesn't hide it;
-120. the Note screen's packet keeps a note to members on a private frequency and says so, counts a change of only the switch, ignores the switch on a public frequency, and Jade's data leaves the note out for a stranger and marks it for the owner.
+120. the Note screen's packet keeps a note to members on a private frequency and says so, counts a change of only the switch, ignores the switch on a public frequency, and Jade's data leaves the note out for a stranger and marks it for the owner;
+121. audit beams turn on for a minute (in their own dimension only) and off when clicked again, burn down tick by tick and go when spent, a ninth drops the one with the least time left, and leaving the world clears them.
 
-All 120 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 121 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

@@ -4138,4 +4138,54 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    /**
+     * Audit beams: clicking a row turns its beam on for a minute (in that dimension only) and
+     * clicking again turns it off; beams burn down tick by tick and go when spent; a ninth beam
+     * drops the one with the least time left; leaving the world clears them.
+     */
+    @GameTest(template = PLATFORM)
+    public static void auditBeamsOnOffAndBurnDown(GameTestHelper helper) {
+        String overworld = "minecraft:overworld";
+        String nether = "minecraft:the_nether";
+        BlockPos spot = new BlockPos(2501, -60, 7);
+        try {
+            com.reiko.signaltower.client.AuditBeams.clear();
+            check(com.reiko.signaltower.client.AuditBeams.toggle(overworld, spot), "On");
+            check(com.reiko.signaltower.client.AuditBeams.secondsLeft(overworld, spot) == 60
+                    && !com.reiko.signaltower.client.AuditBeams.isOn(nether, spot), "A minute, in its own dimension");
+            check(com.reiko.signaltower.client.AuditBeams.toggle(nether, spot), "The same spot in the Nether is another beam");
+            check(com.reiko.signaltower.client.AuditBeams.in(overworld).size() == 1
+                    && com.reiko.signaltower.client.AuditBeams.in(nether).size() == 1, "Each drawn in its own dimension");
+            check(!com.reiko.signaltower.client.AuditBeams.toggle(overworld, spot)
+                    && !com.reiko.signaltower.client.AuditBeams.isOn(overworld, spot)
+                    && com.reiko.signaltower.client.AuditBeams.count() == 1, "Clicked again: off");
+
+            for (int i = 0; i < 20; i++) {
+                com.reiko.signaltower.client.AuditBeams.tick();
+            }
+            check(com.reiko.signaltower.client.AuditBeams.secondsLeft(nether, spot) == 59, "A second burnt: "
+                    + com.reiko.signaltower.client.AuditBeams.secondsLeft(nether, spot));
+            for (int i = 20; i < com.reiko.signaltower.client.AuditBeams.DURATION_TICKS - 1; i++) {
+                com.reiko.signaltower.client.AuditBeams.tick();
+            }
+            check(com.reiko.signaltower.client.AuditBeams.secondsLeft(nether, spot) == 1, "The last tick still shows");
+            com.reiko.signaltower.client.AuditBeams.tick();
+            check(com.reiko.signaltower.client.AuditBeams.count() == 0, "Gone after a minute");
+
+            for (int i = 0; i < com.reiko.signaltower.client.AuditBeams.MAX_BEAMS; i++) {
+                com.reiko.signaltower.client.AuditBeams.toggle(overworld, new BlockPos(2500 + i, -60, 0));
+                com.reiko.signaltower.client.AuditBeams.tick();
+            }
+            check(com.reiko.signaltower.client.AuditBeams.toggle(overworld, new BlockPos(2600, -60, 0)), "A ninth");
+            check(com.reiko.signaltower.client.AuditBeams.count() == com.reiko.signaltower.client.AuditBeams.MAX_BEAMS
+                    && !com.reiko.signaltower.client.AuditBeams.isOn(overworld, new BlockPos(2500, -60, 0))
+                    && com.reiko.signaltower.client.AuditBeams.isOn(overworld, new BlockPos(2501, -60, 0)), "The oldest made room");
+            com.reiko.signaltower.client.AuditBeams.clear();
+            check(com.reiko.signaltower.client.AuditBeams.count() == 0, "Cleared on leaving");
+        } finally {
+            com.reiko.signaltower.client.AuditBeams.clear();
+        }
+        helper.succeed();
+    }
 }

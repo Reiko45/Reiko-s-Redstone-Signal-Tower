@@ -10,6 +10,8 @@ import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.locale.Language;
@@ -17,8 +19,11 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.neoforge.network.PacketDistributor;
+
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +34,9 @@ import java.util.List;
  * dimension, with who tuned it and whether it works, is silent or is deaf. Your own, your
  * friends' and old (no recorded tuner) blocks show where they are; other players' are only
  * counted. Updates every second.
+ * <p>
+ * Clicking a row that shows a position puts a gold beam of light over that block for a minute
+ * ({@link AuditBeams}, v0.33.0); clicking it again turns it off. Rows with a beam get a gold edge.
  */
 public class AuditScreen extends Screen {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".audit.";
@@ -50,6 +58,9 @@ public class AuditScreen extends Screen {
     private int left;
     private int top;
     private int listTop;
+    /** What the last click did, shown under the list for a few seconds. */
+    private @Nullable Component notice;
+    private int noticeTicks;
 
     public AuditScreen(Screen parent, int frequency) {
         super(Component.translatable(KEY + "title", FrequencyNames.label(null, frequency)));
@@ -64,13 +75,22 @@ public class AuditScreen extends Screen {
         listTop = top + 38;
         int buttonsY = listTop + ROWS * ROW_HEIGHT + 28;
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
-                .bounds(width / 2 - 50, buttonsY, 100, 20).build());
+                .bounds(width / 2 - 104, buttonsY, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable(KEY + "close"), button -> {
+            if (minecraft != null) {
+                minecraft.setScreen(null);
+            }
+        }).tooltip(Tooltip.create(Component.translatable(KEY + "close_tooltip")))
+                .bounds(width / 2 + 4, buttonsY, 100, 20).build());
         requestTimer = 0;
     }
 
     @Override
     public void tick() {
         super.tick();
+        if (noticeTicks > 0 && --noticeTicks == 0) {
+            notice = null;
+        }
         if (--requestTimer <= 0) {
             requestTimer = 20;
             PacketDistributor.sendToServer(new AuditRequestPayload(frequency));
@@ -94,6 +114,29 @@ public class AuditScreen extends Screen {
         }
         int row = (int) ((mouseY - listTop) / ROW_HEIGHT);
         return row < ROWS && scroll + row < entries.size() ? row : -1;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int row = button == 0 ? rowAt(mouseX, mouseY) : -1;
+        if (row >= 0 && entries.get(scroll + row).pos().isPresent()) {
+            FrequencyAudit.Entry entry = entries.get(scroll + row);
+            BlockPos pos = entry.pos().get();
+            boolean on = AuditBeams.toggle(entry.dimension(), pos);
+            notice = on
+                    ? (sameDimension(entry)
+                    ? Component.translatable(KEY + "beam_on", kind(entry), pos.getX(), pos.getY(), pos.getZ())
+                    : Component.translatable(KEY + "beam_on_dimension", kind(entry), pos.getX(), pos.getY(), pos.getZ(),
+                    dimensionName(entry.dimension()))).withStyle(ChatFormatting.GOLD)
+                    : Component.translatable(KEY + "beam_off", kind(entry), pos.getX(), pos.getY(), pos.getZ())
+                    .withStyle(ChatFormatting.GRAY);
+            noticeTicks = 100;
+            if (minecraft != null) {
+                minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, on ? 1.2F : 0.8F));
+            }
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
@@ -204,6 +247,14 @@ public class AuditScreen extends Screen {
             case DEAF -> Component.translatable(KEY + "tip_deaf").withStyle(ChatFormatting.RED);
             case WORKING -> Component.translatable(KEY + (sends ? "tip_sends" : "tip_hears")).withStyle(ChatFormatting.GREEN);
         });
+        if (entry.pos().isPresent()) {
+            int secondsLeft = AuditBeams.secondsLeft(entry.dimension(), entry.pos().get());
+            lines.add(secondsLeft >= 0
+                    ? Component.translatable(KEY + "tip_beam_on", secondsLeft).withStyle(ChatFormatting.GOLD)
+                    : sameDimension(entry)
+                    ? Component.translatable(KEY + "tip_beam").withStyle(ChatFormatting.DARK_AQUA)
+                    : Component.translatable(KEY + "tip_beam_dimension", dimensionName(entry.dimension())).withStyle(ChatFormatting.DARK_AQUA));
+        }
         List<FormattedCharSequence> wrapped = new ArrayList<>();
         for (Component line : lines) {
             wrapped.addAll(font.split(line, 240));
@@ -284,6 +335,9 @@ public class AuditScreen extends Screen {
                 continue;
             }
             FrequencyAudit.Entry entry = entries.get(scroll + i);
+            if (entry.pos().isPresent() && AuditBeams.isOn(entry.dimension(), entry.pos().get())) {
+                graphics.fill(left, rowTop, left + 2, rowTop + ROW_HEIGHT - 1, 0xFFFFC21A);
+            }
             int textY = rowTop + 3;
             drawFitted(graphics, kind(entry), left + 4, textY, WHERE_X - 8);
             drawFitted(graphics, where(entry), left + WHERE_X, textY, TUNER_X - WHERE_X - 6);
@@ -313,8 +367,8 @@ public class AuditScreen extends Screen {
         } else {
             graphics.drawCenteredString(font, summary(), centerX, below, 0xFFFFFF);
         }
-        graphics.drawCenteredString(font, Component.translatable(KEY + "receivers_loaded").withStyle(ChatFormatting.DARK_GRAY),
-                centerX, below + 11, 0xFFFFFF);
+        graphics.drawCenteredString(font, notice != null ? notice
+                : Component.translatable(KEY + "receivers_loaded").withStyle(ChatFormatting.DARK_GRAY), centerX, below + 11, 0xFFFFFF);
 
         if (hovered >= 0) {
             graphics.renderTooltip(font, tooltip(entries.get(scroll + hovered)), mouseX, mouseY);

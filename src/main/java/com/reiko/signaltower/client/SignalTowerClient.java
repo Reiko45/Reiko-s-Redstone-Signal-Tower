@@ -47,6 +47,8 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::registerGuiLayers);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
+        NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onRenderLevel);
+        NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onClientTick);
     }
 
     /**
@@ -120,6 +122,7 @@ public final class SignalTowerClient {
     private static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         com.reiko.signaltower.radio.FrequencyNames.clientClear();
         com.reiko.signaltower.radio.FrequencyNotes.clientClear();
+        AuditBeams.clear();
         com.reiko.signaltower.radio.FrequencyClaims.clientClear();
     }
 }
