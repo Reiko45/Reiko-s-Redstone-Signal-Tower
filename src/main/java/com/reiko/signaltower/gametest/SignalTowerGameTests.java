@@ -4188,4 +4188,100 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Handing a frequency over ----
+
+    /**
+     * Handing over: only the owner may (not a friend, not an operator), only to one of its members
+     * (by name, ignoring case; a group member counts), and not to someone at their limit. The new
+     * owner gets it with everyone else on it, the old owner first, as single friends (groups
+     * flattened), still encrypted, with its note; the old owner's blocks may still send on it, a
+     * stranger's may not. A public frequency has nothing to hand over; the packet survives the network.
+     */
+    @GameTest(template = PLATFORM)
+    public static void handOverFrequency(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        var notes = com.reiko.signaltower.radio.FrequencyNotes.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID steveId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        UUID zedId = UUID.randomUUID();
+        List<Component> chat = new java.util.ArrayList<>(); // hand-over messages go to chat
+        BlockPos at = new BlockPos(1, 1, 1);
+        Player dev = namedPlayer(helper, at, devId, "Dev", false, new java.util.ArrayList<>(), chat);
+        Player steve = namedPlayer(helper, at, steveId, "Steve", false, new java.util.ArrayList<>(), chat);
+        Player op = namedPlayer(helper, at, UUID.randomUUID(), "Admin", true, new java.util.ArrayList<>(), chat);
+        java.util.function.BiFunction<Player, com.reiko.signaltower.network.HandOverFrequencyPayload, Boolean> apply =
+                com.reiko.signaltower.network.HandOverFrequencyPayload::apply;
+        int limit = com.reiko.signaltower.Config.PRIVATE_FREQUENCIES_PER_PLAYER.get();
+        try {
+            claims.putGroup(devId, null, "Crew 26", java.util.Map.of(alexId, "Alex"));
+            claims.put(2601, devId, "Dev", java.util.Map.of(steveId, "Steve"), List.of("Crew 26"), true);
+            notes.set(2601, "vault door", true);
+
+            check(!apply.apply(steve, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Steve")), "A friend can't");
+            check(lastKey(chat).endsWith("hand_over_not_owner") && claims.get(2601).owner().equals(devId), "Told why: " + lastKey(chat));
+            check(!apply.apply(op, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Steve")), "Nor an operator");
+            check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Zed")), "Not to a stranger");
+            check(lastKey(chat).endsWith("hand_over_not_member"), "Told why: " + lastKey(chat));
+            check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Dev")), "Not to themselves");
+
+            check(apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, " alex ")), "To a group member");
+            var handed = claims.get(2601);
+            check(handed.owner().equals(alexId) && "Alex".equals(handed.ownerName()) && lastKey(chat).endsWith("hand_over_done"),
+                    "Alex owns it: " + handed.ownerName() + " / " + lastKey(chat));
+            check(handed.friendNames().equals(List.of("Dev", "Steve")) && handed.groups().isEmpty(),
+                    "Everyone else as single friends, the old owner first: " + handed.friendNames() + " " + handed.groups());
+            check(handed.encrypted() && handed.allows(devId) && handed.allows(steveId) && !handed.allows(zedId), "Still encrypted, same members");
+            check(com.reiko.signaltower.radio.FrequencyClaims.maySend(helper.getLevel(), 2601, devId)
+                    && !com.reiko.signaltower.radio.FrequencyClaims.maySend(helper.getLevel(), 2601, zedId), "Dev's blocks still send");
+            check(notes.isMembersOnly(2601) && com.reiko.signaltower.radio.FrequencyNotes.visibleTo(server, 2601, dev),
+                    "Its note stays, and Dev still sees it");
+            check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Steve")), "Dev can't give it away again");
+
+            check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2602, "Steve")), "Public: nothing to hand over");
+            check(lastKey(chat).endsWith("hand_over_public"), "Told why: " + lastKey(chat));
+
+            if (limit > 0) {
+                for (int i = 0; i < limit; i++) {
+                    claims.put(2700 + i, steveId, "Steve", java.util.Map.of());
+                }
+                claims.put(2602, devId, "Dev", java.util.Map.of(steveId, "Steve"));
+                check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2602, "Steve")), "Steve is at his limit");
+                check(lastKey(chat).endsWith("hand_over_limit") && claims.get(2602).owner().equals(devId), "Told why: " + lastKey(chat));
+            }
+
+            java.util.Map<UUID, String> many = new java.util.LinkedHashMap<>();
+            for (int i = 0; i < com.reiko.signaltower.radio.FrequencyClaims.MAX_FRIENDS - 2; i++) {
+                many.put(UUID.randomUUID(), "Friend" + i);
+            }
+            java.util.Map<UUID, String> big = new java.util.LinkedHashMap<>();
+            for (int i = 0; i < 5; i++) {
+                big.put(UUID.randomUUID(), "Crew" + i);
+            }
+            claims.putGroup(devId, null, "Big 26", big);
+            claims.put(2603, devId, "Dev", many, List.of("Big 26"));
+            check(com.reiko.signaltower.radio.FrequencyClaims.friendsAfterHandOver(claims.get(2603), many.keySet().iterator().next()).size()
+                    == claims.get(2603).memberNames().size(), "Its member count is what the screen checks");
+            check(!apply.apply(dev, new com.reiko.signaltower.network.HandOverFrequencyPayload(2603, "Friend0")), "Too many to flatten");
+            check(lastKey(chat).endsWith("hand_over_too_many") && claims.get(2603).owner().equals(devId), "Told why: " + lastKey(chat));
+
+            var buffer = Unpooled.buffer();
+            var payload = new com.reiko.signaltower.network.HandOverFrequencyPayload(2601, "Steve");
+            com.reiko.signaltower.network.HandOverFrequencyPayload.STREAM_CODEC.encode(buffer, payload);
+            check(com.reiko.signaltower.network.HandOverFrequencyPayload.STREAM_CODEC.decode(buffer).equals(payload), "Survives the network");
+        } finally {
+            notes.set(2601, "");
+            for (int f : new int[]{2601, 2602, 2603}) {
+                claims.remove(f);
+            }
+            for (int i = 0; i < Math.max(limit, 0); i++) {
+                claims.remove(2700 + i);
+            }
+            claims.removeGroup(devId, "Crew 26");
+            claims.removeGroup(devId, "Big 26");
+        }
+        helper.succeed();
+    }
 }

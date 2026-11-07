@@ -74,14 +74,27 @@ public class AuditScreen extends Screen {
         top = Math.max(4, height / 2 - 96);
         listTop = top + 38;
         int buttonsY = listTop + ROWS * ROW_HEIGHT + 28;
+        // The owner also gets Hand over (v0.34.0); an operator auditing someone else's doesn't.
+        FrequencyClaims.ClaimInfo claim = FrequencyClaims.clientInfo(frequency);
+        boolean owner = claim != null && minecraft != null && minecraft.player != null
+                && claim.owner().equals(minecraft.player.getUUID());
+        int x = owner ? width / 2 - 154 : width / 2 - 104;
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
-                .bounds(width / 2 - 104, buttonsY, 100, 20).build());
+                .bounds(x, buttonsY, 100, 20).build());
         addRenderableWidget(Button.builder(Component.translatable(KEY + "close"), button -> {
             if (minecraft != null) {
                 minecraft.setScreen(null);
             }
         }).tooltip(Tooltip.create(Component.translatable(KEY + "close_tooltip")))
-                .bounds(width / 2 + 4, buttonsY, 100, 20).build());
+                .bounds(x + 104, buttonsY, 100, 20).build());
+        if (owner) {
+            addRenderableWidget(Button.builder(Component.translatable(KEY + "hand_over"), button -> {
+                if (minecraft != null) {
+                    minecraft.setScreen(new HandOverScreen(this, parent, frequency));
+                }
+            }).tooltip(Tooltip.create(Component.translatable(KEY + "hand_over_tooltip")))
+                    .bounds(x + 208, buttonsY, 100, 20).build());
+        }
         requestTimer = 0;
     }
 

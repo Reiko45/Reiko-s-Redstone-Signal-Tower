@@ -427,6 +427,54 @@ public final class FrequencyClaims extends SavedData {
         return claim;
     }
 
+    // ---- Handing a frequency over (v0.34.0) ----
+
+    /**
+     * The member of {@code claim} called {@code name} (ignoring case): one of its friends or a
+     * member of a group it uses, never its owner. Null if there's none.
+     */
+    public static @Nullable Map.Entry<UUID, String> memberNamed(Claim claim, String name) {
+        for (Map<UUID, String> members : List.of(claim.friends(), claim.groupMembers())) {
+            for (Map.Entry<UUID, String> member : members.entrySet()) {
+                if (!member.getKey().equals(claim.owner()) && member.getValue().equalsIgnoreCase(name.strip())) {
+                    return Map.entry(member.getKey(), member.getValue());
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Who would be friends if {@code claim} went to {@code newOwner}: the old owner first, then its
+     * friends, then its groups' members (groups belong to their owner, so they become single
+     * friends), without the new owner. Its size is the claim's member count.
+     */
+    public static Map<UUID, String> friendsAfterHandOver(Claim claim, UUID newOwner) {
+        Map<UUID, String> friends = new LinkedHashMap<>();
+        friends.put(claim.owner(), claim.ownerName());
+        claim.friends().forEach(friends::putIfAbsent);
+        claim.groupMembers().forEach(friends::putIfAbsent);
+        friends.remove(newOwner);
+        return friends;
+    }
+
+    /**
+     * Gives {@code frequency} to {@code newOwner} (who should be one of its members): everyone else
+     * on it stays on it as a friend, and it stays encrypted if it was. Null if it isn't private or
+     * would have more than {@link #MAX_FRIENDS} friends.
+     */
+    public @Nullable Claim handOver(int frequency, UUID newOwner, String newOwnerName) {
+        Claim claim = get(frequency);
+        if (claim == null) {
+            return null;
+        }
+        Map<UUID, String> friends = friendsAfterHandOver(claim, newOwner);
+        if (friends.size() > MAX_FRIENDS) {
+            return null;
+        }
+        return put(frequency, newOwner, newOwnerName, friends, List.of(), claim.encrypted());
+    }
+
     /** Makes {@code frequency} public again. Returns true if it was private. */
     public boolean remove(int frequency) {
         if (claims.remove(frequency) != null) {
