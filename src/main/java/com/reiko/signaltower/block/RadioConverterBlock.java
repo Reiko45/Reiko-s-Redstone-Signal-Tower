@@ -5,6 +5,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -96,9 +97,11 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
         Integer send = stack.get(ModRegistry.OUTPUT_FREQUENCY.get());
         if (listen != null) {
             tooltip.add(Component.translatable(prefix + "converter_listens", FrequencyNames.label(null, listen)).withStyle(ChatFormatting.AQUA));
+            FrequencyNotes.addTooltipLine(listen, tooltip);
         }
         if (send != null) {
             tooltip.add(Component.translatable(prefix + "converter_sends", FrequencyNames.label(null, send)).withStyle(ChatFormatting.AQUA));
+            FrequencyNotes.addTooltipLine(send, tooltip);
         }
         tooltip.add(Component.translatable(prefix + "converter_hint").withStyle(ChatFormatting.DARK_GRAY));
     }

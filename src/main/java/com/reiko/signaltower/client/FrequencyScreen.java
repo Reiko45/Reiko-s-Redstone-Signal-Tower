@@ -14,6 +14,7 @@ import com.reiko.signaltower.network.SetFrequencyPrivacyPayload;
 import com.reiko.signaltower.radio.Frequency;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -67,6 +68,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** True once the player typed in the name box, so changing the frequency doesn't overwrite it. */
     private boolean nameEdited;
     private boolean fillingName;
+    /** Tuner only: opens the typed frequency's note; its tooltip shows the note ({@code shownNote}: the one it shows now). */
+    private @Nullable Button noteButton;
+    private @Nullable String shownNote;
     /** Tuner only: whether the typed frequency is to be private (and encrypted), and the friends typed for it. */
     private @Nullable Button privateButton;
     private @Nullable EditBox friendsBox;
@@ -150,7 +154,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         addRenderableWidget(input);
 
         if (tuner) {
-            nameBox = new EditBox(font, centerX - 50, inputY + 26, 162, 20, Component.translatable(KEY + ".name"));
+            nameBox = new EditBox(font, centerX - 50, inputY + 26, 116, 20, Component.translatable(KEY + ".name"));
             nameBox.setMaxLength(FrequencyNames.MAX_LENGTH);
             nameBox.setHint(Component.translatable(KEY + ".name_hint").withStyle(ChatFormatting.DARK_GRAY));
             nameBox.setResponder(text -> {
@@ -159,6 +163,9 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
                 }
             });
             addRenderableWidget(nameBox);
+            noteButton = addRenderableWidget(Button.builder(Component.translatable(KEY + ".note"), button -> openNote())
+                    .bounds(centerX + 70, inputY + 26, 42, 20).build());
+            shownNote = null;
             fillName();
             if (keepName != null) {
                 fillingName = true;
@@ -269,6 +276,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
 
     /** Shows the typed frequency's current name in the name box, until the player types their own. */
     private void fillName() {
+        updateNoteButton(true);
         if (nameBox == null || nameEdited) {
             return;
         }
@@ -493,6 +501,36 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     }
 
     /** Opens the player's friend groups; Use here there adds the group to the Friends box. */
+    /**
+     * The Note button works for any typed frequency; its tooltip shows the note (or how to add
+     * one). {@code force}: the typed frequency changed, so set the tooltip even if the note didn't.
+     */
+    private void updateNoteButton(boolean force) {
+        if (noteButton == null) {
+            return;
+        }
+        noteButton.active = parsed().isPresent();
+        String note = parsed().isPresent() ? FrequencyNotes.noteOf(null, parsed().getAsInt()) : null;
+        if (force || !java.util.Objects.equals(note, shownNote)) {
+            shownNote = note;
+            noteButton.setTooltip(Tooltip.create(note == null
+                    ? Component.translatable(KEY + ".note_tooltip_empty")
+                    : Component.translatable(KEY + ".note_tooltip", note)));
+            noteButton.setMessage(Component.translatable(KEY + ".note")
+                    .withStyle(note == null ? ChatFormatting.WHITE : ChatFormatting.YELLOW));
+        }
+    }
+
+    /** Opens the typed frequency's note (read-only on someone else's private frequency, for non-members). */
+    private void openNote() {
+        if (minecraft == null || parsed().isEmpty()) {
+            return;
+        }
+        FrequencyClaims.ClaimInfo claim = claim();
+        boolean mayEdit = claim == null || mine(claim) || isFriend(claim) || isOperator();
+        minecraft.setScreen(new NoteScreen(this, parsed().getAsInt(), mayEdit ? null : claim.ownerName()));
+    }
+
     private void openGroups() {
         if (minecraft != null) {
             minecraft.setScreen(new GroupsScreen(this, name -> pickedGroup = name));
@@ -549,6 +587,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     @Override
     public void tick() {
         super.tick();
+        updateNoteButton(false); // a saved note arrives from the server a moment after the Note screen closes
         if (toggleMode != null && --scanTimer <= 0) {
             scanTimer = 20;
             PacketDistributor.sendToServer(new RemoteScanRequestPayload(

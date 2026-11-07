@@ -9,6 +9,7 @@ import com.reiko.signaltower.item.RemoteControlItem;
 import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.SignalNetwork;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
@@ -77,7 +78,7 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
     }
 
     /**
-     * Every named or private frequency, in order, with how strong it is anywhere in the player's
+     * Every named, noted or private frequency, in order, with how strong it is anywhere in the player's
      * dimension and where they stand. Someone else's private frequency only says whether it's heard
      * where the player stands (anywhere = -1), so the directory can't be used to watch it from afar;
      * someone else's encrypted frequency not even that (here = -1 too). Public for the GameTests.
@@ -90,6 +91,7 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
         }
         FrequencyClaims claims = FrequencyClaims.get(server);
         TreeSet<Integer> frequencies = new TreeSet<>(FrequencyNames.get(server).all().keySet());
+        frequencies.addAll(FrequencyNotes.get(server).all().keySet());
         frequencies.addAll(claims.allInfo().keySet());
         SignalNetwork network = SignalNetwork.get(level);
         for (int frequency : frequencies) {

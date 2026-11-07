@@ -14,6 +14,8 @@ import com.reiko.signaltower.network.FrequencyClaimPayload;
 import com.reiko.signaltower.network.FrequencyClaimsPayload;
 import com.reiko.signaltower.network.FrequencyNamePayload;
 import com.reiko.signaltower.network.FrequencyNamesPayload;
+import com.reiko.signaltower.network.FrequencyNotePayload;
+import com.reiko.signaltower.network.FrequencyNotesPayload;
 import com.reiko.signaltower.network.GroupsPayload;
 import com.reiko.signaltower.network.OpenConverterScreenPayload;
 import com.reiko.signaltower.network.RemoteScanRequestPayload;
@@ -23,10 +25,12 @@ import com.reiko.signaltower.network.ScannerResultPayload;
 import com.reiko.signaltower.network.ScrollFrequencyPayload;
 import com.reiko.signaltower.network.SelectRemoteButtonPayload;
 import com.reiko.signaltower.network.SetFrequencyNamePayload;
+import com.reiko.signaltower.network.SetFrequencyNotePayload;
 import com.reiko.signaltower.network.SetFrequencyPrivacyPayload;
 import com.reiko.signaltower.network.TrackTransmitterPayload;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 
@@ -98,6 +102,12 @@ public final class SignalTower {
                 FrequencyNamePayload::handle);
         registrar.playToClient(FrequencyNamesPayload.TYPE, FrequencyNamesPayload.STREAM_CODEC,
                 FrequencyNamesPayload::handle);
+        registrar.playToServer(SetFrequencyNotePayload.TYPE, SetFrequencyNotePayload.STREAM_CODEC,
+                SetFrequencyNotePayload::handle);
+        registrar.playToClient(FrequencyNotePayload.TYPE, FrequencyNotePayload.STREAM_CODEC,
+                FrequencyNotePayload::handle);
+        registrar.playToClient(FrequencyNotesPayload.TYPE, FrequencyNotesPayload.STREAM_CODEC,
+                FrequencyNotesPayload::handle);
         registrar.playToServer(EditGroupPayload.TYPE, EditGroupPayload.STREAM_CODEC, EditGroupPayload::handle);
         registrar.playToClient(GroupsPayload.TYPE, GroupsPayload.STREAM_CODEC, GroupsPayload::handle);
         registrar.playToServer(DirectoryRequestPayload.TYPE, DirectoryRequestPayload.STREAM_CODEC,
@@ -126,12 +136,13 @@ public final class SignalTower {
     }
 
     /**
-     * The player gets the world's frequency names and private frequencies, and their own friend
+     * The player gets the world's frequency names, notes and private frequencies, and their own friend
      * groups, and pagers say what turned on while their owner was away.
      */
     private static void onLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             PacketDistributor.sendToPlayer(player, new FrequencyNamesPayload(FrequencyNames.get(player.server).all()));
+            PacketDistributor.sendToPlayer(player, new FrequencyNotesPayload(FrequencyNotes.get(player.server).all()));
             PacketDistributor.sendToPlayer(player, new FrequencyClaimsPayload(FrequencyClaims.get(player.server).allInfo()));
             PacketDistributor.sendToPlayer(player, new GroupsPayload(FrequencyClaims.get(player.server).groupInfo(player.getUUID())));
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.

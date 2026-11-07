@@ -6,6 +6,7 @@ import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
@@ -218,6 +219,7 @@ public class RemoteControlItem extends Item {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";
         tooltip.add(Component.translatable(prefix + "frequency", FrequencyNames.label(null, FrequencyTunerItem.getFrequency(stack)))
                 .withStyle(ChatFormatting.AQUA));
+        FrequencyNotes.addTooltipLine(FrequencyTunerItem.getFrequency(stack), tooltip);
         RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "remote_mode", describeMode(isToggleMode(stack), getPulseTicks(stack)))
                 .withStyle(ChatFormatting.AQUA));

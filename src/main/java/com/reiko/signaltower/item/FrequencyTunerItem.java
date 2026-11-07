@@ -9,6 +9,7 @@ import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.Frequency;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -127,6 +128,7 @@ public class FrequencyTunerItem extends Item {
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".frequency", FrequencyNames.label(null, getFrequency(stack)))
                 .withStyle(ChatFormatting.AQUA));
+        FrequencyNotes.addTooltipLine(getFrequency(stack), tooltip);
         RadioFavorites.addFavoritesLine(stack, tooltip);
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_air").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tuner_use_block").withStyle(ChatFormatting.GRAY));

@@ -5,6 +5,7 @@ import com.reiko.signaltower.network.DirectoryRequestPayload;
 import com.reiko.signaltower.network.DirectoryResultPayload;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -64,7 +65,7 @@ public class DirectoryScreen extends Screen {
     }
 
     /** One frequency in the list. */
-    private record Row(int frequency, @Nullable String name, FrequencyClaims.@Nullable ClaimInfo claim) {}
+    private record Row(int frequency, @Nullable String name, @Nullable String note, FrequencyClaims.@Nullable ClaimInfo claim) {}
 
     private final Screen parent;
     private final int current;
@@ -133,13 +134,15 @@ public class DirectoryScreen extends Screen {
         return Component.translatable(KEY + "filter", Component.translatable(KEY + "filter_" + filter.key()));
     }
 
-    /** Reads the world's names and private frequencies from the client's copies. */
+    /** Reads the world's names, notes and private frequencies from the client's copies. */
     private void reload() {
         TreeSet<Integer> frequencies = new TreeSet<>(FrequencyNames.clientFrequencies());
+        frequencies.addAll(FrequencyNotes.clientFrequencies());
         frequencies.addAll(FrequencyClaims.clientFrequencies());
         List<Row> rows = new ArrayList<>(frequencies.size());
         for (int frequency : frequencies) {
-            rows.add(new Row(frequency, FrequencyNames.nameOf(null, frequency), FrequencyClaims.clientInfo(frequency)));
+            rows.add(new Row(frequency, FrequencyNames.nameOf(null, frequency), FrequencyNotes.noteOf(null, frequency),
+                    FrequencyClaims.clientInfo(frequency)));
         }
         all = rows;
         refilter();
@@ -153,6 +156,7 @@ public class DirectoryScreen extends Screen {
             if (matchesFilter(row) && (query.isEmpty()
                     || (!digits.isEmpty() && digits.chars().allMatch(Character::isDigit) && Integer.toString(row.frequency()).contains(digits))
                     || (row.name() != null && row.name().toLowerCase(Locale.ROOT).contains(query))
+                    || (row.note() != null && row.note().toLowerCase(Locale.ROOT).contains(query))
                     || (row.claim() != null && row.claim().ownerName().toLowerCase(Locale.ROOT).contains(query)))) {
                 rows.add(row);
             }
@@ -243,6 +247,22 @@ public class DirectoryScreen extends Screen {
         return String.format(Locale.ROOT, "%,d", frequency);
     }
 
+    /** The name column: the name, then its note in grey (cut off to fit); "-" with neither. */
+    private static Component nameCell(Row row) {
+        if (row.name() == null && row.note() == null) {
+            return Component.literal("-").withStyle(ChatFormatting.DARK_GRAY);
+        }
+        var cell = Component.empty();
+        if (row.name() != null) {
+            cell.append(Component.literal(row.name()).withStyle(ChatFormatting.AQUA));
+        }
+        if (row.note() != null) {
+            cell.append(Component.literal((row.name() != null ? "  " : "") + row.note())
+                    .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+        }
+        return cell;
+    }
+
     /** Who can send on it, short enough for its column. */
     private Component owner(Row row) {
         FrequencyClaims.ClaimInfo claim = row.claim();
@@ -286,6 +306,9 @@ public class DirectoryScreen extends Screen {
         List<Component> lines = new ArrayList<>();
         Object label = row.name() == null ? format(row.frequency()) : FrequencyNames.named(row.frequency(), row.name());
         lines.add(Component.translatable(KEY + "tip_frequency", label));
+        if (row.note() != null) {
+            lines.add(FrequencyNotes.line(row.note()));
+        }
         FrequencyClaims.ClaimInfo claim = row.claim();
         if (claim == null) {
             lines.add(Component.translatable(KEY + "tip_public").withStyle(ChatFormatting.GRAY));
@@ -355,9 +378,7 @@ public class DirectoryScreen extends Screen {
             boolean isCurrent = row.frequency() == current;
             graphics.drawString(font, (isCurrent ? "» " : "") + format(row.frequency()), left + 4, textY,
                     isCurrent ? 0x80FF80 : 0x55FFFF);
-            drawFitted(graphics, row.name() == null
-                    ? Component.literal("-").withStyle(ChatFormatting.DARK_GRAY)
-                    : Component.literal(row.name()).withStyle(ChatFormatting.AQUA), left + NAME_X, textY, OWNER_X - NAME_X - 6);
+            drawFitted(graphics, nameCell(row), left + NAME_X, textY, OWNER_X - NAME_X - 6);
             drawFitted(graphics, owner(row), left + OWNER_X, textY, NOW_X - OWNER_X - 6);
             drawFitted(graphics, now(row), left + NOW_X, textY, WIDTH - NOW_X - 4);
         }

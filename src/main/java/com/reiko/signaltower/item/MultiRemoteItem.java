@@ -4,6 +4,7 @@ import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioBlockEntity;
 import com.reiko.signaltower.client.ClientHooks;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -138,6 +139,9 @@ public class MultiRemoteItem extends Item {
             tooltip.add(Component.translatable(prefix + (selected ? "remote_button_line_selected" : "remote_button_line"),
                     button.label(i), FrequencyNames.label(null, button.frequency()), RemoteControlItem.describeMode(button.toggle(), button.pulseTicks()))
                     .withStyle(selected ? ChatFormatting.AQUA : ChatFormatting.DARK_AQUA));
+            if (selected) {
+                FrequencyNotes.addTooltipLine(button.frequency(), tooltip); // only the selected button's, to keep it short
+            }
         }
         tooltip.add(Component.translatable(prefix + "multi_remote_use").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable(prefix + "multi_remote_select").withStyle(ChatFormatting.GRAY));

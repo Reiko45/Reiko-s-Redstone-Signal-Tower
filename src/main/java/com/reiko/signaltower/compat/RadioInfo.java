@@ -12,6 +12,7 @@ import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
 import net.minecraft.ChatFormatting;
@@ -47,7 +48,8 @@ public final class RadioInfo {
     /**
      * The server's data for the block at {@code pos}, or null if it isn't one of the mod's radio
      * blocks or masts. The frequencies' names (if they have any) come along as "name" and
-     * "output_name", since the client might not know them. If the frequency it sends on (or a
+     * "output_name", since the client might not know them, and their notes as "note" and
+     * "output_note". If the frequency it sends on (or a
      * receiver's) is private, its owner comes along as "private_to", "encrypted" says whether only
      * members hear it, and "silenced" says whether this block is kept quiet because its tuner
      * isn't the owner or a friend. A receiver or converter that can't hear the frequency it
@@ -58,6 +60,8 @@ public final class RadioInfo {
         if (tag != null) {
             addName(level, tag, "frequency", "name");
             addName(level, tag, "output", "output_name");
+            addNote(level, tag, "frequency", "note");
+            addNote(level, tag, "output", "output_note");
             if (!tag.contains("top") && tag.contains("frequency")) {
                 int frequency = tag.contains("output") ? tag.getInt("output") : tag.getInt("frequency");
                 FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
@@ -178,9 +182,12 @@ public final class RadioInfo {
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
             if (data.contains("output")) {
                 lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));
+                addNoteLine(lines, data, "note");
                 lines.add(Component.translatable(LANG + "sends", number(data, "output", "output_name")));
+                addNoteLine(lines, data, "output_note");
             } else {
                 lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
             }
             return lines;
         }
@@ -191,7 +198,9 @@ public final class RadioInfo {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioRepeaterBlock.LIT);
             if (hasData) {
                 lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));
+                addNoteLine(lines, data, "note");
                 lines.add(Component.translatable(LANG + "sends", number(data, "output", "output_name")));
+                addNoteLine(lines, data, "output_note");
             }
             lines.add(!on ? Component.translatable(LANG + "converting_nothing").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "converting", value(data.getInt("power")))
@@ -203,6 +212,7 @@ public final class RadioInfo {
         }
         if (hasData) {
             lines.add(frequencyLine(data));
+            addNoteLine(lines, data, "note");
         }
         if (block instanceof RadioTransmitterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
@@ -244,6 +254,23 @@ public final class RadioInfo {
 
     private static Component frequencyLine(CompoundTag data) {
         return Component.translatable(LANG + "frequency", number(data, "frequency", "name"));
+    }
+
+    /** Puts the note on the frequency under {@code frequencyKey} (if it has one) under {@code noteKey}. */
+    private static void addNote(ServerLevel level, CompoundTag tag, String frequencyKey, String noteKey) {
+        if (tag.contains(frequencyKey)) {
+            String note = FrequencyNotes.noteOf(level, tag.getInt(frequencyKey));
+            if (note != null) {
+                tag.putString(noteKey, note);
+            }
+        }
+    }
+
+    /** Adds the note under {@code noteKey} (if there is one) as a grey line. */
+    private static void addNoteLine(List<Component> lines, CompoundTag data, String noteKey) {
+        if (data.contains(noteKey)) {
+            lines.add(FrequencyNotes.line(data.getString(noteKey)));
+        }
     }
 
     /** "2026", or "2026 (Front Gate)" if the server sent a name, in aqua. */

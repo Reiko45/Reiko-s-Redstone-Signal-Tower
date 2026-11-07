@@ -71,6 +71,17 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![Naming 2026 "Front Gate" in the tuner, and the name in the remote's screen, Jade, the tuner's tooltip, the scanner and a remote press](docs/images/frequency-names.png)
 
+**Frequency notes:**
+- **Adding one:** in the Frequency Tuner's screen, type the frequency and click **Note** (next to the Name box). Type a short note on what it's for, like "lever by the front door; also lights the hall" (up to 64 characters), and press **Save** or Enter: "Note for frequency 2026 (Front Gate) saved". Clear the box and save to remove it. The Note button turns yellow when the typed frequency has a note, and hovering it shows the note.
+- **Shared:** like names, notes belong to the world: everyone on a server sees them, they're saved with the world, and they count in every dimension. Anyone holding a tuner can change one, except on a private frequency (only its owner, their friends and server operators can; others see it read-only).
+- **Where they show**, in grey italics:
+  - the frequency directory: after the name in the Name column, in the row's tooltip, and the search box matches notes too ("hall" finds 2026);
+  - Jade, under the frequency line (a converter shows both its frequencies' notes);
+  - item tooltips: the tuner, Remote Control, pager, radio blocks, the converter (both frequencies) and the Multi-Button Remote's selected button.
+- A frequency with only a note (no name, public) is listed in the directory too. A world holds up to 4,096 notes.
+
+  ![The Note screen for 2026 (Front Gate); Jade showing the note under the frequency; the directory finding it by searching "hall", with the note in the tooltip; and the tuner's item tooltip](docs/images/frequency-notes.png)
+
 **Private frequencies:**
 - **Making one private:** in the Frequency Tuner's screen, type the frequency and click the button under the Name box so it says **Private** instead of **Public**, then press Done: "2026 (Front Gate) is now private: only you can send on it". The line under the button says who can send on the typed frequency, or what Done will change.
 - **Friends:** type players' names in the box next to the button, separated by commas (up to 16), and press Done: "only you and Steve can send on it". A friend must be online the first time you add them; after that they stay a friend by their account, online or not. Delete a name and press Done to take them off.
@@ -113,7 +124,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - **Now:** "On 15" if something is sending on it anywhere in your dimension, "On 15, here" if you also hear it where you stand, "Off" if nothing is.
 - **Others' private frequencies stay private:** for someone else's private frequency the directory only says "Here 15" when you can hear it where you stand, and "?" otherwise, so it can't be used to watch their base from afar. Someone else's encrypted frequency only says "Encrypted".
 - **Using one:** click a row and it goes into the screen you came from (with its name and privacy, in the tuner's; into that button's or that box's frequency in the keypad and the converter's screen), so you just press Done. **Back** returns with what you'd typed.
-- **Finding one:** type in the search box to match a name, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
+- **Finding one:** type in the search box to match a name, a note, a number or an owner. The **Show** button switches between All, Named, Private, Mine (private ones you own or are a friend on) and On now; sneak-click goes back. Hover a row for details: who owns it, its friends (if you're one of them), and whether it's on.
 - It updates every second while open.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
@@ -513,9 +524,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 109. on an encrypted frequency, a non-member's receiver hears nothing (no signal, no towers), their scanner doesn't list it, their converter neither passes it on nor carries presses, and their receivers aren't counted by remotes or the locator; members' and old blocks hear it; made just private, everyone hears it again;
 110. real blocks: a stranger's receiver and toggle receiver stay off and say why (the tuner's message, the readout, Jade), the friend's and an old one light up; just private, the stranger's lights up, and becoming able to hear isn't a turn-on for the toggle receiver;
 111. a non-member's pager doesn't alert, isn't counted for "Heard by" and reports nothing in the catch-up; their scanner can't track it and drops a target on it; their directory shows only "Encrypted"; the friend's do all of that;
-112. the tuner's packet encrypts a new claim, decrypts and re-encrypts it, says so, changes nothing when asked for what it already is, refuses anyone but the owner, and lets an operator only make it public.
+112. the tuner's packet encrypts a new claim, decrypts and re-encrypts it, says so, changes nothing when asked for what it already is, refuses anyone but the owner, and lets an operator only make it public;
+113. notes are tidied (spaces trimmed, formatting codes dropped, cut to 64 characters), an empty one removes the note, frequencies are clamped, a world keeps at most 4,096 (existing ones can still change), they're saved, the three note packets survive the network, and the client's copy (with its tooltip line) is kept up to date and cleared on leaving;
+114. the Note screen's packet needs a tuner in hand, sets and removes a note and says so, changes nothing when nothing changed, and on a private frequency refuses non-members but lets a friend and an operator change it;
+115. Jade's data carries the note and shows it right under the frequency line (under both lines for a converter, none without a note), and the directory lists frequencies that only have a note.
 
-All 112 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 115 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

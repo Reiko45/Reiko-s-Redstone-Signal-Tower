@@ -6,6 +6,7 @@ import com.reiko.signaltower.blockentity.RadioReceiverBlockEntity;
 import com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
+import com.reiko.signaltower.radio.FrequencyNotes;
 import com.reiko.signaltower.radio.SignalNetwork;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
@@ -129,6 +130,7 @@ public abstract class RadioBlock extends BaseEntityBlock {
         if (frequency != null) {
             tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".frequency", FrequencyNames.label(null, frequency))
                     .withStyle(ChatFormatting.AQUA));
+            FrequencyNotes.addTooltipLine(frequency, tooltip);
         }
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tune_hint").withStyle(ChatFormatting.DARK_GRAY));
     }

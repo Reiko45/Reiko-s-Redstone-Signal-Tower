@@ -119,6 +119,7 @@ public final class SignalTowerClient {
     /** Leaving a world or server: forget its frequency names (the next one sends its own). */
     private static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         com.reiko.signaltower.radio.FrequencyNames.clientClear();
+        com.reiko.signaltower.radio.FrequencyNotes.clientClear();
         com.reiko.signaltower.radio.FrequencyClaims.clientClear();
     }
 }

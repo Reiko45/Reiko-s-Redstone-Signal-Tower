@@ -3658,4 +3658,159 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Frequency notes ----
+
+    /**
+     * Notes are tidied (formatting codes gone, spaces trimmed, cut to 64 characters), an empty
+     * one removes the note, a world keeps at most 4,096, they're saved, and the packets and the
+     * client's copy (with its tooltip line) work like names'.
+     */
+    @GameTest(template = PLATFORM)
+    public static void frequencyNotesStoredSavedAndSynced(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var notes = new com.reiko.signaltower.radio.FrequencyNotes();
+        check("opens the barn door".equals(notes.set(2301, "  opens the barn door  ")), "Spaces trimmed: " + notes.get(2301));
+        check(!notes.set(2302, "§cred door").contains("§"), "Formatting codes dropped");
+        String longNote = notes.set(2302, "x".repeat(100));
+        check(longNote.length() == com.reiko.signaltower.radio.FrequencyNotes.MAX_LENGTH, "Cut to 64: " + longNote.length());
+        check("".equals(notes.set(2302, "   ")) && notes.get(2302) == null, "Empty removes it");
+        check(notes.set(0, "low").equals("low") && notes.get(1) != null, "Frequencies are clamped like everywhere else");
+        notes.set(1, "");
+
+        var loaded = com.reiko.signaltower.radio.FrequencyNotes.load(notes.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check("opens the barn door".equals(loaded.get(2301)) && loaded.all().size() == 1, "Saved and loaded: " + loaded.all());
+
+        var full = new com.reiko.signaltower.radio.FrequencyNotes();
+        for (int i = 0; i < com.reiko.signaltower.radio.FrequencyNotes.MAX_NOTES; i++) {
+            full.set(100_000 + i, "n");
+        }
+        check(full.set(99, "one more") == null && full.get(99) == null, "Full: refused");
+        check("changed".equals(full.set(100_000, "changed")) && "".equals(full.set(100_001, "")), "But existing ones can still change or go");
+
+        var buffer = Unpooled.buffer();
+        var list = new com.reiko.signaltower.network.FrequencyNotesPayload(java.util.Map.of(2301, "opens the barn door", 42, "farm"));
+        com.reiko.signaltower.network.FrequencyNotesPayload.STREAM_CODEC.encode(buffer, list);
+        check(com.reiko.signaltower.network.FrequencyNotesPayload.STREAM_CODEC.decode(buffer).notes().equals(list.notes()), "The list survives the network");
+        var one = new com.reiko.signaltower.network.FrequencyNotePayload(2301, "x".repeat(64));
+        com.reiko.signaltower.network.FrequencyNotePayload.STREAM_CODEC.encode(buffer, one);
+        check(com.reiko.signaltower.network.FrequencyNotePayload.STREAM_CODEC.decode(buffer).equals(one), "One change survives it");
+        var set = new com.reiko.signaltower.network.SetFrequencyNotePayload(2301, "opens the barn door");
+        com.reiko.signaltower.network.SetFrequencyNotePayload.STREAM_CODEC.encode(buffer, set);
+        check(com.reiko.signaltower.network.SetFrequencyNotePayload.STREAM_CODEC.decode(buffer).equals(set), "So does the tuner's");
+
+        try {
+            com.reiko.signaltower.radio.FrequencyNotes.clientReplaceAll(java.util.Map.of(2303, "gate"));
+            check("gate".equals(com.reiko.signaltower.radio.FrequencyNotes.noteOf(null, 2303)), "From the full list");
+            com.reiko.signaltower.radio.FrequencyNotes.clientSet(2304, "bell");
+            com.reiko.signaltower.radio.FrequencyNotes.clientSet(2303, "");
+            check(com.reiko.signaltower.radio.FrequencyNotes.noteOf(null, 2303) == null
+                    && com.reiko.signaltower.radio.FrequencyNotes.clientFrequencies().equals(java.util.Set.of(2304)), "One change at a time");
+            List<Component> tooltip = new java.util.ArrayList<>();
+            com.reiko.signaltower.radio.FrequencyNotes.addTooltipLine(2303, tooltip);
+            com.reiko.signaltower.radio.FrequencyNotes.addTooltipLine(2304, tooltip);
+            check(tooltip.size() == 1 && keyOf(tooltip.get(0)).endsWith("tooltip.reikos_signal_tower.note")
+                    && tooltip.get(0).getString().contains("bell"), "A tooltip line only for a noted frequency: " + tooltip);
+            com.reiko.signaltower.radio.FrequencyNotes.clientClear();
+            check(com.reiko.signaltower.radio.FrequencyNotes.noteOf(null, 2304) == null, "Cleared on leaving");
+        } finally {
+            com.reiko.signaltower.radio.FrequencyNotes.clientClear();
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The Note screen's packet: needs a tuner in hand, sets and removes a note (saying so), does
+     * nothing when nothing changes, and on a private frequency only lets members and operators
+     * change it.
+     */
+    @GameTest(template = PLATFORM)
+    public static void noteThroughTheTunerPacket(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var notes = com.reiko.signaltower.radio.FrequencyNotes.get(level.getServer());
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID ownerId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player player = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Writer", false, bar, new java.util.ArrayList<>());
+        Player friend = namedPlayer(helper, new BlockPos(1, 1, 1), friendId, "Friend", false, bar, new java.util.ArrayList<>());
+        Player op = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Admin", true, bar, new java.util.ArrayList<>());
+        java.util.function.BiFunction<Player, com.reiko.signaltower.network.SetFrequencyNotePayload, Boolean> apply =
+                com.reiko.signaltower.network.SetFrequencyNotePayload::apply;
+        try {
+            check(!apply.apply(player, new com.reiko.signaltower.network.SetFrequencyNotePayload(2305, "barn")), "No tuner in hand: refused");
+            check(notes.get(2305) == null, "Nothing stored");
+            for (Player p : List.of(player, friend, op)) {
+                p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+            }
+            check(apply.apply(player, new com.reiko.signaltower.network.SetFrequencyNotePayload(2305, "opens the barn door")), "Set");
+            check("opens the barn door".equals(com.reiko.signaltower.radio.FrequencyNotes.noteOf(level, 2305))
+                    && lastKey(bar).endsWith("note_set"), "Stored, and said: " + lastKey(bar));
+            check(!apply.apply(player, new com.reiko.signaltower.network.SetFrequencyNotePayload(2305, " opens the barn door ")),
+                    "The same note again changes nothing");
+            check(apply.apply(player, new com.reiko.signaltower.network.SetFrequencyNotePayload(2305, "")), "Removed");
+            check(notes.get(2305) == null && lastKey(bar).endsWith("note_removed"), "Gone: " + lastKey(bar));
+
+            claims.put(2306, ownerId, "Owner", java.util.Map.of(friendId, "Friend"));
+            check(!apply.apply(player, new com.reiko.signaltower.network.SetFrequencyNotePayload(2306, "mine now")), "Not a member: refused");
+            check(notes.get(2306) == null && lastKey(bar).endsWith("private_refused_note"), "Told why: " + lastKey(bar));
+            check(apply.apply(friend, new com.reiko.signaltower.network.SetFrequencyNotePayload(2306, "vault door")), "A friend may");
+            check(apply.apply(op, new com.reiko.signaltower.network.SetFrequencyNotePayload(2306, "checked by an admin")), "So may an operator");
+            check("checked by an admin".equals(notes.get(2306)), "Stored");
+        } finally {
+            notes.set(2305, "");
+            notes.set(2306, "");
+            claims.remove(2306);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Notes in Jade (under the frequency line, and under both of a converter's) and in the
+     * directory, which lists a frequency that only has a note.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 60)
+    public static void notesInJadeAndDirectory(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var notes = com.reiko.signaltower.radio.FrequencyNotes.get(level.getServer());
+        notes.set(2307, "opens the barn door");
+        notes.set(2309, "farm lights");
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos converter = new BlockPos(3, 1, 1);
+        BlockPos plain = new BlockPos(5, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 2307);
+        place(helper, converter, ModRegistry.RADIO_CONVERTER.get(), 2307);
+        ((com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity) helper.getBlockEntity(converter)).setFrequencies(2307, 2309);
+        place(helper, plain, ModRegistry.RADIO_RECEIVER.get(), 2308);
+        Player player = mockPlayerAt(helper, new BlockPos(1, 1, 3));
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    try {
+                        CompoundTag txInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(tx));
+                        check(txInfo != null && "opens the barn door".equals(txInfo.getString("note")), "Jade's data has the note: " + txInfo);
+                        List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), txInfo));
+                        check(keys.size() > 1 && keys.get(0).equals("frequency") && keys.get(1).equals("note"), "Right under the frequency: " + keys);
+
+                        CompoundTag convInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(converter));
+                        check(convInfo != null && "farm lights".equals(convInfo.getString("output_note")), "The converter's output note: " + convInfo);
+                        List<String> convKeys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(converter), convInfo));
+                        check(convKeys.subList(0, 4).equals(List.of("listens", "note", "sends", "note")), "Under both of its frequencies: " + convKeys);
+
+                        CompoundTag plainInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(plain));
+                        check(plainInfo != null && !plainInfo.contains("note")
+                                && !lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(plain), plainInfo)).contains("note"),
+                                "No note, no line");
+
+                        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+                        var listed = com.reiko.signaltower.network.DirectoryRequestPayload.entriesFor(player).stream()
+                                .map(com.reiko.signaltower.network.DirectoryResultPayload.Entry::frequency).toList();
+                        check(listed.contains(2307) && listed.contains(2309) && !listed.contains(2308), "The directory lists noted frequencies: " + listed);
+                    } finally {
+                        notes.set(2307, "");
+                        notes.set(2309, "");
+                    }
+                })
+                .thenSucceed();
+    }
 }
