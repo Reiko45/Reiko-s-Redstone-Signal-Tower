@@ -4393,4 +4393,159 @@ public final class SignalTowerGameTests {
         }
         helper.succeed();
     }
+
+    // ---- Guest passes and intruder alerts ----
+
+    /**
+     * Guest passes: a guest may send on a private frequency (and hear it, encrypted) until their
+     * pass runs out, then drops off; never the owner, a friend, or a ninth guest (a renewal still
+     * works when full). The owner's packet renews and removes guests and refuses an offline name,
+     * a wrong length, a non-owner and a public frequency. Editing the friends or handing it over
+     * keeps the guests (not one who became a friend or the owner); they're saved and sent to clients.
+     */
+    @GameTest(template = PLATFORM)
+    public static void guestPasses(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID steveId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(1, 1, 1);
+        Player dev = namedPlayer(helper, at, devId, "Dev", false, bar, new java.util.ArrayList<>());
+        Player steve = namedPlayer(helper, at, steveId, "Steve", false, bar, new java.util.ArrayList<>());
+        long now = 1_800_000_000_000L;
+        try {
+            claims.put(2901, devId, "Dev", java.util.Map.of(steveId, "Steve"), List.of(), true);
+            check(claims.putGuest(2901, alexId, "Alex", now + 3_600_000L) != null, "Alex is a guest");
+            var claim = claims.get(2901);
+            check(claim.allows(alexId) && claim.hears(alexId) && com.reiko.signaltower.radio.FrequencyClaims.maySend(level, 2901, alexId),
+                    "A guest sends and hears");
+            check(claims.putGuest(2901, steveId, "Steve", now + 1000) == null && claims.putGuest(2901, devId, "Dev", now + 1000) == null,
+                    "Not a friend or the owner");
+            for (int i = 0; i < com.reiko.signaltower.radio.FrequencyClaims.MAX_GUESTS - 1; i++) {
+                claims.putGuest(2901, UUID.randomUUID(), "Guest" + i, now + 3_600_000L);
+            }
+            check(claims.putGuest(2901, UUID.randomUUID(), "OneTooMany", now + 1000) == null, "At most 8 guests");
+            check(claims.putGuest(2901, alexId, "Alex", now + 7_200_000L) != null, "A renewal works when full");
+
+            java.util.function.BiFunction<Player, com.reiko.signaltower.network.GuestPayload, Boolean> apply =
+                    (p, payload) -> com.reiko.signaltower.network.GuestPayload.apply(p, payload, now);
+            check(apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2901, " alex ", 86400)), "Renewed for a day");
+            check(claims.get(2901).guests().get(alexId).untilMillis() == now + 86_400_000L && lastKey(bar).endsWith("guest_renewed"),
+                    "Until a day from now: " + lastKey(bar));
+            check(!apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2901, "Alex", 100)), "Only an hour, a day or a week");
+            check(!apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2901, "Zed", 3600)), "Someone offline can't be added");
+            check(lastKey(bar).endsWith("guest_offline"), "Told why: " + lastKey(bar));
+            check(!apply.apply(steve, new com.reiko.signaltower.network.GuestPayload(2901, "Alex", 0)), "A friend can't");
+            check(lastKey(bar).endsWith("guest_not_owner"), "Told why: " + lastKey(bar));
+            check(!apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2902, "Alex", 3600)), "Public: nothing to do");
+            check(lastKey(bar).endsWith("guest_public"), "Told why: " + lastKey(bar));
+
+            claims.put(2901, devId, "Dev", java.util.Map.of(steveId, "Steve"), List.of(), true);
+            check(claims.get(2901).guests().containsKey(alexId) && claims.get(2901).guests().size() == com.reiko.signaltower.radio.FrequencyClaims.MAX_GUESTS,
+                    "Editing its friends keeps the guests");
+            var info = com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.of(claims.get(2901));
+            check(info.guest("alex") != null && info.isMember(alexId, "Alex") && !info.members().contains("Alex"),
+                    "Clients see Alex as a guest (and so a member)");
+            var buffer = Unpooled.buffer();
+            com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.STREAM_CODEC.encode(buffer, info);
+            check(com.reiko.signaltower.radio.FrequencyClaims.ClaimInfo.STREAM_CODEC.decode(buffer).equals(info), "Guests survive the network");
+            var loaded = com.reiko.signaltower.radio.FrequencyClaims.load(claims.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+            check(loaded.get(2901).guests().equals(claims.get(2901).guests()), "And saving");
+
+            check(apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2901, "Alex", 0)), "Removed");
+            check(!claims.get(2901).allows(alexId) && lastKey(bar).endsWith("guest_removed"), "Alex is off: " + lastKey(bar));
+            check(!apply.apply(dev, new com.reiko.signaltower.network.GuestPayload(2901, "Alex", 0)), "Not a guest any more");
+
+            claims.putGuest(2901, alexId, "Alex", now + 1000);
+            com.reiko.signaltower.network.GuestPayload.expire(server, now);
+            check(claims.get(2901).allows(alexId), "Not yet");
+            com.reiko.signaltower.network.GuestPayload.expire(server, now + 1000);
+            check(!claims.get(2901).allows(alexId) && !com.reiko.signaltower.radio.FrequencyClaims.maySend(level, 2901, alexId),
+                    "The pass ran out: Alex's blocks go silent");
+
+            claims.putGuest(2901, alexId, "Alex", now + 3_600_000L);
+            claims.put(2901, devId, "Dev", java.util.Map.of(steveId, "Steve", alexId, "Alex"), List.of(), true);
+            check(!claims.get(2901).guests().containsKey(alexId) && claims.get(2901).allows(alexId), "Made a friend: no longer a guest");
+            claims.put(2901, devId, "Dev", java.util.Map.of(steveId, "Steve"), List.of(), true);
+            claims.putGuest(2901, alexId, "Alex", now + 3_600_000L);
+            var handed = claims.handOver(2901, steveId, "Steve");
+            check(handed != null && handed.owner().equals(steveId) && handed.guests().containsKey(alexId), "Handed over: Alex stays a guest");
+        } finally {
+            claims.remove(2901);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Intruder alerts: a stranger's refused remote press (through the real remote code), a sender
+     * they place that stays silent (through the real placement) and a tune attempt are kept for the
+     * owner while they're away, one per intruder, frequency and kind a minute; members and public
+     * frequencies don't alert. At login the owner gets how many and the last five; older ones are
+     * only counted. Kept alerts survive saving.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 40)
+    public static void intruderAlerts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        var alerts = com.reiko.signaltower.radio.IntruderAlerts.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID steveId = UUID.randomUUID();
+        Player zed = namedPlayer(helper, new BlockPos(1, 1, 1), UUID.randomUUID(), "Zed", false,
+                new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player steve = namedPlayer(helper, new BlockPos(1, 1, 1), steveId, "Steve", false,
+                new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos tx = new BlockPos(3, 1, 1);
+        try {
+            alerts.resetQuiet();
+            claims.put(2903, devId, "Dev", java.util.Map.of(steveId, "Steve"));
+            RemoteControlItem.sendSignal(level, zed, new ItemStack(ModRegistry.REMOTE_CONTROL.get()), 2903, false, 20);
+            var kept = alerts.missedFor(devId);
+            check(kept.size() == 1 && kept.get(0).kind() == com.reiko.signaltower.radio.IntruderAlerts.Kind.REMOTE
+                    && "Zed".equals(kept.get(0).intruder()) && kept.get(0).frequency() == 2903, "A refused press, kept for Dev: " + kept);
+            RemoteControlItem.sendSignal(level, zed, new ItemStack(ModRegistry.REMOTE_CONTROL.get()), 2903, false, 20);
+            check(alerts.missedFor(devId).size() == 1, "Not again within a minute");
+
+            place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 2903);
+            BlockState state = helper.getBlockState(tx);
+            state.getBlock().setPlacedBy(level, helper.absolutePos(tx), state, zed, new ItemStack(ModRegistry.RADIO_TRANSMITTER_ITEM.get()));
+            kept = alerts.missedFor(devId);
+            check(kept.size() == 2 && kept.get(1).kind() == com.reiko.signaltower.radio.IntruderAlerts.Kind.SILENT
+                    && kept.get(1).block().equals(ModRegistry.RADIO_TRANSMITTER.get().getDescriptionId()), "A silent transmitter: " + kept);
+
+            com.reiko.signaltower.radio.IntruderAlerts.report(server, 2903, steve, com.reiko.signaltower.radio.IntruderAlerts.Kind.TUNE, null);
+            com.reiko.signaltower.radio.IntruderAlerts.report(server, 2904, zed, com.reiko.signaltower.radio.IntruderAlerts.Kind.TUNE, null);
+            check(alerts.missedFor(devId).size() == 2, "Not for a friend, nor a public frequency");
+
+            var loaded = com.reiko.signaltower.radio.IntruderAlerts.load(alerts.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+            check(loaded.missedFor(devId).equals(alerts.missedFor(devId)), "Kept alerts survive saving");
+
+            var lines = com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, devId);
+            check(lines.size() == 3 && keyOf(lines.get(0)).endsWith("intruder_missed")
+                    && lines.get(1).getSiblings().stream().anyMatch(c -> keyOf(c).endsWith("intruder_remote"))
+                    && lines.get(2).getSiblings().stream().anyMatch(c -> keyOf(c).endsWith("intruder_silent")),
+                    "At login: how many, then each: " + lines);
+            check(alerts.missedFor(devId).isEmpty() && com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, devId).isEmpty(),
+                    "Then they're forgotten");
+
+            for (int i = 0; i < 20; i++) {
+                alerts.resetQuiet();
+                com.reiko.signaltower.radio.IntruderAlerts.report(server, 2903, zed, com.reiko.signaltower.radio.IntruderAlerts.Kind.TUNE,
+                        ModRegistry.RADIO_TRANSMITTER.get());
+            }
+            check(alerts.missedFor(devId).size() == com.reiko.signaltower.radio.IntruderAlerts.MAX_STORED, "The last 16 are kept");
+            lines = com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, devId);
+            check(lines.size() == 1 + com.reiko.signaltower.radio.IntruderAlerts.SHOWN_AT_LOGIN + 1
+                    && firstArg(lines.get(0)).equals("20") && keyOf(lines.get(lines.size() - 1)).endsWith("intruder_missed_more"),
+                    "20 in all, the last 5 shown, then how many more: " + lines);
+        } finally {
+            claims.remove(2903);
+            com.reiko.signaltower.radio.IntruderAlerts.missedLines(server, devId);
+            alerts.resetQuiet();
+        }
+        helper.succeed();
+    }
 }

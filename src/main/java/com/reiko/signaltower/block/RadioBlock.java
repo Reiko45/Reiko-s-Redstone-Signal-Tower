@@ -119,6 +119,15 @@ public abstract class RadioBlock extends BaseEntityBlock {
             Component quiet = quietNotice(serverLevel, pos);
             if (quiet != null) {
                 player.displayClientMessage(quiet, true);
+                // Tell the frequency's owner (v0.36.0): a block of theirs that stays silent, or can't hear.
+                OptionalInt sends = SignalNetwork.get(serverLevel).towerFrequencyAt(pos);
+                if (silencedNotice(serverLevel, pos) != null && sends.isPresent()) {
+                    com.reiko.signaltower.radio.IntruderAlerts.report(serverLevel.getServer(), sends.getAsInt(), player,
+                            com.reiko.signaltower.radio.IntruderAlerts.Kind.SILENT, state.getBlock());
+                } else {
+                    com.reiko.signaltower.radio.IntruderAlerts.report(serverLevel.getServer(), radio.getFrequency(), player,
+                            com.reiko.signaltower.radio.IntruderAlerts.Kind.DEAF, state.getBlock());
+                }
             }
         }
     }

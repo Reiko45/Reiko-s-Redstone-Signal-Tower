@@ -169,6 +169,8 @@ public class RemoteControlItem extends Item {
         // Only the owner and their friends can send on a private frequency.
         Component refused = FrequencyClaims.refusal(level, frequency, player.getUUID(), "private_refused_send");
         if (refused != null) {
+            com.reiko.signaltower.radio.IntruderAlerts.report(level.getServer(), frequency, player,
+                    com.reiko.signaltower.radio.IntruderAlerts.Kind.REMOTE, null);
             level.playSound(null, origin, SoundEvents.STONE_BUTTON_CLICK_OFF, SoundSource.PLAYERS, 0.6F, 0.7F);
             remote.set(ModRegistry.REMOTE_LIGHT.get(), new RemoteLight(false, level.getGameTime() + RemoteLight.SHOW_TICKS));
             return refused;

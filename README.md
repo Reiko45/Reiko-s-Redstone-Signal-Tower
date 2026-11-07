@@ -148,6 +148,14 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
     - A transmitter that's yours, a friend's or has no record shows where it is; click its row for a beam of light over it, as in the audit. Another player's transmitter is named but not located, and where someone pressed a remote is never kept.
     - Hover a row for how long ago it was ("47 seconds ago"). A turn-on carried over from another frequency by a converter says so ("Transmitter on 2026").
     - Each dimension keeps the last 32 turn-ons of each frequency (the same ones the pager catch-up uses). Ones from before version 0.35 show as "Turned on", without a cause.
+  - **Guest passes:** the owner's audit has a **Guests...** button. Type a player's name (they must be online), then pick **1 hour**, **1 day** or **1 week**: "Alex is a guest on 2026 (Front Gate) for 1 hour". Until the pass runs out they can send on it like a friend (and hear it, if it's encrypted), and they're told in chat.
+    - The list shows each guest's time left ("59 minutes left"). Click one, then pick a time to renew their pass, or **Remove** to end it now.
+    - Passes run on real time, so they keep counting while the server is off. When one runs out, the guest drops off, their blocks go silent (or deaf) again, and both of you are told if you're online.
+    - Up to 8 guests per frequency. Friends and group members don't need a pass. Editing the friends or handing the frequency over keeps the guests. In the audit and the log, a guest's blocks show like a friend's.
+  - **Intruder alerts:** when someone who isn't on one of your private frequencies tries to use it, you're told in chat: "Radio alert: Alex pressed a remote on 2026 (Front Gate), but it's private: refused". It covers a refused remote press, a transmitter, repeater or converter they tried to tune onto it, a block they placed on it that stays silent, and one they set to it that can't hear it (encrypted).
+    - Like the audit, an alert never says where their block is.
+    - The same player, frequency and kind of try alerts at most once a minute.
+    - If you're offline, you get them when you log in: "While you were away, someone tried to use your private frequencies (3 times):", then the last five with their in-game day and time.
 
   ![The directory as Dev (left) and as Steve (right): Dev's own and public frequencies show whether they're on, Steve's private ones only when Dev can hear them; the tooltip on Steve's Farm; and a frequency picked into the Remote Control's screen](docs/images/frequency-directory.png)
 
@@ -156,6 +164,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   ![The audit with beams on over Steve's receiver and a repeater 135 blocks east (gold edges, "Beam on for 58 more seconds"), and the two gold beams in the evening sky](docs/images/audit-beams.png)
 
   ![The log of 2026: Dev's and Steve's remote pulses, Steve's transmitter twice (with its position, and its tooltip: "Tuned by Steve, a friend", 5 blocks south-east), older turn-ons without a cause; and a remote pulse's tooltip ("Where they stood isn't kept")](docs/images/frequency-log.png)
+
+  ![Dev's Guests screen giving Alex an hour on 2026; Alex's receiver hearing 2026 during the pass and his chat line; the alert Dev got when Alex pressed a remote after the pass was taken back; and the login summary of a tune Alex tried while Dev was away](docs/images/guests-and-alerts.png)
 
   ![Dev handing 4242 (Vault) over to Steve, a member through the Base crew group ("Click again"); Dev's directory afterwards ("Steve + you"); Steve's tuner on 4242 (Private, friend Dev) and his chat line](docs/images/hand-over.png)
 
@@ -565,9 +575,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 120. the Note screen's packet keeps a note to members on a private frequency and says so, counts a change of only the switch, ignores the switch on a public frequency, and Jade's data leaves the note out for a stranger and marks it for the owner;
 121. audit beams turn on for a minute (in their own dimension only) and off when clicked again, burn down tick by tick and go when spent, a ninth drops the one with the least time left, and leaving the world clears them;
 122. handing a frequency over: only its owner may (not a friend or an operator), only to one of its members (a group member counts, the name ignoring case), not to someone at their limit nor when it has more members than 16 friends; the new owner gets it with everyone else as single friends (the old owner first), still encrypted, with its note; the old owner's blocks still send and a stranger's don't; a public one has nothing to hand over; the packet survives the network;
-123. the frequency log lists the owner's transmitter (with its position), one with no recorded tuner (with its position), a friend's remote pulse and a stranger's toggle (named, no position), newest first; a silenced stranger's transmitter isn't a turn-on; someone no longer on it is named but not located; a converter's output frequency shows them carried over; only the owner and operators get it, not for a public frequency; causes are saved and old saves load without them; the answer survives the network.
+123. the frequency log lists the owner's transmitter (with its position), one with no recorded tuner (with its position), a friend's remote pulse and a stranger's toggle (named, no position), newest first; a silenced stranger's transmitter isn't a turn-on; someone no longer on it is named but not located; a converter's output frequency shows them carried over; only the owner and operators get it, not for a public frequency; causes are saved and old saves load without them; the answer survives the network;
+124. a guest can send on a private frequency and hear it (encrypted) until their pass runs out, then drops off and their blocks go silent; never the owner, a friend or a ninth guest (a renewal still works when full); the owner's packet renews and removes guests and refuses an offline name, a wrong length, a non-owner and a public frequency; editing the friends or handing it over keeps the guests (not one who became a friend); guests are saved and sent to clients;
+125. intruder alerts: a stranger's refused remote press (the real remote code), a transmitter they place that stays silent (the real placement) and a tune attempt are kept for an owner who's away, at most once a minute each; friends and public frequencies don't alert; at login the owner gets how many and the last five, then they're forgotten; older ones are only counted; kept alerts survive saving.
 
-All 123 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 125 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

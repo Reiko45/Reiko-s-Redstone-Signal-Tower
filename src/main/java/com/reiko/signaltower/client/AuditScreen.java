@@ -78,10 +78,10 @@ public class AuditScreen extends Screen {
         FrequencyClaims.ClaimInfo claim = FrequencyClaims.clientInfo(frequency);
         boolean owner = claim != null && minecraft != null && minecraft.player != null
                 && claim.owner().equals(minecraft.player.getUUID());
-        // Back, Close and Log (v0.35.0); the owner also gets Hand over.
-        int buttonWidth = owner ? 90 : 100;
+        // Back, Close and Log (v0.35.0); the owner also gets Guests (v0.36.0) and Hand over.
+        int buttonWidth = owner ? 72 : 100;
         int step = buttonWidth + 4;
-        int x = width / 2 - ((owner ? 4 : 3) * step - 4) / 2;
+        int x = width / 2 - ((owner ? 5 : 3) * step - 4) / 2;
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, button -> onClose())
                 .bounds(x, buttonsY, buttonWidth, 20).build());
         addRenderableWidget(Button.builder(Component.translatable(KEY + "close"), button -> {
@@ -97,12 +97,18 @@ public class AuditScreen extends Screen {
         }).tooltip(Tooltip.create(Component.translatable(KEY + "log_tooltip")))
                 .bounds(x + 2 * step, buttonsY, buttonWidth, 20).build());
         if (owner) {
+            addRenderableWidget(Button.builder(Component.translatable(KEY + "guests"), button -> {
+                if (minecraft != null) {
+                    minecraft.setScreen(new GuestScreen(this, frequency));
+                }
+            }).tooltip(Tooltip.create(Component.translatable(KEY + "guests_tooltip")))
+                    .bounds(x + 3 * step, buttonsY, buttonWidth, 20).build());
             addRenderableWidget(Button.builder(Component.translatable(KEY + "hand_over"), button -> {
                 if (minecraft != null) {
                     minecraft.setScreen(new HandOverScreen(this, parent, frequency));
                 }
             }).tooltip(Tooltip.create(Component.translatable(KEY + "hand_over_tooltip")))
-                    .bounds(x + 3 * step, buttonsY, buttonWidth, 20).build());
+                    .bounds(x + 4 * step, buttonsY, buttonWidth, 20).build());
         }
         requestTimer = 0;
     }

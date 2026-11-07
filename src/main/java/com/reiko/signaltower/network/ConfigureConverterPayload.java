@@ -54,12 +54,18 @@ public record ConfigureConverterPayload(BlockPos pos, int listen, int send) impl
                 "private_refused_block");
         if (refused != null) {
             player.displayClientMessage(refused, true);
+            com.reiko.signaltower.radio.IntruderAlerts.report(player.getServer(), Frequency.clamp(payload.send()), player,
+                    com.reiko.signaltower.radio.IntruderAlerts.Kind.TUNE, player.level().getBlockState(pos).getBlock());
             return false;
         }
         converter.setTunedBy(player.getUUID());
         converter.setFrequencies(payload.listen(), payload.send());
         // Set, but on someone else's encrypted frequency it won't hear anything: say so instead.
         Component deaf = player.level() instanceof ServerLevel level ? RadioBlock.deafNotice(level, pos) : null;
+        if (deaf != null) {
+            com.reiko.signaltower.radio.IntruderAlerts.report(player.getServer(), converter.getFrequency(), player,
+                    com.reiko.signaltower.radio.IntruderAlerts.Kind.DEAF, player.level().getBlockState(pos).getBlock());
+        }
         player.displayClientMessage(deaf != null ? deaf : Component.translatable("message." + SignalTower.MOD_ID + ".converter_set",
                 converter.getFrequency(), converter.getOutputFrequency()).withStyle(ChatFormatting.AQUA), true);
         return true;

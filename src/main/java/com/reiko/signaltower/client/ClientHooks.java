@@ -71,6 +71,16 @@ public final class ClientHooks {
     }
 
     /** An audit answer arrived: hand it to the open audit screen, if there is one. */
+    /** A screen's answer from the server: shown in the Guests screen if it's open, else above the hotbar. */
+    public static void onScreenNotice(net.minecraft.network.chat.Component message) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof GuestScreen screen) {
+            screen.notice(message);
+        } else if (minecraft.player != null) {
+            minecraft.player.displayClientMessage(message, true);
+        }
+    }
+
     public static void onLogResult(com.reiko.signaltower.network.LogResultPayload result) {
         if (Minecraft.getInstance().screen instanceof LogScreen screen) {
             screen.onResult(result);

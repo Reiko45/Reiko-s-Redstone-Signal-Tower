@@ -10,6 +10,7 @@ import com.reiko.signaltower.radio.Frequency;
 import com.reiko.signaltower.radio.FrequencyClaims;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.FrequencyNotes;
+import com.reiko.signaltower.radio.IntruderAlerts;
 import com.reiko.signaltower.registry.ModRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -78,6 +79,10 @@ public class FrequencyTunerItem extends Item {
                 if (refused != null) {
                     // Someone else's private frequency: this block would send on it, so it's not tuned.
                     message = refused;
+                    if (player != null) {
+                        IntruderAlerts.report(level.getServer(), sendsOn(radio, frequency), player, IntruderAlerts.Kind.TUNE,
+                                level.getBlockState(pos).getBlock());
+                    }
                     level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
                 } else {
                     radio.setTunedBy(player == null ? null : player.getUUID());
@@ -86,6 +91,10 @@ public class FrequencyTunerItem extends Item {
                     Component deaf = level instanceof ServerLevel serverLevel ? RadioBlock.deafNotice(serverLevel, pos) : null;
                     message = deaf != null ? deaf
                             : Component.translatable("message." + SignalTower.MOD_ID + ".frequency_set", FrequencyNames.label(level, radio.getFrequency()));
+                    if (deaf != null && player != null) {
+                        IntruderAlerts.report(level.getServer(), radio.getFrequency(), player, IntruderAlerts.Kind.DEAF,
+                                level.getBlockState(pos).getBlock());
+                    }
                     level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
                 }
             }
@@ -103,15 +112,22 @@ public class FrequencyTunerItem extends Item {
      * listen, so they can always be tuned.
      */
     private static @Nullable Component refusal(Level level, RadioBlockEntity radio, int frequency, @Nullable Player player) {
-        int sends;
-        if (radio instanceof RadioTransmitterBlockEntity) {
-            sends = frequency;
-        } else if (radio instanceof RadioRepeaterBlockEntity relay) {
-            sends = relay.isConverter() ? relay.getOutputFrequency() : frequency;
-        } else {
+        int sends = sendsOn(radio, frequency);
+        if (sends < 0) {
             return null;
         }
         return FrequencyClaims.refusal(level, sends, player == null ? null : player.getUUID(), "private_refused_block");
+    }
+
+    /** The frequency {@code radio} would send on if tuned to {@code frequency} (a converter: its output), or -1 for a receiver. */
+    private static int sendsOn(RadioBlockEntity radio, int frequency) {
+        if (radio instanceof RadioTransmitterBlockEntity) {
+            return frequency;
+        }
+        if (radio instanceof RadioRepeaterBlockEntity relay) {
+            return relay.isConverter() ? relay.getOutputFrequency() : frequency;
+        }
+        return -1;
     }
 
     @Override

@@ -68,6 +68,18 @@ public final class FrequencyClaims extends SavedData {
     public static final int MAX_GROUP_NAME = 24;
     /** The most names a claim can let send, besides its owner. */
     public static final int MAX_MEMBERS = MAX_FRIENDS + MAX_GROUPS_PER_CLAIM * MAX_GROUP_MEMBERS;
+    /** The most guests one private frequency can have at once (v0.36.0). */
+    public static final int MAX_GUESTS = 8;
+    /** How long a guest pass can be: an hour, a day or a week (in seconds, real time). */
+    public static final List<Integer> GUEST_SECONDS = List.of(3600, 86400, 604800);
+
+    /**
+     * A guest on a private frequency (v0.36.0): who (by name, as when added) and until when, in
+     * real time (milliseconds since 1970, the server's clock), so a pass keeps running while the
+     * server is off. Until then they're a member like a friend; afterwards they drop off.
+     */
+    public record Guest(String name, long untilMillis) {
+    }
 
     /** A player's friend group: its name and its members (by UUID, with the names they had when added). */
     public record Group(String name, Map<UUID, String> members) {
@@ -86,11 +98,17 @@ public final class FrequencyClaims extends SavedData {
      * kept up to date when they change), and whether only members can hear it ({@code encrypted}).
      */
     public record Claim(UUID owner, String ownerName, Map<UUID, String> friends, List<String> groups,
-                        Map<UUID, String> groupMembers, boolean encrypted) {
+                        Map<UUID, String> groupMembers, boolean encrypted, Map<UUID, Guest> guests) {
         public Claim {
             friends = Collections.unmodifiableMap(new LinkedHashMap<>(friends)); // keeps the order they were added in
             groups = List.copyOf(groups);
             groupMembers = Collections.unmodifiableMap(new LinkedHashMap<>(groupMembers));
+            guests = Collections.unmodifiableMap(new LinkedHashMap<>(guests));
+        }
+
+        public Claim(UUID owner, String ownerName, Map<UUID, String> friends, List<String> groups,
+                     Map<UUID, String> groupMembers, boolean encrypted) {
+            this(owner, ownerName, friends, groups, groupMembers, encrypted, Map.of());
         }
 
         public Claim(UUID owner, String ownerName, Map<UUID, String> friends, List<String> groups,
@@ -102,9 +120,10 @@ public final class FrequencyClaims extends SavedData {
             this(owner, ownerName, friends, List.of(), Map.of());
         }
 
-        /** True for the owner, their friends and the members of the groups it uses. */
+        /** True for the owner, their friends, the members of the groups it uses and its guests. */
         public boolean allows(@Nullable UUID player) {
-            return player != null && (player.equals(owner) || friends.containsKey(player) || groupMembers.containsKey(player));
+            return player != null && (player.equals(owner) || friends.containsKey(player) || groupMembers.containsKey(player)
+                    || guests.containsKey(player));
         }
 
         /** True if a receiver tuned by {@code listener} hears it: always unless it's encrypted and they aren't a member. */
@@ -112,9 +131,30 @@ public final class FrequencyClaims extends SavedData {
             return !encrypted || allows(listener);
         }
 
-        /** This claim with other friends, groups and members, keeping its owner and encryption. */
+        /** This claim with other friends, groups and members, keeping its owner, encryption and guests. */
         Claim with(Map<UUID, String> friends, List<String> groups, Map<UUID, String> groupMembers) {
-            return new Claim(owner, ownerName, friends, groups, groupMembers, encrypted);
+            return new Claim(owner, ownerName, friends, groups, groupMembers, encrypted, guests);
+        }
+
+        /** This claim with other guests (never its owner, a friend or a group member). */
+        public Claim withGuests(Map<UUID, Guest> newGuests) {
+            Map<UUID, Guest> kept = new LinkedHashMap<>();
+            newGuests.forEach((uuid, guest) -> {
+                if (!uuid.equals(owner) && !friends.containsKey(uuid) && !groupMembers.containsKey(uuid) && kept.size() < MAX_GUESTS) {
+                    kept.put(uuid, guest);
+                }
+            });
+            return new Claim(owner, ownerName, friends, groups, groupMembers, encrypted, kept);
+        }
+
+        /** The guest called {@code name} (ignoring case), or null. */
+        public @Nullable Map.Entry<UUID, Guest> guestNamed(String name) {
+            for (Map.Entry<UUID, Guest> guest : guests.entrySet()) {
+                if (guest.getValue().name().equalsIgnoreCase(name.strip())) {
+                    return guest;
+                }
+            }
+            return null;
         }
 
         /** The friends listed one by one, in the order they were added. */
@@ -138,15 +178,31 @@ public final class FrequencyClaims extends SavedData {
      * can hear it.
      */
     public record ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members,
-                            boolean encrypted) {
-        public static final StreamCodec<ByteBuf, ClaimInfo> STREAM_CODEC = StreamCodec.composite(
-                UUIDUtil.STREAM_CODEC, ClaimInfo::owner,
-                ByteBufCodecs.stringUtf8(64), ClaimInfo::ownerName,
-                ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_FRIENDS)), ClaimInfo::friends,
-                ByteBufCodecs.stringUtf8(MAX_GROUP_NAME * 4).apply(ByteBufCodecs.list(MAX_GROUPS_PER_CLAIM)), ClaimInfo::groups,
-                ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_MEMBERS)), ClaimInfo::members,
-                ByteBufCodecs.BOOL, ClaimInfo::encrypted,
-                ClaimInfo::new);
+                            boolean encrypted, List<GuestInfo> guests) {
+        // Seven fields: more than StreamCodec.composite takes in 1.21.1, so written out by hand.
+        public static final StreamCodec<ByteBuf, ClaimInfo> STREAM_CODEC = StreamCodec.of(
+                (buffer, info) -> {
+                    UUIDUtil.STREAM_CODEC.encode(buffer, info.owner());
+                    ByteBufCodecs.stringUtf8(64).encode(buffer, info.ownerName());
+                    ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_FRIENDS)).encode(buffer, info.friends());
+                    ByteBufCodecs.stringUtf8(MAX_GROUP_NAME * 4).apply(ByteBufCodecs.list(MAX_GROUPS_PER_CLAIM)).encode(buffer, info.groups());
+                    ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_MEMBERS)).encode(buffer, info.members());
+                    ByteBufCodecs.BOOL.encode(buffer, info.encrypted());
+                    GuestInfo.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_GUESTS)).encode(buffer, info.guests());
+                },
+                buffer -> new ClaimInfo(
+                        UUIDUtil.STREAM_CODEC.decode(buffer),
+                        ByteBufCodecs.stringUtf8(64).decode(buffer),
+                        ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_FRIENDS)).decode(buffer),
+                        ByteBufCodecs.stringUtf8(MAX_GROUP_NAME * 4).apply(ByteBufCodecs.list(MAX_GROUPS_PER_CLAIM)).decode(buffer),
+                        ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(MAX_MEMBERS)).decode(buffer),
+                        ByteBufCodecs.BOOL.decode(buffer),
+                        GuestInfo.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_GUESTS)).decode(buffer)));
+
+        public ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members,
+                         boolean encrypted) {
+            this(owner, ownerName, friends, groups, members, encrypted, List.of());
+        }
 
         public ClaimInfo(UUID owner, String ownerName, List<String> friends, List<String> groups, List<String> members) {
             this(owner, ownerName, friends, groups, members, false);
@@ -158,23 +214,36 @@ public final class FrequencyClaims extends SavedData {
 
         public static ClaimInfo of(Claim claim) {
             return new ClaimInfo(claim.owner(), claim.ownerName(), claim.friendNames(), claim.groups(), claim.memberNames(),
-                    claim.encrypted());
+                    claim.encrypted(), claim.guests().values().stream().map(g -> new GuestInfo(g.name(), g.untilMillis())).toList());
         }
 
-        /** True if the player with this UUID and name is the owner or can send on it. */
+        /** True if the player with this UUID and name is the owner or can send on it (a guest too). */
         public boolean isMember(UUID player, String name) {
             return owner.equals(player) || hasMember(name);
         }
 
-        /** True if {@code name} (ignoring case) can send on it besides the owner. */
+        /** True if {@code name} (ignoring case) can send on it besides the owner: a friend, a group member or a guest. */
         public boolean hasMember(String name) {
-            return members.stream().anyMatch(member -> member.equalsIgnoreCase(name));
+            return members.stream().anyMatch(member -> member.equalsIgnoreCase(name)) || guest(name) != null;
+        }
+
+        /** The guest called {@code name} (ignoring case), or null. */
+        public @Nullable GuestInfo guest(String name) {
+            return guests.stream().filter(guest -> guest.name().equalsIgnoreCase(name)).findFirst().orElse(null);
         }
 
         /** True if it uses the group called {@code name} (ignoring case). */
         public boolean usesGroup(String name) {
             return groups.stream().anyMatch(group -> group.equalsIgnoreCase(name));
         }
+    }
+
+    /** What every client is told about a guest: their name and when their pass runs out (the server's clock, in ms). */
+    public record GuestInfo(String name, long untilMillis) {
+        public static final StreamCodec<ByteBuf, GuestInfo> STREAM_CODEC = StreamCodec.composite(
+                ByteBufCodecs.stringUtf8(64), GuestInfo::name,
+                ByteBufCodecs.VAR_LONG, GuestInfo::untilMillis,
+                GuestInfo::new);
     }
 
     /** What a player's own client is told about one of their groups. */
@@ -421,10 +490,81 @@ public final class FrequencyClaims extends SavedData {
                 limited.put(friend.getKey(), friend.getValue());
             }
         }
+        Claim existing = claims.get(Frequency.clamp(frequency));
         Claim claim = withMembers(new Claim(owner, ownerName, limited, groupNames, Map.of(), encrypted));
+        if (existing != null && existing.owner().equals(owner) && !existing.guests().isEmpty()) {
+            claim = claim.withGuests(existing.guests()); // editing friends or encryption keeps the guests (not ones who became friends)
+        }
         claims.put(Frequency.clamp(frequency), claim);
         setDirty();
         return claim;
+    }
+
+    // ---- Guests (v0.36.0) ----
+
+    /**
+     * Makes {@code player} a guest on {@code frequency} until {@code untilMillis} (renewing them if
+     * they already are). Returns the claim, or null if it isn't private, they're its owner, a friend
+     * or a group member, or it already has {@link #MAX_GUESTS} other guests.
+     */
+    public @Nullable Claim putGuest(int frequency, UUID player, String name, long untilMillis) {
+        Claim claim = get(frequency);
+        if (claim == null || player.equals(claim.owner()) || claim.friends().containsKey(player)
+                || claim.groupMembers().containsKey(player)
+                || !claim.guests().containsKey(player) && claim.guests().size() >= MAX_GUESTS) {
+            return null;
+        }
+        Map<UUID, Guest> guests = new LinkedHashMap<>(claim.guests());
+        guests.put(player, new Guest(name, untilMillis));
+        Claim updated = claim.withGuests(guests);
+        claims.put(Frequency.clamp(frequency), updated);
+        setDirty();
+        return updated;
+    }
+
+    /** Takes {@code player}'s guest pass on {@code frequency} away. Returns the claim, or null if they weren't a guest. */
+    public @Nullable Claim removeGuest(int frequency, UUID player) {
+        Claim claim = get(frequency);
+        if (claim == null || !claim.guests().containsKey(player)) {
+            return null;
+        }
+        Map<UUID, Guest> guests = new LinkedHashMap<>(claim.guests());
+        guests.remove(player);
+        Claim updated = claim.withGuests(guests);
+        claims.put(Frequency.clamp(frequency), updated);
+        setDirty();
+        return updated;
+    }
+
+    /** A guest whose pass ran out: on which frequency, who, and the claim as it is now. */
+    public record Expired(int frequency, UUID player, String name, Claim claim) {
+    }
+
+    /** Takes every guest whose pass ran out by {@code nowMillis} off, and returns them. */
+    public List<Expired> expireGuests(long nowMillis) {
+        List<Expired> expired = new ArrayList<>();
+        for (Map.Entry<Integer, Claim> entry : new ArrayList<>(claims.entrySet())) {
+            Claim claim = entry.getValue();
+            if (claim.guests().isEmpty()) {
+                continue;
+            }
+            Map<UUID, Guest> left = new LinkedHashMap<>();
+            List<Map.Entry<UUID, Guest>> gone = new ArrayList<>();
+            claim.guests().forEach((uuid, guest) -> {
+                if (guest.untilMillis() <= nowMillis) {
+                    gone.add(Map.entry(uuid, guest));
+                } else {
+                    left.put(uuid, guest);
+                }
+            });
+            if (!gone.isEmpty()) {
+                Claim updated = claim.withGuests(left);
+                claims.put(entry.getKey(), updated);
+                setDirty();
+                gone.forEach(guest -> expired.add(new Expired(entry.getKey(), guest.getKey(), guest.getValue().name(), updated)));
+            }
+        }
+        return expired;
     }
 
     // ---- Handing a frequency over (v0.34.0) ----
@@ -472,7 +612,12 @@ public final class FrequencyClaims extends SavedData {
         if (friends.size() > MAX_FRIENDS) {
             return null;
         }
-        return put(frequency, newOwner, newOwnerName, friends, List.of(), claim.encrypted());
+        Claim handed = put(frequency, newOwner, newOwnerName, friends, List.of(), claim.encrypted());
+        if (!claim.guests().isEmpty()) { // guests keep their passes (the new owner, if one, no longer needs it)
+            handed = handed.withGuests(claim.guests());
+            claims.put(Frequency.clamp(frequency), handed);
+        }
+        return handed;
     }
 
     /** Makes {@code frequency} public again. Returns true if it was private. */
@@ -572,6 +717,17 @@ public final class FrequencyClaims extends SavedData {
             if (claim.encrypted()) {
                 entry.putBoolean("encrypted", true);
             }
+            if (!claim.guests().isEmpty()) {
+                ListTag guestList = new ListTag();
+                claim.guests().forEach((uuid, guest) -> {
+                    CompoundTag guestTag = new CompoundTag();
+                    guestTag.putUUID("uuid", uuid);
+                    guestTag.putString("name", guest.name());
+                    guestTag.putLong("until", guest.untilMillis());
+                    guestList.add(guestTag);
+                });
+                entry.put("guests", guestList);
+            }
             list.add(entry);
         });
         tag.put("claims", list);
@@ -610,8 +766,19 @@ public final class FrequencyClaims extends SavedData {
             for (int j = 0; j < names.size(); j++) {
                 groupNames.add(names.getString(j));
             }
-            result.put(entry.getInt("frequency"), entry.getUUID("owner"), entry.getString("owner_name"),
+            Claim claim = result.put(entry.getInt("frequency"), entry.getUUID("owner"), entry.getString("owner_name"),
                     loadPlayers(entry.getList("friends", Tag.TAG_COMPOUND)), groupNames, entry.getBoolean("encrypted"));
+            ListTag guestList = entry.getList("guests", Tag.TAG_COMPOUND); // none before v0.36.0
+            if (!guestList.isEmpty()) {
+                Map<UUID, Guest> guests = new LinkedHashMap<>();
+                for (int j = 0; j < guestList.size(); j++) {
+                    CompoundTag guestTag = guestList.getCompound(j);
+                    if (guestTag.hasUUID("uuid")) {
+                        guests.put(guestTag.getUUID("uuid"), new Guest(guestTag.getString("name"), guestTag.getLong("until")));
+                    }
+                }
+                result.claims.put(Frequency.clamp(entry.getInt("frequency")), claim.withGuests(guests));
+            }
         }
         result.setDirty(false);
         return result;

@@ -71,6 +71,7 @@ public final class SignalTower {
         NeoForge.EVENT_BUS.addListener(SignalTower::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedOut);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
+        NeoForge.EVENT_BUS.addListener(SignalTower::onServerTick);
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -118,6 +119,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.LogRequestPayload.STREAM_CODEC, com.reiko.signaltower.network.LogRequestPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.LogResultPayload.TYPE,
                 com.reiko.signaltower.network.LogResultPayload.STREAM_CODEC, com.reiko.signaltower.network.LogResultPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.GuestPayload.TYPE,
+                com.reiko.signaltower.network.GuestPayload.STREAM_CODEC, com.reiko.signaltower.network.GuestPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.ScreenNoticePayload.TYPE,
+                com.reiko.signaltower.network.ScreenNoticePayload.STREAM_CODEC, com.reiko.signaltower.network.ScreenNoticePayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.HandOverFrequencyPayload.TYPE,
                 com.reiko.signaltower.network.HandOverFrequencyPayload.STREAM_CODEC, com.reiko.signaltower.network.HandOverFrequencyPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.AuditResultPayload.TYPE,
@@ -158,6 +163,17 @@ public final class SignalTower {
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.
             boolean worldRan = !player.server.isSingleplayerOwner(player.getGameProfile());
             PagerItem.catchUp(player.serverLevel(), player, worldRan);
+            // Anyone who tried to use their private frequencies while they were away (v0.36.0).
+            for (net.minecraft.network.chat.Component line : com.reiko.signaltower.radio.IntruderAlerts.missedLines(player.server, player.getUUID())) {
+                player.displayClientMessage(line, false);
+            }
+        }
+    }
+
+    /** Once a second: guest passes that ran out end (v0.36.0). */
+    private static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
+        if (event.getServer().getTickCount() % 20 == 0) {
+            com.reiko.signaltower.network.GuestPayload.expire(event.getServer(), System.currentTimeMillis());
         }
     }
 
