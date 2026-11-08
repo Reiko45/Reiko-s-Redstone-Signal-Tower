@@ -14,8 +14,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * Server to client (v0.37.0): how far the sender at {@code pos} reaches, for the reach preview
  * ring; {@code reach} -1 if there's nothing to show. {@code kind}: {@link #TRANSMITTER},
  * {@link #REPEATER}, {@link #CONVERTER}, {@link #KEYPAD}, {@link #COMPACT_TRANSMITTER} or {@link #MOTION_SENSOR}; {@code frequency} is the one it sends on.
+ * v0.48.0: a tower with a Dish Antenna reaches {@code dishReach} inside its beam; {@code dish} is
+ * its aim (bits 0-3) and the beam's half-width in degrees (bits 4 up), or -1 if it has no dish.
  */
-public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency) implements CustomPacketPayload {
+public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency, int dishReach, int dish) implements CustomPacketPayload {
     public static final int TRANSMITTER = 0;
     public static final int REPEATER = 1;
     public static final int CONVERTER = 2;
@@ -31,6 +33,24 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
     /** A Radio Jammer (v0.46.0): the ring is how far it jams. */
     public static final int JAMMER = 8;
 
+    public ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency) {
+        this(pos, reach, kind, frequency, reach, -1);
+    }
+
+    public boolean hasDish() {
+        return dish >= 0;
+    }
+
+    /** Where the dish points (0 north ... 15 north-north-west). */
+    public int dishAim() {
+        return dish & 15;
+    }
+
+    /** How many degrees either side of its aim the dish's beam reaches. */
+    public int dishCone() {
+        return dish >> 4;
+    }
+
     public static final Type<ReachPreviewPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "reach_preview"));
 
@@ -39,6 +59,8 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
             ByteBufCodecs.VAR_INT, ReachPreviewPayload::reach,
             ByteBufCodecs.VAR_INT, ReachPreviewPayload::kind,
             ByteBufCodecs.VAR_INT, ReachPreviewPayload::frequency,
+            ByteBufCodecs.VAR_INT, ReachPreviewPayload::dishReach,
+            ByteBufCodecs.VAR_INT, ReachPreviewPayload::dish,
             ReachPreviewPayload::new);
 
     @Override

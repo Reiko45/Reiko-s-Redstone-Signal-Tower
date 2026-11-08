@@ -52,7 +52,13 @@ public class RadioRepeaterBlock extends RadioBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(LIT, com.reiko.signaltower.radio.AntennaTier.PROPERTY);
+        builder.add(LIT, com.reiko.signaltower.radio.AntennaTier.PROPERTY, com.reiko.signaltower.radio.AntennaTier.AIM);
+    }
+
+    /** v0.48.0: aimed the way the placer looks (for a Dish Antenna it brings along). */
+    @Override
+    public @org.jetbrains.annotations.Nullable BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {
+        return com.reiko.signaltower.radio.AntennaTier.aimed(defaultBlockState(), context.getRotation());
     }
 
     @Override

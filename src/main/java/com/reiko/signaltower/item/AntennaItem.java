@@ -32,6 +32,8 @@ import java.util.List;
  * repeater or converter with it to fit it, multiplying the tower's reach. A tower already wearing
  * another antenna gives that one back. Sneak + right-click the tower with an empty hand takes it
  * off again. On someone else's private frequency only its owner and members may change it.
+ * A Dish Antenna (v0.48.0) is aimed the way the player looks; using one on a tower that already
+ * has a dish turns it to face that way instead.
  */
 public class AntennaItem extends Item {
     private static final String KEY = "message." + SignalTower.MOD_ID + ".";
@@ -73,8 +75,11 @@ public class AntennaItem extends Item {
         }
         AntennaTier old = state.getValue(AntennaTier.PROPERTY);
         Component name = Component.translatable(state.getBlock().getDescriptionId());
-        if (old == tier) {
-            return tell(player, Component.translatable(KEY + "antenna_already", name, tier.label()).withStyle(ChatFormatting.GRAY));
+        int aim = AntennaTier.aimFor(player.getYRot());
+        if (old == tier && (tier != AntennaTier.DISH || AntennaTier.aimOf(state) == aim)) {
+            return tell(player, tier == AntennaTier.DISH
+                    ? Component.translatable(KEY + "dish_already", name, AntennaTier.aimLabel(aim)).withStyle(ChatFormatting.GRAY)
+                    : Component.translatable(KEY + "antenna_already", name, tier.label()).withStyle(ChatFormatting.GRAY));
         }
         Component refused = refusal(player, pos, state);
         if (refused != null) {
@@ -82,13 +87,25 @@ public class AntennaItem extends Item {
         }
         int before = reachShown(level, pos, state);
         BlockState fitted = state.setValue(AntennaTier.PROPERTY, tier);
+        if (tier == AntennaTier.DISH && fitted.hasProperty(AntennaTier.AIM)) {
+            fitted = fitted.setValue(AntennaTier.AIM, aim);
+        }
         level.setBlock(pos, fitted, Block.UPDATE_ALL);
         refresh(level, pos);
+        if (old == tier) { // a dish, turned to face the other way: nothing used up or given back
+            level.playSound(null, pos, SoundEvents.ARMOR_EQUIP_IRON.value(), SoundSource.BLOCKS, 1.0F, 1.3F);
+            return tell(player, Component.translatable(KEY + "dish_reaimed", name, AntennaTier.aimLabel(aim),
+                    dishReachShown(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
+        }
         if (!player.getAbilities().instabuild) {
             stack.shrink(1);
             giveBack(player, old);
         }
         level.playSound(null, pos, sound(tier), SoundSource.BLOCKS, 1.0F, 1.0F);
+        if (tier == AntennaTier.DISH) {
+            return tell(player, Component.translatable(KEY + "dish_fitted", name, AntennaTier.aimLabel(aim),
+                    dishReachShown(level, pos, fitted), reachShown(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
+        }
         return tell(player, Component.translatable(KEY + "antenna_fitted", name, tier.label(), before,
                 reachShown(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
     }
@@ -158,6 +175,16 @@ public class AntennaItem extends Item {
                 : RadioHelper.towerReachNow(serverLevel, pos, state);
     }
 
+    /** The reach of a tower in {@code state} with a dish, in the way it's aimed, in the weather where it stands now (v0.48.0). */
+    public static int dishReachShown(Level level, BlockPos pos, BlockState state) {
+        int clear = state.getBlock() instanceof com.reiko.signaltower.block.RadioJammerBlock
+                ? com.reiko.signaltower.blockentity.RadioJammerBlockEntity.jamReach(level, pos, state)
+                : RadioHelper.towerReach(level, pos, state);
+        int far = AntennaTier.dishReach(clear);
+        return level instanceof net.minecraft.server.level.ServerLevel serverLevel
+                ? com.reiko.signaltower.radio.SignalNetwork.get(serverLevel).reachNow(serverLevel, pos, far) : far;
+    }
+
     /** Tells the network about the tower's new reach. */
     private static void refresh(Level level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof RadioTransmitterBlockEntity transmitter) {
@@ -182,6 +209,7 @@ public class AntennaItem extends Item {
             case GOLD -> SoundEvents.ARMOR_EQUIP_GOLD.value();
             case DIAMOND -> SoundEvents.ARMOR_EQUIP_DIAMOND.value();
             case NETHERITE -> SoundEvents.ARMOR_EQUIP_NETHERITE.value();
+            case DISH -> SoundEvents.ARMOR_EQUIP_CHAIN.value();
             default -> SoundEvents.ARMOR_EQUIP_IRON.value();
         };
     }
@@ -193,8 +221,8 @@ public class AntennaItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".antenna_item", tier.multiplierText())
-                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == AntennaTier.DISH ? ".dish_item" : ".antenna_item"),
+                tier.multiplierText()).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".antenna_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

@@ -53,7 +53,7 @@ public class RadioSignalRecorderBlock extends RadioTransmitterBlock {
 
     @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(POWERED, false); // it sends nothing until it plays
+        return com.reiko.signaltower.radio.AntennaTier.aimed(defaultBlockState().setValue(POWERED, false), context.getRotation()); // it sends nothing until it plays
     }
 
     @Override

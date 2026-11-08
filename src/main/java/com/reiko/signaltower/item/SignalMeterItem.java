@@ -58,9 +58,13 @@ public class SignalMeterItem extends Item {
      * someone else's encrypted frequency. {@code hills} and {@code jammed} (v0.46.0) as in
      * {@link SignalNetwork.Reception}.
      */
-    public record Reading(int frequency, int strength, int towers, int margin, boolean deaf, int hills, int jammed) {
+    public record Reading(int frequency, int strength, int towers, int margin, boolean deaf, int hills, int jammed, int faded) {
         public Reading(int frequency, int strength, int towers, int margin, boolean deaf) {
-            this(frequency, strength, towers, margin, deaf, 0, 0);
+            this(frequency, strength, towers, margin, deaf, 0, 0, 0);
+        }
+
+        public Reading(int frequency, int strength, int towers, int margin, boolean deaf, int hills, int jammed) {
+            this(frequency, strength, towers, margin, deaf, hills, jammed, 0);
         }
     }
 
@@ -73,7 +77,7 @@ public class SignalMeterItem extends Item {
         SignalNetwork network = SignalNetwork.get(level);
         SignalNetwork.Reception reception = network.listen(level, frequency, pos, who);
         return new Reading(frequency, reception.power(), reception.transmittersInReach(), network.edgeMargin(level, frequency, pos), false,
-                reception.hills(), reception.jammed());
+                reception.hills(), reception.jammed(), reception.faded());
     }
 
     public static boolean isSilent(ItemStack stack) {

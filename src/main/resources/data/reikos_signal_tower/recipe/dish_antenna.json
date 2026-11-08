@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "I I",
+    " I ",
+    " A "
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "A": {
+      "item": "reikos_signal_tower:iron_antenna"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:dish_antenna"
+  }
+}

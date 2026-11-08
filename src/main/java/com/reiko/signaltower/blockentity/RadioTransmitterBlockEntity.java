@@ -56,6 +56,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         SignalNetwork.get(serverLevel).updateTransmitter(worldPosition, getFrequency(), power,
                 reachOf(serverLevel, worldPosition, state), getTunedBy(), state.getBlock() instanceof CompactRadioTransmitterBlock,
                 power > 0 ? turnOnCause() : null);
+        SignalNetwork.get(serverLevel).setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state)); // v0.48.0
     }
 
     /**

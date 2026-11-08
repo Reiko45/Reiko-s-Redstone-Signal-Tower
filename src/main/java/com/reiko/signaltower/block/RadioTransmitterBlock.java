@@ -51,13 +51,14 @@ public class RadioTransmitterBlock extends RadioBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(POWERED, AntennaTier.PROPERTY);
+        builder.add(POWERED, AntennaTier.PROPERTY, AntennaTier.AIM);
     }
 
     @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
         boolean powered = RadioHelper.readTransmitterInput(context.getLevel(), context.getClickedPos()) > 0;
-        return defaultBlockState().setValue(POWERED, powered);
+        // v0.48.0: aimed the way the placer looks (for a Dish Antenna it brings along).
+        return AntennaTier.aimed(defaultBlockState().setValue(POWERED, powered), context.getRotation());
     }
 
     // ---- Keeping the network up to date ----

@@ -148,12 +148,17 @@ public final class SignalMeterHud {
                         : edge.copy()).withStyle(ChatFormatting.GRAY);
             }
         }
-        // v0.46.0: what hills and a jammer take off, on a line of its own.
+        // v0.46.0: what hills and a jammer take off, on a line of its own; v0.48.0: and fading.
         Component loss = null;
-        if (!current.deaf() && (current.hills() > 0 || current.jammed() > 0)) {
-            Component hills = current.hills() > 0 ? Component.translatable(KEY + "hills", current.hills()).withStyle(ChatFormatting.GOLD) : null;
-            Component jammed = current.jammed() > 0 ? Component.translatable(KEY + "jammed", current.jammed()).withStyle(ChatFormatting.LIGHT_PURPLE) : null;
-            loss = hills != null && jammed != null ? Component.translatable(KEY + "loss_both", hills, jammed) : hills != null ? hills : jammed;
+        if (!current.deaf()) {
+            for (Component part : new Component[] {
+                    current.faded() > 0 ? Component.translatable(KEY + "faded", current.faded()).withStyle(ChatFormatting.GRAY) : null,
+                    current.hills() > 0 ? Component.translatable(KEY + "hills", current.hills()).withStyle(ChatFormatting.GOLD) : null,
+                    current.jammed() > 0 ? Component.translatable(KEY + "jammed", current.jammed()).withStyle(ChatFormatting.LIGHT_PURPLE) : null}) {
+                if (part != null) {
+                    loss = loss == null ? part : Component.translatable(KEY + "loss_both", loss, part);
+                }
+            }
         }
         int height = HEIGHT + (loss != null ? 10 : 0);
         int width = Math.max(MIN_WIDTH, Math.max(Math.max(font.width(detail), loss == null ? 0 : font.width(loss)),

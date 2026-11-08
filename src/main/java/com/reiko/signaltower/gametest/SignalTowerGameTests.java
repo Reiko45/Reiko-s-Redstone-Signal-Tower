@@ -74,6 +74,19 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 @PrefixGameTestTemplate(false)
 public final class SignalTowerGameTests {
     private static final String PLATFORM = "test_platform";
+    /** v0.48.0: the tests that check signal fade run in a batch of their own, with it on (the default config). */
+    private static final String FADE = "signal_fade";
+
+    /** Signal fade is off for every other test, which check other things at exact strengths (batches run one after another). */
+    @net.minecraft.gametest.framework.BeforeBatch(batch = "defaultBatch")
+    public static void withoutFade(ServerLevel level) {
+        SignalNetwork.fadeForTests(false);
+    }
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = FADE)
+    public static void withFade(ServerLevel level) {
+        SignalNetwork.fadeForTests(null);
+    }
 
     // ---- helpers ----
 
@@ -7030,6 +7043,186 @@ public final class SignalTowerGameTests {
                     check(network.isKnockedOut(absTop), "Any bolt landing on it knocks it out");
                 })
                 .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.48.0: signal fade and the Dish Antenna
+
+    /**
+     * Signal fade (the defaults): full strength out to half a tower's reach, then weaker and weaker,
+     * down to 1 at the very edge, the same in every direction; the reception says how much it lost.
+     * A repeater hears the signal unfaded and sends it on at full strength; a compact transmitter
+     * doesn't fade; a jammer's jamming fades too. The meter carries it to the HUD. In the world a
+     * receiver three quarters of the way out outputs what's left, and Jade says how much faded.
+     */
+    @GameTest(template = PLATFORM, batch = FADE, timeoutTicks = 200)
+    public static void signalFade(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        check(SignalNetwork.fade(15, 0.4) == 15 && SignalNetwork.fade(15, 0.5) == 15 && SignalNetwork.fade(15, 0.75) == 8
+                && SignalNetwork.fade(15, 1.0) == 1 && SignalNetwork.fade(1, 1.0) == 1 && SignalNetwork.fade(0, 0.9) == 0
+                && SignalNetwork.fade(6, 0.75) == 3, "15 to half way, 8 at three quarters, 1 at the edge");
+
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000); // not loaded: no hills, no block checks
+        network.updateTransmitter(far, 4381, 15, 100);
+        SignalNetwork.Reception near = network.listen(level, 4381, far.east(40));
+        check(near.power() == 15 && near.faded() == 0, "Full strength at 40 of 100: " + near);
+        SignalNetwork.Reception out = network.listen(level, 4381, far.east(75));
+        check(out.power() == 8 && out.faded() == 7, "8 at 75: " + out);
+        SignalNetwork.Reception edge = network.listen(level, 4381, far.east(100));
+        check(edge.power() == 1 && edge.faded() == 14, "1 at the very edge: " + edge);
+        check(network.listen(level, 4381, far.east(101)).power() == 0, "Nothing beyond it");
+        check(network.listen(level, 4381, far.north(60).east(60)).power() == SignalNetwork.fade(15, Math.sqrt(7200) / 100),
+                "By distance, whichever way");
+
+        network.updateRepeater(far.east(90), 4381, 64);
+        check(network.listen(level, 4381, far.east(110)).power() == 15, "A repeater 90 out sends it on at full strength");
+        check(network.listen(level, 4381, far.east(95)).power() == 15, "Near the repeater it's strong again");
+        check(network.listen(level, 4381, far.east(90 + 48)).power() == 8, "And it fades out toward the repeater's edge");
+
+        network.updateTransmitter(far.north(400), 4383, 15, 16, null, true);
+        check(network.listen(level, 4383, far.north(400).east(16)).power() == 15, "A compact transmitter doesn't fade");
+
+        BlockPos jamAt = far.south(800);
+        network.updateTransmitter(jamAt.west(1), 4384, 15, 100);
+        network.updateJammer(jamAt, 4384, 15, 40, null);
+        check(network.listen(level, 4384, jamAt.east(10)).power() == 0, "Close to a jammer: silenced");
+        SignalNetwork.Reception jammed = network.listen(level, 4384, jamAt.east(30));
+        check(jammed.jammed() == 8 && jammed.power() == 7, "Three quarters out it jams 8: " + jammed);
+
+        var packet = com.reiko.signaltower.network.MeterReadingPayload.of(
+                new com.reiko.signaltower.item.SignalMeterItem.Reading(4381, 8, 1, 25, false, 2, 3, 7));
+        check(packet.faded() == 7 && packet.hills() == 2 && packet.jammed() == 3, "The meter's packet carries it");
+
+        BlockPos tx = new BlockPos(1, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4385);
+        int reach = RadioHelper.reachAt(level, helper.absolutePos(tx));
+        int distance = Math.min(reach * 3 / 4, 120);
+        BlockPos rx = tx.east(distance);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4385);
+        int expected = SignalNetwork.fade(15, distance / (double) reach);
+        check(expected < 15, "Far enough out to fade: " + distance + " of " + reach);
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, rx, expected))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rx));
+                    check(info.getInt("faded") == 15 - expected
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info)).contains("faded"),
+                            "Jade says how much faded: " + info);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Dish Antenna (the defaults): fitted, it's aimed the way the player looks, and the tower
+     * reaches three times as far inside a beam 15° either side of that, as far as with no antenna
+     * elsewhere (a jammer's dish too, and the coverage of a remote press it relays). Using a dish on
+     * a dish turns it instead. Jade and the reach ring (a keyhole) show it; it survives saving.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void dishAntenna(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var dish = com.reiko.signaltower.radio.AntennaTier.DISH;
+        check(com.reiko.signaltower.radio.AntennaTier.aimFor(180F) == 0 && com.reiko.signaltower.radio.AntennaTier.aimFor(-90F) == 4
+                && com.reiko.signaltower.radio.AntennaTier.aimFor(0F) == 8 && com.reiko.signaltower.radio.AntennaTier.aimFor(90F) == 12
+                && com.reiko.signaltower.radio.AntennaTier.aimFor(202.5F) == 1, "Looking north 0, east 4, south 8, west 12");
+        check(com.reiko.signaltower.radio.AntennaTier.inBeam(0, -50, 0) && !com.reiko.signaltower.radio.AntennaTier.inBeam(0, 50, 0)
+                && !com.reiko.signaltower.radio.AntennaTier.inBeam(50, 0, 0) && com.reiko.signaltower.radio.AntennaTier.inBeam(50, -13, 4)
+                && !com.reiko.signaltower.radio.AntennaTier.inBeam(50, -14, 4) && com.reiko.signaltower.radio.AntennaTier.inBeam(0, 0, 9),
+                "A beam 15° either side of the aim");
+        check(com.reiko.signaltower.radio.AntennaTier.dishReach(64) == 192 && dish.multiplierText().equals("×3") && dish.multiplier() == 1.0,
+                "×3 that way, ×1 elsewhere");
+
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000);
+        network.updateTransmitter(far, 4391, 15, 64);
+        network.setDish(far, 4);
+        check(Integer.valueOf(4).equals(network.dishAim(far)), "Aimed east");
+        check(network.listen(level, 4391, far.east(192)).power() == 15 && network.listen(level, 4391, far.east(193)).power() == 0,
+                "192 blocks east");
+        check(network.listen(level, 4391, far.west(64)).power() == 15 && network.listen(level, 4391, far.west(65)).power() == 0
+                && network.listen(level, 4391, far.south(100)).power() == 0, "64 every other way");
+        check(network.edgeMargin(level, 4391, far.east(150)) == 42, "The meter's edge is out at 192 that way");
+        SignalNetwork.Coverage relayed = new SignalNetwork.Coverage(far, 64, true, 192, 4);
+        check(relayed.reaches(far.east(150)) && !relayed.reaches(far.west(150)) && relayed.reaches(far.west(60)), "A press it relays goes as far");
+        SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+        check(Integer.valueOf(4).equals(loaded.dishAim(far)), "It survives saving");
+        network.setDish(far, -1);
+        check(network.listen(level, 4391, far.east(150)).power() == 0 && network.dishAim(far) == null, "Without it: 64 that way too");
+
+        BlockPos jamAt = far.south(500);
+        network.updateTransmitter(jamAt.west(1), 4392, 15, 200);
+        network.updateJammer(jamAt, 4392, 15, 32, null);
+        network.setDish(jamAt, 0);
+        check(network.listen(level, 4392, jamAt.north(90)).power() == 0 && network.listen(level, 4392, jamAt.south(40)).power() == 15,
+                "A jammer's dish jams 96 north, 32 elsewhere");
+
+        BlockPos tx = new BlockPos(1, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4393);
+        BlockPos absTx = helper.absolutePos(tx);
+        int reach = RadioHelper.reachAt(level, absTx);
+        int beam = com.reiko.signaltower.radio.AntennaTier.dishReach(reach);
+        int east = Math.min(beam - 2, 125);
+        check(east > reach, "The receiver is beyond the usual reach: " + east + " > " + reach);
+        BlockPos rx = tx.east(east);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4393);
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        dev.setYRot(-90F); // looking east
+        ItemStack dishes = new ItemStack(ModRegistry.DISH_ANTENNA.get());
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK))
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    assertOutput(helper, rx, 0);
+                    Component fitted = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, dish, dishes);
+                    check(fitted != null && keyOf(fitted).endsWith("dish_fitted") && dishes.isEmpty()
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == dish
+                            && helper.getBlockState(tx).getValue(com.reiko.signaltower.radio.AntennaTier.AIM) == 4
+                            && Integer.valueOf(4).equals(SignalNetwork.get(level).dishAim(absTx)), "Fitted, aimed east: " + fitted);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info));
+                    check(info.getInt("dish_reach") == beam && keys.contains("antenna_dish") && keys.contains("dish_reach"), "Jade: " + keys + " " + info);
+
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.FREQUENCY_TUNER.get()));
+                    var ring = com.reiko.signaltower.network.ReachPreviewRequestPayload.answer(dev, absTx);
+                    check(ring.hasDish() && ring.dishAim() == 4 && ring.dishCone() == 15 && ring.dishReach() == beam && ring.reach() == reach,
+                            "The reach ring knows: " + ring);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.encode(buffer, ring);
+                    check(com.reiko.signaltower.network.ReachPreviewPayload.STREAM_CODEC.decode(buffer).equals(ring), "Survives the network");
+                    int nearDots = 0;
+                    int farDots = 0;
+                    for (double[] dot : com.reiko.signaltower.client.ReachRingShape.keyhole(reach, beam, 4, 15)) {
+                        double r = Math.hypot(dot[0], dot[1]);
+                        double off = Math.toDegrees(Math.abs(Math.atan2(dot[1], dot[0]))); // east is 0
+                        if (Math.abs(r - (reach + 0.5)) < 1e-6 && off > 15 - 1e-6) nearDots++;
+                        else if (Math.abs(r - (beam + 0.5)) < 1e-6 && off < 15 + 1e-6) farDots++;
+                        else check(Math.abs(off - 15) < 1e-6 && r >= reach + 0.5 - 1e-6 && r <= beam + 0.5, "Else on the beam's sides: " + r + " at " + off);
+                    }
+                    check(nearDots > 100 && farDots > 10, "A keyhole: " + nearDots + " round, " + farDots + " out in the beam");
+                    check(com.reiko.signaltower.client.ReachRingShape.edgeDistance(east, 0, reach, beam, 4, 15) == beam - east
+                            && com.reiko.signaltower.client.ReachRingShape.edgeDistance(-(reach + 1), 0, reach, beam, 4, 15) == -1,
+                            "The ring's edge distance follows the beam");
+
+                    dev.setYRot(90F); // now west
+                    ItemStack another = new ItemStack(ModRegistry.DISH_ANTENNA.get());
+                    Component turned = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, dish, another);
+                    check(turned != null && keyOf(turned).endsWith("dish_reaimed") && another.getCount() == 1
+                            && helper.getBlockState(tx).getValue(com.reiko.signaltower.radio.AntennaTier.AIM) == 12, "Turned to face west: " + turned);
+                    Component same = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, dish, another);
+                    check(same != null && keyOf(same).endsWith("dish_already") && another.getCount() == 1, "Already facing west");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> {
+                    com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, com.reiko.signaltower.radio.AntennaTier.IRON, new ItemStack(ModRegistry.IRON_ANTENNA.get()));
+                    check(dev.getInventory().countItem(ModRegistry.DISH_ANTENNA.get()) == 1 && SignalNetwork.get(level).dishAim(absTx) == null,
+                            "An iron antenna replaces it; the dish comes back");
+                })
                 .thenSucceed();
     }
 }

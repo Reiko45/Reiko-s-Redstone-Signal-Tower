@@ -155,13 +155,15 @@ public final class ReachRing {
         if (ring == null) {
             return;
         }
-        int count = ReachRingShape.dotCount(ring.reach());
+        java.util.List<double[]> keyhole = ring.hasDish()
+                ? ReachRingShape.keyhole(ring.reach(), ring.dishReach(), ring.dishAim(), ring.dishCone()) : null;
+        int count = keyhole != null ? keyhole.size() : ReachRingShape.dotCount(ring.reach());
         float[] built = new float[count * 5];
         double centerX = ring.pos().getX() + 0.5;
         double centerZ = ring.pos().getZ() + 0.5;
         double max = maxDistance(minecraft);
         for (int i = 0; i < count; i++) {
-            double[] offset = ReachRingShape.dot(ring.reach(), i, count);
+            double[] offset = keyhole != null ? keyhole.get(i) : ReachRingShape.dot(ring.reach(), i, count);
             double x = centerX + offset[0];
             double z = centerZ + offset[1];
             double angle = 2 * Math.PI * i / count;
@@ -181,8 +183,8 @@ public final class ReachRing {
             built[i * 5] = (float) x;
             built[i * 5 + 1] = y;
             built[i * 5 + 2] = (float) z;
-            built[i * 5 + 3] = (float) -Math.sin(angle);
-            built[i * 5 + 4] = (float) Math.cos(angle);
+            built[i * 5 + 3] = (float) (keyhole != null ? offset[2] : -Math.sin(angle));
+            built[i * 5 + 4] = (float) (keyhole != null ? offset[3] : Math.cos(angle));
         }
         dots = built;
     }
@@ -271,9 +273,15 @@ public final class ReachRing {
             case ReachPreviewPayload.JAMMER -> "radio_jammer";
             default -> "radio_transmitter";
         };
-        Component first = Component.translatable(KEY, Component.translatable("block." + SignalTower.MOD_ID + "." + block),
-                FrequencyNames.label(null, ring.frequency()), ring.reach());
-        int edge = ReachRingShape.edgeDistance(player.getBlockX() - ring.pos().getX(), player.getBlockZ() - ring.pos().getZ(), ring.reach());
+        Component name = Component.translatable("block." + SignalTower.MOD_ID + "." + block);
+        Component first = ring.hasDish()
+                ? Component.translatable(KEY + "_dish", name, FrequencyNames.label(null, ring.frequency()), ring.reach(), ring.dishReach(),
+                        com.reiko.signaltower.radio.AntennaTier.aimLabel(ring.dishAim()))
+                : Component.translatable(KEY, name, FrequencyNames.label(null, ring.frequency()), ring.reach());
+        long dx = player.getBlockX() - ring.pos().getX();
+        long dz = player.getBlockZ() - ring.pos().getZ();
+        int edge = ring.hasDish() ? ReachRingShape.edgeDistance(dx, dz, ring.reach(), ring.dishReach(), ring.dishAim(), ring.dishCone())
+                : ReachRingShape.edgeDistance(dx, dz, ring.reach());
         Component second = edge > 0 ? Component.translatable(KEY + "_inside", edge).withStyle(ChatFormatting.GREEN)
                 : edge == 0 ? Component.translatable(KEY + "_edge").withStyle(ChatFormatting.YELLOW)
                 : Component.translatable(KEY + "_outside", -edge).withStyle(ChatFormatting.GOLD);

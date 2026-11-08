@@ -311,7 +311,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
-for tier in ("iron", "gold", "diamond", "netherite"):
+for tier in ("iron", "gold", "diamond", "netherite", "dish"):
     write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -423,10 +423,62 @@ for tier in ANTENNAS:
     write(models / f"antenna_{tier}.json", antenna_model(tier))
 
 
+def solid(frm, to, texture):
+    """A box with every face's UV the size of the face, centred in the texture (the dish sits above
+    the block, where Minecraft's automatic UVs would run off the texture)."""
+    w, h, d = (to[i] - frm[i] for i in range(3))
+
+    def uv(a, b):
+        return [round((16 - a) / 2, 3), round((16 - b) / 2, 3), round((16 + a) / 2, 3), round((16 + b) / 2, 3)]
+    faces = {"north": uv(w, h), "south": uv(w, h), "east": uv(d, h), "west": uv(d, h), "up": uv(w, d), "down": uv(w, d)}
+    return {"from": frm, "to": to, "faces": {f: {"texture": texture, "uv": v} for f, v in faces.items()}}
+
+
+def dish_model(angle):
+    """The Dish Antenna (v0.48.0): a round dish on the north side of the rod, facing north, with a
+    feed arm and horn in front of it; turned {@code angle} degrees about the rod (blockstates turn
+    it the rest of the way, in quarter turns)."""
+    plate, rod = "#plate", "#rod"
+    elements = [
+        # the dish: three overlapping slabs, a hair apart so no faces z-fight, for a roundish outline
+        solid([3.5, 22, 4.5], [12.5, 28, 5.5], plate),
+        solid([5, 20.5, 4.6], [11, 29.5, 5.6], plate),
+        solid([4.2, 21.2, 4.7], [11.8, 28.8, 5.7], plate),
+        solid([6, 23, 5.7], [10, 27, 6.3], plate),              # its rounded back
+        solid([7.2, 24.2, 6.3], [8.8, 25.8, 7], rod),           # the mount to the rod
+        solid([7.6, 24.6, 1.8], [8.4, 25.4, 4.5], rod),         # the feed arm
+        solid([7, 24, 1], [9, 26, 1.8], "#horn"),               # the feed horn
+    ]
+    if angle:
+        for element in elements:
+            element["rotation"] = {"origin": [8, 25, 8], "axis": "y", "angle": angle}
+    return {"parent": "minecraft:block/block",
+            "textures": {"particle": "minecraft:block/iron_block", "plate": "minecraft:block/smooth_stone",
+                         "rod": tex("radio_mast_post"), "horn": "minecraft:block/gray_concrete"},
+            "elements": elements}
+
+
+# Aims 0-15 (north, north-north-east ... clockwise): quarter turns from the blockstate, the rest
+# from turning the model's elements (Minecraft only turns elements by -45, -22.5, 22.5 or 45).
+DISH_ANGLES = {"0": 0, "cw22": -22.5, "cw45": -45, "ccw22": 22.5}
+for key, angle in DISH_ANGLES.items():
+    write(models / f"antenna_dish_{key}.json", dish_model(angle))
+
+
+def dish_part(aim):
+    quarter, rest = divmod(aim, 4)
+    key, turns = [("0", quarter), ("cw22", quarter), ("cw45", quarter), ("ccw22", quarter + 1)][rest]
+    apply = {"model": f"{MOD}:block/antenna_dish_{key}"}
+    if turns % 4:
+        apply["y"] = turns % 4 * 90
+    return {"when": {"antenna": "dish", "rotation": str(aim)}, "apply": apply}
+
+
 def tower_states(name, lit_property):
     parts = [{"when": {lit_property: "false"}, "apply": {"model": f"{MOD}:block/{name}"}},
              {"when": {lit_property: "true"}, "apply": {"model": f"{MOD}:block/{name}_on"}}]
     parts += [{"when": {"antenna": tier}, "apply": {"model": f"{MOD}:block/antenna_{tier}"}} for tier in ANTENNAS]
+    parts += [dish_part(aim) for aim in range(16)]  # v0.48.0
     write(states / f"{name}.json", {"multipart": parts})
 
 
@@ -684,6 +736,25 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.antenna_already": "This %s already has a %s",
     f"message.{MOD}.antenna_taken_off": "%s taken off: reach %s → %s blocks",
     f"jade.{MOD}.antenna": "Antenna: %s (%s reach)",
+    # v0.48.0: signal fade and the Dish Antenna
+    f"jade.{MOD}.faded": "Faded: -%s (far out in its tower's reach)",
+    f"hud.{MOD}.meter_faded": "Fade -%s",
+    f"jade.{MOD}.antenna_dish": "Antenna: %s, aimed %s (%s reach that way)",
+    f"jade.{MOD}.dish_reach": "Reaches %2$s blocks to the %1$s",
+    f"item.{MOD}.dish_antenna": "Dish Antenna",
+    f"tooltip.{MOD}.dish_item": "Fit it to a transmitter, repeater, converter or jammer for %s its reach in the direction you face as you fit it (a narrow beam); elsewhere it reaches as far as with no antenna.",
+    f"tooltip.{MOD}.antenna_dish": "Antenna: %s (%s reach where it's aimed)",
+    f"message.{MOD}.dish_fitted": "%s: Dish Antenna aimed %s: %s blocks that way, %s elsewhere",
+    f"message.{MOD}.dish_reaimed": "%s: Dish Antenna turned to face %s (%s blocks that way)",
+    f"message.{MOD}.dish_already": "This %s's dish already faces %s",
+    f"{MOD}.configuration.signalFadeStartPercent": "Signal fade starts at (% of the reach)",
+    f"{MOD}.configuration.signalFadeAtEdge": "Signal fade at the edge of reach",
+    f"{MOD}.configuration.dishReachMultiplier": "Dish Antenna reach multiplier",
+    f"{MOD}.configuration.dishConeDegrees": "Dish Antenna beam (degrees either side)",
+    **{f"direction.{MOD}.{key}": name for key, name in zip(
+        ("n", "nne", "ne", "ene", "e", "ese", "se", "sse", "s", "ssw", "sw", "wsw", "w", "wnw", "nw", "nnw"),
+        ("north", "north-north-east", "north-east", "east-north-east", "east", "east-south-east", "south-east", "south-south-east",
+         "south", "south-south-west", "south-west", "west-south-west", "west", "west-north-west", "north-west", "north-north-west"))},
     f"block.{MOD}.radio_lamp": "Radio Lamp",
     f"block.{MOD}.radio_lamp.tooltip": "A lamp with a receiver built in: it gives off as much light as the strength it hears (dim to bright), in its dye color. Right-click it with a dye to change the color. It's only a light: no redstone comes out.",
     f"tooltip.{MOD}.lamp_color": "Color: %s",
@@ -1564,6 +1635,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.silenced": "Silent: private to %s",
     # v0.37.0: the reach preview ring and the Code Keypad
     f"hud.{MOD}.reach_ring": "Reach ring: %s on %s, %s blocks",
+    f"hud.{MOD}.reach_ring_dish": "Reach ring: %s on %s, %s blocks (%s to the %s)",
     f"hud.{MOD}.reach_ring_inside": "You're inside: %s blocks to the edge",
     f"hud.{MOD}.reach_ring_edge": "You're right at the edge",
     f"hud.{MOD}.reach_ring_outside": "You're %s blocks outside",
@@ -1819,6 +1891,13 @@ recipes["iron_antenna"] = ({
     "key": {"I": {"item": "minecraft:iron_ingot"}, "R": {"item": "minecraft:redstone"}},
     "result": {"count": 1, "id": f"{MOD}:iron_antenna"},
 }, "minecraft:iron_ingot")
+recipes["dish_antenna"] = ({  # v0.48.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": ["I I", " I ", " A "],
+    "key": {"I": {"item": "minecraft:iron_ingot"}, "A": {"item": f"{MOD}:iron_antenna"}},
+    "result": {"count": 1, "id": f"{MOD}:dish_antenna"},
+}, f"{MOD}:iron_antenna")
 recipes["gold_antenna"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",

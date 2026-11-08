@@ -82,6 +82,14 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
         int reach = block instanceof RadioTransmitterBlock
                 ? com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, pos, level.getBlockState(pos))
                 : RadioHelper.towerReachNow(level, pos, level.getBlockState(pos));
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
+        int aim = com.reiko.signaltower.radio.AntennaTier.dishAim(state);
+        if (aim >= 0) {
+            // v0.48.0: a keyhole, its dish's beam reaching farther.
+            int far = Math.max(reach, com.reiko.signaltower.item.AntennaItem.dishReachShown(level, pos, state));
+            return new ReachPreviewPayload(pos, reach, kind, frequency, far,
+                    aim | com.reiko.signaltower.radio.AntennaTier.dishConeDegrees() << 4);
+        }
         return new ReachPreviewPayload(pos, reach, kind, frequency);
     }
 }

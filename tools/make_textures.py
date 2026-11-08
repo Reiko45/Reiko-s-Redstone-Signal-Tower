@@ -420,6 +420,30 @@ def antenna_item(tier):
     return img
 
 
+def dish_item():
+    """The Dish Antenna (v0.48.0): a round light-grey dish on a short arm, with a feed horn in front."""
+    import math
+    img = blank()
+    px = img.load()
+    dark, mid, light, shine = (90, 94, 100, 255), (170, 174, 180, 255), (215, 218, 222, 255), (245, 246, 248, 255)
+    for y in range(16):
+        for x in range(16):
+            d = math.hypot(x - 6.5, y - 6.5)
+            if d <= 5.6:
+                px[x, y] = dark if d > 4.8 else (light if (x + y) < 12 else mid)
+    px[4, 4] = shine
+    px[5, 4] = shine
+    px[4, 5] = shine
+    for i in range(3):                 # the feed arm and horn, out of the middle toward the corner
+        px[7 + i, 7 + i] = dark
+    px[10, 10] = ON[1]
+    px[11, 10] = ON[1]
+    px[10, 11] = ON[2]
+    for (x, y) in [(6, 12), (6, 13), (5, 14), (6, 14), (7, 14), (4, 15), (5, 15), (6, 15), (7, 15), (8, 15)]:   # the stand
+        px[x, y] = dark
+    return img
+
+
 def board_front():
     """The status board's face (v0.43.0): a dark screen in a steel frame (the rows are drawn on it)."""
     img = casing(16, rivets=False)
@@ -1045,7 +1069,8 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
          "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
-         **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")}}
+         **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
+         "dish_antenna": dish_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

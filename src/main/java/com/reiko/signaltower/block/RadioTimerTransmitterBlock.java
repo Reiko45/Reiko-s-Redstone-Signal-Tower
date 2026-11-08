@@ -52,7 +52,7 @@ public class RadioTimerTransmitterBlock extends RadioTransmitterBlock {
 
     @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(POWERED, false); // its first tick decides
+        return com.reiko.signaltower.radio.AntennaTier.aimed(defaultBlockState().setValue(POWERED, false), context.getRotation()); // its first tick decides
     }
 
     @Override

@@ -282,6 +282,7 @@ public final class SignalTower {
             event.accept(ModRegistry.GOLD_ANTENNA.get());
             event.accept(ModRegistry.DIAMOND_ANTENNA.get());
             event.accept(ModRegistry.NETHERITE_ANTENNA.get());
+            event.accept(ModRegistry.DISH_ANTENNA.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());

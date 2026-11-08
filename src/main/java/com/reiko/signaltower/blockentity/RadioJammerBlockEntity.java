@@ -39,6 +39,7 @@ public class RadioJammerBlockEntity extends RadioTransmitterBlockEntity {
         }
         SignalNetwork.get(serverLevel).updateJammer(worldPosition, getFrequency(), power,
                 jamReach(serverLevel, worldPosition, state), getTunedBy());
+        SignalNetwork.get(serverLevel).setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state));
     }
 
     /** How strongly it jams now: the redstone reaching it or its masts (0-15). */

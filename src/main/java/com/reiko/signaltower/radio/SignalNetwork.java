@@ -77,15 +77,20 @@ public final class SignalNetwork extends SavedData {
      * {@code hills} (v0.46.0): how much of that signal's strength hills and other ground took off on
      * the way (0: none; it can be all of it). {@code jammed}: how strong a Radio Jammer is here on
      * the frequency (0: none), already taken off {@code power}. {@code lifted} (v0.47.0): the
-     * signal heard only reaches because the listener stands higher than its tower.
+     * signal heard only reaches because the listener stands higher than its tower. {@code faded}
+     * (v0.48.0): how much it faded on the way out to the edge of its tower's reach.
      */
-    public record Reception(int power, int transmittersInReach, int hills, int jammed, boolean lifted) {
+    public record Reception(int power, int transmittersInReach, int hills, int jammed, boolean lifted, int faded) {
         public Reception(int power, int transmittersInReach) {
-            this(power, transmittersInReach, 0, 0, false);
+            this(power, transmittersInReach, 0, 0, false, 0);
         }
 
         public Reception(int power, int transmittersInReach, int hills, int jammed) {
-            this(power, transmittersInReach, hills, jammed, false);
+            this(power, transmittersInReach, hills, jammed, false, 0);
+        }
+
+        public Reception(int power, int transmittersInReach, int hills, int jammed, boolean lifted) {
+            this(power, transmittersInReach, hills, jammed, lifted, 0);
         }
     }
 
@@ -98,19 +103,34 @@ public final class SignalNetwork extends SavedData {
 
     /**
      * One area a remote signal goes out from: the player's own position, or a Radio Transmitter
-     * that relayed the press ({@code tower} is true), each with its own reach.
+     * that relayed the press ({@code tower} is true), each with its own reach. A tower with a Dish
+     * Antenna (v0.48.0) also reaches {@code far} inside its beam, aimed {@code aim} (-1: no dish).
      */
-    public record Coverage(BlockPos origin, int reach, boolean tower) {
+    public record Coverage(BlockPos origin, int reach, boolean tower, int far, int aim) {
         public Coverage {
             origin = origin.immutable();
         }
 
+        public Coverage(BlockPos origin, int reach, boolean tower) {
+            this(origin, reach, tower, reach, -1);
+        }
+
         /** Horizontal distance only, like transmitters. */
         public boolean reaches(BlockPos pos) {
-            long dx = origin.getX() - pos.getX();
-            long dz = origin.getZ() - pos.getZ();
-            return dx * dx + dz * dz <= (long) reach * reach;
+            long dx = pos.getX() - origin.getX();
+            long dz = pos.getZ() - origin.getZ();
+            long distSq = dx * dx + dz * dz;
+            return distSq <= (long) reach * reach
+                    || aim >= 0 && distSq <= (long) far * far && AntennaTier.inBeam(dx, dz, aim);
         }
+    }
+
+    /** What a tower at {@code pos} with a (clear-weather) reach of {@code reach} covers when it relays a press, dish included. */
+    private Coverage towerCoverage(@Nullable ServerLevel level, BlockPos pos, int reach) {
+        int near = reachNow(level, pos, reach);
+        Integer aim = dishes.get(pos);
+        return aim == null ? new Coverage(pos, near, true)
+                : new Coverage(pos, near, true, reachNow(level, pos, Math.max(reach, AntennaTier.dishReach(reach))), aim);
     }
 
     /** The coverage of a remote used from {@code origin} with no towers: just the player's own reach. */
@@ -384,6 +404,7 @@ public final class SignalNetwork extends SavedData {
     }
 
     public void removeTransmitter(BlockPos pos) {
+        dishes.remove(pos);
         Transmitter previous = transmitters.remove(pos);
         if (previous != null) {
             removeFromIndex(pos, previous.frequency());
@@ -442,6 +463,7 @@ public final class SignalNetwork extends SavedData {
     }
 
     public void removeRepeater(BlockPos pos) {
+        dishes.remove(pos);
         Repeater previous = repeaters.remove(pos);
         gateOutputs.remove(pos);
         if (previous != null) {
@@ -505,7 +527,7 @@ public final class SignalNetwork extends SavedData {
         if (repeater == null || deaf(level, repeater.frequency(), repeater.tunedBy())) {
             return 0;
         }
-        return listen(level, repeater.frequency(), pos).power();
+        return listen(level, repeater.frequency(), pos, null, false).power(); // a converter hears it unfaded
     }
 
     /** The frequency the repeater or converter at {@code pos} listens on, or empty if there's none in the network there. */
@@ -607,7 +629,7 @@ public final class SignalNetwork extends SavedData {
                 if (jam > 0) {
                     jamHere.put(pos, jam);
                 }
-                power.put(pos, Math.max(0, listenDirect(level, repeater.frequency(), pos).power() - jam));
+                power.put(pos, Math.max(0, listenDirect(level, repeater.frequency(), pos, false).power() - jam));
             }
         }
         Set<BlockPos> done = new HashSet<>();
@@ -740,7 +762,7 @@ public final class SignalNetwork extends SavedData {
                     continue;
                 }
                 reached.add(pos);
-                Coverage own = new Coverage(pos, reachNow(level, pos, repeater.reach()), true);
+                Coverage own = towerCoverage(level, pos, repeater.reach());
                 List<Coverage> list = areas.computeIfAbsent(repeater.output(), f -> new ArrayList<>());
                 if (!list.contains(own)) { // a repeater is already there if it relayed the press as a tower
                     list.add(own);
@@ -838,7 +860,7 @@ public final class SignalNetwork extends SavedData {
                 stale.add(pos);
                 continue;
             }
-            coverage.add(new Coverage(pos, reachNow(level, pos, entry.getValue().reach()), true));
+            coverage.add(towerCoverage(level, pos, entry.getValue().reach()));
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
@@ -854,7 +876,7 @@ public final class SignalNetwork extends SavedData {
                 staleRepeaters.add(pos);
                 continue;
             }
-            coverage.add(new Coverage(pos, reachNow(level, pos, entry.getValue().reach()), true));
+            coverage.add(towerCoverage(level, pos, entry.getValue().reach()));
         }
         if (staleRepeaters != null) {
             staleRepeaters.forEach(this::removeRepeater);
@@ -1303,7 +1325,8 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            int power = tx.power() > 0 && !isKnockedOut(at) ? Math.max(0, tx.power() - hillLoss(level, at, pos)) : 0;
+            int power = tx.power() > 0 && !isKnockedOut(at)
+                    ? Math.max(0, (tx.compact() ? tx.power() : fade(tx.power(), fadeFraction(distSq, reach))) - hillLoss(level, at, pos)) : 0;
             offer(best, tx.frequency(), new BestTransmitter(power, distSq, at, 1, Source.TRANSMITTER));
         }
         if (stale != null) {
@@ -1320,7 +1343,7 @@ public final class SignalNetwork extends SavedData {
                 continue;
             }
             int sends = sending.getOrDefault(at, 0);
-            offer(best, repeater.output(), new BestTransmitter(sends > 0 ? Math.max(0, sends - hillLoss(level, at, pos)) : 0, distSq, at, 1,
+            offer(best, repeater.output(), new BestTransmitter(sends > 0 ? Math.max(0, fade(sends, fadeFraction(distSq, reach)) - hillLoss(level, at, pos)) : 0, distSq, at, 1,
                     repeater.converts() ? Source.CONVERTER : Source.REPEATER));
         }
         return best;
@@ -1406,21 +1429,29 @@ public final class SignalNetwork extends SavedData {
      * someone else's encrypted frequency. {@code null} listens like anyone could.
      */
     public Reception listen(ServerLevel level, int frequency, BlockPos receiverPos, @Nullable UUID listener) {
+        return listen(level, frequency, receiverPos, listener, true);
+    }
+
+    /**
+     * {@link #listen(ServerLevel, int, BlockPos, UUID)}; {@code fades} false for a repeater or
+     * converter listening, which hears signals unfaded and sends them on at full strength (v0.48.0).
+     */
+    private Reception listen(ServerLevel level, int frequency, BlockPos receiverPos, @Nullable UUID listener, boolean fades) {
         if (deaf(level, frequency, listener)) {
             return new Reception(0, 0);
         }
-        Reception heard = listenRelayed(level, frequency, receiverPos);
+        Reception heard = listenRelayed(level, frequency, receiverPos, fades);
         // v0.46.0: a Radio Jammer here takes its strength off what's heard.
         int jam = jamming(level, frequency, receiverPos);
         if (jam <= 0) {
             return heard;
         }
-        return new Reception(Math.max(0, heard.power() - jam), heard.transmittersInReach(), heard.hills(), jam, heard.lifted());
+        return new Reception(Math.max(0, heard.power() - jam), heard.transmittersInReach(), heard.hills(), jam, heard.lifted(), heard.faded());
     }
 
     /** {@link #listen} before deafness and jammers: transmitters, remote presses, repeaters and converters. */
-    private Reception listenRelayed(ServerLevel level, int frequency, BlockPos receiverPos) {
-        Reception direct = listenDirect(level, frequency, receiverPos);
+    private Reception listenRelayed(ServerLevel level, int frequency, BlockPos receiverPos, boolean fades) {
+        Reception direct = listenDirect(level, frequency, receiverPos, fades);
         if (!repeatersByOutput.containsKey(frequency)) {
             return direct;
         }
@@ -1442,7 +1473,8 @@ public final class SignalNetwork extends SavedData {
                 continue;
             }
             heard++;
-            best.offer(level, repeating.getOrDefault(pos, 0), pos, receiverPos, distSq > own * own);
+            best.offer(level, repeating.getOrDefault(pos, 0), pos, receiverPos, distSq > own * own,
+                    fades ? fadeFraction(distSq, reach) : -1);
         }
         return best.reception(heard);
     }
@@ -1455,6 +1487,8 @@ public final class SignalNetwork extends SavedData {
     private final class Best {
         int power;
         int raw;
+        /** What was left of {@code raw} after fading, before hills (v0.48.0). */
+        int faded;
         /** The winner only reaches because the listener is higher than its tower (v0.47.0). */
         boolean lifted;
 
@@ -1462,19 +1496,29 @@ public final class SignalNetwork extends SavedData {
 
         Best(Reception start) {
             power = start.power();
-            raw = start.power() + start.hills();
+            faded = start.power() + start.hills();
+            raw = faded + start.faded();
             lifted = start.lifted();
         }
 
-        /** A signal of {@code sent} from {@code from}, heard at {@code at}; {@code viaHeight}: only in reach thanks to the listener's height. */
-        void offer(ServerLevel level, int sent, BlockPos from, BlockPos at, boolean viaHeight) {
+        /**
+         * A signal of {@code sent} from {@code from}, heard at {@code at}; {@code viaHeight}: only in
+         * reach thanks to the listener's height; {@code fadeAt}: how far out in its reach the listener
+         * is (0-1), or -1 if it doesn't fade.
+         */
+        void offer(ServerLevel level, int sent, BlockPos from, BlockPos at, boolean viaHeight, double fadeAt) {
             if (sent < power || sent == power && (sent < raw || !lifted || viaHeight)) {
-                return; // can't beat it, so don't measure the hills
+                return; // can't beat it (fading and hills only take away), so don't measure them
             }
-            int after = Math.max(0, sent - hillLoss(level, from, at));
+            int left = fadeAt < 0 ? sent : fade(sent, fadeAt);
+            if (left < power) {
+                return;
+            }
+            int after = Math.max(0, left - hillLoss(level, from, at));
             if (after > power || after == power && (sent > raw || sent == raw && lifted && !viaHeight)) {
                 power = after;
                 raw = sent;
+                faded = left;
                 lifted = viaHeight;
             }
         }
@@ -1483,17 +1527,59 @@ public final class SignalNetwork extends SavedData {
             if (sent > power || sent == power && (sent > raw || lifted)) {
                 power = sent;
                 raw = sent;
+                faded = sent;
                 lifted = false;
             }
         }
 
         Reception reception(int heard) {
-            return new Reception(power, heard, raw - power, 0, lifted);
+            return new Reception(power, heard, faded - power, 0, lifted, raw - faded);
         }
     }
 
+    // ---- Signal fade (v0.48.0) ----
+
+    /** How far out in a reach of {@code reach} a listener {@code distSq} (squared, horizontally) away is: 0 at the tower, 1 at the edge. */
+    private static double fadeFraction(long distSq, long reach) {
+        return reach <= 0 ? 1.0 : Math.min(1.0, Math.sqrt((double) distSq) / reach);
+    }
+
+    /**
+     * What's left of a signal of {@code sent} heard {@code fraction} of the way out to the edge of
+     * its tower's reach: all of it up to {@code signalFadeStartPercent}, then less and less, down to
+     * {@code (15 - signalFadeAtEdge) / 15} of it at the edge; never below 1 (inside reach a signal
+     * is always heard).
+     */
+    public static int fade(int sent, double fraction) {
+        if (sent <= 0 || Boolean.FALSE.equals(fadeForTests)) {
+            return sent;
+        }
+        int start = fadeSetting(com.reiko.signaltower.Config.SIGNAL_FADE_START_PERCENT);
+        int atEdge = fadeSetting(com.reiko.signaltower.Config.SIGNAL_FADE_AT_EDGE);
+        double from = start / 100.0;
+        if (start >= 100 || atEdge <= 0 || fraction <= from) {
+            return sent;
+        }
+        double t = Math.min(1.0, (fraction - from) / (1.0 - from));
+        return Math.max(1, (int) Math.round(sent * (1.0 - t * atEdge / 15.0)));
+    }
+
+    private static @Nullable Boolean fadeForTests;
+
+    /**
+     * For the GameTests only: false turns fading off whatever the config says (most tests check
+     * other things, at exact strengths); null leaves it to the config.
+     */
+    public static void fadeForTests(@Nullable Boolean on) {
+        fadeForTests = on;
+    }
+
+    private static int fadeSetting(net.neoforged.neoforge.common.ModConfigSpec.IntValue setting) {
+        return com.reiko.signaltower.Config.SPEC.isLoaded() ? setting.get() : setting.getDefault();
+    }
+
     /** What {@code receiverPos} hears straight from transmitters and remote presses, leaving repeaters out. */
-    private Reception listenDirect(ServerLevel level, int frequency, BlockPos receiverPos) {
+    private Reception listenDirect(ServerLevel level, int frequency, BlockPos receiverPos, boolean fades) {
         Best best = new Best();
         int heard = 0;
         for (RemoteSignal remote : new RemoteSignal[] {pulses.get(frequency), latches.get(frequency)}) {
@@ -1527,7 +1613,9 @@ public final class SignalNetwork extends SavedData {
                 continue;
             }
             heard++;
-            best.offer(level, isKnockedOut(pos) ? 0 : tx.power(), pos, receiverPos, distSq > own * own);
+            // v0.48.0: it fades toward the edge, unless a relay is listening (or it's a compact one).
+            best.offer(level, isKnockedOut(pos) ? 0 : tx.power(), pos, receiverPos, distSq > own * own,
+                    fades && !tx.compact() ? fadeFraction(distSq, reach) : -1);
         }
 
         if (stale != null) {
@@ -1556,6 +1644,7 @@ public final class SignalNetwork extends SavedData {
     }
 
     public void removeJammer(BlockPos pos) {
+        dishes.remove(pos);
         Jammer previous = jammers.remove(pos);
         if (previous != null) {
             removeJammerFromIndex(pos, previous.frequency());
@@ -1609,8 +1698,9 @@ public final class SignalNetwork extends SavedData {
             if (jammer.power() <= best || isKnockedOut(at)) {
                 continue;
             }
-            long reach = reachNow(level, at, jammer.reach());
-            if (horizontalDistSq(at, pos) > reach * reach || blocked(level, frequency, jammer.tunedBy())) {
+            long reach = reachNow(level, at, dishReachToward(at, jammer.reach(), pos));
+            long distSq = horizontalDistSq(at, pos);
+            if (distSq > reach * reach || blocked(level, frequency, jammer.tunedBy())) {
                 continue;
             }
             if (staleJammer(level, at)) {
@@ -1618,7 +1708,7 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            best = Math.max(best, jammer.power() - hillLoss(level, at, pos));
+            best = Math.max(best, fade(jammer.power(), fadeFraction(distSq, reach)) - hillLoss(level, at, pos));
         }
         if (stale != null) {
             stale.forEach(this::removeJammer);
@@ -1659,7 +1749,37 @@ public final class SignalNetwork extends SavedData {
      * is farther; in the weather where the tower stands. (Not for compact transmitters.)
      */
     public long linkReach(@Nullable ServerLevel level, BlockPos towerPos, int reach, BlockPos listener, int ear) {
-        return reachNow(level, towerPos, listener.getY() > towerPos.getY() ? Math.max(reach, ear) : reach);
+        int base = dishReachToward(towerPos, reach, listener);
+        return reachNow(level, towerPos, listener.getY() > towerPos.getY() ? Math.max(base, ear) : base);
+    }
+
+    // ---- Dish Antennas (v0.48.0) ----
+
+    /** Where each tower with a Dish Antenna points, by position (its block state's aim; saved, for unloaded towers). */
+    private final Map<BlockPos, Integer> dishes = new HashMap<>();
+
+    /** The tower at {@code pos} has a dish aimed {@code aim} (0-15), or none ({@code aim} < 0). Called by its block entity. */
+    public void setDish(BlockPos pos, int aim) {
+        Integer previous = aim < 0 ? dishes.remove(pos) : dishes.put(pos.immutable(), aim & 15);
+        if (previous == null ? aim >= 0 : previous != aim) {
+            relayEpoch++;
+            bumpTower(pos);
+            setDirty();
+        }
+    }
+
+    /** Where the dish on the tower at {@code pos} points, or null if it has none. */
+    public @Nullable Integer dishAim(BlockPos pos) {
+        return dishes.get(pos);
+    }
+
+    /** A tower's (clear-weather) reach toward {@code target}: times the dish multiplier if it has a dish aimed that way. */
+    public int dishReachToward(BlockPos towerPos, int reach, BlockPos target) {
+        Integer aim = dishes.get(towerPos);
+        if (aim == null || !AntennaTier.inBeam(target.getX() - towerPos.getX(), target.getZ() - towerPos.getZ(), aim)) {
+            return reach;
+        }
+        return Math.max(reach, AntennaTier.dishReach(reach));
     }
 
     private static long square(long value) {
@@ -1930,6 +2050,15 @@ public final class SignalNetwork extends SavedData {
         });
         tag.put("jammers", jammerList);
 
+        ListTag dishList = new ListTag();
+        dishes.forEach((pos, aim) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("pos", pos.asLong());
+            entry.putInt("aim", aim);
+            dishList.add(entry);
+        });
+        tag.put("dishes", dishList);
+
         ListTag latchList = new ListTag();
         latches.forEach((frequency, latch) -> {
             CompoundTag entry = new CompoundTag();
@@ -1945,6 +2074,10 @@ public final class SignalNetwork extends SavedData {
                 areaTag.putLong("pos", area.origin().asLong());
                 areaTag.putInt("reach", area.reach());
                 areaTag.putBoolean("tower", area.tower());
+                if (area.aim() >= 0) {
+                    areaTag.putInt("far", area.far());
+                    areaTag.putInt("aim", area.aim());
+                }
                 areas.add(areaTag);
             }
             entry.put("coverage", areas);
@@ -2036,6 +2169,11 @@ public final class SignalNetwork extends SavedData {
             network.jammers.put(pos, jammer);
             network.jammersByFrequency.computeIfAbsent(jammer.frequency(), f -> new HashMap<>()).put(pos, jammer);
         }
+        ListTag dishList = tag.getList("dishes", Tag.TAG_COMPOUND);
+        for (int i = 0; i < dishList.size(); i++) {
+            CompoundTag entry = dishList.getCompound(i);
+            network.dishes.put(BlockPos.of(entry.getLong("pos")), entry.getInt("aim") & 15);
+        }
         ListTag latchList = tag.getList("remote_latches", Tag.TAG_COMPOUND);
         for (int i = 0; i < latchList.size(); i++) {
             CompoundTag entry = latchList.getCompound(i);
@@ -2043,7 +2181,9 @@ public final class SignalNetwork extends SavedData {
             ListTag areas = entry.getList("coverage", Tag.TAG_COMPOUND);
             for (int j = 0; j < areas.size(); j++) {
                 CompoundTag area = areas.getCompound(j);
-                coverage.add(new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), area.getBoolean("tower")));
+                coverage.add(area.contains("aim")
+                        ? new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), area.getBoolean("tower"), area.getInt("far"), area.getInt("aim"))
+                        : new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), area.getBoolean("tower")));
             }
             if (coverage.isEmpty()) { // saved before 0.11.0: just the player's own area
                 coverage.add(new Coverage(BlockPos.of(entry.getLong("pos")), entry.getInt("reach"), false));

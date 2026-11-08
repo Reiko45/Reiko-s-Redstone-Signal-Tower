@@ -156,6 +156,10 @@ public final class RadioInfo {
                 com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(level.getBlockState(cursor));
                 if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
                     tag.putString("top_antenna", antenna.getSerializedName());
+                    int aim = com.reiko.signaltower.radio.AntennaTier.dishAim(level.getBlockState(cursor));
+                    if (aim >= 0) {
+                        tag.putInt("top_aim", aim);
+                    }
                 }
                 tag.putInt("frequency", radio.getFrequency());
                 if (top instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
@@ -236,6 +240,10 @@ public final class RadioInfo {
             if (reception.lifted()) {
                 tag.putInt("lifted", SignalNetwork.get(level).ear(level, pos));
             }
+            // v0.48.0: how much the signal faded, far out in its tower's reach.
+            if (reception.faded() > 0) {
+                tag.putInt("faded", reception.faded());
+            }
             if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
                 tag.putBoolean("toggled_on", toggle.isToggledOn());
                 tag.putInt("heard", reception.power());
@@ -279,6 +287,11 @@ public final class RadioInfo {
      * percent); v0.47.0: how long until it's back if lightning knocked it out ("struck", ticks).
      */
     private static void putWeather(ServerLevel level, BlockPos pos, CompoundTag tag) {
+        BlockState state = level.getBlockState(pos);
+        if (com.reiko.signaltower.radio.AntennaTier.dishAim(state) >= 0) {
+            // v0.48.0: how far its dish reaches, the way it's aimed (in the weather now).
+            tag.putInt("dish_reach", com.reiko.signaltower.item.AntennaItem.dishReachShown(level, pos, state));
+        }
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
             tag.putLong("struck", struck);
@@ -298,7 +311,16 @@ public final class RadioInfo {
     public static List<Component> lines(BlockState state, @Nullable CompoundTag data) {
         List<Component> lines = blockLines(state, data);
         com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(state);
-        if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
+        if (antenna == com.reiko.signaltower.radio.AntennaTier.DISH) {
+            // v0.48.0: where its dish points, and how far it reaches that way.
+            int aim = com.reiko.signaltower.radio.AntennaTier.aimOf(state);
+            lines.add(Component.translatable(LANG + "antenna_dish", antenna.label(), com.reiko.signaltower.radio.AntennaTier.aimLabel(aim),
+                    antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
+            if (data != null && data.contains("dish_reach")) {
+                lines.add(Component.translatable(LANG + "dish_reach", com.reiko.signaltower.radio.AntennaTier.aimLabel(aim),
+                        data.getInt("dish_reach")).withStyle(ChatFormatting.GOLD));
+            }
+        } else if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
             // v0.45.0: its antenna, and how much farther that makes it reach.
             lines.add(Component.translatable(LANG + "antenna", antenna.label(), antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
         }
@@ -313,6 +335,9 @@ public final class RadioInfo {
         }
         if (data != null && data.contains("lifted")) {
             lines.add(Component.translatable(LANG + "lifted", data.getInt("lifted")).withStyle(ChatFormatting.GREEN));
+        }
+        if (data != null && data.contains("faded")) {
+            lines.add(Component.translatable(LANG + "faded", data.getInt("faded")).withStyle(ChatFormatting.GRAY));
         }
         if (data != null && data.contains("hills")) {
             lines.add(Component.translatable(LANG + "hills", data.getInt("hills")).withStyle(ChatFormatting.GOLD));
@@ -358,10 +383,12 @@ public final class RadioInfo {
             Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
             if (data.contains("top_antenna")) {
-                lines.add(Component.translatable(LANG + "antenna",
-                        Component.translatable("item." + SignalTower.MOD_ID + "." + data.getString("top_antenna") + "_antenna"),
-                        com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT)).multiplierText())
-                        .withStyle(ChatFormatting.GOLD));
+                Component antennaName = Component.translatable("item." + SignalTower.MOD_ID + "." + data.getString("top_antenna") + "_antenna");
+                String multiplier = com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT)).multiplierText();
+                lines.add((data.contains("top_aim")
+                        ? Component.translatable(LANG + "antenna_dish", antennaName,
+                                com.reiko.signaltower.radio.AntennaTier.aimLabel(data.getInt("top_aim")), multiplier)
+                        : Component.translatable(LANG + "antenna", antennaName, multiplier)).withStyle(ChatFormatting.GOLD));
             }
             if (data.contains("output")) {
                 lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));

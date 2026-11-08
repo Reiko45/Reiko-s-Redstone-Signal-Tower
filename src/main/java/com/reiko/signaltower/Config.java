@@ -81,6 +81,27 @@ public final class Config {
             .comment("How long, in seconds, a tower struck by lightning stays quiet (sends, relays and jams nothing).")
             .defineInRange("lightningOutageSeconds", 5, 1, 600);
 
+    public static final ModConfigSpec.IntValue SIGNAL_FADE_START_PERCENT = BUILDER
+            .comment("Signals fade toward the edge of a tower's reach: full strength up to this percent of the way out,",
+                    "then weaker the farther out (see signalFadeAtEdge). Repeaters and converters hear the signal unfaded",
+                    "and send it on at full strength. Compact transmitters, motion sensors and remote presses don't fade.",
+                    "100 means signals don't fade.")
+            .defineInRange("signalFadeStartPercent", 50, 0, 100);
+
+    public static final ModConfigSpec.IntValue SIGNAL_FADE_AT_EDGE = BUILDER
+            .comment("How much of a full-strength (15) signal is lost at the very edge of reach: 14 leaves 1. Weaker",
+                    "signals lose the same share. Inside reach a signal never fades below 1. 0 means no fade.")
+            .defineInRange("signalFadeAtEdge", 14, 0, 15);
+
+    public static final ModConfigSpec.DoubleValue DISH_REACH_MULTIPLIER = BUILDER
+            .comment("How many times its normal reach a tower with a Dish Antenna reaches in the direction it's aimed",
+                    "(still capped by maxReach). Elsewhere it reaches as far as without an antenna.")
+            .defineInRange("dishReachMultiplier", 3.0, 1.0, 100.0);
+
+    public static final ModConfigSpec.IntValue DISH_CONE_DEGREES = BUILDER
+            .comment("How wide a Dish Antenna's beam is: this many degrees either side of where it's aimed.")
+            .defineInRange("dishConeDegrees", 15, 1, 90);
+
     public static final ModConfigSpec.IntValue JAMMER_REACH_PERCENT = BUILDER
             .comment("How far a Radio Jammer reaches, in percent of what a transmitter at the same height",
                     "(with the same antenna) would.")

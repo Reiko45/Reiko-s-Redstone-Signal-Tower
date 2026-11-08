@@ -11,8 +11,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Timer Transmitter** | A transmitter with a clock. It sends full strength on a schedule: a pulse every 1 second to 20 minutes, or on between two in-game times (on at 18:00, off at 06:00 lights the night). A redstone signal into it pauses it. Otherwise it's a full-size transmitter, with reach by height. |
 | **Radio Signal Recorder** | A transmitter with a tape. It records up to 30 seconds of a frequency (every on, off and strength, to the tick) and plays it back on its own frequency: once each time a redstone pulse reaches it, or on a loop while it's powered. Record a rhythm on a remote and get it back as a doorbell tune, a light show or a secret knock. |
-| **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
-| **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
+| **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength (weaker far out toward the edge of a tower's reach). Works like a redstone block with a dimmer. |
+| **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the strength it was sent at, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. Its **signal gate** can make it a wireless comparator (send only at a level or more) or a wireless NOT gate (send 15 while it hears nothing). |
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Radio Inverted Receiver** | A receiver with a redstone torch built in: full strength while its frequency is silent, nothing while it's on. Turning a frequency on can then switch something off. |
@@ -27,6 +27,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
 | **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
+| **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
 | **Radio Jammer** | A tower top that drowns out one frequency around it while it gets redstone. Everything there that listens on that frequency hears that much less, and a full-strength signal silences it completely. It reaches half as far as a transmitter at the same height. On someone else's private frequency it does nothing, and the owner is told. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
@@ -491,6 +492,7 @@ An **Aviation Beacon** (since 0.44) is a warning light for towers. Put it on top
 - On someone else's private frequency only its owner and members can fit or take off an antenna (others get a red refusal and the owner an alert, as when tuning).
 - Breaking the tower keeps its antenna on the item ("Antenna: Diamond Antenna (×3 reach)" in its tooltip), and placing it puts it back. Compact transmitters and motion sensors don't take antennas.
 - The multipliers are in the server config: `ironAntennaReach`, `goldAntennaReach`, `diamondAntennaReach`, `netheriteAntennaReach`.
+- A **Dish Antenna** (since 0.48) fits the same towers but points: three times the reach in one direction only (see Dish Antenna).
 
 ### Radio Lamps
 
@@ -534,6 +536,29 @@ Since 0.47 **lightning strikes tall towers** during thunderstorms:
 - The mod's own bolts don't start fires or hurt anyone. A bolt that lands on a tower some other way (vanilla lightning, a Trident with Channeling, `/summon lightning_bolt`) knocks it out too, unless a rod protects it.
 
 ![A lime Radio Lamp on top of a 12-mast pillar, lit, and one on the ground at its foot, dark: both on a transmitter 80 blocks away whose reach is 56; Jade on the high lamp saying "Up high: hears lower towers up to 152 blocks away" (the meter: 15, 70 blocks to the edge); lightning striking Dev's tower in a thunderstorm ("Sending: nothing", "Struck by lightning: back in 4.7s"); sparks round the dark tower ("back in 3.5s"); and the same tower with a Lightning Rod on its side, still "Sending: 15" after the next strike](docs/images/receiver-height-and-lightning.png)
+
+### Signal fade
+
+Since 0.48 a signal **fades toward the edge** of a tower's reach. Out to half its reach it's heard at full strength; from there it gets weaker and weaker, down to 1 at the very edge (it never fades to nothing: inside the reach it's always heard). A transmitter sending 15 with a reach of 56 is heard at 15 up to 28 blocks away, 13 at 32, 9 at 40, 5 at 48 and 1 at 56. A row of Radio Lamps shows it at night: their light shrinks toward the edge.
+
+- **Repeaters and converters hear it unfaded** and send it on at full strength, so a chain of repeaters gets 15 to the far end. Put the next repeater wherever you like within reach; only the receivers at the end hear the fade.
+- It applies to everything that listens: receivers of every kind, lamps, speakers, status boards, and the pager, meter and scanner in your hand. A jammer's jamming fades the same way. Compact transmitters, motion sensors, keypads and remote presses don't fade (their reach is short anyway).
+- It comes off first, then hills, then jamming.
+- Jade shows how much a receiver's signal faded ("Faded: -10 (far out in its tower's reach)"), and the Signal Meter adds it to its bottom line ("Fade -11").
+- The server config sets where it starts and how much it takes: `signalFadeStartPercent` (50: half the reach; 100 switches fading off) and `signalFadeAtEdge` (14: 15 becomes 1 at the edge; 0 switches it off).
+
+### Dish Antenna
+
+A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-size Radio Transmitter, Timer Transmitter, Signal Recorder, Repeater, Converter or Jammer with it, and the dish faces the way you're looking (one of 16 directions: north, north-north-east, north-east and so on):
+
+- **In its beam,** 15° either side of where it points, the tower reaches **three times** as far as with no antenna. Everywhere else it reaches as far as with no antenna. A transmitter with a reach of 56 then reaches 168 blocks east and 56 every other way ("Radio Transmitter: Dish Antenna aimed east: 168 blocks that way, 56 elsewhere"). The server config's `maxReach` still caps it.
+- **To turn it,** right-click the tower with another Dish Antenna while looking the new way: the dish turns (nothing is used up). Fitting a different antenna replaces it and gives the dish back; sneak + right-click with an empty hand takes it off.
+- Everything goes by the beam: receivers, repeaters (a dish on a repeater sends the relayed signal far in one direction), a jammer's jamming, remote presses the tower relays, the meter's distance to the edge, and weather and fade (which work on the longer reach).
+- **You can see it:** a grey dish on the tower's mast, facing its way. Jade shows "Antenna: Dish Antenna, aimed east (×3 reach that way)" and "Reaches 168 blocks to the east" (also on a mast below, without the second line), and the reach ring becomes a keyhole: the circle, with the beam sticking out of it.
+- A tower placed from an item that carries a dish faces the way you look when you place it.
+- The server config has `dishReachMultiplier` (3) and `dishConeDegrees` (15 either side).
+
+![A row of Radio Lamps at night on a transmitter whose reach is 56, their light shrinking toward the edge of its reach; Jade on the lamp 48 blocks out saying "Light: 5" and "Faded: -10 (far out in its tower's reach)", with the meter reading 4, "Fade -11"; a transmitter with a Dish Antenna, Jade saying "Antenna: Dish Antenna, aimed east (×3 reach that way)" and "Reaches 168 blocks to the east", and the reach ring "56 blocks (168 to the east)"; and its reach ring from above: a keyhole, the circle with the beam reaching out east](docs/images/signal-fade-and-dish-antenna.png)
 
 ### Radio Jammers
 
@@ -595,6 +620,7 @@ Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size 
 - The ring stays on that tower while you keep holding the tuner, so you can walk out to the edge to see where to put the next repeater or receiver. Look at another tower to move it; put the tuner away to clear it.
 - The dots follow the ground, and far ones are drawn bigger so the ring still shows from a hilltop. Only you see it, and only the part within your render distance.
 - The reach comes from the server, so it's always the real one (the dimension's sea level, the server config and the weather).
+- A tower with a Dish Antenna (since 0.48) gets a keyhole: the circle, with its beam reaching out the way the dish points. The first line adds how far that is ("56 blocks (168 to the east)"), and "You're inside" counts to whichever edge is yours.
 
 ### Reach
 
@@ -614,7 +640,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-An antenna multiplies a tower's reach (see Antennas), and rain shortens it (see Weather and terrain). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
+An antenna multiplies a tower's reach (see Antennas; a Dish Antenna only in one direction), rain shortens it (see Weather and terrain), and the signal fades toward the edge of it (see Signal fade). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -655,6 +681,16 @@ I = Iron Ingot   R = Redstone Dust
 ```
 
 **Gold Antenna:** an Iron Antenna, 2 Gold Ingots and a Redstone Dust, in any arrangement. **Diamond Antenna:** a Gold Antenna and 2 Diamonds. **Netherite Antenna:** a Diamond Antenna and a Netherite Ingot.
+
+**Dish Antenna:**
+
+```
+     I  .  I
+     .  I  .
+     .  A  .
+
+I = Iron Ingot   A = Iron Antenna
+```
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
@@ -1002,9 +1038,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 149. the Radio Jammer: powered by redstone it silences a receiver near it and not one far away, at half a transmitter's reach; Jade says "Jammed" on the receiver and what it jams on the jammer; the meter says "Jammed"; it sends nothing itself; a stranger's jammer on someone else's private frequency is silent (and says so, and shows in the audit); and broken, it stops and keeps its frequency on the item.
 
 150. receiver height: 4 blocks up a receiver hears a tower 30 blocks past its reach (3 up doesn't), one lower than the tower gains nothing, a compact transmitter keeps its short reach, a repeater up high picks it up and passes it on, and the meter and scanner go by it; a real receiver 11 blocks above a transmitter hears it from 98 blocks (Jade says why) and one at the transmitter's height doesn't;
-151. lightning: the chance grows with height (none below sea level); struck, a transmitter on masts goes quiet for 5 seconds (receiver off, light out, Jade counts down) and comes back; a Lightning Rod beside its top takes the next hit (the rod pulses, the tower stays on) but one 3 blocks away is too far; a bolt that isn't the mod's knocks it out too; compact transmitters can't be struck, repeaters can.
+151. lightning: the chance grows with height (none below sea level); struck, a transmitter on masts goes quiet for 5 seconds (receiver off, light out, Jade counts down) and comes back; a Lightning Rod beside its top takes the next hit (the rod pulses, the tower stays on) but one 3 blocks away is too far; a bolt that isn't the mod's knocks it out too; compact transmitters can't be struck, repeaters can;
+152. signal fade (in a batch of its own; every other test runs with fading off, to check other things at exact strengths): 15 out to half the reach, 8 at three quarters and 1 at the very edge, the same in every direction; a repeater 90 blocks out sends it on at 15 and it fades again toward the repeater's edge; a compact transmitter doesn't fade; a jammer three quarters out jams 8; the meter's packet carries it; a real receiver three quarters out outputs what's left and Jade says how much faded;
+153. the Dish Antenna: looking north, east, south or west aims it 0, 4, 8 or 12; its beam is 15° either side; a tower reaches 192 blocks in its beam and 64 everywhere else (the meter's edge too, and a press it relays), saved and loaded; without it, 64 again; a jammer's dish jams farther that way only; fitted in the world it reaches a receiver 125 blocks east, Jade and the reach ring (a keyhole, also over the network) show it; a second dish turns it west (nothing used up, the receiver goes off), the same way again says it already faces there, and an iron antenna replaces it and gives the dish back.
 
-All 151 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 153 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

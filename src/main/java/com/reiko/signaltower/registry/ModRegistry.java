@@ -460,6 +460,9 @@ public final class ModRegistry {
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> NETHERITE_ANTENNA = ITEMS.register("netherite_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.NETHERITE,
                     new Item.Properties().fireResistant()));
+    /** v0.48.0: sends much farther, but only in the direction it's aimed. */
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> DISH_ANTENNA = ITEMS.register("dish_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.DISH, new Item.Properties()));
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
