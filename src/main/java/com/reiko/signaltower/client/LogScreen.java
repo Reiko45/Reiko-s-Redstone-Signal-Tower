@@ -190,7 +190,7 @@ public class LogScreen extends Screen {
         if (entry.pos().isEmpty()) {
             // Another player's transmitter isn't located, and where a remote was pressed isn't kept.
             return (entry.kind() == SignalNetwork.CauseKind.TRANSMITTER || entry.kind() == SignalNetwork.CauseKind.GATE
-                    || entry.kind() == SignalNetwork.CauseKind.TIMER
+                    || entry.kind() == SignalNetwork.CauseKind.TIMER || entry.kind() == SignalNetwork.CauseKind.RECORDER
                     ? Component.translatable(AUDIT_KEY + "hidden") : Component.literal("-")).withStyle(ChatFormatting.DARK_GRAY);
         }
         BlockPos pos = entry.pos().get();

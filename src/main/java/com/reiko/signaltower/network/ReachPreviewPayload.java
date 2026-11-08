@@ -26,6 +26,8 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
     public static final int MOTION_SENSOR = 5;
     /** A Radio Timer Transmitter (v0.42.0). */
     public static final int TIMER_TRANSMITTER = 6;
+    /** A Radio Signal Recorder (v0.44.0). */
+    public static final int SIGNAL_RECORDER = 7;
 
     public static final Type<ReachPreviewPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "reach_preview"));

@@ -1,0 +1,369 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "reikos_signal_tower:block/aviation_beacon_white",
+    "dome": "reikos_signal_tower:block/aviation_beacon_white",
+    "base": "reikos_signal_tower:block/aviation_beacon_base"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        0,
+        5
+      ],
+      "to": [
+        11,
+        1,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            5.0,
+            11.0,
+            11.0
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            5.0,
+            11.0,
+            11.0
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        6.5,
+        1,
+        6.5
+      ],
+      "to": [
+        9.5,
+        8,
+        9.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            4.5,
+            9.5,
+            11.5
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            4.5,
+            9.5,
+            11.5
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            4.5,
+            9.5,
+            11.5
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            4.5,
+            9.5,
+            11.5
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            6.5,
+            9.5,
+            9.5
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            6.5,
+            6.5,
+            9.5,
+            9.5
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        8,
+        5
+      ],
+      "to": [
+        11,
+        14,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "south": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "east": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "west": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "up": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ]
+        },
+        "down": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        14,
+        6
+      ],
+      "to": [
+        10,
+        15.5,
+        10
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            6.0,
+            10.0,
+            10.0
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            6.0,
+            10.0,
+            10.0
+          ]
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        1,
+        0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        3,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        2,
+        0
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    },
+    "thirdperson_righthand": {
+      "rotation": [
+        75,
+        45,
+        0
+      ],
+      "translation": [
+        0,
+        2.5,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    }
+  }
+}

@@ -70,6 +70,9 @@ public final class RadioInfo {
         if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.StatusBoardBlockEntity board) {
             return readBoard(level, board);
         }
+        if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
+            return readBeacon(level, pos);
+        }
         CompoundTag tag = gather(level, pos);
         if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor) {
             // v0.39.0: whose it is and whether it sees someone; its range, mode and who it saw only for its owner.
@@ -146,7 +149,8 @@ public final class RadioInfo {
                     && level.getBlockEntity(cursor) instanceof RadioBlockEntity radio) {
                 tag.putString("top", top instanceof RadioConverterBlock ? "converter"
                         : top instanceof RadioRepeaterBlock ? "repeater"
-                        : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter" : "transmitter");
+                        : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter"
+                        : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 tag.putInt("frequency", radio.getFrequency());
                 if (top instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
@@ -174,6 +178,18 @@ public final class RadioInfo {
                 tag.putBoolean("timer_paused", timer.isPaused(level));
                 tag.putBoolean("timer_clock", timer.clockOn(level));
                 tag.putLong("change_in", timer.changeIn(level));
+            }
+            if (radio instanceof com.reiko.signaltower.blockentity.SignalRecorderBlockEntity recorder) {
+                // v0.44.0: what it records from (as "second", so it gets a name and a note), its tape and what it's doing.
+                if (recorder.getListenFrequency() > 0) {
+                    tag.putInt("second", recorder.getListenFrequency());
+                }
+                tag.putBoolean("recorder_loop", recorder.isLoop());
+                tag.putInt("recorder_length", recorder.getLength());
+                tag.putInt("recorder_changes", recorder.getChanges().length);
+                tag.putInt("recorder_phase", recorder.getPhase().ordinal());
+                tag.putInt("recorder_elapsed", recorder.elapsed(level.getGameTime()));
+                tag.putInt("recorder_taking", recorder.getTaking().size());
             }
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
@@ -261,6 +277,9 @@ public final class RadioInfo {
         Block block = state.getBlock();
         if (block instanceof com.reiko.signaltower.block.StatusBoardBlock) {
             return boardLines(data);
+        }
+        if (block instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
+            return beaconLines(state, data);
         }
         List<Component> lines = new ArrayList<>();
         boolean hasData = data != null && data.contains("frequency");
@@ -413,6 +432,9 @@ public final class RadioInfo {
             lines.add(!on ? Component.translatable(LANG + "sending_nothing").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "sending", value(data.getInt("power")))
                     : Component.translatable(LANG + "broadcasting").withStyle(ChatFormatting.GREEN));
+            if (hasData && data.contains("recorder_phase")) {
+                recorderLines(lines, data);
+            }
             if (hasData && data.contains("timer_daily")) {
                 // v0.42.0: a timer's schedule, then a pause or what happens next.
                 boolean daily = data.getBoolean("timer_daily");
@@ -531,6 +553,78 @@ public final class RadioInfo {
         }
         tag.put("rows", rows);
         return tag;
+    }
+
+    /** A recorder's lines (v0.44.0): what it records from, its tape and mode, and what it's doing. */
+    private static void recorderLines(List<Component> lines, CompoundTag data) {
+        if (data.contains("second")) {
+            lines.add(Component.translatable(LANG + "recorder_records_from", number(data, "second", "second_name")));
+            addNoteLine(lines, data, "second_note");
+        }
+        int length = data.getInt("recorder_length");
+        lines.add(Component.translatable(LANG + "recorder_tape",
+                com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.tapeText(length, data.getInt("recorder_changes")),
+                com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.modeText(data.getBoolean("recorder_loop")))
+                .withStyle(ChatFormatting.YELLOW));
+        int elapsed = data.getInt("recorder_elapsed");
+        switch (com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.Phase.of(data.getInt("recorder_phase"))) {
+            case WAITING -> lines.add(Component.translatable(LANG + "recorder_waiting").withStyle(ChatFormatting.GOLD));
+            case RECORDING -> lines.add(Component.translatable(LANG + "recorder_recording",
+                    com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.seconds(elapsed), data.getInt("recorder_taking"))
+                    .withStyle(ChatFormatting.RED));
+            case PLAYING -> lines.add(Component.translatable(LANG + "recorder_playing",
+                    com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.seconds(length > 0 ? elapsed % length : 0),
+                    com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.seconds(length)).withStyle(ChatFormatting.GREEN));
+            default -> {
+            }
+        }
+    }
+
+    /**
+     * An Aviation Beacon's data (v0.44.0): the tower it's on ("beacon_tower", its block's id path),
+     * how far up that is, whether it's sending, and its frequency (and name).
+     */
+    private static CompoundTag readBeacon(ServerLevel level, BlockPos pos) {
+        CompoundTag tag = new CompoundTag();
+        BlockState state = level.getBlockState(pos);
+        BlockPos tower = com.reiko.signaltower.block.AviationBeaconBlock.towerOf(level, pos, state);
+        if (tower != null) {
+            BlockState top = level.getBlockState(tower);
+            tag.putString("beacon_tower", com.reiko.signaltower.radio.AviationLight.towerName(top));
+            tag.putInt("beacon_above", Math.max(0, tower.getY() - pos.getY()));
+            tag.putBoolean("beacon_sending", com.reiko.signaltower.radio.AviationLight.isSending(top));
+            if (level.getBlockEntity(tower) instanceof RadioBlockEntity radio) {
+                int frequency = radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter()
+                        ? relay.getOutputFrequency() : radio.getFrequency();
+                tag.putInt("beacon_frequency", frequency);
+                addName(level, tag, "beacon_frequency", "beacon_name");
+            }
+        }
+        tag.putBoolean("beacon_lit", com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, pos, state));
+        return tag;
+    }
+
+    /** An Aviation Beacon's lines: how it blinks (from its block state), whether it's on now, and its tower. */
+    private static List<Component> beaconLines(BlockState state, @Nullable CompoundTag data) {
+        List<Component> lines = new ArrayList<>();
+        lines.add(com.reiko.signaltower.block.AviationBeaconBlock.describe(state).copy().withStyle(ChatFormatting.YELLOW));
+        if (data == null) {
+            return lines;
+        }
+        lines.add(data.getBoolean("beacon_lit") ? Component.translatable(LANG + "beacon_on").withStyle(ChatFormatting.GREEN)
+                : Component.translatable(LANG + "beacon_off").withStyle(ChatFormatting.GRAY));
+        if (!data.contains("beacon_tower")) {
+            boolean sendingMode = state.getValue(com.reiko.signaltower.block.AviationBeaconBlock.WHEN)
+                    == com.reiko.signaltower.radio.AviationLight.When.SENDING;
+            lines.add(Component.translatable(LANG + (sendingMode ? "beacon_no_tower_dark" : "beacon_no_tower"))
+                    .withStyle(sendingMode ? ChatFormatting.GOLD : ChatFormatting.GRAY));
+            return lines;
+        }
+        Component tower = Component.translatable("block." + SignalTower.MOD_ID + "." + data.getString("beacon_tower"));
+        Component frequency = data.contains("beacon_frequency") ? number(data, "beacon_frequency", "beacon_name") : Component.literal("?");
+        lines.add(Component.translatable(LANG + (data.getBoolean("beacon_sending") ? "beacon_tower_sending" : "beacon_tower_silent"),
+                tower, frequency, data.getInt("beacon_above")).withStyle(data.getBoolean("beacon_sending") ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+        return lines;
     }
 
     /** A status board's lines: one per row, "2026 (Front Gate): 15", "off" or "encrypted by Dev". */

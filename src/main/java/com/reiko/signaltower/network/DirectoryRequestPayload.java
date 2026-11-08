@@ -68,7 +68,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
                 && (player.level().getBlockState(pos).getBlock() instanceof RadioConverterBlock
                     || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock
                     || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock
-                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.StatusBoardBlock)).isPresent();
+                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.StatusBoardBlock
+                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock)).isPresent();
     }
 
     public static boolean holdsRadioItem(Player player) {

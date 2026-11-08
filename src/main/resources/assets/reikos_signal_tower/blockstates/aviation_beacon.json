@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "color=red,face=floor,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_red"
+    },
+    "color=red,face=wall,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_red"
+    },
+    "color=red,face=ceiling,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_red"
+    },
+    "color=red,face=floor,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_red",
+      "y": 90
+    },
+    "color=red,face=wall,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_red",
+      "y": 90
+    },
+    "color=red,face=ceiling,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_red",
+      "y": 90
+    },
+    "color=red,face=floor,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_red",
+      "y": 180
+    },
+    "color=red,face=wall,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_red",
+      "y": 180
+    },
+    "color=red,face=ceiling,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_red",
+      "y": 180
+    },
+    "color=red,face=floor,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_red",
+      "y": 270
+    },
+    "color=red,face=wall,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_red",
+      "y": 270
+    },
+    "color=red,face=ceiling,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_red",
+      "y": 270
+    },
+    "color=white,face=floor,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_white"
+    },
+    "color=white,face=wall,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_white"
+    },
+    "color=white,face=ceiling,facing=north": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_white"
+    },
+    "color=white,face=floor,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_white",
+      "y": 90
+    },
+    "color=white,face=wall,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_white",
+      "y": 90
+    },
+    "color=white,face=ceiling,facing=east": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_white",
+      "y": 90
+    },
+    "color=white,face=floor,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_white",
+      "y": 180
+    },
+    "color=white,face=wall,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_white",
+      "y": 180
+    },
+    "color=white,face=ceiling,facing=south": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_white",
+      "y": 180
+    },
+    "color=white,face=floor,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_floor_white",
+      "y": 270
+    },
+    "color=white,face=wall,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_wall_white",
+      "y": 270
+    },
+    "color=white,face=ceiling,facing=west": {
+      "model": "reikos_signal_tower:block/aviation_beacon_ceiling_white",
+      "y": 270
+    }
+  }
+}

@@ -117,6 +117,27 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new TimerScreen(state));
     }
 
+    /** Opens an Aviation Beacon's screen (v0.44.0), from its block state on this client. */
+    public static void openBeaconScreen(net.minecraft.core.BlockPos pos) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level != null
+                && minecraft.level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
+            minecraft.setScreen(new AviationBeaconScreen(pos, minecraft.level.getBlockState(pos)));
+        }
+    }
+
+    /** Opens a Radio Signal Recorder's screen (v0.44.0). */
+    public static void openRecorderScreen(com.reiko.signaltower.network.OpenRecorderScreenPayload state) {
+        Minecraft.getInstance().setScreen(new RecorderScreen(state));
+    }
+
+    /** A recorder's status arrived: hand it to its open screen, if there is one. */
+    public static void onRecorderStatus(com.reiko.signaltower.network.RecorderStatus status) {
+        if (Minecraft.getInstance().screen instanceof RecorderScreen screen) {
+            screen.onStatus(status);
+        }
+    }
+
     /** Opens a Radio Counter Receiver's screen (v0.42.0). */
     public static void openCounterScreen(com.reiko.signaltower.network.OpenCounterScreenPayload state) {
         Minecraft.getInstance().setScreen(new CounterScreen(state));

@@ -10,6 +10,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 |---|---|
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Timer Transmitter** | A transmitter with a clock. It sends full strength on a schedule: a pulse every 1 second to 20 minutes, or on between two in-game times (on at 18:00, off at 06:00 lights the night). A redstone signal into it pauses it. Otherwise it's a full-size transmitter, with reach by height. |
+| **Radio Signal Recorder** | A transmitter with a tape. It records up to 30 seconds of a frequency (every on, off and strength, to the tick) and plays it back on its own frequency: once each time a redstone pulse reaches it, or on a loop while it's powered. Record a rhythm on a remote and get it back as a doorbell tune, a light show or a secret knock. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. Its **signal gate** can make it a wireless comparator (send only at a level or more) or a wireless NOT gate (send 15 while it hears nothing). |
@@ -24,6 +25,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
+| **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
@@ -443,6 +445,32 @@ A **Radio Status Board** (since 0.43) hangs on the side of a block, like a wall 
 
 ![The speaker's screen set to the doorbell; Alex's remote press ringing it, with Jade and the "Note Block plays" subtitle; the board's screen with each row's state; the board on a wall showing the timer's pulse on 4400 and Front Gate on; the board glowing at night; and a speaker item's tooltip with its settings](docs/images/radio-speaker-and-status-board.png)
 
+### Signal recorders
+
+A **Radio Signal Recorder** (since 0.44) is a full-size transmitter (reach by height, masts, relaying remote presses) that broadcasts a recording instead of the redstone around it. Right-click it with an empty hand to open its screen:
+
+- **Records from:** the frequency it records, as heard where it stands (with "..." for the directory). **Plays on:** the frequency it plays on (the tuner sets this one too). They have to be different.
+- **Record** waits for Records from to turn on ("Waiting for 4410 to turn on..."), then records every change (off, on, and the strength) to the tick, until **Stop**, 30 seconds, or 256 changes. The time after the last change until Stop counts too, so a loop keeps its pause. The old recording stays until the new one starts.
+- **Plays:** **once on a redstone pulse** (the default): each time a redstone signal reaches it, or a mast under it, it plays the recording from the start. Or **on a loop while powered**: over and over while the signal stays, stopping when it goes. **Play** plays it once now; **Clear** forgets it.
+- **The screen** draws the recording as a strip (each stretch as tall as its strength, a white line where it's playing) and says what it's doing: "Recording: 3.4s, 6 changes", "Recorded: 4.7s, 10 changes", "Playing: 0.7s of 4.7s", what it hears and whether redstone reaches it. Record, Stop, Play and Clear also save the boxes, and keep the screen open.
+- **An example:** a recorder recording 4410 and playing on 4420, with a receiver and a lamp on 4420. Press Record, close the screen and press a Remote Control on 4410 in a rhythm; open it again and press Stop. A button next to it now plays the rhythm on the lamp (or on a speaker on 4420), and a lever with Loop plays it over and over.
+- **Jade** shows what it records from, the tape ("Tape: 4.7s, 10 changes; plays on a loop while powered") and "Playing: 1.1s of 4.7s". The log lists its turn-ons as "Signal Recorder", the audit as "Signal Recorder", and the tuner shows its reach ring.
+- **Private and encrypted frequencies:** pressing a button makes you its tuner. It only plays on a private frequency for members (others get a red refusal, and the owner an alert), and records someone else's encrypted frequency as silence ("Deaf: 4410 is encrypted by Dev").
+- Breaking it keeps its frequencies, mode and recording on the dropped item, and the item's tooltip shows them.
+
+### Aviation beacons
+
+An **Aviation Beacon** (since 0.44) is a warning light for towers. Put it on top of a transmitter, repeater or converter, on the side of a mast (its bracket reaches the mast), or on any block's top, side or underside.
+
+- **When it's on:** **at night** (the default: from dusk to dawn, the hours you can sleep, and in rain and storms; always in the Nether and the End), **all the time**, or **while its tower sends**: only while the tower it's on (the tower top it stands on, or the one on top of the mast it's on) is broadcasting.
+- **Pattern:** **Blink** (one second on, one off), **Flash** (a short flash every 1.5 seconds, like a strobe) or **Steady**. **Color:** red or white.
+- **Seen from far away:** its glow grows with distance and isn't fogged, so at night the lights show as far as the world is drawn, long after the tower itself has faded. Every beacon blinks by the same clock, so all the lights on a tower (and on every tower) blink together.
+- **Setting it:** right-click it with an empty hand. The screen has the three buttons, a little light that blinks the way it will, and which tower it's on ("On a Radio Transmitter (15 blocks up): sending", or "Not on a tower").
+- **Jade** shows how it blinks ("Blinks red at night"), "On now" or "Off now", and its tower ("Tower: Radio Transmitter on 4430, 15 blocks up, sending").
+- It's only a light: no redstone, no frequency. Anyone can change it. It pops off if what it's on goes, and keeps its settings on the dropped item.
+
+![From 150 blocks at night only the tower's blinking beacons show; the same tower closer; a white beacon set to "while its tower sends" lit while the lever is on and dark after Alex switches it off (Jade says why); the beacon's screen; Jade on a recorder looping a rhythm onto a lamp; and the recorder's screen after recording five remote presses, then playing them](docs/images/aviation-beacon-and-signal-recorder.png)
+
 ### Code Keypad
 
 A **Code Keypad** is a thin panel you put on a wall, floor or ceiling. Type its code and it sends a pulse on its frequency, from where it is, like a remote pressed there (towers in its reach relay it). For as long as the pulse lasts, its display lights green and, like a button, it powers the block it's on, so an iron door next to that block opens without any radio at all.
@@ -538,6 +566,18 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Status Board:** a Radio Receiver, a Redstone Lamp and a Glass Pane, in any arrangement in the crafting grid.
 
+**Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
+
+**Aviation Beacon** (makes 2):
+
+```
+     .  G  .
+     R  L  R
+     .  I  .
+
+G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
+```
+
 **Radio Timer Transmitter:** a Radio Transmitter and a Clock, in any arrangement in the crafting grid. Put a timer transmitter in the grid on its own to get the Radio Transmitter back.
 
 **Radio Counter Receiver:** a Radio Receiver and a Hopper, in any arrangement in the crafting grid. Put a counter receiver in the grid on its own to get the Radio Receiver back.
@@ -611,6 +651,17 @@ src/main/java/com/reiko/signaltower/
   blockentity/TimerTransmitterBlockEntity.java  the timer's clock: interval or daily, pause, labels
   client/TimerScreen.java                the timer transmitter's screen
   network/OpenTimerScreenPayload.java, ConfigureTimerPayload.java  timer screen <-> server
+  block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
+  blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
+  radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
+  client/RecorderScreen.java             the recorder's screen (with the recording drawn as a strip)
+  network/OpenRecorderScreenPayload.java, ConfigureRecorderPayload.java, RecorderStatus.java, RecorderStatusPayload.java  recorder screen <-> server
+  block/AviationBeaconBlock.java         warning light on a tower, mast or block; settings in its block state
+  blockentity/AviationBeaconBlockEntity.java  lets the client draw the light (and remembers whether it's on)
+  radio/AviationLight.java               when it's lit, blink patterns, colors, finding its tower
+  client/AviationBeaconRenderer.java     draws the lit dome and the glow that shows from far away
+  client/AviationBeaconScreen.java       the beacon's screen
+  network/ConfigureBeaconPayload.java    beacon screen -> server
   block/RadioSpeakerBlock.java           receiver that plays a sound; opens its screen
   radio/SpeakerSound.java                the speaker's sounds, notes and volumes
   client/SpeakerScreen.java              the speaker's screen (with Test)
@@ -841,9 +892,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 138. the timer transmitter: set by Dev's packet to every 1 s with a 0.25 s pulse, a receiver turns on every 19 to 21 ticks for 4 to 6, and the log names the timer; Jade, the screen and settings packets (round trips) know it; a 10 s pulse is cut to half the interval, and times it doesn't offer become the defaults; a redstone block next to it pauses it (and Jade and the screen say so) until it's gone; a daily timer is on during its hours and off outside them (Jade says until when, or when it turns on), and the clock's hours and labels are right; on someone else's private frequency a stranger's packet is refused, and one out of reach does nothing; it's saved, and drops with its schedule;
 139. the counter receiver: set by Dev's packet to 3 with reset frequency 4052 (Dev becomes its tuner; out of reach does nothing), two turn-ons leave it off and the third pulses it on and counts from 0 again; with a 1 s forget time a pause forgets the count (Jade's lines while counting); its reset frequency clears the count; set to stay on at 2, it stays on through more turn-ons (Jade, the screen packet and a round trip, saved with its count) until the reset frequency turns on; Reset count, no reset frequency, and it drops with its settings;
 140. the speaker: set by Dev's packet to a bell played once (out of reach does nothing), a short pulse plays one note and 50 ticks on still one; one placed while its frequency is on stays quiet but outputs 15; set to the doorbell repeating, 45 ticks on play three rings of two notes; note labels (F♯3, F♯4, C5, F♯5) and pitches are a note block's; Jade, the screen packet (round trip) and saving keep its settings, and it drops with them;
-141. the status board: hung on a wall and set by Dev's packet to 4151, 4152, an empty row and 4153 (out of reach does nothing), its rows follow their transmitters on and off, the update tag carries the rows and strengths (not who set it) to clients, Jade lists the rows, a row on someone else's encrypted frequency is deaf (Jade and the screen say so), the screen packet round-trips, it's saved, and with its wall gone it pops off with its rows on the item.
+141. the status board: hung on a wall and set by Dev's packet to 4151, 4152, an empty row and 4153 (out of reach does nothing), its rows follow their transmitters on and off, the update tag carries the rows and strengths (not who set it) to clients, Jade lists the rows, a row on someone else's encrypted frequency is deaf (Jade and the screen say so), the screen packet round-trips, it's saved, and with its wall gone it pops off with its rows on the item;
+142. the aviation beacon: its clock (dusk to dawn, blink, flash, steady) and when it's lit; on top of a transmitter on masts, on a mast's side and on a stone wall it hangs (not in the air), the first two find the tower and the third none; set to "while its tower sends" it's on only while the transmitter broadcasts (Jade knows its tower, how far up, and whether it's on); the screen's packet sets it (round trip), from anyone within reach; and broken, or popped off when its mast goes, it drops with its settings;
+143. the signal recorder: with nothing to record from, or the same frequency both ways, it says so; Record waits for 4201 to turn on, then records two 10-tick pulses to the tick until Stop; Play sends them on 4202 once, with the same rhythm (the log names the recorder; Jade knows the tape); in Once mode a redstone pulse plays it once; in Loop mode it plays over and over while powered and stops when the power goes; the status, screen and settings packets round-trip (no status out of reach); a stranger can't change it on someone else's private frequency, nor anyone out of reach; it's saved, and drops with its recording.
 
-All 141 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 143 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "reikos_signal_tower:block/radio_signal_recorder"
+    },
+    "powered=true": {
+      "model": "reikos_signal_tower:block/radio_signal_recorder_on"
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " G ",
+    "RLR",
+    " I "
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:red_stained_glass"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "L": {
+      "item": "minecraft:redstone_lamp"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    }
+  },
+  "result": {
+    "count": 2,
+    "id": "reikos_signal_tower:aviation_beacon"
+  }
+}

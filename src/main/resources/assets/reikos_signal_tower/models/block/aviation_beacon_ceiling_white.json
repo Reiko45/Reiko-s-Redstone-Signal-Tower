@@ -1,0 +1,282 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "reikos_signal_tower:block/aviation_beacon_white",
+    "dome": "reikos_signal_tower:block/aviation_beacon_white",
+    "base": "reikos_signal_tower:block/aviation_beacon_base"
+  },
+  "elements": [
+    {
+      "from": [
+        5,
+        15,
+        5
+      ],
+      "to": [
+        11,
+        16,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            7.5,
+            11.0,
+            8.5
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            5.0,
+            11.0,
+            11.0
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            5.0,
+            5.0,
+            11.0,
+            11.0
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        9,
+        7
+      ],
+      "to": [
+        9,
+        15,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            5.0,
+            9.0,
+            11.0
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            5.0,
+            9.0,
+            11.0
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            5.0,
+            9.0,
+            11.0
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            5.0,
+            9.0,
+            11.0
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            7.0,
+            9.0,
+            9.0
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            7.0,
+            7.0,
+            9.0,
+            9.0
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        3,
+        5
+      ],
+      "to": [
+        11,
+        9,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "south": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "east": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "west": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            2,
+            11,
+            8
+          ]
+        },
+        "up": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ]
+        },
+        "down": {
+          "texture": "#dome",
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        1.5,
+        6
+      ],
+      "to": [
+        10,
+        3,
+        10
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            7.25,
+            10.0,
+            8.75
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            6.0,
+            10.0,
+            10.0
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            6.0,
+            6.0,
+            10.0,
+            10.0
+          ]
+        }
+      }
+    }
+  ]
+}

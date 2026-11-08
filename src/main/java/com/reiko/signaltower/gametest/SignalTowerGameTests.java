@@ -6219,4 +6219,304 @@ public final class SignalTowerGameTests {
                                 && List.of(4151, 4152, 0, 4153).equals(stack.get(ModRegistry.BOARD_FREQUENCIES.get()))), "Dropped with its rows"))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.44.0: aviation beacon
+
+    /**
+     * The Aviation Beacon: its clock (dusk to dawn, blink, flash, steady) and when it's lit. On top
+     * of a transmitter on masts, on a mast's side and on a plain wall: it hangs on all three but not
+     * in the air; the first two find the tower, the third none. Set to "while its tower sends" it's
+     * on only while the transmitter broadcasts. Jade knows its tower; the screen's packet sets it
+     * (round trip), from anyone within reach; the item keeps its settings; taking the mast away
+     * pops the side one off.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void aviationBeacon(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 4, 2);
+        BlockPos input = new BlockPos(1, 1, 2);
+        BlockPos top = new BlockPos(2, 5, 2);
+        BlockPos side = new BlockPos(3, 2, 2);
+        BlockPos stone = new BlockPos(6, 1, 2);
+        BlockPos onStone = new BlockPos(6, 1, 1);
+        for (int y = 1; y <= 3; y++) {
+            helper.setBlock(new BlockPos(2, y, 2), ModRegistry.RADIO_MAST.get());
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4251);
+        helper.setBlock(stone, Blocks.STONE);
+        BlockState floor = ModRegistry.AVIATION_BEACON.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.FACE, AttachFace.FLOOR);
+        BlockState onMast = ModRegistry.AVIATION_BEACON.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.FACING, Direction.EAST)
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.WHEN, com.reiko.signaltower.radio.AviationLight.When.SENDING);
+        BlockState plain = ModRegistry.AVIATION_BEACON.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.AviationBeaconBlock.FACING, Direction.NORTH);
+        helper.setBlock(top, floor);
+        helper.setBlock(side, onMast);
+        helper.setBlock(onStone, plain);
+        BlockPos absTx = helper.absolutePos(tx);
+        BlockPos absTop = helper.absolutePos(top);
+        BlockPos absSide = helper.absolutePos(side);
+        BlockPos absStone = helper.absolutePos(onStone);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+
+        // Its clock: dusk to dawn are the hours you can sleep; the blinks go by the game time.
+        check(!com.reiko.signaltower.radio.AviationLight.isNightTime(0) && !com.reiko.signaltower.radio.AviationLight.isNightTime(12_541)
+                && com.reiko.signaltower.radio.AviationLight.isNightTime(12_542) && com.reiko.signaltower.radio.AviationLight.isNightTime(18_000)
+                && !com.reiko.signaltower.radio.AviationLight.isNightTime(23_460) && com.reiko.signaltower.radio.AviationLight.isNightTime(42_000), "Night");
+        var blink = com.reiko.signaltower.radio.AviationLight.Pattern.BLINK;
+        var flash = com.reiko.signaltower.radio.AviationLight.Pattern.FLASH;
+        var steady = com.reiko.signaltower.radio.AviationLight.Pattern.STEADY;
+        check(blink.onAt(0) && blink.onAt(19) && !blink.onAt(20) && !blink.onAt(39) && blink.onAt(40), "Blink: 1s on, 1s off");
+        check(flash.onAt(0) && flash.onAt(2) && !flash.onAt(3) && !flash.onAt(29) && flash.onAt(30), "Flash: 3 ticks every 1.5s");
+        check(steady.onAt(0) && steady.onAt(17) && steady.onAt(12_345), "Steady");
+        check(com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.NIGHT, steady, 5, true, false)
+                && !com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.NIGHT, steady, 5, false, true)
+                && com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.ALWAYS, blink, 5, false, false)
+                && !com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.ALWAYS, blink, 25, false, false)
+                && !com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.SENDING, steady, 5, true, false)
+                && com.reiko.signaltower.radio.AviationLight.isLit(com.reiko.signaltower.radio.AviationLight.When.SENDING, steady, 5, false, true), "When it's lit");
+        check(keyOf(com.reiko.signaltower.block.AviationBeaconBlock.describe(floor)).endsWith("beacon_text_blink"), "Describes itself");
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    check(floor.canSurvive(level, absTop), "On top of the transmitter");
+                    check(onMast.canSurvive(level, absSide), "On the mast's side");
+                    check(plain.canSurvive(level, absStone), "On a stone wall");
+                    check(!floor.canSurvive(level, helper.absolutePos(new BlockPos(4, 4, 4))), "Not in the air: " + helper.getBlockState(new BlockPos(4, 3, 4)));
+                    check(absTx.equals(com.reiko.signaltower.block.AviationBeaconBlock.towerOf(level, absTop, helper.getBlockState(top))), "Top: its tower");
+                    check(absTx.equals(com.reiko.signaltower.block.AviationBeaconBlock.towerOf(level, absSide, helper.getBlockState(side))), "Side: the tower on top of the mast");
+                    check(com.reiko.signaltower.block.AviationBeaconBlock.towerOf(level, absStone, helper.getBlockState(onStone)) == null, "A wall isn't a tower");
+                    check(!com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, absSide, helper.getBlockState(side)), "Dark while its tower is silent");
+                    check(com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, absTop, helper.getBlockState(top))
+                            == com.reiko.signaltower.radio.AviationLight.isDark(level), "At night: by the time and weather");
+                    helper.setBlock(input, Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, absSide, helper.getBlockState(side)),
+                        "On while its tower sends"))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absSide);
+                    check(info != null && info.getString("beacon_tower").equals("radio_transmitter") && info.getInt("beacon_frequency") == 4251
+                            && info.getInt("beacon_above") == 2 && info.getBoolean("beacon_sending") && info.getBoolean("beacon_lit"), "Jade data: " + info);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(side), info));
+                    check(keys.contains("beacon_text_blink") && keys.contains("beacon_on") && keys.contains("beacon_tower_sending"), "Jade: " + keys);
+                    CompoundTag none = com.reiko.signaltower.compat.RadioInfo.read(level, absStone);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(onStone), none)).contains("beacon_no_tower"), "Jade: no tower");
+
+                    var settings = com.reiko.signaltower.network.ConfigureBeaconPayload.of(absTop, com.reiko.signaltower.radio.AviationLight.When.ALWAYS,
+                            flash, com.reiko.signaltower.radio.AviationLight.LightColor.WHITE);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.ConfigureBeaconPayload.STREAM_CODEC.encode(buffer, settings);
+                    check(com.reiko.signaltower.network.ConfigureBeaconPayload.STREAM_CODEC.decode(buffer).equals(settings), "Settings packet round trip");
+                    check(com.reiko.signaltower.network.ConfigureBeaconPayload.apply(far, settings) == null, "Out of reach");
+                    Component set = com.reiko.signaltower.network.ConfigureBeaconPayload.apply(dev, settings);
+                    BlockState now = helper.getBlockState(top);
+                    check(set != null && keyOf(set).endsWith("beacon_set")
+                            && now.getValue(com.reiko.signaltower.block.AviationBeaconBlock.WHEN) == com.reiko.signaltower.radio.AviationLight.When.ALWAYS
+                            && now.getValue(com.reiko.signaltower.block.AviationBeaconBlock.PATTERN) == flash
+                            && now.getValue(com.reiko.signaltower.block.AviationBeaconBlock.COLOR) == com.reiko.signaltower.radio.AviationLight.LightColor.WHITE
+                            && now.getValue(com.reiko.signaltower.block.AviationBeaconBlock.FACE) == AttachFace.FLOOR, "Set: " + set);
+                    check(com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, absTop, now), "Always on");
+                    helper.setBlock(input, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(!com.reiko.signaltower.block.AviationBeaconBlock.isActive(level, absSide, helper.getBlockState(side)),
+                        "Dark again when its tower stops"))
+                .thenExecute(() -> {
+                    level.destroyBlock(absTop, true);
+                    helper.setBlock(new BlockPos(2, 2, 2), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(side).isAir(), "Pops off with its mast");
+                    List<ItemStack> drops = helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                            .filter(stack -> stack.is(ModRegistry.AVIATION_BEACON_ITEM.get())).toList();
+                    check(drops.stream().anyMatch(stack -> stack.get(DataComponents.BLOCK_STATE) != null
+                            && stack.get(DataComponents.BLOCK_STATE).get(com.reiko.signaltower.block.AviationBeaconBlock.COLOR)
+                                == com.reiko.signaltower.radio.AviationLight.LightColor.WHITE
+                            && stack.get(DataComponents.BLOCK_STATE).get(com.reiko.signaltower.block.AviationBeaconBlock.PATTERN) == flash), "Dropped with its settings");
+                    check(drops.stream().anyMatch(stack -> stack.get(DataComponents.BLOCK_STATE) != null
+                            && stack.get(DataComponents.BLOCK_STATE).get(com.reiko.signaltower.block.AviationBeaconBlock.WHEN)
+                                == com.reiko.signaltower.radio.AviationLight.When.SENDING), "The side one too");
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.44.0: signal recorder
+
+    /** Rises (off to on) in {@code samples}, counting from off before the first. */
+    private static int rises(List<Integer> samples) {
+        int count = 0;
+        int previous = 0;
+        for (int sample : samples) {
+            if (sample > 0 && previous == 0) {
+                count++;
+            }
+            previous = sample;
+        }
+        return count;
+    }
+
+    /**
+     * The Radio Signal Recorder: with nothing to record from, or the same frequency both ways, it
+     * says so. Record waits for 4201 to turn on, then records two 10-tick pulses to the tick until
+     * Stop; Play sends them on 4202 once (the log names the recorder; Jade knows the tape). In Once
+     * mode a redstone pulse plays it once; in Loop mode it plays over and over while powered and
+     * stops when the power goes. The packets go both ways (round trips); a stranger can't change
+     * it on someone else's private frequency, nor anyone out of reach; it's saved, and the item
+     * keeps the recording.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 700)
+    public static void signalRecorder(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos src = new BlockPos(1, 1, 1);
+        BlockPos srcIn = new BlockPos(0, 1, 1);
+        BlockPos rec = new BlockPos(5, 1, 1);
+        BlockPos recIn = new BlockPos(5, 1, 2);
+        BlockPos rx = new BlockPos(9, 1, 1);
+        place(helper, src, ModRegistry.RADIO_TRANSMITTER.get(), 4201);
+        place(helper, rec, ModRegistry.RADIO_SIGNAL_RECORDER.get(), 4202);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4202);
+        com.reiko.signaltower.blockentity.SignalRecorderBlockEntity recorder = helper.getBlockEntity(rec);
+        BlockPos abs = helper.absolutePos(rec);
+        SignalNetwork network = SignalNetwork.get(level);
+        Player dev = namedPlayer(helper, new BlockPos(5, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        List<Integer> samples = new java.util.ArrayList<>();
+        var idle = com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.Phase.IDLE;
+        var waiting = com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.Phase.WAITING;
+        var recording = com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.Phase.RECORDING;
+        int record = com.reiko.signaltower.network.ConfigureRecorderPayload.RECORD;
+        int save = com.reiko.signaltower.network.ConfigureRecorderPayload.SAVE;
+
+        // The tape's arithmetic.
+        int[] tape = {15, 10 << 4, 20 << 4 | 7};
+        check(com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.strengthAt(tape, 0) == 15
+                && com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.strengthAt(tape, 9) == 15
+                && com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.strengthAt(tape, 10) == 0
+                && com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.strengthAt(tape, 25) == 7, "Strength at a tick");
+        check(java.util.Arrays.equals(com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.clean(List.of(20 << 4 | 7, 15, 700 << 4 | 3), 600),
+                new int[]{15, 20 << 4 | 7}), "Changes cleaned up");
+        check(com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.seconds(104).equals("5.2")
+                && com.reiko.signaltower.blockentity.SignalRecorderBlockEntity.seconds(20).equals("1"), "Seconds");
+
+        var sequence = helper.startSequence()
+                .thenExecute(() -> {
+                    Component nothing = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 0, false, record));
+                    check(nothing != null && keyOf(nothing).endsWith("recorder_no_listen") && recorder.getPhase() == idle, "Nothing to record from: " + nothing);
+                    Component same = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4202, false, save));
+                    check(same != null && keyOf(same).endsWith("recorder_same"), "Same frequency both ways: " + same);
+                    Component wait = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, false, record));
+                    check(wait != null && keyOf(wait).endsWith("recorder_waiting") && recorder.getPhase() == waiting
+                            && recorder.getListenFrequency() == 4201 && dev.getUUID().equals(recorder.getTunedBy()), "Record: " + wait);
+                })
+                .thenIdle(5)
+                .thenExecute(() -> check(recorder.getPhase() == waiting && recorder.getLength() == 0, "Still waiting: nothing heard yet"));
+        pulseInput(helper, sequence, srcIn, 10, 10);
+        pulseInput(helper, sequence, srcIn, 10, 6);
+        sequence.thenExecute(() -> {
+                    check(recorder.getPhase() == recording, "Recording: " + recorder.getPhase());
+                    Component stopped = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, false,
+                                    com.reiko.signaltower.network.ConfigureRecorderPayload.STOP));
+                    check(stopped != null && keyOf(stopped).endsWith("recorder_recorded") && recorder.getPhase() == idle, "Stop: " + stopped);
+                    int[] changes = recorder.getChanges();
+                    String seen = java.util.Arrays.toString(java.util.Arrays.stream(changes).mapToObj(c -> (c >> 4) + ":" + (c & 15)).toArray());
+                    check(changes.length == 4 && (changes[0] & 15) == 15 && (changes[1] & 15) == 0 && (changes[2] & 15) == 15
+                            && (changes[3] & 15) == 0, "On, off, on, off: " + seen);
+                    check(changes[0] >> 4 == 0 && Math.abs((changes[1] >> 4) - 10) <= 1 && Math.abs((changes[2] >> 4) - 20) <= 1
+                            && Math.abs((changes[3] >> 4) - 30) <= 1, "To the tick: " + seen);
+                    check(Math.abs(recorder.getLength() - 36) <= 2, "Length: " + recorder.getLength());
+                    samples.clear();
+                    Component play = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, false,
+                                    com.reiko.signaltower.network.ConfigureRecorderPayload.PLAY));
+                    check(play != null && keyOf(play).endsWith("recorder_playing"), "Play: " + play);
+                })
+                .thenExecuteFor(46, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    check(rises(samples) == 2 && samples.get(samples.size() - 1) == 0 && recorder.getPhase() == idle, "Played once: " + samples);
+                    int first = samples.indexOf(15);
+                    int second = -1;
+                    for (int i = first + 1; i < samples.size(); i++) {
+                        if (samples.get(i) == 15 && samples.get(i - 1) == 0) {
+                            second = i;
+                            break;
+                        }
+                    }
+                    check(first >= 0 && Math.abs(second - first - 20) <= 1, "Its rhythm: " + samples);
+                    long on = samples.stream().filter(v -> v == 15).count();
+                    check(on >= 18 && on <= 22, "As long as it was: " + samples);
+                    var history = network.history(4202);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.RECORDER
+                            && abs.equals(history.get(history.size() - 1).cause().pos()), "The log names the recorder");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rec), info));
+                    check(keys.contains("recorder_tape") && keys.contains("recorder_records_from"), "Jade: " + keys);
+                    var status = com.reiko.signaltower.network.RecorderStatusPayload.answer(dev, abs);
+                    check(status != null && status.length() == recorder.getLength() && status.changes().size() == 4 && status.phaseValue() == idle
+                            && !status.deaf() && !status.silenced(), "Status: " + status);
+                    check(com.reiko.signaltower.network.RecorderStatusPayload.answer(far, abs) == null, "No status out of reach");
+                    var buffer = Unpooled.buffer();
+                    var open = com.reiko.signaltower.network.OpenRecorderScreenPayload.of(level, recorder);
+                    com.reiko.signaltower.network.OpenRecorderScreenPayload.STREAM_CODEC.encode(buffer, open);
+                    check(com.reiko.signaltower.network.OpenRecorderScreenPayload.STREAM_CODEC.decode(buffer).equals(open), "Screen packet round trip");
+                    buffer.clear();
+                    var settings = new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, true, save);
+                    com.reiko.signaltower.network.ConfigureRecorderPayload.STREAM_CODEC.encode(buffer, settings);
+                    check(com.reiko.signaltower.network.ConfigureRecorderPayload.STREAM_CODEC.decode(buffer).equals(settings), "Settings packet round trip");
+                    samples.clear();
+                    helper.setBlock(recIn, Blocks.REDSTONE_BLOCK); // Once: a pulse plays it once
+                })
+                .thenExecuteFor(60, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    check(rises(samples) == 2 && samples.stream().skip(45).allMatch(v -> v == 0), "A pulse plays it once: " + samples);
+                    helper.setBlock(recIn, Blocks.AIR);
+                    Component set = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, true, save));
+                    check(set != null && keyOf(set).endsWith("recorder_set") && recorder.isLoop(), "Loop: " + set);
+                    samples.clear();
+                    helper.setBlock(recIn, Blocks.REDSTONE_BLOCK);
+                })
+                .thenExecuteFor(100, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    check(rises(samples) >= 5, "Loops while powered: " + samples);
+                    helper.setBlock(recIn, Blocks.AIR);
+                    samples.clear();
+                })
+                .thenExecuteFor(30, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    check(samples.stream().skip(3).allMatch(v -> v == 0) && recorder.getPhase() == idle, "Stops when the power goes: " + samples);
+                    var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+                    claims.put(4202, UUID.randomUUID(), "Owner", java.util.Map.of());
+                    try {
+                        Component refused = com.reiko.signaltower.network.ConfigureRecorderPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, false, save));
+                        check(refused != null && keyOf(refused).endsWith("private_refused_block") && recorder.isLoop(),
+                                "A stranger can't change it on someone else's private frequency");
+                    } finally {
+                        claims.remove(4202);
+                    }
+                    check(com.reiko.signaltower.network.ConfigureRecorderPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureRecorderPayload(abs, 4202, 4201, false, save)) == null && recorder.isLoop(), "Out of reach");
+                    CompoundTag saved = recorder.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.SignalRecorderBlockEntity(abs, helper.getBlockState(rec));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getListenFrequency() == 4201 && copy.isLoop() && copy.getLength() == recorder.getLength()
+                            && java.util.Arrays.equals(copy.getChanges(), recorder.getChanges()) && copy.getFrequency() == 4202, "Saved");
+                    level.destroyBlock(abs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get())
+                                && stack.get(ModRegistry.RECORDER_TAPE.get()) != null
+                                && stack.get(ModRegistry.RECORDER_TAPE.get()).listen() == 4201
+                                && stack.get(ModRegistry.RECORDER_TAPE.get()).loop()
+                                && stack.get(ModRegistry.RECORDER_TAPE.get()).changes().size() == 4
+                                && Integer.valueOf(4202).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its recording"))
+                .thenSucceed();
+    }
 }

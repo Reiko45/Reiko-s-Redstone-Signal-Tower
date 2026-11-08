@@ -135,6 +135,12 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(0, Frequency.MAX).listOf(0, 4))
                     .networkSynchronized(ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list(4))));
 
+    /** A Radio Signal Recorder's recording and settings, kept on the item when it's broken (v0.44.0). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.reiko.signaltower.radio.RecorderTape>> RECORDER_TAPE =
+            DATA_COMPONENTS.registerComponentType("recorder_tape", builder -> builder
+                    .persistent(com.reiko.signaltower.radio.RecorderTape.CODEC)
+                    .networkSynchronized(com.reiko.signaltower.radio.RecorderTape.STREAM_CODEC));
+
     /** A Radio Logic Receiver's second frequency, kept on the item when it's broken (v0.40.0). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SECOND_FREQUENCY =
             DATA_COMPONENTS.registerComponentType("second_frequency", builder -> builder
@@ -283,6 +289,24 @@ public final class ModRegistry {
                     .noOcclusion()
                     .lightLevel(state -> 3)));
 
+    /** A transmitter that records a frequency and plays it back (v0.44.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioSignalRecorderBlock> RADIO_SIGNAL_RECORDER = BLOCKS.register("radio_signal_recorder",
+            () -> new com.reiko.signaltower.block.RadioSignalRecorderBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+
+    /** A warning light for towers (v0.44.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.AviationBeaconBlock> AVIATION_BEACON = BLOCKS.register("aviation_beacon",
+            () -> new com.reiko.signaltower.block.AviationBeaconBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_RED)
+                    .strength(1.0F, 6.0F)
+                    .sound(SoundType.LANTERN)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)));
+
     /** A transmitter with a built-in clock (v0.42.0). */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioTimerTransmitterBlock> RADIO_TIMER_TRANSMITTER = BLOCKS.register("radio_timer_transmitter",
             () -> new com.reiko.signaltower.block.RadioTimerTransmitterBlock(BlockBehaviour.Properties.of()
@@ -401,6 +425,10 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_counter_receiver", RADIO_COUNTER_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_TIMER_TRANSMITTER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_timer_transmitter", RADIO_TIMER_TRANSMITTER);
+    public static final DeferredItem<BlockItem> RADIO_SIGNAL_RECORDER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_signal_recorder", RADIO_SIGNAL_RECORDER);
+    public static final DeferredItem<BlockItem> AVIATION_BEACON_ITEM =
+            ITEMS.registerSimpleBlockItem("aviation_beacon", AVIATION_BEACON);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -454,6 +482,14 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity>> TIMER_TRANSMITTER_BE =
             BLOCK_ENTITIES.register("radio_timer_transmitter",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity::new, RADIO_TIMER_TRANSMITTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SignalRecorderBlockEntity>> SIGNAL_RECORDER_BE =
+            BLOCK_ENTITIES.register("radio_signal_recorder",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.SignalRecorderBlockEntity::new, RADIO_SIGNAL_RECORDER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.AviationBeaconBlockEntity>> AVIATION_BEACON_BE =
+            BLOCK_ENTITIES.register("aviation_beacon",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.AviationBeaconBlockEntity::new, AVIATION_BEACON.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.StatusBoardBlockEntity>> STATUS_BOARD_BE =
             BLOCK_ENTITIES.register("radio_status_board",

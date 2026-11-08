@@ -46,8 +46,10 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::clientSetup);
         modEventBus.addListener(SignalTowerClient::registerGuiLayers);
         // v0.43.0: the status board's rows.
-        modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) ->
-                event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new));
+        modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) -> {
+            event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new);
+            event.registerBlockEntityRenderer(ModRegistry.AVIATION_BEACON_BE.get(), AviationBeaconRenderer::new);
+        });
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onRenderLevel);

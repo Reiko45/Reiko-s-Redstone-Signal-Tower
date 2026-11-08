@@ -173,6 +173,17 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenBoardScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenBoardScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureBoardPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureBoardPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureBoardPayload::handle);
+        // v0.44.0: the Aviation Beacon and the Radio Signal Recorder.
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureBeaconPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureBeaconPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureBeaconPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenRecorderScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenRecorderScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenRecorderScreenPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.RecorderStatusPayload.TYPE,
+                com.reiko.signaltower.network.RecorderStatusPayload.STREAM_CODEC, com.reiko.signaltower.network.RecorderStatusPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.RecorderStatusPayload.Request.TYPE,
+                com.reiko.signaltower.network.RecorderStatusPayload.Request.STREAM_CODEC, com.reiko.signaltower.network.RecorderStatusPayload.Request::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureRecorderPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureRecorderPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureRecorderPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenTimerScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenTimerScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTimerScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureTimerPayload.TYPE,
@@ -250,7 +261,9 @@ public final class SignalTower {
             event.accept(ModRegistry.CODE_KEYPAD_ITEM.get());
             event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
             event.accept(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get());
+            event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
+            event.accept(ModRegistry.AVIATION_BEACON_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());

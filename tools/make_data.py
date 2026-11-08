@@ -114,6 +114,7 @@ for lit in (False, True):
     write(models / f"radio_counter_receiver{suffix}.json", receiver_model(lit, "radio_counter_receiver_side"))
     write(models / f"radio_speaker{suffix}.json", receiver_model(lit, "radio_speaker_side"))
     write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
+    write(models / f"radio_signal_recorder{suffix}.json", transmitter_model(lit, "radio_signal_recorder"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -301,8 +302,9 @@ write(models / "radio_mast.json", {
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_signal_recorder", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
+write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
 write(items / "radio_motion_sensor.json", {"parent": f"{MOD}:block/radio_motion_sensor_inventory"})
@@ -434,6 +436,10 @@ write(states / "radio_speaker.json", {"variants": {
 write(states / "radio_counter_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_counter_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+write(states / "radio_signal_recorder.json", {"variants": {
+    "powered=false": {"model": f"{MOD}:block/radio_signal_recorder"},
+    "powered=true": {"model": f"{MOD}:block/radio_signal_recorder_on"},
+}})
 write(states / "radio_timer_transmitter.json", {"variants": {
     "powered=false": {"model": f"{MOD}:block/radio_timer_transmitter"},
     "powered=true": {"model": f"{MOD}:block/radio_timer_transmitter_on"},
@@ -492,6 +498,75 @@ write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radi
 
 # ---------------------------------------------------------------- lang
 
+# v0.44.0: the Aviation Beacon. A red (or white) dome on a post: standing on a block, on a bracket
+# from a wall (the bracket reaches 3 pixels into the wall's block, so it touches a mast too), or
+# hanging from a ceiling. The client draws the light over the dome while it's on.
+def beacon_faces(uv_side, uv_end, texture):
+    faces = {f: {"texture": texture, "uv": uv_side} for f in SIDES}
+    faces["up"] = {"texture": texture, "uv": uv_end}
+    faces["down"] = {"texture": texture, "uv": uv_end}
+    return faces
+
+
+def beacon_part(frm, to, texture, uv_side=None, uv_end=None):
+    w = to[0] - frm[0]
+    h = to[1] - frm[1]
+    uv_side = uv_side or [8 - w / 2, 8 - h / 2, 8 + w / 2, 8 + h / 2]
+    uv_end = uv_end or [8 - w / 2, 8 - w / 2, 8 + w / 2, 8 + w / 2]
+    return {"from": frm, "to": to, "faces": beacon_faces(uv_side, uv_end, texture)}
+
+
+def beacon_model(face, color):
+    if face == "floor":
+        elements = [
+            beacon_part([5, 0, 5], [11, 1, 11], "#base"),
+            beacon_part([6.5, 1, 6.5], [9.5, 8, 9.5], "#base"),
+            beacon_part([5, 8, 5], [11, 14, 11], "#dome", [5, 2, 11, 8], [5, 5, 11, 11]),
+            beacon_part([6, 14, 6], [10, 15.5, 10], "#base"),
+        ]
+    elif face == "ceiling":
+        elements = [
+            beacon_part([5, 15, 5], [11, 16, 11], "#base"),
+            beacon_part([7, 9, 7], [9, 15, 9], "#base"),
+            beacon_part([5, 3, 5], [11, 9, 11], "#dome", [5, 2, 11, 8], [5, 5, 11, 11]),
+            beacon_part([6, 1.5, 6], [10, 3, 10], "#base"),
+        ]
+    else:  # wall, facing north: the wall is to the south
+        elements = [
+            {"from": [7, 6, 7], "to": [9, 7.5, 19], "faces": beacon_faces([0, 6, 12, 7.5], [7, 0, 9, 12], "#base")},
+            beacon_part([5.5, 7.5, 5.5], [10.5, 8.5, 10.5], "#base"),
+            beacon_part([5, 8.5, 5], [11, 14.5, 11], "#dome", [5, 2, 11, 8], [5, 5, 11, 11]),
+            beacon_part([6, 14.5, 6], [10, 15.5, 10], "#base"),
+        ]
+    model = {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": tex(f"aviation_beacon_{color}"), "dome": tex(f"aviation_beacon_{color}"),
+                     "base": tex("aviation_beacon_base")},
+        "elements": elements,
+    }
+    if face == "floor":
+        model["display"] = {
+            "gui": {"rotation": [30, 225, 0], "translation": [0, 1, 0], "scale": [1.0, 1.0, 1.0]},
+            "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
+            "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1.0, 1.0, 1.0]},
+            "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 2, 0], "scale": [0.6, 0.6, 0.6]},
+            "thirdperson_righthand": {"rotation": [75, 45, 0], "translation": [0, 2.5, 0], "scale": [0.5, 0.5, 0.5]},
+        }
+    return model
+
+
+beacon_variants = {}
+for color in ("red", "white"):
+    for face in ("floor", "wall", "ceiling"):
+        write(models / f"aviation_beacon_{face}_{color}.json", beacon_model(face, color))
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
+        for face in ("floor", "wall", "ceiling"):
+            variant = {"model": f"{MOD}:block/aviation_beacon_{face}_{color}"}
+            if y:
+                variant["y"] = y
+            beacon_variants[f"color={color},face={face},facing={facing}"] = variant
+write(states / "aviation_beacon.json", {"variants": beacon_variants})
+
 write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_transmitter": "Radio Transmitter",
     f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
@@ -502,6 +577,97 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.44.0: Aviation Beacon and Radio Signal Recorder
+    f"block.{MOD}.aviation_beacon": "Aviation Beacon",
+    f"block.{MOD}.aviation_beacon.tooltip": "A warning light for the top or side of a tower (or any block). It blinks red at night, can be seen from far away, and can blink only while its tower is broadcasting. All beacons blink together. Right-click it with an empty hand to set it.",
+    f"tooltip.{MOD}.beacon_light": "%s",
+    f"message.{MOD}.beacon_when_night": "at night",
+    f"message.{MOD}.beacon_when_always": "all the time",
+    f"message.{MOD}.beacon_when_sending": "while its tower sends",
+    f"message.{MOD}.beacon_pattern_blink": "Blink",
+    f"message.{MOD}.beacon_pattern_flash": "Flash",
+    f"message.{MOD}.beacon_pattern_steady": "Steady",
+    f"message.{MOD}.beacon_color_red": "red",
+    f"message.{MOD}.beacon_color_white": "white",
+    f"message.{MOD}.beacon_text_blink": "Blinks %s %s",
+    f"message.{MOD}.beacon_text_flash": "Flashes %s %s",
+    f"message.{MOD}.beacon_text_steady": "Glows %s %s",
+    f"message.{MOD}.beacon_set": "Aviation Beacon: %s",
+    f"screen.{MOD}.beacon.when": "On",
+    f"screen.{MOD}.beacon.when_night_tip": "At night, and in rain and storms (always in the Nether and the End): from dusk to dawn, the hours you can sleep.",
+    f"screen.{MOD}.beacon.when_always_tip": "Day and night.",
+    f"screen.{MOD}.beacon.when_sending_tip": "Only while the tower it's on (the transmitter, repeater or converter it's on, or on top of its mast) is broadcasting, so you can see from afar whether the tower is on.",
+    f"screen.{MOD}.beacon.pattern": "Pattern",
+    f"screen.{MOD}.beacon.pattern_blink_tip": "One second on, one second off.",
+    f"screen.{MOD}.beacon.pattern_flash_tip": "A short flash every second and a half, like a strobe.",
+    f"screen.{MOD}.beacon.pattern_steady_tip": "On without blinking.",
+    f"screen.{MOD}.beacon.color": "Color",
+    f"screen.{MOD}.beacon.no_tower": "Not on a tower",
+    f"screen.{MOD}.beacon.no_tower_dark": "Not on a tower: it will stay dark",
+    f"screen.{MOD}.beacon.tower_sending": "On a %s (%s blocks up): sending",
+    f"screen.{MOD}.beacon.tower_silent": "On a %s (%s blocks up): not sending",
+    f"jade.{MOD}.beacon_on": "On now",
+    f"jade.{MOD}.beacon_off": "Off now",
+    f"jade.{MOD}.beacon_no_tower": "Not on a tower",
+    f"jade.{MOD}.beacon_no_tower_dark": "Not on a tower: stays dark",
+    f"jade.{MOD}.beacon_tower_sending": "Tower: %s on %s, %s blocks up, sending",
+    f"jade.{MOD}.beacon_tower_silent": "Tower: %s on %s, %s blocks up, not sending",
+    f"block.{MOD}.radio_signal_recorder": "Radio Signal Recorder",
+    f"block.{MOD}.radio_signal_recorder.tooltip": "A transmitter that records up to 30 seconds of a frequency (every on, off and strength) and plays it back on its own frequency: once on each redstone pulse, or on a loop while powered. Right-click it with an empty hand to record.",
+    f"tooltip.{MOD}.recorder_plays_on": "Plays on: %s",
+    f"tooltip.{MOD}.recorder_records_from": "Records from: %s",
+    f"tooltip.{MOD}.recorder_tape": "%s; plays %s",
+    f"message.{MOD}.recorder_empty": "nothing recorded",
+    f"message.{MOD}.recorder_tape": "%ss, %s changes",
+    f"message.{MOD}.recorder_mode_once": "once on a redstone pulse",
+    f"message.{MOD}.recorder_mode_loop": "on a loop while powered",
+    f"message.{MOD}.recorder_status": "Signal Recorder | Frequency %s | %s | Sending %s | Reach %s blocks",
+    f"message.{MOD}.recorder_same": "It can't record %s and play on it too: pick two different frequencies",
+    f"message.{MOD}.recorder_waiting": "Radio Signal Recorder: waiting for %s to turn on...",
+    f"message.{MOD}.recorder_no_listen": "Set a frequency to record from first",
+    f"message.{MOD}.recorder_recorded": "Radio Signal Recorder: recorded %s",
+    f"message.{MOD}.recorder_stopped_waiting": "Radio Signal Recorder: stopped waiting (the old recording is kept)",
+    f"message.{MOD}.recorder_stopped": "Radio Signal Recorder: stopped",
+    f"message.{MOD}.recorder_playing": "Radio Signal Recorder: playing on %s",
+    f"message.{MOD}.recorder_nothing": "Radio Signal Recorder: nothing recorded",
+    f"message.{MOD}.recorder_cleared": "Radio Signal Recorder: recording cleared",
+    f"message.{MOD}.recorder_no_source": "nothing",
+    f"message.{MOD}.recorder_set": "Radio Signal Recorder: plays on %s, records from %s, plays %s",
+    f"screen.{MOD}.recorder.listen": "Records from",
+    f"screen.{MOD}.recorder.listen_tip": "The frequency it records, as heard where it stands. Record waits for it to turn on, then records every change until Stop (30 seconds at most).",
+    f"screen.{MOD}.recorder.listen_none": "none",
+    f"screen.{MOD}.recorder.send": "Plays on",
+    f"screen.{MOD}.recorder.send_tip": "The frequency it plays the recording on (it sends it like a transmitter, reaching as far as its height).",
+    f"screen.{MOD}.recorder.directory": "Pick from the frequency directory",
+    f"screen.{MOD}.recorder.mode": "Plays",
+    f"screen.{MOD}.recorder.once_tip": "Plays the recording from the start each time a redstone signal reaches it (or a mast under it).",
+    f"screen.{MOD}.recorder.loop_tip": "Plays the recording over and over while a redstone signal reaches it (or a mast under it), and stops when it goes.",
+    f"screen.{MOD}.recorder.record": "Record",
+    f"screen.{MOD}.recorder.record_tip": "Saves the boxes, then waits for Records from to turn on and records until Stop. The old recording stays until the new one starts.",
+    f"screen.{MOD}.recorder.stop": "Stop",
+    f"screen.{MOD}.recorder.play": "Play",
+    f"screen.{MOD}.recorder.play_tip": "Plays the recording once now.",
+    f"screen.{MOD}.recorder.clear": "Clear",
+    f"screen.{MOD}.recorder.waiting": "Waiting for %s to turn on...",
+    f"screen.{MOD}.recorder.recording": "Recording: %ss, %s changes",
+    f"screen.{MOD}.recorder.playing": "Playing: %ss of %ss",
+    f"screen.{MOD}.recorder.playing_loop": "Playing on a loop: %ss of %ss",
+    f"screen.{MOD}.recorder.recorded": "Recorded: %s",
+    f"screen.{MOD}.recorder.empty": "Nothing recorded yet: press Record, then send on Records from",
+    f"screen.{MOD}.recorder.detail": "Hearing %s | Redstone %s",
+    f"screen.{MOD}.recorder.nothing": "nothing",
+    f"screen.{MOD}.recorder.nothing_set": "(no frequency set)",
+    f"screen.{MOD}.recorder.redstone_on": "on",
+    f"screen.{MOD}.recorder.redstone_off": "off",
+    f"screen.{MOD}.recorder.deaf": "Deaf: %s is encrypted by %s",
+    f"screen.{MOD}.recorder.silenced": "Silent: %s is private to %s",
+    f"jade.{MOD}.recorder_records_from": "Records from: %s",
+    f"jade.{MOD}.recorder_tape": "Tape: %s; plays %s",
+    f"jade.{MOD}.recorder_waiting": "Waiting for a signal to record",
+    f"jade.{MOD}.recorder_recording": "Recording: %ss, %s changes",
+    f"jade.{MOD}.recorder_playing": "Playing: %ss of %ss",
+    f"screen.{MOD}.log.kind_recorder": "Signal Recorder",
+    f"screen.{MOD}.audit.kind_signal_recorder": "Signal Recorder",
     # v0.43.0: Radio Speaker and Radio Status Board
     f"block.{MOD}.radio_speaker": "Radio Speaker",
     f"block.{MOD}.radio_speaker.tooltip": "A receiver that also plays a sound when its frequency turns on: a bell, chime, doorbell and more, once or every second while it's on. Right-click it with an empty hand to pick the sound.",
@@ -1531,6 +1697,20 @@ recipes["radio_timer_transmitter"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_timer_transmitter"},
 }, f"{MOD}:radio_transmitter")
 recipes["radio_transmitter_from_timer"] = (shapeless("radio_timer_transmitter", "radio_transmitter"), f"{MOD}:radio_timer_transmitter")
+recipes["radio_signal_recorder"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:book"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_signal_recorder"},
+}, f"{MOD}:radio_transmitter")
+recipes["aviation_beacon"] = ({
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": [" G ", "RLR", " I "],
+    "key": {"G": {"item": "minecraft:red_stained_glass"}, "R": {"item": "minecraft:redstone"},
+            "L": {"item": "minecraft:redstone_lamp"}, "I": {"item": "minecraft:iron_ingot"}},
+    "result": {"count": 2, "id": f"{MOD}:aviation_beacon"},
+}, "minecraft:redstone_lamp")
 recipes["radio_delay_receiver"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1607,9 +1787,14 @@ for name, (recipe, trigger) in recipes.items():
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
+             "radio_signal_recorder", "aviation_beacon",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
-    if name not in ("radio_mast", "wall_redstone"):
+    if name == "aviation_beacon":
+        # Its settings are in its block state: keep them on the item.
+        entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
+                               "properties": ["when", "pattern", "color"]}]
+    elif name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -1621,6 +1806,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:timer_mode", f"{MOD}:timer_interval", f"{MOD}:timer_pulse", f"{MOD}:timer_hours"]
                           if name == "radio_timer_transmitter" else [])
                        + ([f"{MOD}:speaker"] if name == "radio_speaker" else [])
+                       + ([f"{MOD}:recorder_tape"] if name == "radio_signal_recorder" else [])
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
@@ -1640,7 +1826,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
                f"{MOD}:radio_delay_receiver", f"{MOD}:radio_counter_receiver", f"{MOD}:radio_timer_transmitter",
-               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board",
+               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:aviation_beacon",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]

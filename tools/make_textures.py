@@ -268,6 +268,76 @@ def speaker_side(lit):
     return img
 
 
+def recorder_side(lit):
+    """Two tape reels joined by the tape, over a record light (v0.44.0): it glows red while it plays."""
+    r = ON if lit else OFF
+    img = casing(18)
+    px = img.load()
+    vents(img)
+    import math
+    for cx in (4.5, 10.5):
+        for y in range(1, 9):
+            for x in range(0, 16):
+                d = math.hypot(x - cx, y - 4.5)
+                if d <= 3.0:
+                    px[x, y] = O if d > 2.3 else L if d > 1.2 else D
+    # The tape between the reels, along the bottom
+    for x in range(4, 12):
+        px[x, 7] = (40, 30, 26, 255)
+    # Record light and a small window under the reels
+    for (x, y) in [(7, 10), (8, 10), (7, 11), (8, 11)]:
+        px[x, y] = r[2] if lit else r[1]
+    for x in (6, 9):
+        px[x, 10] = px[x, 11] = O
+    return img
+
+
+def beacon_dome(color):
+    """An aviation light's glass (v0.44.0): red or white, darker at the edges, with a shine."""
+    base = {"red": [(96, 14, 12, 255), (150, 24, 18, 255), (196, 44, 32, 255), (236, 120, 100, 255)],
+            "white": [(150, 150, 146, 255), (196, 196, 190, 255), (226, 226, 220, 255), (250, 250, 246, 255)]}[color]
+    img = blank(base[1])
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            edge = min(x, 15 - x, y, 15 - y)
+            px[x, y] = base[0] if edge < 1 else base[1] if edge < 3 else base[2]
+    # Ribs of the lens, and a shine at the top left
+    for x in (6, 9):
+        for y in range(2, 14):
+            px[x, y] = base[1]
+    for (x, y) in [(4, 3), (5, 3), (4, 4), (4, 5)]:
+        px[x, y] = base[3]
+    return img
+
+
+def beacon_base():
+    """An aviation light's housing and bracket (v0.44.0): dark painted steel."""
+    img = casing(19, rivets=False)
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            r, g, b, a = px[x, y]
+            px[x, y] = (r * 3 // 5, g * 3 // 5, b * 3 // 5, a)
+    return img
+
+
+def beacon_glow():
+    """The light around a lit aviation beacon (v0.44.0), 64 by 64: white in the middle fading to
+    black at the edge, opaque (it's added to what's behind it, so black adds nothing)."""
+    import math
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 255))
+    px = img.load()
+    for y in range(64):
+        for x in range(64):
+            d = math.hypot(x - 31.5, y - 31.5) / 32.0
+            v = max(0.0, 1.0 - d)
+            v = v ** 1.7 * 0.8 + max(0.0, 0.5 - d * 2.5)
+            c = max(0, min(255, int(round(v * 255))))
+            px[x, y] = (c, c, c, 255)
+    return img
+
+
 def board_front():
     """The status board's face (v0.43.0): a dark screen in a steel frame (the rows are drawn on it)."""
     img = casing(16, rivets=False)
@@ -837,6 +907,13 @@ blocks = {
     "radio_status_board_side": board_side(),
     "radio_counter_receiver_side": counter_receiver_side(False),
     "radio_counter_receiver_side_on": counter_receiver_side(True),
+    "radio_signal_recorder_side": recorder_side(False),
+    "radio_signal_recorder_side_on": recorder_side(True),
+    "radio_signal_recorder_top": top(False, receiver=False),
+    "radio_signal_recorder_top_on": top(True, receiver=False),
+    "aviation_beacon_red": beacon_dome("red"),
+    "aviation_beacon_white": beacon_dome("white"),
+    "aviation_beacon_base": beacon_base(),
     "radio_timer_transmitter_side": timer_transmitter_side(False),
     "radio_timer_transmitter_side_on": timer_transmitter_side(True),
     "radio_timer_transmitter_top": top(False, receiver=False),
@@ -882,4 +959,7 @@ for folder, textures in ((BLOCK, blocks), (ITEM, items)):
 GUI = ITEM.parent / "gui"
 GUI.mkdir(parents=True, exist_ok=True)
 scanner_arrow().save(GUI / "scanner_arrow.png")
+MISC = ITEM.parent / "misc"
+MISC.mkdir(parents=True, exist_ok=True)
+beacon_glow().save(MISC / "aviation_beacon_glow.png")
 print(f"wrote {len(blocks)} block and {len(items)} item textures to {ROOT}")
