@@ -67,6 +67,9 @@ public final class RadioInfo {
      * frequency's members only comes along if they may see it ({@code null}: open notes only).
      */
     public static @Nullable CompoundTag read(ServerLevel level, BlockPos pos, @Nullable Player viewer) {
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.StatusBoardBlockEntity board) {
+            return readBoard(level, board);
+        }
         CompoundTag tag = gather(level, pos);
         if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor) {
             // v0.39.0: whose it is and whether it sees someone; its range, mode and who it saw only for its owner.
@@ -204,6 +207,10 @@ public final class RadioInfo {
                 tag.putInt("hold", delay.getHoldTicks());
                 tag.putInt("heard", reception.power());
                 tag.putLong("change_in", delay.changeIn(level.getGameTime()));
+            } else if (block instanceof com.reiko.signaltower.block.RadioSpeakerBlock && radio instanceof RadioReceiverBlockEntity speaker) {
+                // v0.43.0: what it plays, and what it hears.
+                tag.putInt("speaker", speaker.packedSpeaker());
+                tag.putInt("heard", reception.power());
             } else if (block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock && radio instanceof RadioReceiverBlockEntity counter) {
                 // v0.42.0: the count, its settings and its reset frequency (as "second", so it gets a name, note and deafness).
                 tag.putInt("count", counter.getCount());
@@ -252,6 +259,9 @@ public final class RadioInfo {
 
     private static List<Component> blockLines(BlockState state, @Nullable CompoundTag data) {
         Block block = state.getBlock();
+        if (block instanceof com.reiko.signaltower.block.StatusBoardBlock) {
+            return boardLines(data);
+        }
         List<Component> lines = new ArrayList<>();
         boolean hasData = data != null && data.contains("frequency");
         if (block instanceof RadioMastBlock) {
@@ -462,6 +472,16 @@ public final class RadioInfo {
                 }
                 lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
+        } else if (block instanceof com.reiko.signaltower.block.RadioSpeakerBlock) {
+            // v0.43.0: its output like a receiver's, then what it plays.
+            int power = state.getValue(RadioReceiverBlock.POWER);
+            lines.add(power > 0 ? Component.translatable(LANG + "output", value(power))
+                    : Component.translatable(LANG + "output_off").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "speaker_plays", RadioReceiverBlockEntity.speakerText(data.getInt("speaker")))
+                        .withStyle(ChatFormatting.YELLOW));
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
+            }
         } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {
             // v0.39.0: on while silent. The block state's output says which, with or without server data.
             boolean on = state.getValue(RadioReceiverBlock.POWER) > 0;
@@ -480,6 +500,57 @@ public final class RadioInfo {
             if (hasData) {
                 lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
+        }
+        return lines;
+    }
+
+    /**
+     * A status board's rows (v0.43.0) as "rows": per row its frequency, its name if it has one, the
+     * strength heard there, and the owner if the board is deaf to it ("deaf_to").
+     */
+    private static CompoundTag readBoard(ServerLevel level, com.reiko.signaltower.blockentity.StatusBoardBlockEntity board) {
+        CompoundTag tag = new CompoundTag();
+        net.minecraft.nbt.ListTag rows = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < com.reiko.signaltower.blockentity.StatusBoardBlockEntity.ROWS; i++) {
+            int frequency = board.getFrequency(i);
+            if (frequency <= 0) {
+                continue;
+            }
+            CompoundTag row = new CompoundTag();
+            row.putInt("frequency", frequency);
+            String name = FrequencyNames.nameOf(level, frequency);
+            if (name != null) {
+                row.putString("name", name);
+            }
+            row.putInt("strength", board.getStrength(i));
+            if (board.isDeaf(i)) {
+                FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
+                row.putString("deaf_to", claim != null ? claim.ownerName() : "?");
+            }
+            rows.add(row);
+        }
+        tag.put("rows", rows);
+        return tag;
+    }
+
+    /** A status board's lines: one per row, "2026 (Front Gate): 15", "off" or "encrypted by Dev". */
+    private static List<Component> boardLines(@Nullable CompoundTag data) {
+        List<Component> lines = new ArrayList<>();
+        if (data == null) {
+            return lines;
+        }
+        net.minecraft.nbt.ListTag rows = data.getList("rows", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        if (rows.isEmpty()) {
+            lines.add(Component.translatable(LANG + "board_empty").withStyle(ChatFormatting.GRAY));
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            CompoundTag row = rows.getCompound(i);
+            Component frequency = number(row, "frequency", "name");
+            int strength = row.getInt("strength");
+            lines.add(row.contains("deaf_to")
+                    ? Component.translatable(LANG + "board_row_deaf", frequency, Component.literal(row.getString("deaf_to"))).withStyle(ChatFormatting.RED)
+                    : strength > 0 ? Component.translatable(LANG + "board_row_on", frequency, value(strength))
+                    : Component.translatable(LANG + "board_row_off", frequency).withStyle(ChatFormatting.GRAY));
         }
         return lines;
     }

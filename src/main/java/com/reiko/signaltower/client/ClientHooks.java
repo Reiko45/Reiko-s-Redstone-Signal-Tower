@@ -102,6 +102,16 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new SensorScreen(state));
     }
 
+    /** Opens a Radio Speaker's screen (v0.43.0). */
+    public static void openSpeakerScreen(com.reiko.signaltower.network.OpenSpeakerScreenPayload state) {
+        Minecraft.getInstance().setScreen(new SpeakerScreen(state));
+    }
+
+    /** Opens a Radio Status Board's screen (v0.43.0). */
+    public static void openBoardScreen(com.reiko.signaltower.network.OpenBoardScreenPayload state) {
+        Minecraft.getInstance().setScreen(new BoardScreen(state));
+    }
+
     /** Opens a Radio Timer Transmitter's screen (v0.42.0). */
     public static void openTimerScreen(com.reiko.signaltower.network.OpenTimerScreenPayload state) {
         Minecraft.getInstance().setScreen(new TimerScreen(state));

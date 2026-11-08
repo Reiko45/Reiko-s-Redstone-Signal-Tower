@@ -6041,4 +6041,182 @@ public final class SignalTowerGameTests {
                                 && Integer.valueOf(4052).equals(stack.get(ModRegistry.RESET_FREQUENCY.get()))), "Dropped with its settings"))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.43.0: speaker
+
+    /**
+     * The speaker: set (by Dev's packet) to a bell played once, a short pulse plays one note and a
+     * long one still only one; set to the doorbell repeating every second, 45 ticks on play three
+     * rings of two notes each. One placed while its frequency is already on stays quiet, but
+     * outputs. The note labels and pitches are a note block's; Jade, the screen packet (round trip),
+     * saving and the item keep its settings; nobody out of reach can set it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void radioSpeaker(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos input = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        BlockPos late = new BlockPos(9, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4101);
+        place(helper, rx, ModRegistry.RADIO_SPEAKER.get(), 4101);
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity speaker = helper.getBlockEntity(rx);
+        BlockPos abs = helper.absolutePos(rx);
+        Player dev = namedPlayer(helper, new BlockPos(6, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        int bell = com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.packSpeaker(com.reiko.signaltower.radio.SpeakerSound.BELL, 12,
+                com.reiko.signaltower.radio.SpeakerSound.Volume.NORMAL, false);
+        int doorbell = com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.packSpeaker(com.reiko.signaltower.radio.SpeakerSound.DOORBELL, 18,
+                com.reiko.signaltower.radio.SpeakerSound.Volume.LOUD, true);
+        int[] before = new int[1];
+
+        check(com.reiko.signaltower.radio.SpeakerSound.noteLabel(12).getString().equals("F♯4")
+                && com.reiko.signaltower.radio.SpeakerSound.noteLabel(0).getString().equals("F♯3")
+                && com.reiko.signaltower.radio.SpeakerSound.noteLabel(18).getString().equals("C5")
+                && com.reiko.signaltower.radio.SpeakerSound.noteLabel(24).getString().equals("F♯5")
+                && Math.abs(com.reiko.signaltower.radio.SpeakerSound.pitch(12) - 1.0F) < 1e-6
+                && Math.abs(com.reiko.signaltower.radio.SpeakerSound.pitch(24) - 2.0F) < 1e-6
+                && com.reiko.signaltower.radio.SpeakerSound.byId(15) == com.reiko.signaltower.radio.SpeakerSound.BELL, "Notes and pitches");
+        check(keyOf(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.speakerText(bell)).endsWith("speaker_text_once")
+                && keyOf(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.speakerText(doorbell)).endsWith("speaker_text_repeat"), "Texts");
+
+        var sequence = helper.startSequence();
+        sequence.thenExecute(() -> {
+            Component set = com.reiko.signaltower.network.ConfigureSpeakerPayload.apply(dev,
+                    new com.reiko.signaltower.network.ConfigureSpeakerPayload(abs, bell));
+            check(set != null && keyOf(set).endsWith("speaker_set") && speaker.packedSpeaker() == bell, "Set: " + set);
+            check(com.reiko.signaltower.network.ConfigureSpeakerPayload.apply(far,
+                    new com.reiko.signaltower.network.ConfigureSpeakerPayload(abs, doorbell)) == null && speaker.packedSpeaker() == bell, "Out of reach");
+        }).thenIdle(3).thenExecute(() -> before[0] = speaker.getNotesPlayed());
+        pulseInput(helper, sequence, input, 3, 3);
+        sequence.thenExecute(() -> check(speaker.getNotesPlayed() == before[0] + 1, "A pulse: one note, played " + (speaker.getNotesPlayed() - before[0])));
+        sequence.thenExecute(() -> helper.setBlock(input, Blocks.REDSTONE_BLOCK))
+                .thenIdle(50)
+                .thenExecute(() -> {
+                    check(speaker.getNotesPlayed() == before[0] + 2 && outputAt(helper, rx) == 15, "On for 50 ticks: still one note, and it outputs");
+                    helper.setBlock(late, ModRegistry.RADIO_SPEAKER.get());
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity lateSpeaker = helper.getBlockEntity(late);
+                    lateSpeaker.setFrequency(4101);
+                })
+                .thenIdle(10)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity lateSpeaker = helper.getBlockEntity(late);
+                    check(lateSpeaker.getNotesPlayed() == 0 && outputAt(helper, late) == 15, "Placed while it's on: quiet, but on");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info)).contains("speaker_plays"), "Jade");
+                    helper.setBlock(input, Blocks.AIR);
+                    speaker.setSpeaker(com.reiko.signaltower.radio.SpeakerSound.DOORBELL, 18, com.reiko.signaltower.radio.SpeakerSound.Volume.LOUD, true);
+                    check(speaker.packedSpeaker() == doorbell, "Doorbell, C5, loud, repeating");
+                })
+                .thenIdle(5)
+                .thenExecute(() -> before[0] = speaker.getNotesPlayed());
+        pulseInput(helper, sequence, input, 45, 12);
+        sequence.thenExecute(() -> {
+                    check(speaker.getNotesPlayed() == before[0] + 6, "45 ticks on: three rings of two notes, played " + (speaker.getNotesPlayed() - before[0]));
+                    var screen = com.reiko.signaltower.network.OpenSpeakerScreenPayload.of(level, speaker);
+                    check(screen.frequency() == 4101 && screen.speaker() == doorbell && !screen.deaf() && screen.heard() == 0, "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenSpeakerScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenSpeakerScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    CompoundTag saved = speaker.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.RadioReceiverBlockEntity(abs, helper.getBlockState(rx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.packedSpeaker() == doorbell && copy.getFrequency() == 4101, "Saved");
+                    level.destroyBlock(abs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_SPEAKER_ITEM.get())
+                                && Integer.valueOf(doorbell).equals(stack.get(ModRegistry.SPEAKER.get()))), "Dropped with its settings"))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.43.0: status board
+
+    /**
+     * The status board: set (by Dev's packet) to 4151, 4152, an empty row and 4153 on a wall, each
+     * row shows the strength heard there as its transmitter turns on and off, and that reaches
+     * clients in the update tag; Jade lists the rows; on someone else's encrypted frequency its row
+     * is deaf; the screen packet (round trip) and saving keep up; nobody out of reach can set it;
+     * taking the wall away pops it off with its rows on the item.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void statusBoard(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos txA = new BlockPos(2, 1, 1);
+        BlockPos inA = new BlockPos(1, 1, 1);
+        BlockPos txB = new BlockPos(16, 1, 1);
+        BlockPos inB = new BlockPos(17, 1, 1);
+        BlockPos boardPos = new BlockPos(10, 1, 1);
+        BlockPos wall = new BlockPos(10, 1, 2);
+        place(helper, txA, ModRegistry.RADIO_TRANSMITTER.get(), 4151);
+        place(helper, txB, ModRegistry.RADIO_TRANSMITTER.get(), 4152);
+        helper.setBlock(wall, Blocks.STONE);
+        helper.setBlock(boardPos, ModRegistry.RADIO_STATUS_BOARD.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.StatusBoardBlock.FACING, net.minecraft.core.Direction.NORTH));
+        com.reiko.signaltower.blockentity.StatusBoardBlockEntity board = helper.getBlockEntity(boardPos);
+        BlockPos abs = helper.absolutePos(boardPos);
+        Player dev = namedPlayer(helper, new BlockPos(10, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    check(helper.getBlockState(boardPos).canSurvive(level, abs), "It hangs on the wall");
+                    Component set = com.reiko.signaltower.network.ConfigureBoardPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureBoardPayload(abs, List.of(4151, 4152, 0, 4153)));
+                    check(set != null && keyOf(set).endsWith("board_set") && firstArg(set).equals("3")
+                            && board.frequencyList().equals(List.of(4151, 4152, 0, 4153)) && dev.getUUID().equals(board.getTunedBy()), "Set: " + set);
+                    check(com.reiko.signaltower.network.ConfigureBoardPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureBoardPayload(abs, List.of(1, 2, 3, 4))) == null
+                            && board.getFrequency(0) == 4151, "Out of reach");
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(board.getStrength(0) == 0 && board.getStrength(1) == 0 && board.getStrength(3) == 0, "All off");
+                    helper.setBlock(inA, Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(board.getStrength(0) == 15 && board.getStrength(1) == 0, "Row 1 on"))
+                .thenExecute(() -> helper.setBlock(inB, Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> check(board.getStrength(1) == 15, "Row 2 on"))
+                .thenExecute(() -> {
+                    CompoundTag update = board.getUpdateTag(level.registryAccess());
+                    var client = new com.reiko.signaltower.blockentity.StatusBoardBlockEntity(abs, helper.getBlockState(boardPos));
+                    client.loadWithComponents(update, level.registryAccess());
+                    check(client.getStrength(0) == 15 && client.getStrength(1) == 15 && client.getStrength(3) == 0
+                            && client.getFrequency(3) == 4153 && client.getTunedBy() == null, "Clients get the rows and strengths (not who set it)");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(boardPos), info));
+                    check(keys.equals(List.of("board_row_on", "board_row_on", "board_row_off")), "Jade: " + keys);
+                    var screen = com.reiko.signaltower.network.OpenBoardScreenPayload.of(level, board);
+                    check(screen.frequencies().equals(List.of(4151, 4152, 0, 4153)) && screen.strengths().equals(List.of(15, 15, 0, 0))
+                            && screen.deaf() == 0, "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenBoardScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenBoardScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    helper.setBlock(inA, Blocks.AIR);
+                    claims.put(4153, UUID.randomUUID(), "Owner", java.util.Map.of(), List.of(), true);
+                })
+                .thenWaitUntil(() -> check(board.getStrength(0) == 0, "Row 1 off again"))
+                .thenWaitUntil(() -> check(board.isDeaf(3), "Row 4: deaf to someone else's encrypted frequency"))
+                .thenExecute(() -> {
+                    try {
+                        CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                        List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(boardPos), info));
+                        check(keys.equals(List.of("board_row_off", "board_row_on", "board_row_deaf")), "Jade with a deaf row: " + keys);
+                        check(com.reiko.signaltower.network.OpenBoardScreenPayload.of(level, board).deaf() == 8, "The screen knows row 4 is deaf");
+                    } finally {
+                        claims.remove(4153);
+                    }
+                    CompoundTag saved = board.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.StatusBoardBlockEntity(abs, helper.getBlockState(boardPos));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.frequencyList().equals(List.of(4151, 4152, 0, 4153)) && dev.getUUID().equals(copy.getTunedBy()), "Saved");
+                    helper.setBlock(wall, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(boardPos).isAir(), "Pops off without its wall"))
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_STATUS_BOARD_ITEM.get())
+                                && List.of(4151, 4152, 0, 4153).equals(stack.get(ModRegistry.BOARD_FREQUENCIES.get()))), "Dropped with its rows"))
+                .thenSucceed();
+    }
 }

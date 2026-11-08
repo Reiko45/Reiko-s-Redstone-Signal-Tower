@@ -251,6 +251,38 @@ def timer_transmitter_side(lit):
     return img
 
 
+def speaker_side(lit):
+    """A speaker cone under incoming waves (v0.43.0): its middle glows red while it hears its frequency."""
+    r = ON if lit else OFF
+    img = casing(15, rivets=False)
+    px = img.load()
+    for p in [(6, 2), (7, 1), (8, 1), (9, 2)]:
+        px[p] = r[1]
+    # Cone: a dark ring, a lighter ring, a dark ring and the middle
+    import math
+    for y in range(3, 15):
+        for x in range(2, 14):
+            d = math.hypot(x - 7.5, y - 8.5)
+            if d <= 5.6:
+                px[x, y] = O if d > 4.7 else L if d > 3.6 else D if d > 2.6 else M if d > 1.4 else (r[2] if lit else r[1])
+    return img
+
+
+def board_front():
+    """The status board's face (v0.43.0): a dark screen in a steel frame (the rows are drawn on it)."""
+    img = casing(16, rivets=False)
+    px = img.load()
+    for y in range(1, 15):
+        for x in range(1, 15):
+            px[x, y] = (24, 26, 30, 255) if 1 < x < 14 and 1 < y < 14 else O
+    return img
+
+
+def board_side():
+    """The status board's edges and back (v0.43.0)."""
+    return casing(17, rivets=False)
+
+
 def counter_receiver_side(lit):
     """Incoming waves above tally marks (v0.42.0): four strokes and one across, red while it's on."""
     r = ON if lit else OFF
@@ -799,6 +831,10 @@ blocks = {
     "radio_toggle_receiver_side_on": toggle_receiver_side(True),
     "radio_inverted_receiver_side": inverted_receiver_side(False),
     "radio_logic_receiver_side": logic_receiver_side(False),
+    "radio_speaker_side": speaker_side(False),
+    "radio_speaker_side_on": speaker_side(True),
+    "radio_status_board_front": board_front(),
+    "radio_status_board_side": board_side(),
     "radio_counter_receiver_side": counter_receiver_side(False),
     "radio_counter_receiver_side_on": counter_receiver_side(True),
     "radio_timer_transmitter_side": timer_transmitter_side(False),

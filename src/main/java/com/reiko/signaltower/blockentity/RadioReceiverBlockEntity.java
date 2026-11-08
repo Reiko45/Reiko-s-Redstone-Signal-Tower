@@ -4,6 +4,8 @@ import com.reiko.signaltower.block.RadioInvertedReceiverBlock;
 import com.reiko.signaltower.block.RadioLogicReceiverBlock;
 import com.reiko.signaltower.block.RadioDelayReceiverBlock;
 import com.reiko.signaltower.block.RadioCounterReceiverBlock;
+import com.reiko.signaltower.block.RadioSpeakerBlock;
+import com.reiko.signaltower.radio.SpeakerSound;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -39,7 +41,9 @@ import java.util.UUID;
  * when loaded or re-tuned). A counter receiver (v0.42.0) counts its frequency's turn-ons and
  * turns on when the count reaches its target: for a 1-second pulse (then it counts again), or until
  * its reset frequency turns on. It can forget the count after a while without a turn-on, and its
- * reset frequency also clears the count; it's tracked on both. Its count is saved. A toggle
+ * reset frequency also clears the count; it's tracked on both. Its count is saved. A speaker
+ * (v0.43.0) outputs like a plain receiver and plays its sound when its frequency turns on (once, or
+ * every second while it stays on). A toggle
  * receiver doesn't pass the signal through: it flips between off and on (full strength) each time
  * its frequency turns on (goes from silent to any strength) where it stands. It starts listening
  * without flipping when it's placed, loaded or re-tuned, so an already-on frequency doesn't count
@@ -66,6 +70,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     /** The counts a counter receiver can wait for: 1 to 16, 20, 24, 32, 48 and 64. */
     public static final int[] COUNTS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 48, 64};
     public static final int DEFAULT_COUNT = 3;
+    private static final String SPEAKER_TAG = "speaker";
+    /** How often a speaker set to repeat plays while its frequency stays on, in ticks. */
+    public static final int SPEAKER_REPEAT_TICKS = 20;
     /** How long a counter receiver's pulse lasts when it reaches its count (and doesn't stay on). */
     public static final int COUNTER_PULSE_TICKS = 20;
     /** The delays and holds a delay receiver offers, in ticks: none, 0.5, 1, 2, 3, 5, 10, 30 and 60 seconds. */
@@ -148,6 +155,15 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     private boolean counterOn;
     private long lastCountAt;
     private long counterOnUntil;
+    /** Speaker: its sound, note (0-24), volume and whether it repeats while on. Saved (packed, see {@link #packSpeaker}). */
+    private SpeakerSound speakerSound = SpeakerSound.BELL;
+    private int speakerNote = SpeakerSound.DEFAULT_PITCH;
+    private SpeakerSound.Volume speakerVolume = SpeakerSound.Volume.NORMAL;
+    private boolean speakerRepeat;
+    /** Speaker: when it plays again while on, when the doorbell's second note is due (-1: none), and how many notes it has played (not saved; for the GameTests). */
+    private long nextRingAt;
+    private long secondNoteAt = -1;
+    private int notesPlayed;
     /** Counter receiver: whether it heard its reset frequency at the last check (not saved). */
     private boolean lastReset;
     /** Logic receiver: what it heard on each frequency at the last check (not saved; for the screen). A counter's second is its reset frequency. */
@@ -293,6 +309,107 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
                 delayedOffSince = now;
             }
         }
+    }
+
+    // ---- Speaker (v0.43.0) ----
+
+    /** True if this is a Radio Speaker. */
+    public boolean isSpeaker() {
+        return getBlockState().getBlock() instanceof RadioSpeakerBlock;
+    }
+
+    public SpeakerSound getSpeakerSound() {
+        return speakerSound;
+    }
+
+    public int getSpeakerNote() {
+        return speakerNote;
+    }
+
+    public SpeakerSound.Volume getSpeakerVolume() {
+        return speakerVolume;
+    }
+
+    public boolean isSpeakerRepeat() {
+        return speakerRepeat;
+    }
+
+    /** How many notes it has played since it was loaded (the doorbell plays two per ring). */
+    public int getNotesPlayed() {
+        return notesPlayed;
+    }
+
+    public void setSpeaker(SpeakerSound sound, int note, SpeakerSound.Volume volume, boolean repeat) {
+        speakerSound = sound;
+        speakerNote = SpeakerSound.validNote(note);
+        speakerVolume = volume;
+        speakerRepeat = repeat;
+        setChanged();
+    }
+
+    /** Its settings in one number: sound + 16 × volume + 64 × repeat + 128 × note (the item's {@code speaker} component). */
+    public static int packSpeaker(SpeakerSound sound, int note, SpeakerSound.Volume volume, boolean repeat) {
+        return sound.ordinal() | volume.ordinal() << 4 | (repeat ? 1 : 0) << 6 | SpeakerSound.validNote(note) << 7;
+    }
+
+    public int packedSpeaker() {
+        return packSpeaker(speakerSound, speakerNote, speakerVolume, speakerRepeat);
+    }
+
+    private void unpackSpeaker(int packed) {
+        speakerSound = SpeakerSound.byId(packed & 15);
+        speakerVolume = SpeakerSound.Volume.byId(packed >> 4 & 3);
+        speakerRepeat = (packed >> 6 & 1) == 1;
+        speakerNote = SpeakerSound.validNote(packed >> 7);
+    }
+
+    /** "Bell, F♯4, normal, once" for its settings. */
+    public static net.minecraft.network.chat.Component speakerText(int packed) {
+        return net.minecraft.network.chat.Component.translatable("message." + com.reiko.signaltower.SignalTower.MOD_ID
+                        + (((packed >> 6) & 1) == 1 ? ".speaker_text_repeat" : ".speaker_text_once"),
+                SpeakerSound.byId(packed & 15).label(), SpeakerSound.noteLabel(packed >> 7), SpeakerSound.Volume.byId(packed >> 4 & 3).label());
+    }
+
+    /** Plays a note of its sound at its note (the doorbell's first note a major third up), with a note particle. */
+    private void playNote(ServerLevel level, boolean high) {
+        float pitch = SpeakerSound.pitch(speakerNote) * (high ? 1.26F : 1.0F);
+        level.playSound(null, worldPosition, speakerSound.sound(), net.minecraft.sounds.SoundSource.BLOCKS,
+                speakerVolume.volume(), pitch);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.NOTE, worldPosition.getX() + 0.5, worldPosition.getY() + 1.2,
+                worldPosition.getZ() + 0.5, 0, speakerNote / 24.0, 0, 0, 1);
+        notesPlayed++;
+    }
+
+    /** Starts a ring: one note, or the doorbell's first with its second due a moment later. */
+    private void ring(ServerLevel level, long now) {
+        playNote(level, speakerSound == SpeakerSound.DOORBELL);
+        if (speakerSound == SpeakerSound.DOORBELL) {
+            secondNoteAt = now + SpeakerSound.DOORBELL_GAP;
+        }
+        nextRingAt = now + SPEAKER_REPEAT_TICKS;
+    }
+
+    /** A speaker's sound for this check: a ring when its frequency turns on, again every second while on if it repeats, and the doorbell's second note. */
+    private void speakerTick(ServerLevel level, long now, int heard) {
+        boolean hearing = heard > 0;
+        if (!primed) {
+            // Placed, loaded or re-tuned: whatever is on now isn't a turn-on.
+            primed = true;
+        } else if (hearing && !lastHeard) {
+            ring(level, now);
+        } else if (hearing && speakerRepeat && now >= nextRingAt) {
+            ring(level, now);
+        }
+        lastHeard = hearing;
+        if (secondNoteAt >= 0 && now >= secondNoteAt) {
+            secondNoteAt = -1;
+            playNote(level, false);
+        }
+    }
+
+    /** True while a speaker has a note to come (repeating while on, or the doorbell's second), so it checks every tick. */
+    private boolean speakerTiming() {
+        return isSpeaker() && (secondNoteAt >= 0 || speakerRepeat && lastHeard);
     }
 
     // ---- Counter receiver (v0.42.0) ----
@@ -550,7 +667,7 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
 
         boolean changed = revision != be.seenRevision || frequency != be.seenFrequency
                 || second != be.seenSecond || second > 0 && revisionB != be.seenRevisionB
-                || be.timing() || be.isDelay() && !be.primed || be.counterTiming();
+                || be.timing() || be.isDelay() && !be.primed || be.counterTiming() || be.speakerTiming();
         if (!changed && be.timer-- > 0) {
             return;
         }
@@ -584,6 +701,10 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             power = be.counterOutput(serverLevel.getGameTime(), heard, be.heardB);
         } else if (be.isDelay()) {
             power = be.delayOutput(serverLevel.getGameTime(), heard);
+        } else if (be.isSpeaker()) {
+            be.heardA = heard;
+            be.speakerTick(serverLevel, serverLevel.getGameTime(), heard);
+            power = heard;
         } else {
             power = be.outputFor(heard);
         }
@@ -612,6 +733,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         if (isDelay()) {
             tag.putInt(DELAY_TAG, delayTicks);
             tag.putInt(HOLD_TAG, holdTicks);
+        }
+        if (isSpeaker()) {
+            tag.putInt(SPEAKER_TAG, packedSpeaker());
         }
         if (isCounter()) {
             tag.putInt(TARGET_TAG, counterTarget);
@@ -643,6 +767,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         counterOn = tag.getBoolean(COUNTER_ON_TAG);
         lastCountAt = tag.getLong(LAST_COUNT_TAG);
         counterOnUntil = tag.getLong(UNTIL_TAG);
+        if (tag.contains(SPEAKER_TAG)) {
+            unpackSpeaker(tag.getInt(SPEAKER_TAG));
+        }
         primed = false;
     }
 
@@ -666,6 +793,10 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         Integer hold = componentInput.get(ModRegistry.HOLD_TICKS.get());
         if (hold != null) {
             holdTicks = validTime(hold);
+        }
+        Integer speaker = componentInput.get(ModRegistry.SPEAKER.get());
+        if (speaker != null) {
+            unpackSpeaker(speaker);
         }
         Integer target = componentInput.get(ModRegistry.COUNTER_TARGET.get());
         if (target != null) {
@@ -696,6 +827,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             components.set(ModRegistry.DELAY_TICKS.get(), delayTicks);
             components.set(ModRegistry.HOLD_TICKS.get(), holdTicks);
         }
+        if (isSpeaker()) {
+            components.set(ModRegistry.SPEAKER.get(), packedSpeaker());
+        }
         if (isCounter()) {
             components.set(ModRegistry.COUNTER_TARGET.get(), counterTarget);
             components.set(ModRegistry.COUNTER_LATCH.get(), counterLatch ? 1 : 0);
@@ -711,6 +845,7 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         tag.remove(MODE_TAG);
         tag.remove(DELAY_TAG);
         tag.remove(HOLD_TAG);
+        tag.remove(SPEAKER_TAG);
         tag.remove(TARGET_TAG);
         tag.remove(LATCH_TAG);
         tag.remove(FORGET_TAG);

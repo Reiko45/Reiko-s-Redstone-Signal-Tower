@@ -112,6 +112,7 @@ for lit in (False, True):
     write(models / f"radio_logic_receiver{suffix}.json", receiver_model(lit, "radio_logic_receiver_side"))
     write(models / f"radio_delay_receiver{suffix}.json", receiver_model(lit, "radio_delay_receiver_side"))
     write(models / f"radio_counter_receiver{suffix}.json", receiver_model(lit, "radio_counter_receiver_side"))
+    write(models / f"radio_speaker{suffix}.json", receiver_model(lit, "radio_speaker_side"))
     write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
 
 
@@ -299,7 +300,8 @@ write(models / "radio_mast.json", {
 
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
+             "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -400,6 +402,35 @@ write(states / "radio_receiver.json", {"variants": {
 write(states / "radio_toggle_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+# v0.43.0: the status board, a thin panel on the wall south of it when it faces north.
+write(models / "radio_status_board.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": f"{MOD}:block/radio_status_board_side", "front": f"{MOD}:block/radio_status_board_front",
+                 "side": f"{MOD}:block/radio_status_board_side"},
+    "elements": [{"from": [1, 1, 14], "to": [15, 15, 16], "faces": {
+        "north": {"uv": [1, 1, 15, 15], "texture": "#front"},
+        "south": {"uv": [1, 1, 15, 15], "texture": "#side", "cullface": "south"},
+        "east": {"uv": [0, 1, 2, 15], "texture": "#side"},
+        "west": {"uv": [14, 1, 16, 15], "texture": "#side"},
+        "up": {"uv": [1, 14, 15, 16], "texture": "#side"},
+        "down": {"uv": [1, 0, 15, 2], "texture": "#side"}}}],
+    "display": {
+        "gui": {"rotation": [0, 180, 0], "translation": [0, 0, -3], "scale": [0.8, 0.8, 0.8]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
+        "fixed": {"rotation": [0, 180, 0], "translation": [0, 0, -6], "scale": [0.8, 0.8, 0.8]},
+        "firstperson_righthand": {"rotation": [0, 135, 0], "translation": [0, 0, 0], "scale": [0.4, 0.4, 0.4]},
+        "thirdperson_righthand": {"rotation": [75, 180, 0], "translation": [0, 2.5, 0], "scale": [0.375, 0.375, 0.375]},
+    },
+})
+write(states / "radio_status_board.json", {"variants": {
+    "facing=north": {"model": f"{MOD}:block/radio_status_board"},
+    "facing=east": {"model": f"{MOD}:block/radio_status_board", "y": 90},
+    "facing=south": {"model": f"{MOD}:block/radio_status_board", "y": 180},
+    "facing=west": {"model": f"{MOD}:block/radio_status_board", "y": 270},
+}})
+write(states / "radio_speaker.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_speaker" + ("_on" if p > 0 else "")} for p in range(16)
+}})
 write(states / "radio_counter_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_counter_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -471,6 +502,59 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.43.0: Radio Speaker and Radio Status Board
+    f"block.{MOD}.radio_speaker": "Radio Speaker",
+    f"block.{MOD}.radio_speaker.tooltip": "A receiver that also plays a sound when its frequency turns on: a bell, chime, doorbell and more, once or every second while it's on. Right-click it with an empty hand to pick the sound.",
+    f"block.{MOD}.radio_status_board": "Radio Status Board",
+    f"block.{MOD}.radio_status_board.tooltip": "A panel for a wall that shows up to four frequencies: each one's name, a light and the strength heard there, readable in the dark. Right-click it with an empty hand to pick them.",
+    f"message.{MOD}.speaker_sound_bell": "Bell",
+    f"message.{MOD}.speaker_sound_chime": "Chime",
+    f"message.{MOD}.speaker_sound_ding": "Ding",
+    f"message.{MOD}.speaker_sound_doorbell": "Doorbell",
+    f"message.{MOD}.speaker_sound_pling": "Pling",
+    f"message.{MOD}.speaker_sound_bass": "Bass",
+    f"message.{MOD}.speaker_sound_beep": "Beep",
+    f"message.{MOD}.speaker_volume_quiet": "quiet",
+    f"message.{MOD}.speaker_volume_normal": "normal",
+    f"message.{MOD}.speaker_volume_loud": "loud",
+    f"message.{MOD}.speaker_text_once": "%s, %s, %s, once",
+    f"message.{MOD}.speaker_text_repeat": "%s, %s, %s, every second while on",
+    f"message.{MOD}.speaker_status": "Speaker | Frequency %s | %s | Output %s",
+    f"message.{MOD}.speaker_set": "Radio Speaker: %s",
+    f"message.{MOD}.board_set": "Radio Status Board: showing %s frequencies",
+    f"tooltip.{MOD}.speaker_plays": "Plays: %s",
+    f"tooltip.{MOD}.board_row": "Shows: %s",
+    f"jade.{MOD}.speaker_plays": "Plays: %s",
+    f"jade.{MOD}.board_empty": "No frequencies yet: right-click it to pick up to four",
+    f"jade.{MOD}.board_row_on": "%s: %s",
+    f"jade.{MOD}.board_row_off": "%s: off",
+    f"jade.{MOD}.board_row_deaf": "%s: encrypted by %s",
+    f"screen.{MOD}.audit.kind_speaker": "Speaker",
+    f"screen.{MOD}.speaker.frequency": "Plays when %s turns on",
+    f"screen.{MOD}.speaker.sound": "Sound",
+    f"screen.{MOD}.speaker.sound_tip": "What it plays. Shift-click or scroll to go back.",
+    f"screen.{MOD}.speaker.pitch": "Pitch",
+    f"screen.{MOD}.speaker.pitch_tip": "The note, like a note block's (F♯4 is the sound's own pitch). Shift-click or scroll to go back.",
+    f"screen.{MOD}.speaker.volume": "Volume",
+    f"screen.{MOD}.speaker.volume_tip": "Quiet and normal are heard within 16 blocks, loud within 48.",
+    f"screen.{MOD}.speaker.repeat": "Plays",
+    f"screen.{MOD}.speaker.repeat_off": "Once when it turns on",
+    f"screen.{MOD}.speaker.repeat_on": "Every second while on",
+    f"screen.{MOD}.speaker.repeat_tip": "Once each time its frequency turns on, or every second for as long as it stays on (an alarm).",
+    f"screen.{MOD}.speaker.test": "Test",
+    f"screen.{MOD}.speaker.test_tip": "Plays the sound for you only",
+    f"screen.{MOD}.speaker.hearing": "Hearing %s",
+    f"screen.{MOD}.speaker.hearing_nothing": "Hearing nothing right now",
+    f"screen.{MOD}.speaker.deaf": "Deaf: %s is encrypted by %s",
+    f"screen.{MOD}.board.row": "Row %s",
+    f"screen.{MOD}.board.empty": "empty",
+    f"screen.{MOD}.board.directory": "Pick from the frequency directory",
+    f"screen.{MOD}.board.explain": "Shows up to four frequencies, as heard here",
+    f"screen.{MOD}.board.not_saved": "(not saved yet)",
+    f"screen.{MOD}.board.encrypted": "encrypted",
+    f"screen.{MOD}.board.off": "off",
+    f"screen.{MOD}.board.enc": "enc",
+    f"screen.{MOD}.board.no_rows": "Right-click to set up",
     # v0.42.0: Radio Timer Transmitter and Radio Counter Receiver
     f"block.{MOD}.radio_timer_transmitter": "Radio Timer Transmitter",
     f"block.{MOD}.radio_timer_transmitter.tooltip": "A transmitter with a clock: it sends full strength every few seconds or minutes, or between two times of day. A redstone signal into it pauses it. Right-click it with an empty hand to set its schedule.",
@@ -1420,6 +1504,19 @@ recipes["radio_toggle_receiver"] = ({
 }, f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
 
+recipes["radio_speaker"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:note_block"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_speaker"},
+}, f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_speaker"] = (shapeless("radio_speaker", "radio_receiver"), f"{MOD}:radio_speaker")
+recipes["radio_status_board"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:redstone_lamp"}, {"item": "minecraft:glass_pane"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_status_board"},
+}, f"{MOD}:radio_receiver")
 recipes["radio_counter_receiver"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1509,7 +1606,7 @@ for name, (recipe, trigger) in recipes.items():
 # ---------------------------------------------------------------- loot tables
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter",
+             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
@@ -1523,6 +1620,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                           if name == "radio_counter_receiver" else [])
                        + ([f"{MOD}:timer_mode", f"{MOD}:timer_interval", f"{MOD}:timer_pulse", f"{MOD}:timer_hours"]
                           if name == "radio_timer_transmitter" else [])
+                       + ([f"{MOD}:speaker"] if name == "radio_speaker" else [])
+                       + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
@@ -1541,6 +1640,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
                f"{MOD}:radio_delay_receiver", f"{MOD}:radio_counter_receiver", f"{MOD}:radio_timer_transmitter",
+               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]

@@ -8,6 +8,8 @@
     "reikos_signal_tower:radio_delay_receiver",
     "reikos_signal_tower:radio_counter_receiver",
     "reikos_signal_tower:radio_timer_transmitter",
+    "reikos_signal_tower:radio_speaker",
+    "reikos_signal_tower:radio_status_board",
     "reikos_signal_tower:radio_repeater",
     "reikos_signal_tower:radio_converter",
     "reikos_signal_tower:compact_radio_receiver",

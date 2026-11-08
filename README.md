@@ -18,6 +18,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
 | **Radio Counter Receiver** | Counts how many times its frequency turns on, and turns on once the count reaches a set number (1 to 64): for a 1-second pulse, or until a second **reset frequency** turns on. It can forget the count after a pause, so three quick presses work and three slow ones don't (a secret knock). |
+| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass or beep, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver. |
+| **Radio Status Board** | A panel for a wall that shows up to four frequencies at a glance: each one's name, a light and the strength heard there, glowing so it reads at night. A control-room display for your base. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
@@ -416,6 +418,31 @@ A **Radio Counter Receiver** (since 0.42) counts how many times its frequency tu
 
 ![The timer's screen set to a 0.5 s pulse every 2 s; its daily mode before saving; Jade on the timer mid-pulse with the lamp lit; the counter's screen at 2 of 3 and forgetting in 2.7 s; Jade on the counter at "Reached 3: on until reset" with its lamp lit; and Alex's lever pausing the timer](docs/images/timer-transmitter-and-counter-receiver.png)
 
+### Speakers
+
+A **Radio Speaker** (since 0.43) is a receiver (it outputs what it hears, like a Radio Receiver) that also plays a sound when its frequency turns on. Right-click it with an empty hand to open its screen:
+
+- **Sound:** Bell, Chime, Ding, Doorbell (two notes, "ding-dong"), Pling, Bass or Beep. They're the game's own sounds, so they show in subtitles ("Bell rings", "Note Block plays") and follow the Blocks volume slider.
+- **Pitch:** any of a note block's 25 notes, F♯3 to F♯5 (F♯4 is the sound's own pitch).
+- **Volume:** quiet or normal (heard within 16 blocks) or loud (within 48).
+- **Plays:** **Once when it turns on** (the default), or **Every second while on**, for an alarm that rings until the signal stops.
+- **Test** plays the sound just for you, so you can try sounds before saving.
+- A note particle pops out of the top each time it plays. Placing it, loading it or re-tuning it while its frequency is on doesn't ring it.
+- **An example:** a speaker on 4410 set to Doorbell. Any remote press on 4410 within reach rings it, with "Note Block plays" in the subtitles.
+- Jade shows what it plays ("Plays: Doorbell, F♯4, normal, once"). It counts as a receiver ("Heard by", the remote's light, the locator, the audit as "Speaker"), and breaking it keeps its frequency and sound on the item.
+
+### Status boards
+
+A **Radio Status Board** (since 0.43) hangs on the side of a block, like a wall sign, and shows up to four frequencies:
+
+- Each row has a light (green while the frequency is on, dark red while it's off), the frequency's name if it has one (with the number under it) or its number, and on the right the strength heard where the board hangs, or "off". The text is drawn full bright, so the board reads in the dark.
+- **Setting it up:** right-click it with an empty hand. Type up to four frequencies (leave a box empty for an empty row), or pick them with "..." from the directory. Next to each box the screen shows what that row shows now ("Front Gate: 15", "off").
+- **Encrypted frequencies:** the board hears them as whoever placed it or last pressed Done. On someone else's encrypted frequency that row shows "enc" with a grey light.
+- It's only a display. It outputs no redstone and isn't counted by "Heard by" or the audit.
+- Jade lists the rows ("2026 (Front Gate): 15", "4300: off"). It pops off if the block behind it goes, and keeps its rows on the dropped item.
+
+![The speaker's screen set to the doorbell; Alex's remote press ringing it, with Jade and the "Note Block plays" subtitle; the board's screen with each row's state; the board on a wall showing the timer's pulse on 4400 and Front Gate on; the board glowing at night; and a speaker item's tooltip with its settings](docs/images/radio-speaker-and-status-board.png)
+
 ### Code Keypad
 
 A **Code Keypad** is a thin panel you put on a wall, floor or ceiling. Type its code and it sends a pulse on its frequency, from where it is, like a remote pressed there (towers in its reach relay it). For as long as the pulse lasts, its display lights green and, like a button, it powers the block it's on, so an iron door next to that block opens without any radio at all.
@@ -507,6 +534,10 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Logic Receiver:** two Radio Receivers and a Nether Quartz, in any arrangement in the crafting grid.
 
+**Radio Speaker:** a Radio Receiver and a Note Block, in any arrangement in the crafting grid. Put a speaker in the grid on its own to get the Radio Receiver back.
+
+**Radio Status Board:** a Radio Receiver, a Redstone Lamp and a Glass Pane, in any arrangement in the crafting grid.
+
 **Radio Timer Transmitter:** a Radio Transmitter and a Clock, in any arrangement in the crafting grid. Put a timer transmitter in the grid on its own to get the Radio Transmitter back.
 
 **Radio Counter Receiver:** a Radio Receiver and a Hopper, in any arrangement in the crafting grid. Put a counter receiver in the grid on its own to get the Radio Receiver back.
@@ -580,6 +611,15 @@ src/main/java/com/reiko/signaltower/
   blockentity/TimerTransmitterBlockEntity.java  the timer's clock: interval or daily, pause, labels
   client/TimerScreen.java                the timer transmitter's screen
   network/OpenTimerScreenPayload.java, ConfigureTimerPayload.java  timer screen <-> server
+  block/RadioSpeakerBlock.java           receiver that plays a sound; opens its screen
+  radio/SpeakerSound.java                the speaker's sounds, notes and volumes
+  client/SpeakerScreen.java              the speaker's screen (with Test)
+  network/OpenSpeakerScreenPayload.java, ConfigureSpeakerPayload.java  speaker screen <-> server
+  block/StatusBoardBlock.java            wall panel showing up to four frequencies
+  blockentity/StatusBoardBlockEntity.java  the board's rows and what's heard there, synced to clients
+  client/StatusBoardRenderer.java        draws the rows on the board's face
+  client/BoardScreen.java                the board's screen
+  network/OpenBoardScreenPayload.java, ConfigureBoardPayload.java  board screen <-> server
   block/RadioCounterReceiverBlock.java   receiver that counts turn-ons; opens its screen
   client/CounterScreen.java              the counter receiver's screen
   network/OpenCounterScreenPayload.java, ConfigureCounterPayload.java  counter screen <-> server
@@ -799,9 +839,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 136. the signal gate, with a transmitter sending 11: Pass sends 11, At least 8 sends 11 (set by Dev's packet), At least 12 nothing, Below 12 sends 15 (the log names the gate), Below 11 nothing, and Below 1 nothing until the transmitter goes quiet, then 15; Jade, the screen and settings packets (round trips) know it; on a fresh network a gate is a source, saved with what it sends, and a press isn't carried through it (only through a plain converter); a NOT gate feeding itself blinks, never changing twice in a row within 2 ticks; it's saved, and drops with its gate;
 137. the delay receiver: with a 1 s delay and 2 s hold it turns on 20 to 24 ticks after its frequency and off 60 to 65 ticks after it goes quiet, saying when (Jade's lines, the screen packet and a round trip); with no delay and a 2 s hold a 4-tick pulse turns it on at once and holds it 40 ticks; a player out of reach can't set it, times it doesn't offer become none, time labels read 0.5s, 60s and none (and countdowns 2.4s, 2s, 0.1s); it's saved, and drops with its timings;
 138. the timer transmitter: set by Dev's packet to every 1 s with a 0.25 s pulse, a receiver turns on every 19 to 21 ticks for 4 to 6, and the log names the timer; Jade, the screen and settings packets (round trips) know it; a 10 s pulse is cut to half the interval, and times it doesn't offer become the defaults; a redstone block next to it pauses it (and Jade and the screen say so) until it's gone; a daily timer is on during its hours and off outside them (Jade says until when, or when it turns on), and the clock's hours and labels are right; on someone else's private frequency a stranger's packet is refused, and one out of reach does nothing; it's saved, and drops with its schedule;
-139. the counter receiver: set by Dev's packet to 3 with reset frequency 4052 (Dev becomes its tuner; out of reach does nothing), two turn-ons leave it off and the third pulses it on and counts from 0 again; with a 1 s forget time a pause forgets the count (Jade's lines while counting); its reset frequency clears the count; set to stay on at 2, it stays on through more turn-ons (Jade, the screen packet and a round trip, saved with its count) until the reset frequency turns on; Reset count, no reset frequency, and it drops with its settings.
+139. the counter receiver: set by Dev's packet to 3 with reset frequency 4052 (Dev becomes its tuner; out of reach does nothing), two turn-ons leave it off and the third pulses it on and counts from 0 again; with a 1 s forget time a pause forgets the count (Jade's lines while counting); its reset frequency clears the count; set to stay on at 2, it stays on through more turn-ons (Jade, the screen packet and a round trip, saved with its count) until the reset frequency turns on; Reset count, no reset frequency, and it drops with its settings;
+140. the speaker: set by Dev's packet to a bell played once (out of reach does nothing), a short pulse plays one note and 50 ticks on still one; one placed while its frequency is on stays quiet but outputs 15; set to the doorbell repeating, 45 ticks on play three rings of two notes; note labels (F♯3, F♯4, C5, F♯5) and pitches are a note block's; Jade, the screen packet (round trip) and saving keep its settings, and it drops with them;
+141. the status board: hung on a wall and set by Dev's packet to 4151, 4152, an empty row and 4153 (out of reach does nothing), its rows follow their transmitters on and off, the update tag carries the rows and strengths (not who set it) to clients, Jade lists the rows, a row on someone else's encrypted frequency is deaf (Jade and the screen say so), the screen packet round-trips, it's saved, and with its wall gone it pops off with its rows on the item.
 
-All 139 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 141 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 
