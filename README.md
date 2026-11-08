@@ -28,6 +28,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
 | **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
+| **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
+| **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
@@ -571,6 +573,8 @@ Since 0.49 **towers need power to send.** A full-size transmitter (plain, timer 
 - **Free:** compact transmitters, motion sensors, keypads, remotes, and everything that only listens.
 - Several batteries round one tower add up (it takes from them in turn), and one battery can feed several towers. A tower only uses charge while its chunk is loaded; an unloaded one stays as it was.
 - **You can see it:** the battery's four bars light up as it fills, and a comparator reads it (0 empty, 15 full). An empty-hand right-click says how full it is. Jade shows the battery's charge and what towers are using ("Powering towers: 0.88 a second (about 20h 19m left)"), and on a tower either "Battery: 64% (about 20h 18m left at 0.88 a second)" or "Out of power: needs a charged Radio Battery next to it or its mast". A battery keeps its charge when you break it.
+- **Solar Panels** (since 0.50) put a battery on sunlight: see Solar Panel. A transmitter with an Ender Antenna costs twice as much (it sends into two dimensions).
+- You can place blocks on a battery (a Solar Panel, say); only an empty hand gets its readout.
 - **Upgrading an old world:** existing towers go quiet until they get a battery. To play without power cost, set `towersNeedPower` to false in the server config. The config also has `chargePerSecondPer64Blocks` (1), `batteryCapacity` (100,000), `chargePerRedstone` (1,000) and `fePerCharge` (10).
 
 ### Coverage Map
@@ -582,6 +586,25 @@ A **Coverage Map** (since 0.49) is a map for one frequency. Sneak + right-click 
 - **Markers:** a red one on each transmitter sending on the frequency, a blue one on each repeater or converter, a red X on each jammer, and the white arrow for you.
 - **Zoom:** sneak + right-click the air to step it out: 1:4 (512 blocks across) to start, then 1:8, 1:16, 1:1 and 1:2. Maps line up like vanilla maps of the same zoom, so they tile on a wall of item frames; drawing it in a new square (or at a new zoom) makes a new map.
 - It's a real map: it shows in your hand and in item frames like any other (a framed one shows how it was last painted). On someone else's encrypted frequency it stays blank.
+
+### Ender Antenna
+
+An **Ender Antenna** (since 0.50) lets a Radio Transmitter (plain, timer or recorder) send into **another dimension** as well as its own. Right-click the transmitter with it:
+
+- It sends from **the same spot** in the other dimension: the x and z scaled the way portals scale them, so a transmitter at 620, 90 in the Overworld arrives at 77, 11 in the Nether (1/8), and one in the Nether arrives 8 times farther out in the Overworld. The End and other dimensions are 1:1. The height is kept (inside the other dimension's build limits).
+- Over there it's heard as if a transmitter stood at that spot: the same frequency and strength, the tower's own reach (in the weather where the tower stands), fading toward the edge. Hills don't block it. Receivers, lamps, repeaters (which carry it on), meters, scanners and Coverage Maps there all hear it, and it changes the moment the tower does.
+- **Which dimension:** to start with it's the Nether from the Overworld, and the Overworld from anywhere else. Right-click the transmitter with another Ender Antenna to move it on to the next dimension (nothing is used up). The message and Jade say where it goes: "Radio Transmitter: Ender Antenna fitted: sending into the Nether too (arriving at 77, 0, 11)", "Antenna: Ender Antenna (also sends into the Nether at 77, 0, 11)".
+- Only transmitters can take one (not repeaters, converters or jammers, so nothing can loop between dimensions). It replaces any other antenna (and gives it back); its reach stays as with no antenna. With power cost on, the tower uses twice as much charge.
+- The tower keeps sending into the other dimension while its own chunk isn't loaded, like any tower; take the antenna off or break the tower and it stops.
+
+### Solar Panel
+
+A **Solar Panel** (since 0.50) is a flat panel you put on top of a Radio Battery. Once a second it charges the battery under it by how much sunlight it gets, measured like a Daylight Detector: up to **3 charge a second** at noon in clear weather (`solarChargePerSecond` in the server config), less in the morning and evening and in rain or thunder, nothing at night, under a roof or in the Nether and the End. Over a whole day that's about what a transmitter with a reach of 56 uses, so one panel keeps a small tower on the air for free.
+
+- Jade on the panel: "Charging the battery under it: 3 a second" and "Sunlight: 15 of 15" (or "Not charging: too dark (night, or something over it)", "No Radio Battery under it"). On the battery: "Solar Panel: +3 a second", and the time left takes it into account ("the Solar Panel keeps up" when it does).
+- One panel per battery; a battery fed by a panel can still be charged with redstone or FE as well.
+
+![Dev fitting an Ender Antenna to the transmitter on 4480 in the Overworld: "Ender Antenna fitted: sending into the Nether too (arriving at 77, 0, 11)", Jade "Antenna: Ender Antenna (also sends into the Nether at 77, 0, 11)" and "Battery: 64% (about 10h 8m left at 1.75 a second)"; Alex in the Nether next to a purple Radio Lamp on 4480, Jade "Light: 15", "Towers in range: 1", a receiver lighting a redstone lamp beside it, and the meter "15", "1 tower, 55 blocks to the edge"; a Solar Panel on the transmitter's battery, Jade on the battery "Solar Panel: +3 a second", "Powering towers: 1.75 a second"; and Jade on the panel "Charging the battery under it: 3 a second", "Sunlight: 15 of 15"](docs/images/ender-antenna-and-solar-panel.png)
 
 ![Dev looking at a Radio Transmitter on 4480 at night: Jade saying "Sending: nothing" and "Out of power: needs a charged Radio Battery next to it or its mast"; Dev right-clicking the Radio Battery next to it with a stack of redstone: "Radio Battery: +64,000 charge (64,000 / 100,000)", three bars lit, Jade "Charge: 63,999 / 100,000 (64%)", "Powering towers: 0.88 a second (about 20h 19m left)"; the tower sending again, Jade "Sending: 15", "Battery: 64% (about 20h 18m left at 0.88 a second)"; and Alex holding a Coverage Map of 4460 at 1:2: a green disc round the transmitter's red marker, fading through yellow and orange to red at the edge, a blue marker on the repeater and a red X on the jammer](docs/images/power-cost-and-coverage-map.png)
 
@@ -729,6 +752,17 @@ I = Iron Ingot   C = Copper Ingot   B = Block of Redstone
 
 **Coverage Map:** a Map (the empty one) and a Compact Radio Receiver, in any arrangement in the crafting grid.
 
+**Ender Antenna:** an Iron Antenna, an Eye of Ender and an Obsidian, in any arrangement in the crafting grid.
+
+**Solar Panel:**
+
+```
+     G  G  G
+     C  D  C
+
+G = Glass Pane   C = Copper Ingot   D = Daylight Detector
+```
+
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
 **Radio Jammer:** a Radio Transmitter, a Note Block and a Redstone Dust, in any arrangement in the crafting grid.
@@ -827,6 +861,9 @@ src/main/java/com/reiko/signaltower/
   block/RadioBatteryBlock.java           the battery: charging with redstone, its bars, the comparator
   blockentity/RadioBatteryBlockEntity.java  its charge, hoppers and FE, the item keeping its charge
   item/CoverageMapItem.java              a map that paints where a frequency is heard (colors, zoom, markers)
+  radio/CrossDimension.java              Ender Antenna links: where a tower arrives in another dimension, which one
+  block/SolarPanelBlock.java             the flat panel on a battery
+  blockentity/SolarPanelBlockEntity.java  sunlight (like a Daylight Detector) into charge for the battery under it
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -1083,9 +1120,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 152. signal fade (in a batch of its own; every other test runs with fading off, to check other things at exact strengths): 15 out to half the reach, 8 at three quarters and 1 at the very edge, the same in every direction; a repeater 90 blocks out sends it on at 15 and it fades again toward the repeater's edge; a compact transmitter doesn't fade; a jammer three quarters out jams 8; the meter's packet carries it; a real receiver three quarters out outputs what's left and Jade says how much faded;
 153. the Dish Antenna: looking north, east, south or west aims it 0, 4, 8 or 12; its beam is 15° either side; a tower reaches 192 blocks in its beam and 64 everywhere else (the meter's edge too, and a press it relays), saved and loaded; without it, 64 again; a jammer's dish jams farther that way only; fitted in the world it reaches a receiver 125 blocks east, Jade and the reach ring (a keyhole, also over the network) show it; a second dish turns it west (nothing used up, the receiver goes off), the same way again says it already faces there, and an iron antenna replaces it and gives the dish back;
 154. power cost (in a batch of its own, with it on; every other test runs with it off): a transmitter with no battery, or an empty one, is out of power (its light off, Jade says so, its receiver dark); repeaters and jammers need one too, compact transmitters don't; a battery by its mast feeds the tower on top; three Redstone Dust (3,000) bring it back, it uses 1 a second per 64 blocks of reach, Jade shows both ends, and it goes quiet when the charge runs out; a hopper puts Blocks of Redstone in, FE charges it, it's full at 100,000, a comparator reads 15 full and 8 at half, and the item keeps its charge;
-155. the Coverage Map: green, yellow, orange, red, blank; every pixel of a map at 1:4 painted from the network (heard inside the 100-block reach, blank in a jammer's 20 and beyond); drawn in the world it's a real map at 1:4, the same map again in the same square, painted green round a transmitter with a red marker on it after a whole pass while held, and a new map at a new zoom.
+155. the Coverage Map: green, yellow, orange, red, blank; every pixel of a map at 1:4 painted from the network (heard inside the 100-block reach, blank in a jammer's 20 and beyond); drawn in the world it's a real map at 1:4, the same map again in the same square, painted green round a transmitter with a red marker on it after a whole pass while held, and a new map at a new zoom;
+156. the Ender Antenna: 1/8 into the Nether and back (rounding down), 1:1 into the End, the height kept inside the world; the Nether from the Overworld and the Overworld from elsewhere to start with, and the next dimension round after that; a repeater can't take one; fitted to a transmitter, the Nether hears it at the spot it arrives, out to its reach and no farther (the meter's edge too), Jade says where it goes, and the Nether knows at once when it turns off; another one moves it on to the End (nothing used up) and the Nether stops hearing it; saved in the network and the block; gone with the tower;
+157. the Solar Panel: 3 a second in full sun and a third at 5; fractions add up from one second to the next; with no battery under it Jade says so; on a battery it charges it by day (Jade on both) and not in the dark.
 
-All 155 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 157 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

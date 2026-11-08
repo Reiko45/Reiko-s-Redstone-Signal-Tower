@@ -33,7 +33,8 @@ import java.util.List;
  * another antenna gives that one back. Sneak + right-click the tower with an empty hand takes it
  * off again. On someone else's private frequency only its owner and members may change it.
  * A Dish Antenna (v0.48.0) is aimed the way the player looks; using one on a tower that already
- * has a dish turns it to face that way instead.
+ * has a dish turns it to face that way instead. An Ender Antenna (v0.50.0) only fits transmitters;
+ * using another on one that has it sends into the next dimension instead.
  */
 public class AntennaItem extends Item {
     private static final String KEY = "message." + SignalTower.MOD_ID + ".";
@@ -75,6 +76,9 @@ public class AntennaItem extends Item {
         }
         AntennaTier old = state.getValue(AntennaTier.PROPERTY);
         Component name = Component.translatable(state.getBlock().getDescriptionId());
+        if (tier == AntennaTier.ENDER) {
+            return fitEnder(player, pos, state, old, name, stack);
+        }
         int aim = AntennaTier.aimFor(player.getYRot());
         if (old == tier && (tier != AntennaTier.DISH || AntennaTier.aimOf(state) == aim)) {
             return tell(player, tier == AntennaTier.DISH
@@ -185,6 +189,47 @@ public class AntennaItem extends Item {
                 ? com.reiko.signaltower.radio.SignalNetwork.get(serverLevel).reachNow(serverLevel, pos, far) : far;
     }
 
+    /** v0.50.0: fits an Ender Antenna (transmitters only), or turns one that's there to the next dimension. */
+    private static Component fitEnder(Player player, BlockPos pos, BlockState state, AntennaTier old, Component name, ItemStack stack) {
+        Level level = player.level();
+        if (!AntennaTier.sendsAcross(state)) {
+            return tell(player, Component.translatable(KEY + "ender_transmitters_only").withStyle(ChatFormatting.RED));
+        }
+        Component refused = refusal(player, pos, state);
+        if (refused != null) {
+            return tell(player, refused);
+        }
+        if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+                || !(level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity transmitter)) {
+            return null;
+        }
+        if (old == AntennaTier.ENDER) {
+            transmitter.setLinkTarget(com.reiko.signaltower.radio.CrossDimension.next(serverLevel, transmitter.linkTarget(serverLevel)));
+            level.playSound(null, pos, SoundEvents.ENDER_EYE_DEATH, SoundSource.BLOCKS, 0.8F, 1.2F);
+            return tell(player, enderMessage("ender_relinked", serverLevel, pos, name, transmitter));
+        }
+        level.setBlock(pos, state.setValue(AntennaTier.PROPERTY, AntennaTier.ENDER), Block.UPDATE_ALL);
+        transmitter.setLinkTarget(null); // the default: the Nether from the Overworld, else the Overworld
+        if (!player.getAbilities().instabuild) {
+            stack.shrink(1);
+            giveBack(player, old);
+        }
+        level.playSound(null, pos, SoundEvents.END_PORTAL_FRAME_FILL, SoundSource.BLOCKS, 1.0F, 1.0F);
+        return tell(player, enderMessage("ender_fitted", serverLevel, pos, name, transmitter));
+    }
+
+    private static Component enderMessage(String key, net.minecraft.server.level.ServerLevel level, BlockPos pos, Component name,
+                                          com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity transmitter) {
+        var target = transmitter.linkTarget(level);
+        if (target == null) {
+            return Component.translatable(KEY + "ender_nowhere", name).withStyle(ChatFormatting.GRAY);
+        }
+        net.minecraft.server.level.ServerLevel there = level.getServer().getLevel(target);
+        BlockPos arrival = com.reiko.signaltower.radio.CrossDimension.arrival(level, there, pos);
+        return Component.translatable(KEY + key, name, com.reiko.signaltower.radio.CrossDimension.name(target),
+                com.reiko.signaltower.radio.CrossDimension.coords(arrival)).withStyle(ChatFormatting.LIGHT_PURPLE);
+    }
+
     /** Tells the network about the tower's new reach. */
     private static void refresh(Level level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof RadioTransmitterBlockEntity transmitter) {
@@ -210,6 +255,7 @@ public class AntennaItem extends Item {
             case DIAMOND -> SoundEvents.ARMOR_EQUIP_DIAMOND.value();
             case NETHERITE -> SoundEvents.ARMOR_EQUIP_NETHERITE.value();
             case DISH -> SoundEvents.ARMOR_EQUIP_CHAIN.value();
+            case ENDER -> SoundEvents.END_PORTAL_FRAME_FILL;
             default -> SoundEvents.ARMOR_EQUIP_IRON.value();
         };
     }
@@ -221,7 +267,7 @@ public class AntennaItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == AntennaTier.DISH ? ".dish_item" : ".antenna_item"),
+        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == AntennaTier.DISH ? ".dish_item" : tier == AntennaTier.ENDER ? ".ender_item" : ".antenna_item"),
                 tier.multiplierText()).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".antenna_hint").withStyle(ChatFormatting.DARK_GRAY));
     }

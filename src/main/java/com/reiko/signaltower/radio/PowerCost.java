@@ -52,6 +52,11 @@ public final class PowerCost {
         return Math.max(0, reach) / 64.0 * rate;
     }
 
+    /** What the tower at {@code pos} uses a second while it sends: twice as much if it also sends into another dimension (v0.50.0). */
+    public static double rateFor(SignalNetwork network, BlockPos pos) {
+        return perSecond(network.towerReach(pos)) * (network.linkTarget(pos) != null ? 2 : 1);
+    }
+
     public static int capacity() {
         var setting = Config.BATTERY_CAPACITY;
         return Config.SPEC.isLoaded() ? setting.get() : setting.getDefault();
@@ -142,7 +147,7 @@ public final class PowerCost {
             long available = charge(batteries);
             boolean out = available <= 0;
             if (!out && network.wantsToSend(level, pos)) {
-                double rate = perSecond(network.towerReach(pos));
+                double rate = rateFor(network, pos);
                 for (RadioBatteryBlockEntity battery : batteries) {
                     if (battery.getCharge() > 0) battery.noteUse(now, rate / batteries.size());
                 }

@@ -318,6 +318,14 @@ public final class ModRegistry {
                     .requiresCorrectToolForDrops()
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE) > 0 ? 3 : 0)));
 
+    /** v0.50.0: charges the Radio Battery under it by daylight. */
+    public static final DeferredBlock<com.reiko.signaltower.block.SolarPanelBlock> SOLAR_PANEL = BLOCKS.register("solar_panel",
+            () -> new com.reiko.signaltower.block.SolarPanelBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLUE)
+                    .strength(1.5F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
     /** A transmitter that records a frequency and plays it back (v0.44.0). */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioSignalRecorderBlock> RADIO_SIGNAL_RECORDER = BLOCKS.register("radio_signal_recorder",
             () -> new com.reiko.signaltower.block.RadioSignalRecorderBlock(BlockBehaviour.Properties.of()
@@ -469,6 +477,11 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_jammer", RADIO_JAMMER);
     public static final DeferredItem<BlockItem> AVIATION_BEACON_ITEM =
             ITEMS.registerSimpleBlockItem("aviation_beacon", AVIATION_BEACON);
+    public static final DeferredItem<BlockItem> SOLAR_PANEL_ITEM =
+            ITEMS.registerSimpleBlockItem("solar_panel", SOLAR_PANEL);
+    /** v0.50.0: on a transmitter, also sends into another dimension. */
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
     public static final DeferredItem<BlockItem> RADIO_BATTERY_ITEM =
             ITEMS.registerSimpleBlockItem("radio_battery", RADIO_BATTERY);
     /** v0.49.0: a map that paints where a frequency can be heard. */
@@ -562,6 +575,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadioBatteryBlockEntity>> RADIO_BATTERY_BE =
             BLOCK_ENTITIES.register("radio_battery",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadioBatteryBlockEntity::new, RADIO_BATTERY.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SolarPanelBlockEntity>> SOLAR_PANEL_BE =
+            BLOCK_ENTITIES.register("solar_panel",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.SolarPanelBlockEntity::new, SOLAR_PANEL.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CodeKeypadBlockEntity>> CODE_KEYPAD_BE =
             BLOCK_ENTITIES.register("code_keypad",

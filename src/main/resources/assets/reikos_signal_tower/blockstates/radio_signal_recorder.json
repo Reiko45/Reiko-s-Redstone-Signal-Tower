@@ -50,6 +50,14 @@
     },
     {
       "when": {
+        "antenna": "ender"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_ender"
+      }
+    },
+    {
+      "when": {
         "antenna": "dish",
         "rotation": "0"
       },

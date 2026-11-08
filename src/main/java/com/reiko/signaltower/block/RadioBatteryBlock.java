@@ -80,7 +80,8 @@ public class RadioBatteryBlock extends BaseEntityBlock {
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hit) {
         if (RadioBatteryBlockEntity.valueOf(stack) <= 0 || !(level.getBlockEntity(pos) instanceof RadioBatteryBlockEntity battery)) {
-            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+            // An empty hand gets the readout; anything else is used as usual (a Solar Panel placed on top, say).
+            return stack.isEmpty() ? ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION : ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
         }
         if (!level.isClientSide) {
             int before = battery.getCharge();

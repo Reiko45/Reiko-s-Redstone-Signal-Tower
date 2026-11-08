@@ -126,6 +126,11 @@ public final class Config {
             .comment("How much energy (FE, from other mods' cables and generators) makes one charge in a Radio Battery.")
             .defineInRange("fePerCharge", 10, 1, 1000000);
 
+    public static final ModConfigSpec.DoubleValue SOLAR_CHARGE_PER_SECOND = BUILDER
+            .comment("How much charge a Solar Panel puts in the Radio Battery under it each second in full sun (noon, clear",
+                    "sky, nothing over it). Less in rain or thunder and early or late in the day; none at night.")
+            .defineInRange("solarChargePerSecond", 3.0, 0.0, 100000.0);
+
     public static final ModConfigSpec.IntValue JAMMER_REACH_PERCENT = BUILDER
             .comment("How far a Radio Jammer reaches, in percent of what a transmitter at the same height",
                     "(with the same antenna) would.")

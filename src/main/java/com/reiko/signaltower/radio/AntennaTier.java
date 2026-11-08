@@ -33,7 +33,9 @@ public enum AntennaTier implements StringRepresentable {
     DIAMOND("diamond"),
     NETHERITE("netherite"),
     /** v0.48.0: aimed ({@link #AIM}); {@link #dishMultiplier} times the reach inside its beam, normal elsewhere. */
-    DISH("dish");
+    DISH("dish"),
+    /** v0.50.0: on a transmitter, also sends into another dimension ({@link CrossDimension}); reach as with none. */
+    ENDER("ender");
 
     public static final EnumProperty<AntennaTier> PROPERTY = EnumProperty.create("antenna", AntennaTier.class);
     /**
@@ -63,6 +65,7 @@ public enum AntennaTier implements StringRepresentable {
             case DIAMOND -> value(Config.DIAMOND_ANTENNA_REACH);
             case NETHERITE -> value(Config.NETHERITE_ANTENNA_REACH);
             case DISH -> 1.0; // outside its beam; see dishMultiplier()
+            case ENDER -> 1.0;
         };
     }
 
@@ -154,6 +157,7 @@ public enum AntennaTier implements StringRepresentable {
             case DIAMOND -> ModRegistry.DIAMOND_ANTENNA.get();
             case NETHERITE -> ModRegistry.NETHERITE_ANTENNA.get();
             case DISH -> ModRegistry.DISH_ANTENNA.get();
+            case ENDER -> ModRegistry.ENDER_ANTENNA.get();
         };
     }
 
@@ -165,6 +169,15 @@ public enum AntennaTier implements StringRepresentable {
     /** Where the Dish Antenna on a block in {@code state} points (0-15), or -1 if it has no dish (v0.48.0). */
     public static int dishAim(BlockState state) {
         return of(state) == DISH && state.hasProperty(AIM) ? state.getValue(AIM) : -1;
+    }
+
+    /**
+     * True if a tower top in {@code state} can send into another dimension with an Ender Antenna
+     * (v0.50.0): a full-size transmitter (plain, timer, recorder), not a repeater, converter or jammer.
+     */
+    public static boolean sendsAcross(BlockState state) {
+        return fits(state) && state.getBlock() instanceof com.reiko.signaltower.block.RadioTransmitterBlock
+                && !(state.getBlock() instanceof com.reiko.signaltower.block.RadioJammerBlock);
     }
 
     /** True if a block in {@code state} takes an antenna (a full-size tower top). */
@@ -183,7 +196,7 @@ public enum AntennaTier implements StringRepresentable {
     public static void addTooltipLine(ItemStack stack, List<Component> tooltip) {
         AntennaTier tier = of(stack);
         if (tier != NONE) {
-            tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == DISH ? ".antenna_dish" : ".antenna"),
+            tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == DISH ? ".antenna_dish" : tier == ENDER ? ".antenna_ender" : ".antenna"),
                     tier.label(), tier.multiplierText()).withStyle(ChatFormatting.GOLD));
         }
     }

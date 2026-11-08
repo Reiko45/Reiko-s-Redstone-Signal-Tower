@@ -38,6 +38,37 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         return null;
     }
 
+    /** v0.50.0: the dimension its Ender Antenna sends into, if one was picked (null: the default). */
+    private @Nullable net.minecraft.resources.ResourceKey<Level> linkTarget;
+
+    /** The dimension its Ender Antenna sends into (the one picked, if the server still has it, else the default). */
+    public @Nullable net.minecraft.resources.ResourceKey<Level> linkTarget(ServerLevel level) {
+        return com.reiko.signaltower.radio.CrossDimension.valid(level, linkTarget);
+    }
+
+    /** Picks the dimension its Ender Antenna sends into (null: the default), and tells the network. */
+    public void setLinkTarget(@Nullable net.minecraft.resources.ResourceKey<Level> target) {
+        linkTarget = target;
+        setChanged();
+        refresh();
+    }
+
+    @Override
+    protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        if (linkTarget != null) {
+            tag.putString("link_target", linkTarget.location().toString());
+        }
+    }
+
+    @Override
+    protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        net.minecraft.resources.ResourceLocation id = tag.contains("link_target")
+                ? net.minecraft.resources.ResourceLocation.tryParse(tag.getString("link_target")) : null;
+        linkTarget = id == null ? null : net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id);
+    }
+
     /** Re-reads input power, height and frequency, and tells the network. Safe to call any time. */
     public void refresh() {
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -52,6 +83,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
                 reachOf(serverLevel, worldPosition, state), getTunedBy(), state.getBlock() instanceof CompactRadioTransmitterBlock,
                 power > 0 ? turnOnCause() : null);
         SignalNetwork.get(serverLevel).setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state)); // v0.48.0
+        SignalNetwork.get(serverLevel).setLink(worldPosition, // v0.50.0: an Ender Antenna sends into another dimension too
+                com.reiko.signaltower.radio.AntennaTier.of(state) == com.reiko.signaltower.radio.AntennaTier.ENDER
+                        && com.reiko.signaltower.radio.AntennaTier.sendsAcross(state) ? linkTarget(serverLevel) : null);
         com.reiko.signaltower.radio.PowerCost.check(serverLevel, worldPosition); // v0.49.0: a charged battery, or quiet
         // Its light goes out while lightning has it knocked out (v0.47.0) or it's out of power (v0.49.0);
         // the network keeps what it would send.

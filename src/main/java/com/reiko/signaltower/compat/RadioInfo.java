@@ -76,6 +76,16 @@ public final class RadioInfo {
             tag.putInt("battery_charge", battery.getCharge());
             tag.putInt("battery_capacity", battery.getCapacity());
             tag.putDouble("battery_use", battery.usePerSecond(level.getGameTime()));
+            tag.putDouble("battery_gain", battery.gainPerSecond(level.getGameTime()));
+            return tag;
+        }
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.SolarPanelBlockEntity) {
+            // v0.50.0: how much sun it gets, and whether there's a battery under it to charge.
+            CompoundTag tag = new CompoundTag();
+            int daylight = com.reiko.signaltower.blockentity.SolarPanelBlockEntity.daylight(level, pos);
+            tag.putInt("solar_daylight", daylight);
+            tag.putDouble("solar_rate", com.reiko.signaltower.blockentity.SolarPanelBlockEntity.rateFor(daylight));
+            tag.putBoolean("solar_battery", com.reiko.signaltower.blockentity.SolarPanelBlockEntity.batteryUnder(level, pos) != null);
             return tag;
         }
         if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
@@ -300,6 +310,13 @@ public final class RadioInfo {
             // v0.48.0: how far its dish reaches, the way it's aimed (in the weather now).
             tag.putInt("dish_reach", com.reiko.signaltower.item.AntennaItem.dishReachShown(level, pos, state));
         }
+        var target = SignalNetwork.get(level).linkTarget(pos);
+        ServerLevel there = target == null ? null : level.getServer().getLevel(target);
+        if (there != null) {
+            // v0.50.0: where its Ender Antenna sends into, and where it arrives there.
+            tag.putString("link_dimension", target.location().toString());
+            tag.putLong("link_at", com.reiko.signaltower.radio.CrossDimension.arrival(level, there, pos).asLong());
+        }
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
             tag.putLong("struck", struck);
@@ -338,7 +355,7 @@ public final class RadioInfo {
         }
         tag.putLong("tower_charge", com.reiko.signaltower.radio.PowerCost.charge(batteries));
         tag.putLong("tower_capacity", capacity);
-        tag.putDouble("tower_rate", com.reiko.signaltower.radio.PowerCost.perSecond(network.towerReach(pos)));
+        tag.putDouble("tower_rate", com.reiko.signaltower.radio.PowerCost.rateFor(network, pos));
         tag.putBoolean("tower_sending", network.wantsToSend(level, pos));
     }
 
@@ -358,6 +375,13 @@ public final class RadioInfo {
                 lines.add(Component.translatable(LANG + "dish_reach", com.reiko.signaltower.radio.AntennaTier.aimLabel(aim),
                         data.getInt("dish_reach")).withStyle(ChatFormatting.GOLD));
             }
+        } else if (antenna == com.reiko.signaltower.radio.AntennaTier.ENDER && data != null && data.contains("link_dimension")) {
+            // v0.50.0: the dimension its Ender Antenna sends into, and where.
+            net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(data.getString("link_dimension"));
+            Component dimension = id == null ? Component.literal(data.getString("link_dimension"))
+                    : com.reiko.signaltower.radio.CrossDimension.name(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id));
+            lines.add(Component.translatable(LANG + "antenna_ender", antenna.label(), dimension,
+                    com.reiko.signaltower.radio.CrossDimension.coords(BlockPos.of(data.getLong("link_at")))).withStyle(ChatFormatting.LIGHT_PURPLE));
         } else if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
             // v0.45.0: its antenna, and how much farther that makes it reach.
             lines.add(Component.translatable(LANG + "antenna", antenna.label(), antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
@@ -425,11 +449,16 @@ public final class RadioInfo {
         lines.add(Component.translatable(LANG + "battery_charge", com.reiko.signaltower.radio.PowerCost.number(charge),
                 com.reiko.signaltower.radio.PowerCost.number(capacity), com.reiko.signaltower.block.RadioBatteryBlock.percent(charge, capacity))
                 .withStyle(ChatFormatting.RED));
+        double gain = data.getDouble("battery_gain");
+        if (gain > 0) {
+            lines.add(Component.translatable(LANG + "battery_solar", com.reiko.signaltower.radio.PowerCost.rateLabel(gain)).withStyle(ChatFormatting.YELLOW));
+        }
         double use = data.getDouble("battery_use");
-        lines.add(use > 0
-                ? Component.translatable(LANG + "battery_use", com.reiko.signaltower.radio.PowerCost.rateLabel(use),
-                        com.reiko.signaltower.radio.PowerCost.durationLabel(charge / use)).withStyle(ChatFormatting.GOLD)
-                : Component.translatable(LANG + "battery_idle").withStyle(ChatFormatting.GRAY));
+        double net = use - gain; // v0.50.0: what a Solar Panel puts in comes off
+        lines.add(use <= 0 ? Component.translatable(LANG + "battery_idle").withStyle(ChatFormatting.GRAY)
+                : net <= 0 ? Component.translatable(LANG + "battery_use_covered", com.reiko.signaltower.radio.PowerCost.rateLabel(use)).withStyle(ChatFormatting.GOLD)
+                : Component.translatable(LANG + "battery_use", com.reiko.signaltower.radio.PowerCost.rateLabel(use),
+                        com.reiko.signaltower.radio.PowerCost.durationLabel(charge / net)).withStyle(ChatFormatting.GOLD));
         return lines;
     }
 
@@ -440,6 +469,18 @@ public final class RadioInfo {
         }
         if (block instanceof com.reiko.signaltower.block.RadioBatteryBlock) {
             return batteryLines(state, data);
+        }
+        if (block instanceof com.reiko.signaltower.block.SolarPanelBlock) {
+            // v0.50.0
+            List<Component> lines = new ArrayList<>();
+            if (data != null) {
+                double rate = data.getDouble("solar_rate");
+                lines.add(!data.getBoolean("solar_battery") ? Component.translatable(LANG + "solar_no_battery").withStyle(ChatFormatting.GRAY)
+                        : rate > 0 ? Component.translatable(LANG + "solar_charging", com.reiko.signaltower.radio.PowerCost.rateLabel(rate)).withStyle(ChatFormatting.YELLOW)
+                        : Component.translatable(LANG + "solar_dark").withStyle(ChatFormatting.GRAY));
+                lines.add(Component.translatable(LANG + "solar_light", data.getInt("solar_daylight")).withStyle(ChatFormatting.GRAY));
+            }
+            return lines;
         }
         if (block instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return beaconLines(state, data);

@@ -289,12 +289,14 @@ public final class SignalTower {
             event.accept(ModRegistry.AVIATION_BEACON_ITEM.get());
             event.accept(ModRegistry.RADIO_LAMP_ITEM.get());
             event.accept(ModRegistry.RADIO_BATTERY_ITEM.get());
+            event.accept(ModRegistry.SOLAR_PANEL_ITEM.get());
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());
             event.accept(ModRegistry.DIAMOND_ANTENNA.get());
             event.accept(ModRegistry.NETHERITE_ANTENNA.get());
             event.accept(ModRegistry.DISH_ANTENNA.get());
+            event.accept(ModRegistry.ENDER_ANTENNA.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());

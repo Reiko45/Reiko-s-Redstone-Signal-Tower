@@ -400,7 +400,8 @@ def antenna_item(tier):
     metal = {"iron": [(110, 110, 110, 255), (200, 200, 200, 255), (240, 240, 240, 255)],
              "gold": [(150, 100, 10, 255), (240, 190, 40, 255), (255, 240, 140, 255)],
              "diamond": [(20, 120, 120, 255), (80, 220, 210, 255), (200, 255, 250, 255)],
-             "netherite": [(40, 30, 32, 255), (90, 76, 78, 255), (140, 124, 126, 255)]}[tier]
+             "netherite": [(40, 30, 32, 255), (90, 76, 78, 255), (140, 124, 126, 255)],
+             "ender": [(40, 14, 70, 255), (120, 50, 190, 255), (90, 230, 200, 255)]}[tier]
     img = blank()
     px = img.load()
     for y in range(4, 15):           # the rod
@@ -477,6 +478,32 @@ def battery_top():
         px[x, 8] = H
     px[11, 7] = O
     px[10, 7] = O
+    return img
+
+
+def solar_top():
+    """The Solar Panel's face (v0.50.0): dark blue cells in a 4 x 4 grid with silver lines, a steel rim."""
+    img = blank()
+    px = img.load()
+    rim, line = (120, 125, 136, 255), (170, 176, 188, 255)
+    cell = [(18, 34, 92, 255), (26, 48, 120, 255), (40, 70, 150, 255)]
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15):
+                px[x, y] = rim
+            elif x % 4 == 0 or y % 4 == 0:
+                px[x, y] = line
+            else:
+                px[x, y] = cell[2] if (x % 4 == 1 and y % 4 == 1) else cell[1] if (x + y) % 3 else cell[0]
+    return img
+
+
+def solar_side():
+    """Its edge: a steel frame (the panel's three pixels are the bottom of the texture)."""
+    img = casing(5000, rivets=False)
+    px = img.load()
+    for x in range(16):
+        px[x, 13] = (40, 70, 150, 255)
     return img
 
 
@@ -1057,6 +1084,8 @@ def scanner_arrow():
 blocks = {
     **{f"radio_battery_side_{n}": battery_side(n) for n in range(5)},
     "radio_battery_top": battery_top(),
+    "solar_panel_top": solar_top(),
+    "solar_panel_side": solar_side(),
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
     "compact_radio_transmitter": compact_transmitter(False),
@@ -1132,7 +1161,7 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
          "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
          **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
-         "dish_antenna": dish_item(), "coverage_map": coverage_map_item()}
+         "dish_antenna": dish_item(), "coverage_map": coverage_map_item(), "ender_antenna": antenna_item("ender")}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

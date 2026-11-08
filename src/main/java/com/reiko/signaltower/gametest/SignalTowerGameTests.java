@@ -7437,4 +7437,141 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.50.0: the Ender Antenna and the Solar Panel
+
+    /**
+     * The Ender Antenna: it sends into the Nether at 1/8 of the coordinates (and back, 1:1 into the
+     * End), by default the Nether from the Overworld; fitted to a transmitter, the Nether hears it at
+     * the spot it arrives with the tower's reach, and knows at once when it changes; Jade says where
+     * it goes; another one moves it on to the next dimension (nothing used up); it's saved; taken
+     * away with the tower. Repeaters can't take one.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void crossDimension(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        ServerLevel nether = level.getServer().getLevel(net.minecraft.world.level.Level.NETHER);
+        ServerLevel end = level.getServer().getLevel(net.minecraft.world.level.Level.END);
+        check(nether != null && end != null, "The test server has the Nether and the End");
+        check(com.reiko.signaltower.radio.CrossDimension.arrival(level, nether, new BlockPos(800, 70, -160)).equals(new BlockPos(100, 70, -20))
+                && com.reiko.signaltower.radio.CrossDimension.arrival(nether, level, new BlockPos(100, 70, -20)).equals(new BlockPos(800, 70, -160))
+                && com.reiko.signaltower.radio.CrossDimension.arrival(level, end, new BlockPos(800, 70, -160)).equals(new BlockPos(800, 70, -160))
+                && com.reiko.signaltower.radio.CrossDimension.arrival(level, nether, new BlockPos(-9, 70, 0)).getX() == -2
+                && com.reiko.signaltower.radio.CrossDimension.arrival(level, nether, new BlockPos(0, -60, 0)).getY() == nether.getMinBuildHeight(),
+                "1/8 into the Nether and back (rounding down), 1:1 into the End, the height kept inside the world");
+        check(com.reiko.signaltower.radio.CrossDimension.defaultTarget(level) == net.minecraft.world.level.Level.NETHER
+                && com.reiko.signaltower.radio.CrossDimension.defaultTarget(nether) == net.minecraft.world.level.Level.OVERWORLD
+                && com.reiko.signaltower.radio.CrossDimension.defaultTarget(end) == net.minecraft.world.level.Level.OVERWORLD,
+                "To start with: the Nether from the Overworld, the Overworld from anywhere else");
+        var afterNether = com.reiko.signaltower.radio.CrossDimension.next(level, net.minecraft.world.level.Level.NETHER);
+        check(afterNether == net.minecraft.world.level.Level.END
+                && com.reiko.signaltower.radio.CrossDimension.next(level, afterNether) == net.minecraft.world.level.Level.NETHER,
+                "Another one moves it on, round the other dimensions");
+
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos relay = new BlockPos(10, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4521);
+        place(helper, relay, ModRegistry.RADIO_REPEATER.get(), 4522);
+        BlockPos abs = helper.absolutePos(tx);
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack ender = new ItemStack(ModRegistry.ENDER_ANTENNA.get());
+        BlockPos inNether = com.reiko.signaltower.radio.CrossDimension.arrival(level, nether, abs);
+        BlockPos inEnd = com.reiko.signaltower.radio.CrossDimension.arrival(level, end, abs);
+        long[] revision = new long[1];
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK))
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    Component refused = com.reiko.signaltower.item.AntennaItem.fit(dev, helper.absolutePos(relay), com.reiko.signaltower.radio.AntennaTier.ENDER, ender);
+                    check(refused != null && keyOf(refused).endsWith("ender_transmitters_only") && ender.getCount() == 1
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(relay)) == com.reiko.signaltower.radio.AntennaTier.NONE,
+                            "A repeater can't take one");
+                    Component fitted = com.reiko.signaltower.item.AntennaItem.fit(dev, abs, com.reiko.signaltower.radio.AntennaTier.ENDER, ender);
+                    SignalNetwork here = SignalNetwork.get(level);
+                    check(fitted != null && keyOf(fitted).endsWith("ender_fitted") && ender.isEmpty()
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == com.reiko.signaltower.radio.AntennaTier.ENDER
+                            && here.linkTarget(abs) == net.minecraft.world.level.Level.NETHER, "Fitted: it sends into the Nether too: " + fitted);
+                    SignalNetwork there = SignalNetwork.get(nether);
+                    int reach = here.reachNow(level, abs, here.towerReach(abs));
+                    SignalNetwork.Reception heard = there.listen(nether, 4521, inNether, null);
+                    check(heard.power() == 15 && heard.transmittersInReach() == 1 && there.listen(nether, 4521, inNether.east(reach), null).power() == 15
+                            && there.listen(nether, 4521, inNether.east(reach + 1), null).power() == 0, "The Nether hears it where it arrives, with its reach");
+                    check(there.edgeMargin(nether, 4521, inNether.east(10)) == reach - 10, "The meter's edge there too");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(info.getString("link_dimension").equals("minecraft:the_nether") && info.getLong("link_at") == inNether.asLong()
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("antenna_ender"),
+                            "Jade says where it goes: " + info);
+                    revision[0] = there.revision(4521);
+                    helper.setBlock(new BlockPos(0, 1, 1), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(SignalNetwork.get(nether).listen(nether, 4521, inNether, null).power() == 0, "Off over there too"))
+                .thenExecute(() -> {
+                    check(SignalNetwork.get(nether).revision(4521) > revision[0], "The Nether knew at once");
+                    helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK);
+                    ItemStack another = new ItemStack(ModRegistry.ENDER_ANTENNA.get());
+                    Component moved = com.reiko.signaltower.item.AntennaItem.fit(dev, abs, com.reiko.signaltower.radio.AntennaTier.ENDER, another);
+                    check(moved != null && keyOf(moved).endsWith("ender_relinked") && another.getCount() == 1
+                            && SignalNetwork.get(level).linkTarget(abs) == net.minecraft.world.level.Level.END, "Moved on to the End: " + moved);
+                })
+                .thenWaitUntil(() -> check(SignalNetwork.get(end).listen(end, 4521, inEnd, null).power() == 15, "The End hears it"))
+                .thenExecute(() -> {
+                    check(SignalNetwork.get(nether).listen(nether, 4521, inNether, null).power() == 0, "And the Nether doesn't any more");
+                    SignalNetwork loaded = SignalNetwork.load(SignalNetwork.get(level).save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+                    check(loaded.linkTarget(abs) == net.minecraft.world.level.Level.END
+                            && level.getBlockEntity(abs).saveWithoutMetadata(level.registryAccess()).getString("link_target").equals("minecraft:the_end"),
+                            "Saved, in the network and the block");
+                    helper.setBlock(tx, Blocks.AIR);
+                    check(SignalNetwork.get(level).linkTarget(abs) == null && SignalNetwork.get(end).listen(end, 4521, inEnd, null).power() == 0,
+                            "Gone with the tower");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Solar Panel: 3 a second in full sun, by a Daylight Detector's reading; fractions add up
+     * from one second to the next; with no battery under it, Jade says so; on a battery it charges
+     * it by day (Jade: how fast, and on the battery "Solar Panel: +..."), and not in the dark.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void solarPanel(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        check(com.reiko.signaltower.blockentity.SolarPanelBlockEntity.rateFor(15) == 3.0
+                && com.reiko.signaltower.blockentity.SolarPanelBlockEntity.rateFor(0) == 0
+                && com.reiko.signaltower.blockentity.SolarPanelBlockEntity.rateFor(5) == 1.0, "3 a second in full sun, a third at 5");
+        BlockPos cell = new BlockPos(1, 1, 1);
+        BlockPos panel = new BlockPos(1, 2, 1);
+        BlockPos lone = new BlockPos(5, 1, 1);
+        helper.setBlock(cell, ModRegistry.RADIO_BATTERY.get());
+        helper.setBlock(panel, ModRegistry.SOLAR_PANEL.get());
+        helper.setBlock(lone, ModRegistry.SOLAR_PANEL.get());
+        BlockPos absCell = helper.absolutePos(cell);
+        BlockPos absPanel = helper.absolutePos(panel);
+        var battery = (com.reiko.signaltower.blockentity.RadioBatteryBlockEntity) level.getBlockEntity(absCell);
+        var spare = (com.reiko.signaltower.blockentity.SolarPanelBlockEntity) level.getBlockEntity(helper.absolutePos(lone));
+        int start = battery.getCharge();
+        check(spare.collect(battery, 0.6) == 0 && spare.collect(battery, 0.6) == 1 && spare.collect(battery, 2.5) == 2
+                && battery.getCharge() == start + 3, "Fractions add up: 0.6 + 0.6 + 2.5 is 3 whole");
+        CompoundTag loneInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(lone));
+        check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(lone), loneInfo)).contains("solar_no_battery"),
+                "No battery under it: Jade says so");
+        int lightBefore = com.reiko.signaltower.blockentity.SolarPanelBlockEntity.daylight(level, absPanel);
+        int before = battery.getCharge();
+        helper.startSequence()
+                .thenIdle(45)
+                .thenExecute(() -> {
+                    int lightAfter = com.reiko.signaltower.blockentity.SolarPanelBlockEntity.daylight(level, absPanel);
+                    com.mojang.logging.LogUtils.getLogger().info("solarPanel: daylight {} then {}, charge {} -> {}", lightBefore, lightAfter, before, battery.getCharge());
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absPanel);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(panel), info));
+                    if (lightBefore > 0 && lightAfter > 0) {
+                        CompoundTag cellInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absCell);
+                        check(battery.getCharge() > before && keys.contains("solar_charging") && keys.contains("solar_light")
+                                && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(cell), cellInfo)).contains("battery_solar"),
+                                "Daylight " + lightAfter + ": charging " + before + " -> " + battery.getCharge() + " " + keys);
+                    } else if (lightBefore == 0 && lightAfter == 0) {
+                        check(battery.getCharge() == before && keys.contains("solar_dark"), "Dark: not charging " + keys);
+                    }
+                })
+                .thenSucceed();
+    }
 }

@@ -110,6 +110,24 @@ public class RadioBatteryBlockEntity extends BlockEntity {
         use += rate;
     }
 
+    /** The second (game time) Solar Panels last charged it, and how much a second (v0.50.0, for Jade; not saved). */
+    private long gainTime = Long.MIN_VALUE;
+    private double gain;
+
+    /** A Solar Panel puts {@code rate} a second in, in the second at {@code gameTime}. */
+    public void noteGain(long gameTime, double rate) {
+        if (gainTime != gameTime) {
+            gainTime = gameTime;
+            gain = 0;
+        }
+        gain += rate;
+    }
+
+    /** How much a second Solar Panels put in lately (0 if none did in the last two seconds). */
+    public double gainPerSecond(long gameTime) {
+        return gameTime - gainTime <= 40 ? gain : 0;
+    }
+
     /** How much a second towers took from it lately (0 if none did in the last two seconds). */
     public double usePerSecond(long gameTime) {
         return gameTime - useTime <= 40 ? use : 0;

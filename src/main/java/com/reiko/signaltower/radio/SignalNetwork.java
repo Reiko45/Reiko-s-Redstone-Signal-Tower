@@ -8,8 +8,10 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -406,6 +408,12 @@ public final class SignalNetwork extends SavedData {
     public void removeTransmitter(BlockPos pos) {
         dishes.remove(pos);
         forgetPower(pos);
+        Transmitter linked = transmitters.get(pos);
+        ResourceKey<Level> target = links.remove(pos);
+        if (target != null && linked != null) {
+            setDirty();
+            bumpLinked(target, linked.frequency());
+        }
         Transmitter previous = transmitters.remove(pos);
         if (previous != null) {
             removeFromIndex(pos, previous.frequency());
@@ -816,6 +824,7 @@ public final class SignalNetwork extends SavedData {
 
     private void bump(int frequency, @Nullable Set<Integer> seen) {
         revisions.merge(frequency, 1L, Long::sum);
+        propagateLinks(frequency); // v0.50.0: and in the dimensions its Ender Antennas send into
         Map<BlockPos, Repeater> listening = repeatersByInput.get(frequency);
         if (listening == null) {
             return;
@@ -1160,6 +1169,9 @@ public final class SignalNetwork extends SavedData {
                 }
             }
         }
+        for (Phantom phantom : phantoms(level, frequency)) {
+            best = Math.max(best, margin(phantom.pos(), phantom.reach(), pos));
+        }
         for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
             if (entry.getValue().output() == frequency && !isSilenced(level, entry.getKey()) && !isDeaf(level, entry.getKey())) {
                 best = Math.max(best, margin(entry.getKey(),
@@ -1333,6 +1345,14 @@ public final class SignalNetwork extends SavedData {
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
+        }
+        for (Phantom phantom : phantoms(level, -1)) {
+            // v0.50.0: from another dimension, listed where it arrives here.
+            long distSq = horizontalDistSq(phantom.pos(), pos);
+            if (distSq <= (long) phantom.reach() * phantom.reach()) {
+                offer(best, phantom.frequency(), new BestTransmitter(fade(phantom.power(), fadeFraction(distSq, phantom.reach())),
+                        distSq, phantom.pos(), 1, Source.TRANSMITTER));
+            }
         }
         // Resolve first: that can forget repeaters whose block is gone. Each is listed under the frequency it sends on.
         Map<BlockPos, Integer> sending = resolve(level);
@@ -1525,6 +1545,17 @@ public final class SignalNetwork extends SavedData {
             }
         }
 
+        /** A signal of {@code sent} from another dimension: it fades ({@code fadeAt} 0-1, or -1), but hills don't block it. */
+        void offerFar(int sent, double fadeAt) {
+            int left = fadeAt < 0 ? sent : fade(sent, fadeAt);
+            if (left > power || left == power && (sent > raw || lifted)) {
+                power = left;
+                raw = sent;
+                faded = left;
+                lifted = false;
+            }
+        }
+
         void offerClear(int sent) {
             if (sent > power || sent == power && (sent > raw || lifted)) {
                 power = sent;
@@ -1588,6 +1619,15 @@ public final class SignalNetwork extends SavedData {
             if (remote != null && remote.reaches(level, receiverPos)) {
                 best.offerClear(15); // remote presses don't mind hills
                 heard++;
+            }
+        }
+        for (Phantom phantom : phantoms(level, frequency)) {
+            // v0.50.0: a transmitter in another dimension sending into this one, from where it arrives here (no hills).
+            long distSq = horizontalDistSq(phantom.pos(), receiverPos);
+            long reach = phantom.reach();
+            if (distSq <= reach * reach) {
+                heard++;
+                best.offerFar(phantom.power(), fades ? fadeFraction(distSq, reach) : -1);
             }
         }
         Map<BlockPos, Transmitter> onFrequency = byFrequency.get(frequency);
@@ -1849,6 +1889,104 @@ public final class SignalNetwork extends SavedData {
         return result;
     }
 
+    // ---- Cross-dimension links (v0.50.0) ----
+
+    /** Transmitters with an Ender Antenna, by position: the dimension each also sends into (saved). */
+    private final Map<BlockPos, ResourceKey<Level>> links = new HashMap<>();
+    /** True while telling other dimensions' networks about a change, so they don't tell this one back. */
+    private static boolean linking;
+
+    /** A transmitter in another dimension sending into this one, placed where it arrives here. */
+    public record Phantom(BlockPos pos, int frequency, int power, int reach, ResourceKey<Level> from, BlockPos source) {}
+
+    /** The transmitter at {@code pos} also sends into {@code target}, or into no other dimension ({@code null}). Called by its block entity. */
+    public void setLink(BlockPos pos, @Nullable ResourceKey<Level> target) {
+        ResourceKey<Level> previous = target == null ? links.remove(pos) : links.put(pos.immutable(), target);
+        if (!java.util.Objects.equals(previous, target)) {
+            Transmitter tx = transmitters.get(pos);
+            if (tx != null) {
+                bumpLinked(previous, tx.frequency());
+                bumpLinked(target, tx.frequency());
+            }
+            setDirty();
+        }
+    }
+
+    /** The dimension the transmitter at {@code pos} also sends into, or null. */
+    public @Nullable ResourceKey<Level> linkTarget(BlockPos pos) {
+        return links.get(pos);
+    }
+
+    /** Tells the networks of the dimensions this one's Ender Antennas send into on {@code frequency} that it changed. */
+    private void propagateLinks(int frequency) {
+        if (linking || links.isEmpty() || world == null) {
+            return;
+        }
+        Set<ResourceKey<Level>> targets = new HashSet<>();
+        links.forEach((pos, target) -> {
+            Transmitter tx = transmitters.get(pos);
+            if (tx != null && tx.frequency() == frequency) targets.add(target);
+        });
+        for (ResourceKey<Level> target : targets) {
+            bumpLinked(target, frequency);
+        }
+    }
+
+    private void bumpLinked(@Nullable ResourceKey<Level> target, int frequency) {
+        if (target == null || world == null || linking) {
+            return;
+        }
+        ServerLevel there = world.getServer().getLevel(target);
+        if (there == null || there == world) {
+            return;
+        }
+        linking = true;
+        try {
+            SignalNetwork network = SignalNetwork.get(there);
+            network.relayEpoch++;
+            network.bump(frequency);
+        } finally {
+            linking = false;
+        }
+    }
+
+    /**
+     * Transmitters in other dimensions sending into this one on {@code frequency} (any frequency if
+     * it's negative), where they arrive here: their strength (0 while out of power or struck), and
+     * their reach in the weather where they stand.
+     */
+    public List<Phantom> phantoms(@Nullable ServerLevel level, int frequency) {
+        ServerLevel here = level != null ? level : world;
+        if (here == null) {
+            return List.of();
+        }
+        List<Phantom> result = null;
+        for (ServerLevel other : here.getServer().getAllLevels()) {
+            if (other == here) {
+                continue;
+            }
+            SignalNetwork network = SignalNetwork.get(other);
+            if (network.links.isEmpty()) {
+                continue;
+            }
+            for (Map.Entry<BlockPos, ResourceKey<Level>> link : network.links.entrySet()) {
+                if (link.getValue() != here.dimension()) {
+                    continue;
+                }
+                Transmitter tx = network.transmitters.get(link.getKey());
+                if (tx == null || tx.compact() || frequency >= 0 && tx.frequency() != frequency
+                        || network.blocked(other, tx.frequency(), tx.tunedBy())) {
+                    continue;
+                }
+                if (result == null) result = new ArrayList<>();
+                result.add(new Phantom(CrossDimension.arrival(other, here, link.getKey()), tx.frequency(),
+                        network.isDown(link.getKey()) ? 0 : tx.power(), network.reachNow(other, link.getKey(), tx.reach()),
+                        other.dimension(), link.getKey()));
+            }
+        }
+        return result == null ? List.of() : result;
+    }
+
     // ---- Power cost (v0.49.0) ----
 
     /** Towers out of power (no charged Radio Battery when last checked; saved, so unloaded ones stay quiet). */
@@ -1943,6 +2081,9 @@ public final class SignalNetwork extends SavedData {
         jammers.forEach((pos, jammer) -> {
             if (jammer.frequency() == frequency) result.add(Map.entry(pos, 2));
         });
+        for (Phantom phantom : phantoms(world, frequency)) {
+            result.add(Map.entry(phantom.pos(), 3)); // v0.50.0: arriving from another dimension
+        }
         return result;
     }
 
@@ -2162,6 +2303,16 @@ public final class SignalNetwork extends SavedData {
         if (!drained.isEmpty()) {
             tag.putLongArray("drained", drained.stream().mapToLong(BlockPos::asLong).toArray());
         }
+        if (!links.isEmpty()) {
+            ListTag linkList = new ListTag();
+            links.forEach((pos, target) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putString("dimension", target.location().toString());
+                linkList.add(entry);
+            });
+            tag.put("links", linkList);
+        }
 
         ListTag latchList = new ListTag();
         latches.forEach((frequency, latch) -> {
@@ -2275,6 +2426,15 @@ public final class SignalNetwork extends SavedData {
         }
         for (long packed : tag.getLongArray("drained")) {
             network.drained.add(BlockPos.of(packed));
+        }
+        ListTag linkList = tag.getList("links", Tag.TAG_COMPOUND);
+        for (int i = 0; i < linkList.size(); i++) {
+            CompoundTag entry = linkList.getCompound(i);
+            net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(entry.getString("dimension"));
+            if (id != null) {
+                network.links.put(BlockPos.of(entry.getLong("pos")),
+                        ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id));
+            }
         }
         ListTag dishList = tag.getList("dishes", Tag.TAG_COMPOUND);
         for (int i = 0; i < dishList.size(); i++) {

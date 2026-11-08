@@ -312,9 +312,10 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
 write(items / "radio_battery.json", {"parent": f"{MOD}:block/radio_battery_4"})  # v0.49.0
+write(items / "solar_panel.json", {"parent": f"{MOD}:block/solar_panel"})  # v0.50.0
 write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
 
-for tier in ("iron", "gold", "diamond", "netherite", "dish"):
+for tier in ("iron", "gold", "diamond", "netherite", "dish", "ender"):
     write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -398,9 +399,10 @@ write(items / "frequency_tuner.json", {
 
 states = ASSETS / "blockstates"
 # v0.45.0: tower tops (multipart): the block lit or not, plus its antenna's fittings if it has one.
-ANTENNAS = ("iron", "gold", "diamond", "netherite")
+ANTENNAS = ("iron", "gold", "diamond", "netherite", "ender")
 ANTENNA_TEXTURE = {"iron": "minecraft:block/iron_block", "gold": "minecraft:block/gold_block",
-                   "diamond": "minecraft:block/diamond_block", "netherite": "minecraft:block/netherite_block"}
+                   "diamond": "minecraft:block/diamond_block", "netherite": "minecraft:block/netherite_block",
+                   "ender": "minecraft:block/crying_obsidian"}  # v0.50.0
 
 
 def antenna_model(tier):
@@ -523,6 +525,19 @@ write(states / "radio_status_board.json", {"variants": {
     "facing=south": {"model": f"{MOD}:block/radio_status_board", "y": 180},
     "facing=west": {"model": f"{MOD}:block/radio_status_board", "y": 270},
 }})
+# v0.50.0: the Solar Panel, a three-pixel slab with cells on top
+write(models / "solar_panel.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("solar_panel_top"), "top": tex("solar_panel_top"), "side": tex("solar_panel_side"),
+                 "bottom": tex("radio_bottom")},
+    "elements": [{"from": [0, 0, 0], "to": [16, 3, 16], "faces": {
+        "up": {"texture": "#top", "uv": [0, 0, 16, 16]},
+        "down": {"texture": "#bottom", "uv": [0, 0, 16, 16], "cullface": "down"},
+        **{face: {"texture": "#side", "uv": [0, 13, 16, 16], "cullface": face} for face in ("north", "south", "east", "west")},
+    }}],
+})
+write(states / "solar_panel.json", {"variants": {"": {"model": f"{MOD}:block/solar_panel"}}})
+
 # v0.49.0: the Radio Battery, its bars lit by charge
 for n in range(5):
     write(models / f"radio_battery_{n}.json", {"parent": "minecraft:block/cube_bottom_top", "textures": {
@@ -746,6 +761,27 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.antenna": "Antenna: %s (%s reach)",
     # v0.48.0: signal fade and the Dish Antenna
     f"jade.{MOD}.faded": "Faded: -%s (far out in its tower's reach)",
+    # v0.50.0: the Ender Antenna and the Solar Panel
+    f"item.{MOD}.ender_antenna": "Ender Antenna",
+    f"tooltip.{MOD}.ender_item": "Fit it to a Radio Transmitter (plain, timer or recorder) and it also sends into another dimension, from the same spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and into the Overworld from anywhere else. Use another on it to pick the next dimension. Its reach stays as with no antenna.",
+    f"tooltip.{MOD}.antenna_ender": "Antenna: %s (also sends into another dimension)",
+    f"jade.{MOD}.antenna_ender": "Antenna: %s (also sends into %s at %s)",
+    f"message.{MOD}.ender_fitted": "%s: Ender Antenna fitted: sending into %s too (arriving at %s)",
+    f"message.{MOD}.ender_relinked": "%s: Ender Antenna now sends into %s (arriving at %s)",
+    f"message.{MOD}.ender_nowhere": "%s: Ender Antenna fitted, but there's no other dimension to send into",
+    f"message.{MOD}.ender_transmitters_only": "Only a Radio Transmitter (plain, timer or recorder) can send into another dimension",
+    f"dimension.{MOD}.overworld": "the Overworld",
+    f"dimension.{MOD}.the_nether": "the Nether",
+    f"dimension.{MOD}.the_end": "the End",
+    f"block.{MOD}.solar_panel": "Solar Panel",
+    f"tooltip.{MOD}.solar_help": "Put it on a Radio Battery: it charges it by daylight, up to %s a second at noon in clear weather (less in rain and early or late in the day, none at night or under a roof).",
+    f"jade.{MOD}.solar_charging": "Charging the battery under it: %s a second",
+    f"jade.{MOD}.solar_dark": "Not charging: too dark (night, or something over it)",
+    f"jade.{MOD}.solar_no_battery": "No Radio Battery under it",
+    f"jade.{MOD}.solar_light": "Sunlight: %s of 15",
+    f"jade.{MOD}.battery_solar": "Solar Panel: +%s a second",
+    f"jade.{MOD}.battery_use_covered": "Powering towers: %s a second (the Solar Panel keeps up)",
+    f"{MOD}.configuration.solarChargePerSecond": "Solar Panel charge a second in full sun",
     # v0.49.0: power cost and the Coverage Map
     f"block.{MOD}.radio_battery": "Radio Battery",
     f"jade.{MOD}.battery_charge": "Charge: %s / %s (%s%%)",
@@ -1940,6 +1976,19 @@ recipes["radio_battery"] = ({  # v0.49.0
     "key": {"I": {"item": "minecraft:iron_ingot"}, "C": {"item": "minecraft:copper_ingot"}, "B": {"item": "minecraft:redstone_block"}},
     "result": {"count": 1, "id": f"{MOD}:radio_battery"},
 }, "minecraft:redstone_block")
+recipes["ender_antenna"] = ({  # v0.50.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:iron_antenna"}, {"item": "minecraft:ender_eye"}, {"item": "minecraft:obsidian"}],
+    "result": {"count": 1, "id": f"{MOD}:ender_antenna"},
+}, f"{MOD}:iron_antenna")
+recipes["solar_panel"] = ({  # v0.50.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": ["GGG", "CDC"],
+    "key": {"G": {"item": "minecraft:glass_pane"}, "C": {"item": "minecraft:copper_ingot"}, "D": {"item": "minecraft:daylight_detector"}},
+    "result": {"count": 1, "id": f"{MOD}:solar_panel"},
+}, "minecraft:daylight_detector")
 recipes["coverage_map"] = ({  # v0.49.0
     "type": "minecraft:crafting_shapeless",
     "category": "misc",
@@ -2069,7 +2118,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
-             "radio_battery"):
+             "radio_battery", "solar_panel"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2078,7 +2127,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
-    elif name not in ("radio_mast", "wall_redstone"):
+    elif name not in ("radio_mast", "wall_redstone", "solar_panel"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -2121,7 +2170,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
-               f"{MOD}:radio_mast", f"{MOD}:radio_battery"]
+               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)
