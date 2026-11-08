@@ -128,6 +128,12 @@ public final class ReachRing {
         }
         if (target != null && --rebuildIn <= 0) {
             rebuild(minecraft, level, player);
+            if (pending == null) {
+                // v0.52.0: ask again once a second, so the ring follows a dish turned by a Dish Rotator (or the weather).
+                pending = target.pos();
+                pendingAge = 0;
+                PacketDistributor.sendToServer(new ReachPreviewRequestPayload(target.pos()));
+            }
         }
     }
 

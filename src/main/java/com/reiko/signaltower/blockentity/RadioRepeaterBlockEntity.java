@@ -114,6 +114,7 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
                 || !(serverLevel.getBlockState(worldPosition).getBlock() instanceof RadioRepeaterBlock)) {
             return;
         }
+        com.reiko.signaltower.block.DishRotatorBlock.turnDish(serverLevel, worldPosition); // v0.52.0
         SignalNetwork network = SignalNetwork.get(serverLevel);
         network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.towerReach(serverLevel, worldPosition, serverLevel.getBlockState(worldPosition)),
                 getTunedBy(), getGate(), threshold);

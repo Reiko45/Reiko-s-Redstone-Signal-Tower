@@ -574,6 +574,46 @@ def telegraph_lamp(lit):
     return img
 
 
+def rotator_side():
+    """The Dish Rotator's gearbox side (v0.52.0; rows 4-11 show): steel with two vent slots."""
+    img = casing(5200, rivets=False)
+    px = img.load()
+    for y in (6, 9):
+        for x in range(4, 12):
+            px[x, y] = O
+            px[x, y + 1] = D
+    return img
+
+
+def _arrow(px, top):
+    """A yellow arrow pointing to the top of the texture, its tip at row {top}."""
+    yellow, dark = (240, 200, 40, 255), (150, 110, 20, 255)
+    for i, half in enumerate((0, 1, 2, 3)):
+        for x in range(8 - half - 1, 8 + half + 1):
+            px[x, top + i] = yellow
+    for y in range(top + 4, top + 7):
+        for x in (7, 8):
+            px[x, y] = yellow
+    for y in range(top, top + 7):
+        for x in range(16):
+            if px[x, y] == yellow and (x + 1 >= 16 or px[x + 1, y] != yellow):
+                px[x, y] = dark if y > top + 3 else yellow
+
+
+def rotator_front():
+    """Its front: the way redstone 0 points the dish."""
+    img = casing(5201, rivets=False)
+    _arrow(img.load(), 5)
+    return img
+
+
+def rotator_top():
+    """Its top: an arrow towards the front."""
+    img = casing(5202, rivets=False)
+    _arrow(img.load(), 4)
+    return img
+
+
 def coverage_map_item():
     """The Coverage Map (v0.49.0): a paper map with coverage rings in green, yellow and red around a tower dot."""
     import math
@@ -1153,6 +1193,9 @@ blocks = {
     "radio_battery_top": battery_top(),
     "solar_panel_top": solar_top(),
     "solar_panel_side": solar_side(),
+    "dish_rotator_side": rotator_side(),
+    "dish_rotator_front": rotator_front(),
+    "dish_rotator_top": rotator_top(),
     "radio_telegraph_top": telegraph_top(),
     "radio_telegraph_side": telegraph_side(),
     "radio_telegraph_brass": telegraph_brass(),

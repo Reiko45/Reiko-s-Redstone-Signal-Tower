@@ -55,7 +55,7 @@ public abstract class RadioBlock extends BaseEntityBlock {
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
         // v0.51.0: a mast on a tower top goes in under it (sneak to place it the normal way).
-        if (stack.is(ModRegistry.RADIO_MAST_ITEM.get()) && com.reiko.signaltower.radio.MastBuilder.builds(state)) {
+        if (com.reiko.signaltower.radio.MastBuilder.isMast(stack) && com.reiko.signaltower.radio.MastBuilder.builds(state)) {
             if (!level.isClientSide) {
                 com.reiko.signaltower.radio.MastBuilder.build(player, pos, stack);
             }

@@ -48,7 +48,7 @@ public class RadioMastBlock extends Block {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hitResult) {
-        if (!stack.is(com.reiko.signaltower.registry.ModRegistry.RADIO_MAST_ITEM.get())) {
+        if (!com.reiko.signaltower.radio.MastBuilder.isMast(stack)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (!level.isClientSide) {
@@ -59,7 +59,8 @@ public class RadioMastBlock extends Block {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip." + com.reiko.signaltower.SignalTower.MOD_ID + ".mast_builder").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable(getDescriptionId() + ".tooltip").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip." + com.reiko.signaltower.SignalTower.MOD_ID + ".mast_builder").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     /** Something next to this mast changed, maybe a lever or wire: tell the transmitter on top. */

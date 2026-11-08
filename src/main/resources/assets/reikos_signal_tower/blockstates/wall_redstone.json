@@ -190,6 +190,55 @@
         "model": "reikos_signal_tower:block/wall_redstone_right",
         "y": 270
       }
+    },
+    {
+      "when": {
+        "facing": "down"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_dot",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "down",
+        "up": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_up",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "down",
+        "down": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_down",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "down",
+        "left": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_left",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "facing": "down",
+        "right": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/wall_redstone_right",
+        "x": 270
+      }
     }
   ]
 }

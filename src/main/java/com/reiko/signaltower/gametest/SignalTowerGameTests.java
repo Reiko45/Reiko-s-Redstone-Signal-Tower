@@ -7781,4 +7781,174 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.52.0: Wall Redstone on ceilings and round corners, and the Dish Rotator
+
+    /**
+     * Wall Redstone on a ceiling: placed by clicking the underside of a block it faces down; it
+     * carries power along the ceiling (15, 14) with its lines drawn; it drops off when the block
+     * above goes. Round corners: to the next wall of the same block (14, both lines drawn), cut off
+     * when the edge is filled in; from a wall to the ceiling under the block; and over the top edge
+     * from dust lying on a glass block (which carries nothing itself).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void wallRedstoneCeilingsAndCorners(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // A ceiling, placed by hand on the underside of a block.
+        helper.setBlock(new BlockPos(2, 3, 1), Blocks.STONE);
+        helper.setBlock(new BlockPos(3, 3, 1), Blocks.STONE);
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack dust = new ItemStack(ModRegistry.WALL_REDSTONE_ITEM.get(), 4);
+        dev.setItemInHand(InteractionHand.MAIN_HAND, dust);
+        BlockPos under = helper.absolutePos(new BlockPos(2, 3, 1));
+        dust.useOn(new UseOnContext(dev, InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(under).add(0, -0.5, 0), Direction.DOWN, under, false)));
+        check(helper.getBlockState(new BlockPos(2, 2, 1)).is(ModRegistry.WALL_REDSTONE.get())
+                && helper.getBlockState(new BlockPos(2, 2, 1)).getValue(WallRedstoneBlock.FACING) == Direction.DOWN,
+                "Clicking the underside of a block puts it on the ceiling: " + helper.getBlockState(new BlockPos(2, 2, 1)));
+        helper.setBlock(new BlockPos(3, 2, 1), wallRedstone(Direction.DOWN));
+        helper.setBlock(new BlockPos(1, 2, 1), Blocks.REDSTONE_BLOCK);
+
+        // Round a corner to the next wall of the same block.
+        helper.setBlock(new BlockPos(6, 1, 1), Blocks.STONE);
+        helper.setBlock(new BlockPos(6, 1, 0), wallRedstone(Direction.NORTH));
+        helper.setBlock(new BlockPos(7, 1, 1), wallRedstone(Direction.EAST));
+        helper.setBlock(new BlockPos(5, 1, 0), Blocks.REDSTONE_BLOCK);
+
+        // From a wall round the bottom edge to the ceiling under the block.
+        helper.setBlock(new BlockPos(10, 3, 1), Blocks.STONE);
+        helper.setBlock(new BlockPos(10, 3, 0), wallRedstone(Direction.NORTH));
+        helper.setBlock(new BlockPos(10, 2, 1), wallRedstone(Direction.DOWN));
+        helper.setBlock(new BlockPos(9, 3, 0), Blocks.REDSTONE_BLOCK);
+
+        // Over the top edge from dust lying on a glass block.
+        helper.setBlock(new BlockPos(14, 1, 1), Blocks.GLASS);
+        helper.setBlock(new BlockPos(14, 1, 0), wallRedstone(Direction.NORTH));
+        helper.setBlock(new BlockPos(14, 2, 1), Blocks.REDSTONE_WIRE);
+        helper.setBlock(new BlockPos(15, 2, 1), Blocks.REDSTONE_BLOCK);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertWallPower(helper, new BlockPos(2, 2, 1), 15);
+                    assertWallPower(helper, new BlockPos(3, 2, 1), 14);
+                    BlockState ceiling = helper.getBlockState(new BlockPos(2, 2, 1));
+                    check(ceiling.getValue(WallRedstoneBlock.LEFT) && ceiling.getValue(WallRedstoneBlock.RIGHT)
+                            && !ceiling.getValue(WallRedstoneBlock.UP) && !ceiling.getValue(WallRedstoneBlock.DOWN),
+                            "On the ceiling: lines west (the redstone block) and east (the next dust): " + ceiling);
+                    check(WallRedstoneBlock.armDirection(Direction.DOWN, WallRedstoneBlock.UP) == Direction.SOUTH
+                            && WallRedstoneBlock.armDirection(Direction.NORTH, WallRedstoneBlock.LEFT) == Direction.EAST, "Arm directions");
+
+                    assertWallPower(helper, new BlockPos(6, 1, 0), 15);
+                    assertWallPower(helper, new BlockPos(7, 1, 1), 14);
+                    check(helper.getBlockState(new BlockPos(6, 1, 0)).getValue(WallRedstoneBlock.LEFT)
+                            && helper.getBlockState(new BlockPos(7, 1, 1)).getValue(WallRedstoneBlock.RIGHT), "Both draw a line to the corner");
+
+                    assertWallPower(helper, new BlockPos(10, 3, 0), 15);
+                    assertWallPower(helper, new BlockPos(10, 2, 1), 14);
+                    check(helper.getBlockState(new BlockPos(10, 3, 0)).getValue(WallRedstoneBlock.DOWN)
+                            && helper.getBlockState(new BlockPos(10, 2, 1)).getValue(WallRedstoneBlock.DOWN),
+                            "Wall and ceiling draw lines round the bottom edge");
+
+                    assertWallPower(helper, new BlockPos(14, 1, 0), 14);
+                    check(helper.getBlockState(new BlockPos(14, 1, 0)).getValue(WallRedstoneBlock.UP), "A line over the top edge to the dust");
+
+                    helper.setBlock(new BlockPos(7, 1, 0), Blocks.STONE);
+                    helper.setBlock(new BlockPos(3, 3, 1), Blocks.AIR);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertWallPower(helper, new BlockPos(7, 1, 1), 0);
+                    check(!helper.getBlockState(new BlockPos(6, 1, 0)).getValue(WallRedstoneBlock.LEFT)
+                            && !helper.getBlockState(new BlockPos(7, 1, 1)).getValue(WallRedstoneBlock.RIGHT), "The corner filled in: cut off");
+                    helper.assertBlockNotPresent(ModRegistry.WALL_REDSTONE.get(), new BlockPos(3, 2, 1));
+                    check(!helper.getBlockState(new BlockPos(2, 2, 1)).getValue(WallRedstoneBlock.RIGHT), "The ceiling went: it dropped off");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Dish Rotator: it's a mast (the tower's column goes through it); a dish fitted on top
+     * points the rotator's way at 0 (east here), whichever way the player looks; redstone 5 turns it
+     * 5 steps clockwise (south-south-west) at once, in the network too, without the redstone going
+     * up to the tower; off again, back east. Jade on both. Re-aiming the dish by hand is refused
+     * while the rotator holds it; with two in a column the higher one turns the dish. The mast
+     * builder puts one in under a tower's top, its arrow the way the player looks.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void dishRotator(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos lower = new BlockPos(1, 1, 1);
+        BlockPos rotator = new BlockPos(1, 2, 1);
+        BlockPos top = new BlockPos(1, 3, 1);
+        helper.setBlock(lower, ModRegistry.DISH_ROTATOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.DishRotatorBlock.FACING, Direction.NORTH));
+        helper.setBlock(rotator, ModRegistry.DISH_ROTATOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.DishRotatorBlock.FACING, Direction.EAST));
+        place(helper, top, ModRegistry.RADIO_TRANSMITTER.get(), 4541);
+        for (int x = 2; x <= 13; x++) {
+            helper.setBlock(new BlockPos(x, 1, 1), Blocks.STONE);
+        }
+        BlockPos absTop = helper.absolutePos(top);
+        Player dev = namedPlayer(helper, new BlockPos(2, 3, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        dev.setYRot(180.0F); // looking north
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.block.DishRotatorBlock.segment(Direction.NORTH) == 0
+                            && com.reiko.signaltower.block.DishRotatorBlock.segment(Direction.EAST) == 4
+                            && com.reiko.signaltower.block.DishRotatorBlock.segment(Direction.SOUTH) == 8
+                            && com.reiko.signaltower.block.DishRotatorBlock.segment(Direction.WEST) == 12, "Its arrow as an aim");
+                    check(RadioHelper.mastsBelow(level, absTop) == 2, "It's a mast: the column goes through it");
+                    check(helper.absolutePos(rotator).equals(com.reiko.signaltower.block.DishRotatorBlock.rotatorUnder(level, absTop)),
+                            "The one nearest the top turns the dish");
+                    Component fitted = com.reiko.signaltower.item.AntennaItem.fit(dev, absTop, com.reiko.signaltower.radio.AntennaTier.DISH,
+                            new ItemStack(ModRegistry.DISH_ANTENNA.get()));
+                    check(fitted != null && com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top)) == 4,
+                            "A dish fitted on top points the rotator's way (east), not the player's: " + fitted);
+                    // The mast builder puts one in under a tower's top, its arrow the way the player looks (south).
+                    helper.setBlock(new BlockPos(20, 1, 1), ModRegistry.RADIO_MAST.get());
+                    place(helper, new BlockPos(20, 2, 1), ModRegistry.RADIO_TRANSMITTER.get(), 4542);
+                    helper.setBlock(new BlockPos(20, 2, 1), helper.getBlockState(new BlockPos(20, 2, 1))
+                            .setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY, com.reiko.signaltower.radio.AntennaTier.DISH));
+                    Player alex = namedPlayer(helper, new BlockPos(20, 1, 0), UUID.randomUUID(), "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    alex.setYRot(0.0F); // looking south
+                    Component added = com.reiko.signaltower.radio.MastBuilder.build(alex, helper.absolutePos(new BlockPos(20, 1, 1)),
+                            new ItemStack(ModRegistry.DISH_ROTATOR_ITEM.get()));
+                    check(added != null && keyOf(added).endsWith("rotator_added")
+                            && helper.getBlockState(new BlockPos(20, 2, 1)).is(ModRegistry.DISH_ROTATOR.get())
+                            && helper.getBlockState(new BlockPos(20, 2, 1)).getValue(com.reiko.signaltower.block.DishRotatorBlock.FACING) == Direction.SOUTH
+                            && com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(new BlockPos(20, 3, 1))) == 8,
+                            "Put in by the mast builder, its arrow south, the dish turned south: " + added);
+                    for (int x = 2; x <= 12; x++) {
+                        helper.setBlock(new BlockPos(x, 2, 1), Blocks.REDSTONE_WIRE);
+                    }
+                    helper.setBlock(new BlockPos(13, 2, 1), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top)) == 9,
+                        "Redstone 5 turns it 5 steps clockwise: " + com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top))))
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    check(network.dishAim(absTop) != null && network.dishAim(absTop) == 9, "The network knows");
+                    check(com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, absTop, helper.getBlockState(top)) == 0,
+                            "Its redstone doesn't go up to the tower");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rotator));
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rotator), info));
+                    check(info.getInt("rotator_power") == 5 && info.getInt("rotator_aim") == 9 && keys.contains("rotator_turns")
+                            && keys.contains("mast_top"), "Jade on the rotator: " + keys);
+                    CompoundTag lowerInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(lower));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(lower), lowerInfo)).contains("rotator_overruled"),
+                            "Jade on the lower one: the higher one turns it");
+                    CompoundTag topInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absTop);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(top), topInfo)).contains("dish_rotated"),
+                            "Jade on the tower: turned by a rotator");
+                    Component refused = com.reiko.signaltower.item.AntennaItem.fit(dev, absTop, com.reiko.signaltower.radio.AntennaTier.DISH,
+                            new ItemStack(ModRegistry.DISH_ANTENNA.get()));
+                    check(refused != null && keyOf(refused).endsWith("dish_rotated")
+                            && com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top)) == 9, "No re-aiming by hand: " + refused);
+                    helper.setBlock(new BlockPos(13, 2, 1), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top)) == 4, "Off: back east"))
+                .thenSucceed();
+    }
 }

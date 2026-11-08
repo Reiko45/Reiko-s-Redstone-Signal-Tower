@@ -80,6 +80,14 @@ public class AntennaItem extends Item {
             return fitEnder(player, pos, state, old, name, stack);
         }
         int aim = AntennaTier.aimFor(player.getYRot());
+        // v0.52.0: a Dish Rotator in the tower's mast decides where a dish points.
+        int rotated = tier == AntennaTier.DISH ? com.reiko.signaltower.block.DishRotatorBlock.aimAt(level, pos) : -1;
+        if (rotated >= 0) {
+            if (old == AntennaTier.DISH) {
+                return tell(player, Component.translatable(KEY + "dish_rotated", name, AntennaTier.aimLabel(rotated)).withStyle(ChatFormatting.GOLD));
+            }
+            aim = rotated;
+        }
         if (old == tier && (tier != AntennaTier.DISH || AntennaTier.aimOf(state) == aim)) {
             return tell(player, tier == AntennaTier.DISH
                     ? Component.translatable(KEY + "dish_already", name, AntennaTier.aimLabel(aim)).withStyle(ChatFormatting.GRAY)

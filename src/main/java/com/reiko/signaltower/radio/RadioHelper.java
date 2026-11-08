@@ -74,7 +74,10 @@ public final class RadioHelper {
         int best = level.getBestNeighborSignal(transmitterPos);
         BlockPos.MutableBlockPos cursor = transmitterPos.mutable().move(Direction.DOWN);
         for (int i = 0; i < SCAN_LIMIT && best < 15 && isMast(level, cursor); i++) {
-            best = Math.max(best, level.getBestNeighborSignal(cursor));
+            // v0.52.0: a Dish Rotator's redstone only turns the dish.
+            if (!(level.getBlockState(cursor).getBlock() instanceof com.reiko.signaltower.block.DishRotatorBlock)) {
+                best = Math.max(best, level.getBestNeighborSignal(cursor));
+            }
             cursor.move(Direction.DOWN);
         }
         return best;
@@ -105,6 +108,8 @@ public final class RadioHelper {
         }
         if (level.getBlockEntity(cursor) instanceof RadioTransmitterBlockEntity transmitter) {
             transmitter.refresh();
+        } else if (level.getBlockEntity(cursor) instanceof com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity relay) {
+            relay.refresh(); // v0.52.0: so a Dish Rotator under it turns its dish at once
         }
     }
 

@@ -34,6 +34,8 @@ import java.util.List;
  * it, or a Lightning Rod. A column of masts with nothing on top grows from the top instead. So a
  * tower can be raised from the ground. Sneak to place a mast the normal way.
  * <p>
+ * A Dish Rotator in hand (v0.52.0) goes in the same way, its arrow the way the player looks.
+ * <p>
  * It needs room above (air, or something that can be built over, like grass), stays inside the
  * world, and on someone else's private frequency only its owner and members may raise the tower
  * (like fitting an antenna).
@@ -43,6 +45,11 @@ public final class MastBuilder {
     private static final int SCAN_LIMIT = 4096;
 
     private MastBuilder() {
+    }
+
+    /** True if {@code stack} builds: a Radio Mast, or a Dish Rotator (v0.52.0), which goes in the same way. */
+    public static boolean isMast(ItemStack stack) {
+        return stack.getItem() instanceof net.minecraft.world.item.BlockItem item && item.getBlock() instanceof RadioMastBlock;
     }
 
     /** True if right-clicking a block in {@code state} with a mast builds: a mast, or a full-size tower top. */
@@ -102,7 +109,12 @@ public final class MastBuilder {
         for (int i = lifted.size() - 1; i >= 0; i--) {
             move(level, lifted.get(i), lifted.get(i).above());
         }
-        BlockState mast = ModRegistry.RADIO_MAST.get().defaultBlockState();
+        BlockState mast = isMast(stack) ? ((net.minecraft.world.item.BlockItem) stack.getItem()).getBlock().defaultBlockState()
+                : ModRegistry.RADIO_MAST.get().defaultBlockState();
+        boolean rotator = mast.getBlock() instanceof com.reiko.signaltower.block.DishRotatorBlock;
+        if (rotator) { // its arrow the way the player looks, like placing one
+            mast = mast.setValue(com.reiko.signaltower.block.DishRotatorBlock.FACING, player.getDirection());
+        }
         level.setBlock(base, mast, Block.UPDATE_ALL);
         SoundType sound = mast.getSoundType(level, base, player);
         level.playSound(null, base, sound.getPlaceSound(), SoundSource.BLOCKS, (sound.getVolume() + 1.0F) / 2.0F, sound.getPitch() * 0.8F);
@@ -110,12 +122,17 @@ public final class MastBuilder {
             stack.shrink(1);
         }
         if (!tower) {
-            return tell(player, Component.translatable(KEY + "mast_grown", RadioHelper.mastsBelow(level, base.above()))
+            return tell(player, Component.translatable(KEY + (rotator ? "rotator_grown" : "mast_grown"), RadioHelper.mastsBelow(level, base.above()))
                     .withStyle(ChatFormatting.AQUA));
         }
         BlockPos top = base.above();
         refresh(level, top);
         BlockState raised = level.getBlockState(top);
+        if (rotator) {
+            return tell(player, Component.translatable(KEY + "rotator_added", raised.getBlock().getName(), RadioHelper.mastsBelow(level, top),
+                    before, AntennaItem.reachShown(level, top, raised),
+                    AntennaTier.aimLabel(com.reiko.signaltower.block.DishRotatorBlock.segment(player.getDirection()))).withStyle(ChatFormatting.AQUA));
+        }
         return tell(player, Component.translatable(KEY + "mast_added", raised.getBlock().getName(), RadioHelper.mastsBelow(level, top),
                 before, AntennaItem.reachShown(level, top, raised)).withStyle(ChatFormatting.AQUA));
     }

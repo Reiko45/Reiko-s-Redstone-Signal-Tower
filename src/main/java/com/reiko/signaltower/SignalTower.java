@@ -290,6 +290,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
             event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
+            event.accept(ModRegistry.DISH_ROTATOR_ITEM.get());
             event.accept(ModRegistry.AVIATION_BEACON_ITEM.get());
             event.accept(ModRegistry.RADIO_LAMP_ITEM.get());
             event.accept(ModRegistry.RADIO_BATTERY_ITEM.get());

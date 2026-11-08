@@ -42,7 +42,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
 | **Signal Meter** | A handheld that measures one frequency where you stand: a strength bar beside the hotbar, a Geiger-counter tick, and how many blocks are left to the edge of the tower's reach. Quick for placing receivers at the edge. |
 | **Signal Scanner** | A handheld direction-finder. It lists every frequency you can hear where you stand, how strong it is and where it comes from, and can tune the radio item in your other hand. |
-| **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
+| **Wall Redstone** | Redstone dust that sticks to the side of a block, or to a ceiling. It runs up, down and sideways along a wall, across a ceiling and round outside corners onto the next face, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
+| **Dish Rotator** | A mast segment with a motor in it. In a tower with a Dish Antenna, the redstone strength it gets turns the dish: 0 points it the way its arrow does, each step one sixteenth of a turn clockwise. A lever, a comparator or a Radio Receiver can swing the beam from one base to another. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
 
@@ -557,7 +558,7 @@ Since 0.48 a signal **fades toward the edge** of a tower's reach. Out to half it
 A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-size Radio Transmitter, Timer Transmitter, Signal Recorder, Repeater, Converter or Jammer with it, and the dish faces the way you're looking (one of 16 directions: north, north-north-east, north-east and so on):
 
 - **In its beam,** 15° either side of where it points, the tower reaches **three times** as far as with no antenna. Everywhere else it reaches as far as with no antenna. A transmitter with a reach of 56 then reaches 168 blocks east and 56 every other way ("Radio Transmitter: Dish Antenna aimed east: 168 blocks that way, 56 elsewhere"). The server config's `maxReach` still caps it.
-- **To turn it,** right-click the tower with another Dish Antenna while looking the new way: the dish turns (nothing is used up). Fitting a different antenna replaces it and gives the dish back; sneak + right-click with an empty hand takes it off.
+- **To turn it,** right-click the tower with another Dish Antenna while looking the new way: the dish turns (nothing is used up). Or let a **Dish Rotator** in its mast turn it with redstone (since 0.52). Fitting a different antenna replaces it and gives the dish back; sneak + right-click with an empty hand takes it off.
 - Everything goes by the beam: receivers, repeaters (a dish on a repeater sends the relayed signal far in one direction), a jammer's jamming, remote presses the tower relays, the meter's distance to the edge, and weather and fade (which work on the longer reach).
 - **You can see it:** a grey dish on the tower's mast, facing its way. Jade shows "Antenna: Dish Antenna, aimed east (×3 reach that way)" and "Reaches 168 blocks to the east" (also on a mast below, without the second line), and the reach ring becomes a keyhole: the circle, with the beam sticking out of it.
 - A tower placed from an item that carries a dish faces the way you look when you place it.
@@ -608,6 +609,31 @@ A **Solar Panel** (since 0.50) is a flat panel you put on top of a Radio Battery
 ![Dev fitting an Ender Antenna to the transmitter on 4480 in the Overworld: "Ender Antenna fitted: sending into the Nether too (arriving at 77, 0, 11)", Jade "Antenna: Ender Antenna (also sends into the Nether at 77, 0, 11)" and "Battery: 64% (about 10h 8m left at 1.75 a second)"; Alex in the Nether next to a purple Radio Lamp on 4480, Jade "Light: 15", "Towers in range: 1", a receiver lighting a redstone lamp beside it, and the meter "15", "1 tower, 55 blocks to the edge"; a Solar Panel on the transmitter's battery, Jade on the battery "Solar Panel: +3 a second", "Powering towers: 1.75 a second"; and Jade on the panel "Charging the battery under it: 3 a second", "Sunlight: 15 of 15"](docs/images/ender-antenna-and-solar-panel.png)
 
 ![Dev looking at a Radio Transmitter on 4480 at night: Jade saying "Sending: nothing" and "Out of power: needs a charged Radio Battery next to it or its mast"; Dev right-clicking the Radio Battery next to it with a stack of redstone: "Radio Battery: +64,000 charge (64,000 / 100,000)", three bars lit, Jade "Charge: 63,999 / 100,000 (64%)", "Powering towers: 0.88 a second (about 20h 19m left)"; the tower sending again, Jade "Sending: 15", "Battery: 64% (about 20h 18m left at 0.88 a second)"; and Alex holding a Coverage Map of 4460 at 1:2: a green disc round the transmitter's red marker, fading through yellow and orange to red at the edge, a blue marker on the repeater and a red X on the jammer](docs/images/power-cost-and-coverage-map.png)
+
+### Wall Redstone on ceilings and round corners
+
+Since 0.52, **Wall Redstone** also goes on **ceilings**: right-click the underside of a block. It runs across the ceiling in any direction, like dust on a floor, and powers the block it hangs from.
+
+It also runs **round outside corners**, from one face of a block onto the next, as long as the space at the edge is open (not a solid block):
+
+- round a vertical edge, from one wall of a block to the next wall (the lines meet at the edge);
+- round the bottom edge, from a wall to the ceiling under the same block, and back;
+- over the top edge, from normal dust lying on top of the block down the wall (dust on top of a solid block also powers the wall below through the block; over glass only the wall side is carried).
+
+Each corner costs 1 strength, like any other step. Fill in the edge and the corner is cut. Inside corners (where a wall meets the ceiling under it) work as before: the two pieces are next to each other.
+
+### Dish Rotator
+
+A **Dish Rotator** (since 0.52) is a mast segment with a gearbox. Put it in the mast column of a tower with a Dish Antenna (in place of a mast, anywhere under the top), or right-click the tower with it to put it in under the top like a mast (see Mast builder). Its **arrow** points the way you looked when you placed it.
+
+- The redstone strength reaching it turns the dish: **0** points it the way the arrow does, and each step turns it **22.5° clockwise**, so 4 is a right angle, 8 the opposite way and 12 a right angle the other way. The dish turns the moment the strength changes, with a whirr.
+- Its redstone **only turns the dish**: it doesn't go up the column to the tower, so a lever on the rotator doesn't switch the transmitter on. (Redstone next to the plain masts still does.)
+- Anything giving a strength works: a lever (0 or 15), dust running a few blocks from a source, a comparator, or a **Radio Receiver** outputting what it hears, so another transmitter far away can aim the dish (send 4 to turn it a quarter round).
+- While a rotator holds a dish, you can't turn it by hand with another Dish Antenna ("The Dish Rotator in its mast turns this Radio Transmitter's dish (it points west now)"); a dish fitted on top points where the rotator says. With two rotators in a column, the higher one turns the dish.
+- It's a mast in every other way: the column goes through it, a battery next to it powers the tower, the mast builder works through it.
+- Jade on it: "Redstone: 8 (0 points east)", "Points the dish on top west" (or "No Dish Antenna on top to turn"); on the tower: "Turned by a Dish Rotator (redstone 8)". The reach ring follows the dish round.
+
+![Wall Redstone from a lever climbing a stone-brick pillar and running along the arch above it, round the pillar's corner to light a lamp at its side and round the bottom edge onto the ceiling to light a lamp under the arch; a line of Wall Redstone on a ceiling from a redstone block to a lamp, seen from below (Jade: "Power: 14"); Alex right-clicking a dish tower with a Dish Rotator: "Dish Rotator added under the Radio Transmitter (2 masts up, reach 64 → 72 blocks); redstone 0 points its dish east", Jade on the rotator "Redstone: 0 (0 points east)", "Points the dish on top east"; the rotator's arrow facing east with Jade "Redstone: 8 (0 points east)", "Points the dish on top west"; and the tower with its lever off ("aimed east", "Turned by a Dish Rotator (redstone 0)", the reach ring "216 to the east") and on ("aimed west", "redstone 8", "216 to the west")](docs/images/ceiling-redstone-and-dish-rotator.png)
 
 ### Mast builder
 
@@ -793,6 +819,8 @@ G = Glass Pane   C = Copper Ingot   D = Daylight Detector
 
 **Radio Telegraph:** a Radio Transmitter, a Radio Receiver and a Book and Quill, in any arrangement in the crafting grid.
 
+**Dish Rotator:** a Radio Mast, a Redstone Comparator and a Copper Ingot, in any arrangement in the crafting grid.
+
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
 **Radio Jammer:** a Radio Transmitter, a Note Block and a Redstone Dust, in any arrangement in the crafting grid.
@@ -837,7 +865,7 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
 
-**Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
+**Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block, or its underside for a ceiling.
 
 ## Building and running
 
@@ -895,6 +923,7 @@ src/main/java/com/reiko/signaltower/
   block/SolarPanelBlock.java             the flat panel on a battery
   blockentity/SolarPanelBlockEntity.java  sunlight (like a Daylight Detector) into charge for the battery under it
   radio/MastBuilder.java                 a mast used on a tower goes in under its top (lifting the top and what's on it)
+  block/DishRotatorBlock.java            the Dish Rotator: a mast whose redstone turns the dish on top
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
   blockentity/TelegraphBlockEntity.java  checks in with the network; clicks and pulses; sending cooldown
@@ -930,7 +959,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioConverterBlock.java         a repeater that sends on another frequency; opens its screen
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
   block/RadioMastBlock.java              tower segment, carries signal up to the transmitter
-  block/WallRedstoneBlock.java           redstone dust for walls
+  block/WallRedstoneBlock.java           redstone dust for walls and ceilings, round outside corners
   blockentity/RadioBlockEntity.java      stores the frequency (kept through break/re-place) and who last tuned or placed it
   blockentity/RadioTransmitterBlockEntity.java
   blockentity/RadioReceiverBlockEntity.java
@@ -1160,9 +1189,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 156. the Ender Antenna: 1/8 into the Nether and back (rounding down), 1:1 into the End, the height kept inside the world; the Nether from the Overworld and the Overworld from elsewhere to start with, and the next dimension round after that; a repeater can't take one; fitted to a transmitter, the Nether hears it at the spot it arrives, out to its reach and no farther (the meter's edge too), Jade says where it goes, and the Nether knows at once when it turns off; another one moves it on to the End (nothing used up) and the Nether stops hearing it; saved in the network and the block; gone with the tower;
 157. the Solar Panel: 3 a second in full sun and a third at 5; fractions add up from one second to the next; with no battery under it Jade says so; on a battery it charges it by day (Jade on both) and not in the dark;
 158. the mast builder: a mast used on a tower's bottom mast goes in under the top, lifting it with its frequency, its Diamond Antenna and the beacon on it, the network following and the reach growing (the message says 2 masts up, the reach before and after); used on the top itself it works too, and redstone still comes up the column; with stone in the way it says there's no room; a bare column grows on top, and a lightning rod rides up; someone else's private tower is refused (nothing used up);
-159. the Radio Telegraph: messages are cleaned and cut to 64 characters; one sent on 4533 is remembered and read by the other telegraph on 4533 (it pulses, its screen shows it), not one on 4534 or the sender; sending again at once, or nothing, is refused; a pager back from being away says what it missed, and one in reach gets it (in chat too), not one on another frequency; a Status Board row would show it; Jade shows the last one; saved; the pulse ends; on an encrypted frequency a non-member can't send, and the owner's message isn't readable on a non-member's telegraph (its screen says "encrypted", Jade says deaf) but the log keeps it; the screen re-tunes it, and its packet round-trips.
+159. the Radio Telegraph: messages are cleaned and cut to 64 characters; one sent on 4533 is remembered and read by the other telegraph on 4533 (it pulses, its screen shows it), not one on 4534 or the sender; sending again at once, or nothing, is refused; a pager back from being away says what it missed, and one in reach gets it (in chat too), not one on another frequency; a Status Board row would show it; Jade shows the last one; saved; the pulse ends; on an encrypted frequency a non-member can't send, and the owner's message isn't readable on a non-member's telegraph (its screen says "encrypted", Jade says deaf) but the log keeps it; the screen re-tunes it, and its packet round-trips;
+160. Wall Redstone on ceilings and round corners: clicking the underside of a block puts it on the ceiling; along the ceiling it goes 15, 14 with its lines drawn, and drops off when the block above goes; round a vertical edge to the next wall of the same block it goes 15 → 14 with both lines drawn, cut off (0) when the edge is filled in; round the bottom edge from a wall to the ceiling under the block (15 → 14); over the top edge from dust on a glass block (14);
+161. the Dish Rotator: north, east, south and west are aims 0, 4, 8 and 12; it's a mast (the column goes through it, 2 masts under the top); the higher of two turns the dish; a dish fitted on top points the rotator's way (east), not the player's; the mast builder puts one in under another tower's top, its arrow the way the player looks (south) and that dish turned south; redstone 5 turns the dish 5 steps clockwise (south-south-west), in the network too, without the redstone reaching the tower; Jade on the rotator, on the lower one ("A Dish Rotator higher up turns the dish") and on the tower; no re-aiming by hand while it holds the dish; off again, back east.
 
-All 159 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 161 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

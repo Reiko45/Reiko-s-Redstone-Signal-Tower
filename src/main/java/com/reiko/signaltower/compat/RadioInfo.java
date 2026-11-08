@@ -185,6 +185,19 @@ public final class RadioInfo {
                     tag.putInt("output", converter.getOutputFrequency());
                 }
             }
+            if (block instanceof com.reiko.signaltower.block.DishRotatorBlock) {
+                // v0.52.0: its redstone, its arrow, where that points the dish, and whether it's the one in charge.
+                int power = com.reiko.signaltower.block.DishRotatorBlock.power(level, pos);
+                tag.putBoolean("rotator", true);
+                tag.putInt("rotator_power", power);
+                tag.putInt("rotator_home", com.reiko.signaltower.block.DishRotatorBlock.segment(state.getValue(com.reiko.signaltower.block.DishRotatorBlock.FACING)));
+                tag.putInt("rotator_aim", com.reiko.signaltower.block.DishRotatorBlock.aim(state, power));
+                BlockPos towerTop = com.reiko.signaltower.block.DishRotatorBlock.topAbove(level, pos);
+                tag.putBoolean("rotator_dish", towerTop != null
+                        && com.reiko.signaltower.radio.AntennaTier.dishAim(level.getBlockState(towerTop)) >= 0);
+                tag.putBoolean("rotator_overruled", towerTop != null
+                        && !pos.equals(com.reiko.signaltower.block.DishRotatorBlock.rotatorUnder(level, towerTop)));
+            }
             return tag;
         }
         if (!(level.getBlockEntity(pos) instanceof RadioBlockEntity radio)) {
@@ -192,6 +205,12 @@ public final class RadioInfo {
         }
         int frequency = radio.getFrequency();
         tag.putInt("frequency", frequency);
+        if (com.reiko.signaltower.radio.AntennaTier.dishAim(state) >= 0) {
+            BlockPos rotator = com.reiko.signaltower.block.DishRotatorBlock.rotatorUnder(level, pos);
+            if (rotator != null) {
+                tag.putInt("rotated_by", com.reiko.signaltower.block.DishRotatorBlock.power(level, rotator)); // v0.52.0
+            }
+        }
         if (block instanceof RadioTransmitterBlock) {
             // A compact one (v0.38.0) reads only what's around it and has its fixed reach.
             tag.putInt("power", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, pos, state));
@@ -388,6 +407,9 @@ public final class RadioInfo {
                 lines.add(Component.translatable(LANG + "dish_reach", com.reiko.signaltower.radio.AntennaTier.aimLabel(aim),
                         data.getInt("dish_reach")).withStyle(ChatFormatting.GOLD));
             }
+            if (data != null && data.contains("rotated_by")) {
+                lines.add(Component.translatable(LANG + "dish_rotated", value(data.getInt("rotated_by"))).withStyle(ChatFormatting.GOLD));
+            }
         } else if (antenna == com.reiko.signaltower.radio.AntennaTier.ENDER && data != null && data.contains("link_dimension")) {
             // v0.50.0: the dimension its Ender Antenna sends into, and where.
             net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(data.getString("link_dimension"));
@@ -503,6 +525,16 @@ public final class RadioInfo {
         if (block instanceof RadioMastBlock) {
             if (data == null) {
                 return lines;
+            }
+            if (data.getBoolean("rotator")) {
+                // v0.52.0: the Dish Rotator's own lines, then the tower's.
+                int power = data.getInt("rotator_power");
+                lines.add(Component.translatable(LANG + "rotator_power", value(power),
+                        com.reiko.signaltower.radio.AntennaTier.aimLabel(data.getInt("rotator_home"))).withStyle(ChatFormatting.GRAY));
+                lines.add(!data.getBoolean("rotator_dish") ? Component.translatable(LANG + "rotator_no_dish").withStyle(ChatFormatting.GOLD)
+                        : data.getBoolean("rotator_overruled") ? Component.translatable(LANG + "rotator_overruled").withStyle(ChatFormatting.GOLD)
+                        : Component.translatable(LANG + "rotator_turns", com.reiko.signaltower.radio.AntennaTier.aimLabel(data.getInt("rotator_aim")))
+                                .withStyle(ChatFormatting.AQUA));
             }
             if (!data.contains("top")) {
                 lines.add(Component.translatable(LANG + "mast_no_top").withStyle(ChatFormatting.GRAY));

@@ -314,6 +314,7 @@ write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
 write(items / "radio_battery.json", {"parent": f"{MOD}:block/radio_battery_4"})  # v0.49.0
 write(items / "solar_panel.json", {"parent": f"{MOD}:block/solar_panel"})  # v0.50.0
 write(items / "radio_telegraph.json", {"parent": f"{MOD}:block/radio_telegraph"})  # v0.51.0
+write(items / "dish_rotator.json", {"parent": f"{MOD}:block/dish_rotator"})  # v0.52.0
 write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
 
 for tier in ("iron", "gold", "diamond", "netherite", "dish", "ender"):
@@ -672,8 +673,31 @@ for facing, y in WALL_ROTATION.items():
     part({}, "wall_redstone_dot")
     for arm in ("up", "down", "left", "right"):
         part({arm: "true"}, f"wall_redstone_{arm}")
+# v0.52.0: on a ceiling (facing down) the same models turned up onto the underside of the block
+# above; its arms then run up = south, down = north, left = west, right = east.
+wall_parts.append({"when": {"facing": "down"}, "apply": {"model": f"{MOD}:block/wall_redstone_dot", "x": 270}})
+for arm in ("up", "down", "left", "right"):
+    wall_parts.append({"when": {"facing": "down", arm: "true"}, "apply": {"model": f"{MOD}:block/wall_redstone_{arm}", "x": 270}})
 write(states / "wall_redstone.json", {"multipart": wall_parts})
 write(states / "radio_mast.json", {"variants": {"": {"model": f"{MOD}:block/radio_mast"}}})
+# v0.52.0: the Dish Rotator, a mast segment with a gearbox round it, its arrow (the way 0 points) on
+# the front (north here) and on top.
+write(models / "dish_rotator.json", {
+    "parent": "minecraft:block/block",
+    "render_type": "minecraft:cutout",
+    "textures": {"particle": tex("dish_rotator_side"), "post": tex("radio_mast_post"), "lattice": tex("radio_mast_lattice"),
+                 "side": tex("dish_rotator_side"), "front": tex("dish_rotator_front"), "top": tex("dish_rotator_top")},
+    "elements": [
+        post(3, 3), post(11, 3), post(3, 11), post(11, 11),
+        panel_ns(4), panel_ns(12), panel_ew(4), panel_ew(12),
+        {"from": [2, 4, 2], "to": [14, 12, 14], "faces": {
+            "north": {"texture": "#front"}, "south": {"texture": "#side"}, "east": {"texture": "#side"},
+            "west": {"texture": "#side"}, "up": {"texture": "#top"}, "down": {"texture": "#top"}}},
+    ],
+})
+write(states / "dish_rotator.json", {"variants": {
+    f"facing={facing}": {"model": f"{MOD}:block/dish_rotator", **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270))}})
 
 # ---------------------------------------------------------------- lang
 
@@ -747,6 +771,19 @@ for color in ("red", "white"):
 write(states / "aviation_beacon.json", {"variants": beacon_variants})
 
 write(ASSETS / "lang" / "en_us.json", {
+    # v0.52.0: Wall Redstone on ceilings and round corners, and the Dish Rotator
+    f"tooltip.{MOD}.wall_redstone": "Sticks to walls and ceilings and runs round outside corners. Loses 1 strength per block, like dust.",
+    f"block.{MOD}.dish_rotator": "Dish Rotator",
+    f"tooltip.{MOD}.dish_rotator": "A mast segment that turns the Dish Antenna on top: redstone 0 points it the way its arrow does, each step 22.5\u00b0 clockwise.",
+    f"tooltip.{MOD}.dish_rotator_use": "Place it in the tower's mast column, or right-click the tower with it to put it in under the top; its arrow (the way you look) is where 0 points. Its redstone doesn't go up to the tower.",
+    f"message.{MOD}.rotator_added": "Dish Rotator added under the %1$s (%2$s masts up, reach %3$s \u2192 %4$s blocks); redstone 0 points its dish %5$s",
+    f"message.{MOD}.rotator_grown": "Dish Rotator added on top of the masts: %s tall",
+    f"message.{MOD}.dish_rotated": "The Dish Rotator in its mast turns this %1$s's dish (it points %2$s now)",
+    f"jade.{MOD}.rotator_power": "Redstone: %1$s (0 points %2$s)",
+    f"jade.{MOD}.rotator_turns": "Points the dish on top %s",
+    f"jade.{MOD}.rotator_no_dish": "No Dish Antenna on top to turn",
+    f"jade.{MOD}.rotator_overruled": "A Dish Rotator higher up turns the dish instead",
+    f"jade.{MOD}.dish_rotated": "Turned by a Dish Rotator (redstone %s)",
     # v0.51.0: the mast builder and the Radio Telegraph
     f"tooltip.{MOD}.mast_builder": "Right-click a tower's mast or top with this to add a mast under the top. Sneak to place it normally.",
     f"message.{MOD}.mast_added": "Mast added: the %1$s is %2$s masts up, reach %3$s \u2192 %4$s blocks",
@@ -2085,6 +2122,12 @@ recipes["solar_panel"] = ({  # v0.50.0
     "key": {"G": {"item": "minecraft:glass_pane"}, "C": {"item": "minecraft:copper_ingot"}, "D": {"item": "minecraft:daylight_detector"}},
     "result": {"count": 1, "id": f"{MOD}:solar_panel"},
 }, "minecraft:daylight_detector")
+recipes["dish_rotator"] = ({  # v0.52.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_mast"}, {"item": "minecraft:comparator"}, {"item": "minecraft:copper_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:dish_rotator"},
+}, f"{MOD}:radio_mast")
 recipes["radio_telegraph"] = ({  # v0.51.0
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -2220,7 +2263,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
-             "radio_battery", "solar_panel", "radio_telegraph"):
+             "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2229,7 +2272,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
-    elif name not in ("radio_mast", "wall_redstone", "solar_panel"):
+    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -2272,7 +2315,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
-               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph"]
+               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

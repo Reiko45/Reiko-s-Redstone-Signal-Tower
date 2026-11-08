@@ -450,6 +450,15 @@ public final class ModRegistry {
                     .sound(SoundType.CHAIN)
                     .noOcclusion()));
 
+    /** v0.52.0: a mast segment whose redstone turns the Dish Antenna on top. */
+    public static final DeferredBlock<com.reiko.signaltower.block.DishRotatorBlock> DISH_ROTATOR = BLOCKS.register("dish_rotator",
+            () -> new com.reiko.signaltower.block.DishRotatorBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
     /** Redstone dust that sticks to walls. Breaks instantly and gets knocked off by pistons, like dust. */
     public static final DeferredBlock<WallRedstoneBlock> WALL_REDSTONE = BLOCKS.register("wall_redstone",
             () -> new WallRedstoneBlock(BlockBehaviour.Properties.of()
@@ -488,6 +497,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("aviation_beacon", AVIATION_BEACON);
     public static final DeferredItem<BlockItem> SOLAR_PANEL_ITEM =
             ITEMS.registerSimpleBlockItem("solar_panel", SOLAR_PANEL);
+    public static final DeferredItem<BlockItem> DISH_ROTATOR_ITEM =
+            ITEMS.registerSimpleBlockItem("dish_rotator", DISH_ROTATOR);
     public static final DeferredItem<BlockItem> RADIO_TELEGRAPH_ITEM =
             ITEMS.registerSimpleBlockItem("radio_telegraph", RADIO_TELEGRAPH);
     /** v0.50.0: on a transmitter, also sends into another dimension. */

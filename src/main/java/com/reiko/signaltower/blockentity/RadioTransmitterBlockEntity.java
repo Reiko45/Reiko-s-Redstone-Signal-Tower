@@ -74,6 +74,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
+        com.reiko.signaltower.block.DishRotatorBlock.turnDish(serverLevel, worldPosition); // v0.52.0
         BlockState state = serverLevel.getBlockState(worldPosition);
         if (!(state.getBlock() instanceof RadioTransmitterBlock)) {
             return;
