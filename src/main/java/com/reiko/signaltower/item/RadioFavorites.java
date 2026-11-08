@@ -27,7 +27,8 @@ public final class RadioFavorites {
     /** True for the tuner, the Remote Control and the pager. */
     public static boolean isScrollable(ItemStack stack) {
         Item item = stack.getItem();
-        return item instanceof FrequencyTunerItem || item instanceof RemoteControlItem || item instanceof PagerItem;
+        return item instanceof FrequencyTunerItem || item instanceof RemoteControlItem || item instanceof PagerItem
+                || item instanceof SignalMeterItem;
     }
 
     public static TunerPresets get(ItemStack stack) {

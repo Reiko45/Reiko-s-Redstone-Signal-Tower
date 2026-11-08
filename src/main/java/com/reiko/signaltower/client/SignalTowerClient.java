@@ -51,6 +51,7 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onClientTick);
         NeoForge.EVENT_BUS.addListener(ReachRing::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(ReachRing::onClientTick);
+        NeoForge.EVENT_BUS.addListener(SignalMeterHud::onClientTick);
     }
 
     /**
@@ -65,6 +66,9 @@ public final class SignalTowerClient {
             // The pager's screen lights up while its frequency is on.
             ItemProperties.register(ModRegistry.PAGER.get(), ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "pager_on"),
                     (stack, level, entity, seed) -> PagerItem.lastSignal(stack) > 0 ? 1.0F : 0.0F);
+            // The Signal Meter's needle follows its reading (v0.40.0).
+            ItemProperties.register(ModRegistry.SIGNAL_METER.get(), ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "meter_level"),
+                    SignalMeterHud::needle);
         });
     }
 
@@ -108,6 +112,7 @@ public final class SignalTowerClient {
     private static void registerGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.BOSS_OVERLAY, ScannerHud.LAYER_ID, ScannerHud::render);
         event.registerAbove(ScannerHud.LAYER_ID, ReachRing.LAYER_ID, ReachRing::renderHud);
+        event.registerAbove(ReachRing.LAYER_ID, SignalMeterHud.LAYER_ID, SignalMeterHud::render);
     }
 
     /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */
@@ -127,6 +132,7 @@ public final class SignalTowerClient {
         com.reiko.signaltower.radio.FrequencyNotes.clientClear();
         AuditBeams.clear();
         ReachRing.clear();
+        SignalMeterHud.clear();
         com.reiko.signaltower.radio.FrequencyClaims.clientClear();
     }
 }

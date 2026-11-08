@@ -5295,4 +5295,250 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.40.0: logic receiver
+
+    /**
+     * The logic receiver: AND, OR and XOR of its two frequencies (AND the weaker, OR the stronger,
+     * XOR the one that's on), switched in its screen's packet (refused out of reach); it counts as a
+     * receiver on both frequencies, and re-tuning the second moves that; Jade, the screen packet
+     * (round trip) and the audit know it; on someone else's encrypted second frequency it's deaf
+     * there; it keeps both frequencies and its mode when saved, broken (on the item) and placed again.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void logicReceiver(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        var and = com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.LogicMode.AND;
+        var or = com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.LogicMode.OR;
+        var xor = com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.LogicMode.XOR;
+        check(and.combine(15, 9) == 9 && or.combine(15, 9) == 15 && xor.combine(15, 9) == 0 && xor.combine(0, 9) == 9
+                && and.combine(0, 9) == 0 && or.combine(0, 0) == 0, "AND the weaker, OR the stronger, XOR the one that's on");
+
+        BlockPos rx = new BlockPos(2, 1, 1);
+        BlockPos lamp = new BlockPos(1, 1, 1);
+        BlockPos txA = new BlockPos(5, 1, 1);
+        BlockPos txB = new BlockPos(8, 1, 1);
+        BlockPos deaf = new BlockPos(12, 1, 1);
+        BlockPos txC = new BlockPos(15, 1, 1);
+        helper.setBlock(lamp, Blocks.REDSTONE_LAMP);
+        helper.setBlock(rx, ModRegistry.RADIO_LOGIC_RECEIVER.get());
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity logic = helper.getBlockEntity(rx);
+        logic.setLogic(3701, 3702, and);
+        place(helper, txA, ModRegistry.RADIO_TRANSMITTER.get(), 3701);
+        place(helper, txB, ModRegistry.RADIO_TRANSMITTER.get(), 3702);
+        claims.put(3703, devId, "Dev", java.util.Map.of(), List.of(), true);
+        helper.setBlock(deaf, ModRegistry.RADIO_LOGIC_RECEIVER.get());
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity deafLogic = helper.getBlockEntity(deaf);
+        deafLogic.setTunedBy(rexId);
+        deafLogic.setLogic(3704, 3703, or);
+        place(helper, txC, ModRegistry.RADIO_TRANSMITTER.get(), 3703);
+        ((RadioBlockEntity) helper.getBlockEntity(txC)).setTunedBy(devId);
+        helper.setBlock(txC.north(), Blocks.REDSTONE_BLOCK);
+        BlockPos absolute = helper.absolutePos(rx);
+        List<Component> devBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player farAway = namedPlayer(helper, new BlockPos(40, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        SignalNetwork network = SignalNetwork.get(level);
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "AND with both off: off");
+                    check(network.receiversOn(3701).stream().anyMatch(r -> r.pos().equals(absolute))
+                            && network.receiversOn(3702).stream().anyMatch(r -> r.pos().equals(absolute)), "A receiver on both frequencies");
+                    check(network.countReceivers(3702, helper.absolutePos(txB), 16) >= 1, "Counted on the second for Heard by");
+                    helper.setBlock(txA.north(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "AND with only the first on: still off");
+                    check(logic.heardFirst() == 15 && logic.heardSecond() == 0, "It hears 15 and nothing");
+                    check(com.reiko.signaltower.network.ConfigureLogicPayload.apply(farAway,
+                            new com.reiko.signaltower.network.ConfigureLogicPayload(absolute, 3701, 3702, or.ordinal())) == null
+                            && logic.getLogicMode() == and, "Out of reach: nothing changes");
+                    Component set = com.reiko.signaltower.network.ConfigureLogicPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureLogicPayload(absolute, 3701, 3702, or.ordinal()));
+                    check(set != null && keyOf(set).endsWith("logic_set") && logic.getLogicMode() == or
+                            && devId.equals(logic.getTunedBy()), "Dev sets OR (and tunes it)");
+                })
+                .thenWaitUntil(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "OR with the first on: on");
+                    check(helper.getBlockState(lamp).getValue(RedstoneLampBlock.LIT), "The lamp next to it lights");
+                })
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absolute);
+                    check(info != null && info.getInt("second") == 3702 && info.getString("logic_mode").equals("or")
+                            && info.getInt("heard") == 15 && info.getInt("heard_b") == 0, "Jade data: " + info);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("input_first", "input_second", "logic_mode", "logic_hearing", "output")),
+                            "Jade lines: " + lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info)));
+                    var screen = com.reiko.signaltower.network.OpenLogicScreenPayload.of(level, logic);
+                    check(screen.first() == 3701 && screen.second() == 3702 && screen.modeValue() == or && screen.heardFirst() == 15
+                            && screen.heardSecond() == 0 && screen.output() == 15 && screen.quiet() == 0, "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    logic.setLogic(3701, 3702, xor);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "XOR with only the first on: on");
+                    helper.setBlock(txB.north(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "XOR with both on: off");
+                    logic.setLogic(3701, 3702, and);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "AND with both on: on");
+                    claims.put(3701, devId, "Dev", java.util.Map.of());
+                    var audit = com.reiko.signaltower.radio.FrequencyAudit.audit(server, 3701, dev, 512);
+                    check(audit.stream().anyMatch(e -> e.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.LOGIC_RECEIVER
+                            && e.pos().equals(java.util.Optional.of(absolute))), "In the audit as a logic receiver: " + audit);
+                    claims.remove(3701);
+
+                    // Someone else's encrypted second frequency: deaf there.
+                    BlockPos deafAbsolute = helper.absolutePos(deaf);
+                    check(deafLogic.deafFrequency(level) == 3703 && deafLogic.heardSecond() == 0
+                            && helper.getBlockState(deaf).getValue(RadioReceiverBlock.POWER) == 0, "Deaf on 3703, so OR stays off");
+                    check(com.reiko.signaltower.block.RadioBlock.deafNotice(level, deafAbsolute) != null, "Its deaf notice");
+                    check(com.reiko.signaltower.network.OpenLogicScreenPayload.of(level, deafLogic).quiet()
+                            == com.reiko.signaltower.network.OpenLogicScreenPayload.DEAF_SECOND, "The screen says so");
+                    CompoundTag deafInfo = com.reiko.signaltower.compat.RadioInfo.read(level, deafAbsolute);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(deaf), deafInfo)).contains("deaf_second"),
+                            "Jade says the second is deaf");
+
+                    CompoundTag saved = logic.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.RadioReceiverBlockEntity(absolute, helper.getBlockState(rx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getFrequency() == 3701 && copy.getSecondFrequency() == 3702 && copy.getLogicMode() == and, "Saved");
+
+                    logic.setLogic(3701, 3705, and);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(network.receiversOn(3702).stream().noneMatch(r -> r.pos().equals(absolute))
+                            && network.receiversOn(3705).stream().anyMatch(r -> r.pos().equals(absolute)), "Re-tuned: on 3705, not 3702");
+                    logic.setLogic(3701, 3702, xor);
+                    level.destroyBlock(absolute, true);
+                })
+                .thenWaitUntil(() -> {
+                    ItemStack drop = helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                            .filter(stack -> stack.is(ModRegistry.RADIO_LOGIC_RECEIVER_ITEM.get())).findFirst().orElse(ItemStack.EMPTY);
+                    check(!drop.isEmpty() && Integer.valueOf(3701).equals(drop.get(ModRegistry.FREQUENCY.get()))
+                            && Integer.valueOf(3702).equals(drop.get(ModRegistry.SECOND_FREQUENCY.get()))
+                            && Integer.valueOf(xor.ordinal()).equals(drop.get(ModRegistry.LOGIC_MODE.get())), "Dropped with both frequencies and XOR");
+                })
+                .thenExecute(() -> {
+                    ItemStack drop = helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                            .filter(stack -> stack.is(ModRegistry.RADIO_LOGIC_RECEIVER_ITEM.get())).findFirst().orElseThrow();
+                    helper.setBlock(rx, ModRegistry.RADIO_LOGIC_RECEIVER.get());
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity placed = helper.getBlockEntity(rx);
+                    placed.applyComponentsFromItemStack(drop);
+                    check(placed.getFrequency() == 3701 && placed.getSecondFrequency() == 3702 && placed.getLogicMode() == xor,
+                            "Placed again from the item");
+                    claims.remove(3703);
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.40.0: signal meter
+
+    /**
+     * The Signal Meter's reading: strength, towers and blocks to the edge where the player stands
+     * (an off transmitter still counts for the edge; out of reach is -1 and nothing); someone
+     * else's encrypted frequency reads as deaf with nothing else, its members read it; the edge is
+     * measured like the reach ring (exactly at the reach is 0, a block past it -1); the reading
+     * packet survives the network; its settings packet sets the frequency and tick; it scrolls,
+     * opens the directory and takes the scanner's Tune; sneak-clicking a converter measures what it sends.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void signalMeter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos input = new BlockPos(2, 1, 0);
+        BlockPos secret = new BlockPos(8, 1, 1);
+        BlockPos converter = new BlockPos(12, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 3801);
+        helper.setBlock(input, Blocks.REDSTONE_BLOCK);
+        claims.put(3802, devId, "Dev", java.util.Map.of(), List.of(), true);
+        place(helper, secret, ModRegistry.RADIO_TRANSMITTER.get(), 3802);
+        ((RadioBlockEntity) helper.getBlockEntity(secret)).setTunedBy(devId);
+        helper.setBlock(secret.north(), Blocks.REDSTONE_BLOCK);
+        place(helper, converter, ModRegistry.RADIO_CONVERTER.get(), 3805);
+        ((com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity) helper.getBlockEntity(converter)).setFrequencies(3805, 3806);
+        Player dev = namedPlayer(helper, new BlockPos(4, 1, 1), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(6, 1, 1), rexId, "Rex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos absolute = helper.absolutePos(tx);
+        int reach = RadioHelper.reachAt(level, absolute);
+
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    var reading = com.reiko.signaltower.item.SignalMeterItem.read(level, dev, 3801);
+                    check(reading.strength() == 15 && reading.towers() >= 1 && reading.margin() == reach - 2 && !reading.deaf(),
+                            "Two blocks from the transmitter: 15, " + (reach - 2) + " to the edge: " + reading);
+                    Vec3 beyond = Vec3.atBottomCenterOf(absolute.offset(reach + 2, 0, 0));
+                    rex.moveTo(beyond.x, beyond.y, beyond.z);
+                    var out = com.reiko.signaltower.item.SignalMeterItem.read(level, rex, 3801);
+                    check(out.strength() == 0 && out.margin() == -1, "Out of reach: nothing, -1: " + out);
+                    helper.setBlock(input, Blocks.AIR);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    var off = com.reiko.signaltower.item.SignalMeterItem.read(level, dev, 3801);
+                    check(off.strength() == 0 && off.margin() == reach - 2, "Transmitter off: 0, but still inside its reach: " + off);
+                    Vec3 near = helper.absoluteVec(Vec3.atBottomCenterOf(new BlockPos(6, 1, 1)));
+                    rex.moveTo(near.x, near.y, near.z);
+                    var deaf = com.reiko.signaltower.item.SignalMeterItem.read(level, rex, 3802);
+                    check(deaf.deaf() && deaf.strength() == 0 && deaf.towers() == 0 && deaf.margin() == -1, "Encrypted for Rex: " + deaf);
+                    var member = com.reiko.signaltower.item.SignalMeterItem.read(level, dev, 3802);
+                    check(!member.deaf() && member.strength() == 15, "Dev hears his own: " + member);
+
+                    SignalNetwork fresh = new SignalNetwork().attachTo(level);
+                    BlockPos far = new BlockPos(8_400_000, 70, 0);
+                    fresh.updateTransmitter(far, 3803, 15, 50, null);
+                    check(fresh.edgeMargin(level, 3803, far.offset(30, 0, 0)) == 20, "30 blocks into a 50 reach: 20 to go");
+                    check(fresh.edgeMargin(level, 3803, far.offset(30, 0, 40)) == 0, "Exactly at the reach: 0");
+                    check(fresh.edgeMargin(level, 3803, far.offset(51, 0, 0)) == -1, "A block past it: -1");
+                    check(fresh.edgeMargin(level, 3804, far) == -1, "Nothing on another frequency");
+                    fresh.updateTransmitter(far.offset(60, 0, 0), 3803, 0, 50, null);
+                    check(fresh.edgeMargin(level, 3803, far.offset(51, 0, 0)) == 41, "The off tower beside it reaches farthest past there");
+
+                    var packet = com.reiko.signaltower.network.MeterReadingPayload.of(member);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC.encode(buffer, packet);
+                    check(com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC.decode(buffer).equals(packet), "Reading packet round trip");
+                    var outPacket = com.reiko.signaltower.network.MeterReadingPayload.of(new com.reiko.signaltower.item.SignalMeterItem.Reading(1, 0, 0, -1, false));
+                    buffer.clear();
+                    com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC.encode(buffer, outPacket);
+                    check(com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC.decode(buffer).margin() == -1, "-1 survives the network");
+
+                    ItemStack meter = new ItemStack(ModRegistry.SIGNAL_METER.get());
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, meter);
+                    com.reiko.signaltower.network.ConfigurePagerPayload.apply(dev, new com.reiko.signaltower.network.ConfigurePagerPayload(false, 3804, false, true));
+                    check(FrequencyTunerItem.getFrequency(meter) == 3804 && com.reiko.signaltower.item.SignalMeterItem.isSilent(meter),
+                            "Its screen sets the frequency and turns the tick off");
+                    check(RadioFavorites.isScrollable(meter) && SignalScannerItem.canTune(meter)
+                            && com.reiko.signaltower.network.DirectoryRequestPayload.holdsRadioItem(dev), "Scrolls, takes Tune, opens the directory");
+                    BlockPos converterAbsolute = helper.absolutePos(converter);
+                    dev.setShiftKeyDown(true);
+                    meter.useOn(new UseOnContext(dev, InteractionHand.MAIN_HAND,
+                            new BlockHitResult(Vec3.atCenterOf(converterAbsolute), Direction.NORTH, converterAbsolute, false)));
+                    dev.setShiftKeyDown(false);
+                    check(FrequencyTunerItem.getFrequency(meter) == 3806, "Sneak-clicking a converter measures what it sends: "
+                            + FrequencyTunerItem.getFrequency(meter));
+                    claims.remove(3802);
+                })
+                .thenSucceed();
+    }
 }

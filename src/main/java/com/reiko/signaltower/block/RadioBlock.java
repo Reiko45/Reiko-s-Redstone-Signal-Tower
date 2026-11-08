@@ -91,10 +91,13 @@ public abstract class RadioBlock extends BaseEntityBlock {
      */
     public static @Nullable Component deafNotice(ServerLevel level, BlockPos pos) {
         BlockEntity entity = level.getBlockEntity(pos);
-        if (entity instanceof RadioReceiverBlockEntity
-                || entity instanceof RadioRepeaterBlockEntity relay && relay.isConverter()) {
-            RadioBlockEntity radio = (RadioBlockEntity) entity;
-            return FrequencyClaims.deafness(level, radio.getFrequency(), radio.getTunedBy(), "encrypted_deaf");
+        if (entity instanceof RadioReceiverBlockEntity rx) {
+            // A logic receiver (v0.40.0) can be deaf on either of its two frequencies.
+            int deaf = rx.deafFrequency(level);
+            return deaf > 0 ? FrequencyClaims.deafness(level, deaf, rx.getTunedBy(), "encrypted_deaf") : null;
+        }
+        if (entity instanceof RadioRepeaterBlockEntity relay && relay.isConverter()) {
+            return FrequencyClaims.deafness(level, relay.getFrequency(), relay.getTunedBy(), "encrypted_deaf");
         }
         return null;
     }
@@ -125,7 +128,9 @@ public abstract class RadioBlock extends BaseEntityBlock {
                     com.reiko.signaltower.radio.IntruderAlerts.report(serverLevel.getServer(), sends.getAsInt(), player,
                             com.reiko.signaltower.radio.IntruderAlerts.Kind.SILENT, state.getBlock());
                 } else {
-                    com.reiko.signaltower.radio.IntruderAlerts.report(serverLevel.getServer(), radio.getFrequency(), player,
+                    int deaf = radio instanceof RadioReceiverBlockEntity rx && rx.deafFrequency(serverLevel) > 0
+                            ? rx.deafFrequency(serverLevel) : radio.getFrequency();
+                    com.reiko.signaltower.radio.IntruderAlerts.report(serverLevel.getServer(), deaf, player,
                             com.reiko.signaltower.radio.IntruderAlerts.Kind.DEAF, state.getBlock());
                 }
             }

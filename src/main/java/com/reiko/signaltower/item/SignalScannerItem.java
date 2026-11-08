@@ -42,7 +42,7 @@ public class SignalScannerItem extends Item {
     public static boolean canTune(ItemStack stack) {
         Item item = stack.getItem();
         return item instanceof FrequencyTunerItem || item instanceof RemoteControlItem
-                || item instanceof MultiRemoteItem || item instanceof PagerItem;
+                || item instanceof MultiRemoteItem || item instanceof PagerItem || item instanceof SignalMeterItem;
     }
 
     /** A Multi-Button Remote's buttons with the selected one re-tuned; its name, mode and color stay. */

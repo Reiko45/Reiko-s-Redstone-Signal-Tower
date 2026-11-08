@@ -46,6 +46,8 @@ public record ConfigureRadioItemPayload(boolean offhand, int frequency, boolean 
             RemoteControlItem.setPulseTicks(stack, payload.pulseTicks());
         } else if (stack.getItem() instanceof PagerItem) {
             PagerItem.setFrequency(stack, payload.frequency());
+        } else if (stack.getItem() instanceof com.reiko.signaltower.item.SignalMeterItem) {
+            FrequencyTunerItem.setFrequency(stack, payload.frequency()); // the scanner's Tune button (v0.40.0)
         }
     }
 }

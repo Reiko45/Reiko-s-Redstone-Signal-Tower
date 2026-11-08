@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "reikos_signal_tower:item/signal_meter"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "reikos_signal_tower:meter_level": 0.3
+      },
+      "model": "reikos_signal_tower:item/signal_meter_1"
+    },
+    {
+      "predicate": {
+        "reikos_signal_tower:meter_level": 0.6
+      },
+      "model": "reikos_signal_tower:item/signal_meter_2"
+    },
+    {
+      "predicate": {
+        "reikos_signal_tower:meter_level": 0.9
+      },
+      "model": "reikos_signal_tower:item/signal_meter_3"
+    }
+  ]
+}

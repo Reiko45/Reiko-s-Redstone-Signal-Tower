@@ -85,6 +85,8 @@ public final class RadioInfo {
             addName(level, tag, "output", "output_name");
             addNote(level, tag, "frequency", "note", viewer);
             addNote(level, tag, "output", "output_note", viewer);
+            addName(level, tag, "second", "second_name");
+            addNote(level, tag, "second", "second_note", viewer);
             if (!tag.contains("top") && tag.contains("frequency")) {
                 int frequency = tag.contains("output") ? tag.getInt("output") : tag.getInt("frequency");
                 FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
@@ -104,6 +106,12 @@ public final class RadioInfo {
                     FrequencyClaims.Claim heard = FrequencyClaims.get(level.getServer()).get(radio.getFrequency());
                     if (heard != null && !heard.hears(radio.getTunedBy()) && radio.getTunedBy() != null) {
                         tag.putString("deaf_to", heard.ownerName());
+                    }
+                    if (tag.contains("second") && radio.getTunedBy() != null) {
+                        FrequencyClaims.Claim second = FrequencyClaims.get(level.getServer()).get(tag.getInt("second"));
+                        if (second != null && !second.hears(radio.getTunedBy())) {
+                            tag.putString("deaf_b_to", second.ownerName());
+                        }
                     }
                 }
             }
@@ -172,6 +180,12 @@ public final class RadioInfo {
                 tag.putInt("heard", reception.power());
             } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {
                 tag.putInt("heard", reception.power());
+            } else if (block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock && radio instanceof RadioReceiverBlockEntity logic) {
+                // v0.40.0: both frequencies, the mode and what it hears on each.
+                tag.putInt("second", logic.getSecondFrequency());
+                tag.putString("logic_mode", logic.getLogicMode().key());
+                tag.putInt("heard", logic.heardFirst());
+                tag.putInt("heard_b", logic.heardSecond());
             }
         }
         return tag;
@@ -246,6 +260,25 @@ public final class RadioInfo {
             return lines;
         }
         if (!(block instanceof RadioTransmitterBlock || block instanceof RadioRepeaterBlock || block instanceof RadioReceiverBlock)) {
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock) {
+            // v0.40.0: both frequencies, the mode, what it hears on each, then the output.
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "input_first", number(data, "frequency", "name")));
+                addNoteLine(lines, data, "note");
+                lines.add(Component.translatable(LANG + "input_second", number(data, "second", "second_name")));
+                addNoteLine(lines, data, "second_note");
+                lines.add(Component.translatable(LANG + "logic_mode",
+                        Component.translatable(LANG + "logic_" + data.getString("logic_mode")).withStyle(ChatFormatting.YELLOW)));
+                lines.add(Component.translatable(LANG + "logic_hearing", heardValue(data.getInt("heard")), heardValue(data.getInt("heard_b"))));
+            }
+            int power = state.getValue(RadioReceiverBlock.POWER);
+            lines.add(power > 0 ? Component.translatable(LANG + "output", value(power))
+                    : Component.translatable(LANG + "output_off").withStyle(ChatFormatting.GRAY));
+            if (hasData && data.contains("deaf_b_to")) {
+                lines.add(Component.translatable(LANG + "deaf_second", Component.literal(data.getString("deaf_b_to"))).withStyle(ChatFormatting.RED));
+            }
             return lines;
         }
         if (block instanceof RadioConverterBlock) {
@@ -334,6 +367,11 @@ public final class RadioInfo {
             }
         }
         return lines;
+    }
+
+    /** A strength for the logic receiver's "Hearing" line: the number (green) or "nothing" (grey). */
+    private static Component heardValue(int heard) {
+        return heard > 0 ? value(heard) : Component.translatable(LANG + "nothing").withStyle(ChatFormatting.GRAY);
     }
 
     private static Component frequencyLine(CompoundTag data) {

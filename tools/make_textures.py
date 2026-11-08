@@ -173,6 +173,32 @@ def inverted_receiver_side(lit):
     return img
 
 
+def logic_receiver_side(lit):
+    """Two small sets of incoming waves (one per frequency) whose lines meet in a lamp below, like
+    a gate symbol. "lit" is the output: the lamp glows while the gate's condition holds."""
+    r = ON if lit else OFF
+    img = casing(11)
+    px = img.load()
+    vents(img)
+    for (x0) in (3, 9):
+        for p in [(x0, 3), (x0 + 1, 2), (x0 + 2, 2), (x0 + 3, 3)]:
+            px[p] = r[1]
+        px[x0 + 1, 4] = px[x0 + 2, 4] = r[2] if lit else r[1]
+    # Lines from each wave set down into the gate
+    for p in [(5, 5), (6, 6), (10, 5), (9, 6)]:
+        px[p] = D
+    # The gate: a small dark body with the lamp
+    for x in range(6, 10):
+        px[x, 7] = O
+        px[x, 9] = O
+    px[6, 8] = px[9, 8] = O
+    px[7, 8] = r[2] if lit else r[0]
+    px[8, 8] = r[1] if lit else r[0]
+    for x in range(5, 11):
+        px[x, 10] = O
+    return img
+
+
 def repeater_side(lit, palette=None):
     """An amber mast with arcs passing through it: picked up on the left, sent on to the right.
     The converter uses the same picture in teal (palette = (off, on))."""
@@ -610,6 +636,52 @@ def scanner_item():
     return img
 
 
+def meter_item(level=0):
+    """The Signal Meter (v0.40.0): a teal handheld with a white dial (a red-to-green scale) whose
+    needle swings right with the strength (level 0 resting at the left, 3 at full), a probe
+    antenna and two knobs."""
+    import math
+    img = blank()
+    px = img.load()
+    o = (16, 40, 44, 255)
+    body, body_d, body_l = (48, 140, 150, 255), (32, 104, 112, 255), (110, 200, 206, 255)
+    # Probe antenna, top left
+    for y in (0, 1, 2):
+        px[3, y] = (150, 154, 164, 255)
+    px[3, 0] = (230, 50, 40, 255)
+    # Body
+    for y in range(3, 15):
+        for x in range(2, 14):
+            if (y in (3, 14)) and x in (2, 13):
+                continue
+            edge = x in (2, 13) or y in (3, 14)
+            px[x, y] = o if edge else (body_l if y == 4 else body_d if y == 13 else body)
+    # Dial window: rows 5-10, columns 4-11
+    dial, dial_edge = (236, 236, 228, 255), (170, 170, 160, 255)
+    for y in range(5, 11):
+        for x in range(4, 12):
+            px[x, y] = dial_edge if y == 10 or x in (4, 11) else dial
+    # Scale along the top of the dial: red, yellow, green
+    for x, c in [(5, (210, 60, 50, 255)), (6, (220, 140, 50, 255)), (7, (220, 200, 60, 255)),
+                 (8, (170, 210, 60, 255)), (9, (90, 200, 70, 255)), (10, (40, 190, 80, 255))]:
+        px[x, 6] = c
+    # Needle from the pivot (bottom middle of the dial)
+    angle = math.radians([160, 125, 80, 30][level])
+    cx, cy = 7.5, 9.6
+    for step in range(1, 9):
+        t = step / 2.2
+        x = int(round(cx + math.cos(angle) * t - 0.5))
+        y = int(round(cy - math.sin(angle) * t))
+        if 5 <= x <= 10 and 6 <= y <= 9:
+            px[x, y] = (30, 30, 34, 255)
+    px[7, 9] = px[8, 9] = (60, 60, 66, 255)
+    # Two knobs
+    for x in (5, 10):
+        px[x, 12] = (210, 214, 220, 255)
+        px[x, 11] = (150, 154, 164, 255)
+    return img
+
+
 def scanner_arrow():
     """The Signal Scanner's on-screen arrow (pointing up; the game rotates it): bright green with
     a dark outline so it shows against sky and ground alike."""
@@ -656,6 +728,8 @@ blocks = {
     "radio_toggle_receiver_side": toggle_receiver_side(False),
     "radio_toggle_receiver_side_on": toggle_receiver_side(True),
     "radio_inverted_receiver_side": inverted_receiver_side(False),
+    "radio_logic_receiver_side": logic_receiver_side(False),
+    "radio_logic_receiver_side_on": logic_receiver_side(True),
     "radio_inverted_receiver_side_on": inverted_receiver_side(True),
     "radio_receiver_side": receiver_side(False),
     "radio_receiver_side_on": receiver_side(True),
@@ -684,7 +758,8 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "multi_remote": multi_remote_item(),
          "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
          **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
-         "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item()}
+         "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
+         "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)}}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

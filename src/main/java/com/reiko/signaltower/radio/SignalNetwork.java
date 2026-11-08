@@ -178,6 +178,8 @@ public final class SignalNetwork extends SavedData {
     /** Who tuned or placed each tracked receiver (only those with a known tuner), for encrypted frequencies. */
     private final Map<BlockPos, UUID> receiverTuners = new HashMap<>();
     private final Map<Integer, Set<BlockPos>> receiversByFrequency = new HashMap<>();
+    /** A Radio Logic Receiver's second frequency (v0.40.0): it's tracked on both. */
+    private final Map<BlockPos, Integer> receiverSeconds = new HashMap<>();
     /** Recent times each frequency turned on, oldest first, for the pagers' catch-up. Saved. */
     private final Map<Integer, ArrayDeque<TurnOn>> history = new HashMap<>();
     /** The game time and day time of the last tick, used to stamp {@link TurnOn}s. */
@@ -916,6 +918,14 @@ public final class SignalNetwork extends SavedData {
 
     /** {@link #trackReceiver(BlockPos, int)}, with who tuned or placed it (it isn't counted on an encrypted frequency it can't hear). */
     public void trackReceiver(BlockPos pos, int frequency, @Nullable UUID tunedBy) {
+        trackReceiver(pos, frequency, tunedBy, -1);
+    }
+
+    /**
+     * {@link #trackReceiver(BlockPos, int, UUID)} for a receiver that also listens on {@code second}
+     * (a Radio Logic Receiver, v0.40.0; -1 for none): it counts as a receiver on both.
+     */
+    public void trackReceiver(BlockPos pos, int frequency, @Nullable UUID tunedBy, int second) {
         BlockPos key = pos.immutable();
         if (tunedBy == null) {
             receiverTuners.remove(key);
@@ -923,10 +933,17 @@ public final class SignalNetwork extends SavedData {
             receiverTuners.put(key, tunedBy);
         }
         Integer previous = receivers.put(key, frequency);
-        if (previous != null && previous != frequency) {
+        Integer previousSecond = second > 0 ? receiverSeconds.put(key, second) : receiverSeconds.remove(key);
+        if (previous != null && previous != frequency && previous != second) {
             removeReceiverFromIndex(key, previous);
         }
+        if (previousSecond != null && previousSecond != frequency && previousSecond != second) {
+            removeReceiverFromIndex(key, previousSecond);
+        }
         receiversByFrequency.computeIfAbsent(frequency, f -> new HashSet<>()).add(key);
+        if (second > 0) {
+            receiversByFrequency.computeIfAbsent(second, f -> new HashSet<>()).add(key);
+        }
     }
 
     /** A receiver was broken or its chunk unloaded. */
@@ -936,6 +953,45 @@ public final class SignalNetwork extends SavedData {
         if (previous != null) {
             removeReceiverFromIndex(pos, previous);
         }
+        Integer previousSecond = receiverSeconds.remove(pos);
+        if (previousSecond != null) {
+            removeReceiverFromIndex(pos, previousSecond);
+        }
+    }
+
+    /**
+     * For the Signal Meter (v0.40.0): how many blocks {@code pos} is inside the reach of the sender
+     * on {@code frequency} whose reach goes farthest past it (0 = right at the edge), or -1 if no
+     * sender reaches it. Transmitters count whether they're on or off (so receivers can be placed
+     * before switching on); ones kept quiet on someone else's private frequency, and relays that
+     * are silenced or deaf, don't. Measured like the reach ring.
+     */
+    public int edgeMargin(ServerLevel level, int frequency, BlockPos pos) {
+        int best = -1;
+        Map<BlockPos, Transmitter> onFrequency = byFrequency.get(frequency);
+        if (onFrequency != null) {
+            for (Map.Entry<BlockPos, Transmitter> entry : onFrequency.entrySet()) {
+                if (!blocked(level, frequency, entry.getValue().tunedBy())) {
+                    best = Math.max(best, margin(entry.getKey(), entry.getValue().reach(), pos));
+                }
+            }
+        }
+        for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
+            if (entry.getValue().output() == frequency && !isSilenced(level, entry.getKey()) && !isDeaf(level, entry.getKey())) {
+                best = Math.max(best, margin(entry.getKey(), entry.getValue().reach(), pos));
+            }
+        }
+        return best;
+    }
+
+    private static int margin(BlockPos origin, int reach, BlockPos pos) {
+        long dx = pos.getX() - origin.getX();
+        long dz = pos.getZ() - origin.getZ();
+        long distSq = dx * dx + dz * dz;
+        if (distSq > (long) reach * reach) {
+            return -1;
+        }
+        return Math.max(0, reach - (int) Math.floor(Math.sqrt((double) distSq)));
     }
 
     private void removeReceiverFromIndex(BlockPos pos, int frequency) {

@@ -102,6 +102,21 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new SensorScreen(state));
     }
 
+    /** Opens a Radio Logic Receiver's screen (sent by the server when the block is right-clicked). */
+    public static void openLogicScreen(com.reiko.signaltower.network.OpenLogicScreenPayload state) {
+        Minecraft.getInstance().setScreen(new LogicScreen(state));
+    }
+
+    /** Opens a Signal Meter's frequency screen: the pager's, with only a Sound button. */
+    public static void openMeterScreen(InteractionHand hand, int frequency, Component title, TunerPresets favorites, boolean sound) {
+        Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, favorites, sound));
+    }
+
+    /** A Signal Meter reading arrived from the server. */
+    public static void onMeterReading(com.reiko.signaltower.network.MeterReadingPayload reading) {
+        SignalMeterHud.onReading(reading);
+    }
+
     /** Opens a Radio Converter's screen (sent by the server when the block is right-clicked). */
     public static void openConverterScreen(OpenConverterScreenPayload state) {
         Minecraft.getInstance().setScreen(new ConverterScreen(state));

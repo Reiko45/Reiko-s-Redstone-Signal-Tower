@@ -14,6 +14,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Radio Inverted Receiver** | A receiver with a redstone torch built in: full strength while its frequency is silent, nothing while it's on. Turning a frequency on can then switch something off. |
+| **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
@@ -23,6 +24,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
 | **Radio Pager** | A pocket receiver. Keep it anywhere in your inventory and it beeps and shows a message when its frequency turns on near you. |
+| **Signal Meter** | A handheld that measures one frequency where you stand: a strength bar beside the hotbar, a Geiger-counter tick, and how many blocks are left to the edge of the tower's reach. Quick for placing receivers at the edge. |
 | **Signal Scanner** | A handheld direction-finder. It lists every frequency you can hear where you stand, how strong it is and where it comes from, and can tune the radio item in your other hand. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block. It runs up, down and sideways along a wall, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 
@@ -171,6 +173,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
   ![Dev's Guests screen giving Alex an hour on 2026; Alex's receiver hearing 2026 during the pass and his chat line; the alert Dev got when Alex pressed a remote after the pass was taken back; and the login summary of a tune Alex tried while Dev was away](docs/images/guests-and-alerts.png)
 
+  ![The motion sensor wall with a Radio Logic Receiver on 4242 AND 56: with the "armed" lever off, Alex lights only the plain 4242 alarm; with it on, the logic receiver's lamp lights too; its screen ("Hearing 15 on 4242 (Vault) and 15 on 56", "Output: 15"); the Signal Meter on 55 by the compact transmitter ("1 tower, 9 blocks to the edge"), past its reach ("off", "Out of every tower's reach"), and Alex's meter on Dev's encrypted 2026 ("Encrypted by Dev")](docs/images/logic-receiver-and-signal-meter.png)
+
   ![A wall with a Radio Motion Sensor between two receivers with lamps on 4242: with nobody near, the inverted receiver's lamp is lit; with Alex walking up, the sensor glows, the alarm lamp lights and the inverted one goes out; Dev's sensor screen set to 6 blocks and Strangers only; Jade for Dev ("Looks 6 blocks, reacts to strangers only", "Sees Alex: sending"); Jade on the inverted receiver ("Off (frequency on)", "Hearing: 15"); and the log of 4242 with Alex's turn-on in red](docs/images/motion-sensor-and-inverted-receiver.png)
 
   ![A Compact Radio Transmitter's 16-block ring passing between two lamps, the near one lit and the far one dark; Dev's Guest codes screen with Plumber and Family; Alex opening the door with Plumber's code; Dev's chat line for each use; the fourth try "That guest code is used up"; and Dev's log with "Guest code: Plumber"](docs/images/compact-transmitter-and-guest-codes.png)
@@ -245,9 +249,16 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - **Track with an arrow:** click a transmitter's (or repeater's) row to track it. While you hold the scanner (either hand), an arrow at the top of the screen points to that transmitter as you walk and turn, with the distance underneath and how far up or down it is: "Frequency 77: 3 blocks, 30 up". The tracked row shows in green with a "»". Click it again to stop. If the transmitter is broken or re-tuned to another frequency, the scanner says it lost track. With several transmitters on one frequency, it tracks the one the row points to. Remote presses can't be tracked, so it still never points at players.
 
   ![Tracking frequency 42 in the scanner, then the arrow pointing to it facing north, south and east, and to the tower 30 blocks up](docs/images/scanner-arrow.png)
-- **Tune:** hold a Frequency Tuner, Remote Control, Multi-Button Remote or Radio Pager in your other hand, and each row's Tune button sets that frequency on it. A remote keeps its mode and pulse length, and a Multi-Button Remote changes only its selected button.
+- **Tune:** hold a Frequency Tuner, Remote Control, Multi-Button Remote, Radio Pager or Signal Meter in your other hand, and each row's Tune button sets that frequency on it. A remote keeps its mode and pulse length, and a Multi-Button Remote changes only its selected button.
 
 ![The Signal Scanner listing five frequencies, after tuning the Remote Control in the off-hand to 42](docs/images/signal-scanner.png)
+
+**Signal Meter (since 0.40):**
+- Hold it (either hand) and a small panel to the right of your hotbar shows its frequency, a 15-segment bar with the strength a receiver where you stand would get, and a line like "1 tower, 9 blocks to the edge" (or "1 block to the edge", "right at the edge", "Out of every tower's reach"). It updates five times a second, and the needle on the meter in your hand swings with it.
+- **The edge:** it counts the tower on that frequency whose reach goes farthest past where you stand, the same way as the reach ring. A transmitter that's switched off still counts, so you can place receivers before turning it on. Blocks kept quiet on someone else's private frequency don't.
+- **Tick:** it ticks like a Geiger counter, faster and higher the stronger the signal. Right-click to turn the tick on or off.
+- **Frequency:** sneak + right-click the air opens its screen (frequency, favorites, Tick, Directory). Sneak + scroll changes it like the tuner. Sneak + right-click a radio block measures the frequency it sends on (a converter's output), or its own. The scanner's Tune button sets it too.
+- **Encrypted frequencies:** on someone else's encrypted frequency it says "Encrypted by Dev" and measures nothing, like a receiver of yours there.
 
 **Jade (optional):**
 - If you have [Jade](https://modrinth.com/mod/jade) installed, just look at a block to see its details in Jade's info box, with no clicking:
@@ -324,6 +335,23 @@ A **Radio Converter** works like a repeater, but it sends on a **different** fre
 - Breaking it keeps both frequencies on the dropped item.
 
 ![The converter's screen being set to listen on 2026 and send on 3001; Jade showing it converting; the scanner hearing both frequencies; and the receiver on 3001 lit](docs/images/radio-converter.png)
+
+### Logic receivers
+
+A **Radio Logic Receiver** (since 0.40) listens on two frequencies and outputs according to its mode:
+
+| Mode | Outputs while | Strength |
+|---|---|---|
+| **AND** | both frequencies are on | the weaker of the two |
+| **OR** | either one is on | the stronger of the two |
+| **XOR** | exactly one of them is on | that one's strength |
+
+- **Setting it up:** right-click it with an empty hand to open its screen: a box for each frequency (each with a **...** directory button), the mode button between them (click for the next mode, Shift-click to go back), and what it hears on each and outputs right now. Enter or **Done** saves ("Radio Logic Receiver: 4242 AND 56"). The Frequency Tuner sets (and copies) the first frequency.
+- **An example:** a motion sensor on 4242 and a lever on a compact transmitter on 56 ("armed"). A logic receiver set to 4242 AND 56 only rings the alarm when the alarm is armed and someone's seen.
+- **Counts as a receiver on both:** a remote's "Heard by", its signal light and the locator count it on either frequency, and the audit lists it under both as a Logic Receiver.
+- **Encrypted frequencies:** on someone else's encrypted frequency it hears nothing there (that input counts as off). It says so when you set it, and Jade shows "Second deaf: encrypted by Dev".
+- **Jade** shows both frequencies, the mode, "Hearing: 15 and nothing" and the output.
+- Breaking it keeps both frequencies and the mode on the dropped item.
 
 ### Code Keypad
 
@@ -414,6 +442,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Inverted Receiver:** a Radio Receiver and a Redstone Torch, in any arrangement in the crafting grid. Put an inverted receiver in the grid on its own to get the Radio Receiver back.
 
+**Radio Logic Receiver:** two Radio Receivers and a Nether Quartz, in any arrangement in the crafting grid.
+
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
 **Compact Radio Transmitter:** put one Radio Transmitter in the crafting grid to get a Compact Radio Transmitter, and back again the same way.
@@ -435,6 +465,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 **Radio Pager:** a Compact Radio Receiver, a Note Block and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
+
+**Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block.
 
@@ -469,6 +501,12 @@ src/main/java/com/reiko/signaltower/
   block/RadioReceiverBlock.java          redstone output
   block/RadioToggleReceiverBlock.java    receiver that flips on and off with each turn-on
   block/RadioInvertedReceiverBlock.java  receiver that's on while its frequency is silent
+  block/RadioLogicReceiverBlock.java     receiver on two frequencies (AND / OR / XOR); opens its screen
+  client/LogicScreen.java                the logic receiver's screen
+  network/OpenLogicScreenPayload.java, ConfigureLogicPayload.java  logic receiver screen <-> server
+  item/SignalMeterItem.java              handheld meter: reads a frequency where you stand
+  network/MeterReadingPayload.java       server -> client: the meter's reading
+  client/SignalMeterHud.java             the meter's panel beside the hotbar, its tick and needle
   block/RadioRepeaterBlock.java          picks up its frequency and broadcasts it again
   block/RadioConverterBlock.java         a repeater that sends on another frequency; opens its screen
   block/CompactRadioReceiverBlock.java   button-sized receiver that attaches to a face
@@ -676,9 +714,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 130. the Compact Radio Transmitter: on a wall, it broadcasts the signal around it over its 16-block reach (heard at 16 blocks, not at 17, at any height, where a full transmitter would reach farther); it isn't a relay tower (a full transmitter next to it is), even after saving; the reach ring, Jade and the audit know it; and it pops off with its frequency when its wall goes;
 131. keypad guest codes: only the owner adds them (with a name, 4 to 8 digits, not the keypad's code nor one already used, names different, at most 8) and the main code can't be changed to one; the owner's list carries them (never the main code) and survives the network, Alex's is empty; a code with 3 uses works 3 times (counted, with who used it last), then says it's used up without counting as wrong codes; an hourly one works within the hour and then has expired; one with no limits keeps working; they're saved with the keypad; the frequency log names the guest code (surviving the network and saving); removing one (name ignoring case) makes it a wrong code;
 132. the inverted receiver: on (15, a lamp next to it lit) while its frequency is silent, off (0, the lamp out) while it's on, and on again once it's silent; on someone else's encrypted frequency it hears nothing and stays on; Jade (with and without server data), the readout and the audit know it;
-133. the motion sensor: placing it makes it the placer's (and tuned by them); it sees the nearest player in its 6-block range with a clear line from its face, not someone too far, behind a block or a spectator (and someone farther once the range is 12); only its owner changes the settings (7 blocks, which isn't offered, becomes 6); strangers-only ignores the owner and, on a private frequency, its friends; redstone around it doesn't make it send; seeing Rex it lights and sends over its 16-block reach (not past it, not a relay tower), and the log names Rex (red) at the sensor; Jade shows the owner its settings and who it sees, and Alex neither; the screen packet (with a round trip), the audit and the reach ring know it; it keeps sending for 2 seconds with nobody in sight, then stops; Alex can't re-tune it; it keeps its owner, range and mode when saved, and its frequency when it pops off.
+133. the motion sensor: placing it makes it the placer's (and tuned by them); it sees the nearest player in its 6-block range with a clear line from its face, not someone too far, behind a block or a spectator (and someone farther once the range is 12); only its owner changes the settings (7 blocks, which isn't offered, becomes 6); strangers-only ignores the owner and, on a private frequency, its friends; redstone around it doesn't make it send; seeing Rex it lights and sends over its 16-block reach (not past it, not a relay tower), and the log names Rex (red) at the sensor; Jade shows the owner its settings and who it sees, and Alex neither; the screen packet (with a round trip), the audit and the reach ring know it; it keeps sending for 2 seconds with nobody in sight, then stops; Alex can't re-tune it; it keeps its owner, range and mode when saved, and its frequency when it pops off.;
+134. the logic receiver: AND is the weaker, OR the stronger, XOR the one that's on; with both off AND is off and it's tracked on both frequencies (counted for Heard by on the second); with only the first on AND stays off, a player out of reach can't change it, Dev's packet sets OR (and tunes it) and it lights a lamp; Jade and the screen packet (round trip) show both frequencies, the mode and what it hears; XOR is on with one, off with both; AND is on with both; the audit lists it; on Rex's tuning with Dev's encrypted second frequency it's deaf there (notice, screen flag, Jade line); it's saved; re-tuning the second moves its tracking; broken, it drops with both frequencies and XOR, and placed again from that item it has them back;
+135. the Signal Meter: two blocks from a transmitter it reads 15 and its reach minus 2 to the edge, out of reach nothing and -1; with the transmitter off 0 but still inside; on someone else's encrypted frequency deaf with nothing else, while its owner reads it; the edge is 20 at 30 blocks into a 50 reach, 0 exactly at it, -1 a block past it, and an off tower beside counts; the reading packet survives the network (-1 too); its settings packet sets the frequency and turns the tick off; it scrolls, takes the scanner's Tune and opens the directory; sneak-clicking a converter measures what it sends.
 
-All 133 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 135 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

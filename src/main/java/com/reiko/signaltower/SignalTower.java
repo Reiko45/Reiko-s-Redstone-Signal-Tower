@@ -161,6 +161,12 @@ public final class SignalTower {
                 com.reiko.signaltower.network.KeypadGuestCodesPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestCodesPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.KeypadGuestListPayload.TYPE,
                 com.reiko.signaltower.network.KeypadGuestListPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestListPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenLogicScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenLogicScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureLogicPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureLogicPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureLogicPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.MeterReadingPayload.TYPE,
+                com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC, com.reiko.signaltower.network.MeterReadingPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSensorScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureSensorPayload.TYPE,
@@ -212,6 +218,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_TOGGLE_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_INVERTED_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.RADIO_LOGIC_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
@@ -225,12 +232,14 @@ public final class SignalTower {
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
             event.accept(ModRegistry.SIGNAL_SCANNER.get());
+            event.accept(ModRegistry.SIGNAL_METER.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
             event.accept(ModRegistry.SIGNAL_SCANNER.get());
+            event.accept(ModRegistry.SIGNAL_METER.get());
         }
     }
 }

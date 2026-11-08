@@ -32,8 +32,18 @@ public record ConfigurePagerPayload(boolean offhand, int frequency, boolean soun
 
     /** Runs on the server's main thread. */
     public static void handle(ConfigurePagerPayload payload, IPayloadContext context) {
-        Player player = context.player();
+        apply(context.player(), payload);
+    }
+
+    /** Applies it to the pager or Signal Meter in that hand (nothing for anything else). Public for the GameTests. */
+    public static void apply(Player player, ConfigurePagerPayload payload) {
         ItemStack stack = player.getItemInHand(payload.offhand() ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND);
+        if (stack.getItem() instanceof com.reiko.signaltower.item.SignalMeterItem) {
+            // v0.40.0: the Signal Meter uses the pager's screen and packet (frequency and Sound; no chat log).
+            FrequencyTunerItem.setFrequency(stack, payload.frequency());
+            PagerItem.setSilent(stack, !payload.sound());
+            return;
+        }
         if (!(stack.getItem() instanceof PagerItem)) {
             return;
         }

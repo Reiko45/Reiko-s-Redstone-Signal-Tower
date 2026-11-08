@@ -109,6 +109,7 @@ for lit in (False, True):
     write(models / f"radio_receiver{suffix}.json", receiver_model(lit))
     write(models / f"radio_toggle_receiver{suffix}.json", receiver_model(lit, "radio_toggle_receiver_side"))
     write(models / f"radio_inverted_receiver{suffix}.json", receiver_model(lit, "radio_inverted_receiver_side"))
+    write(models / f"radio_logic_receiver{suffix}.json", receiver_model(lit, "radio_logic_receiver_side"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -294,7 +295,8 @@ write(models / "radio_mast.json", {
 # ---------------------------------------------------------------- item models
 
 items = ASSETS / "models" / "item"
-for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_repeater", "radio_converter", "radio_mast"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
+             "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -348,6 +350,18 @@ write(items / "signal_scanner.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("signal_scanner", "item")},
 })
+# v0.40.0: the Signal Meter's needle follows the meter_level property (0, 0.33, 0.66, 1).
+for i in range(1, 4):
+    write(items / f"signal_meter_{i}.json", {
+        "parent": "minecraft:item/handheld",
+        "textures": {"layer0": tex(f"signal_meter_{i}", "item")},
+    })
+write(items / "signal_meter.json", {
+    "parent": "minecraft:item/handheld",
+    "textures": {"layer0": tex("signal_meter", "item")},
+    "overrides": [{"predicate": {f"{MOD}:meter_level": v}, "model": f"{MOD}:item/signal_meter_{i}"}
+                  for i, v in ((1, 0.3), (2, 0.6), (3, 0.9))],
+})
 write(items / "pager_on.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("pager_on", "item")},
@@ -382,6 +396,9 @@ write(states / "radio_receiver.json", {"variants": {
 }})
 write(states / "radio_toggle_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
+write(states / "radio_logic_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_logic_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
 write(states / "radio_inverted_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_inverted_receiver" + ("_on" if p > 0 else "")} for p in range(16)
@@ -439,6 +456,62 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_toggle_receiver": "Radio Toggle Receiver",
     f"block.{MOD}.radio_toggle_receiver.tooltip": "Flips on or off each time its frequency turns on, like a light switch. Outputs full strength while on.",
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
+    # v0.40.0: Radio Logic Receiver and Signal Meter
+    f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    f"block.{MOD}.radio_logic_receiver.tooltip": "Listens on two frequencies and outputs when both are on (AND), either is on (OR) or exactly one is on (XOR). Right-click it to set them.",
+    f"tooltip.{MOD}.logic_inputs": "Listens on: %s %s %s",
+    f"message.{MOD}.logic_and": "AND",
+    f"message.{MOD}.logic_or": "OR",
+    f"message.{MOD}.logic_xor": "XOR",
+    f"message.{MOD}.logic_status": "Logic Receiver | %s %s %s | Hearing %s and %s | Output %s",
+    f"message.{MOD}.logic_set": "Radio Logic Receiver: %s %s %s",
+    f"screen.{MOD}.audit.kind_logic_receiver": "Logic Receiver",
+    f"screen.{MOD}.logic.explain": "Outputs when its two frequencies match the mode",
+    f"screen.{MOD}.logic.first": "First frequency",
+    f"screen.{MOD}.logic.second": "Second frequency",
+    f"screen.{MOD}.logic.directory_first": "Pick the first frequency from the frequency directory",
+    f"screen.{MOD}.logic.directory_second": "Pick the second frequency from the frequency directory",
+    f"screen.{MOD}.logic.mode": "Mode",
+    f"screen.{MOD}.logic.mode_and": "AND",
+    f"screen.{MOD}.logic.mode_or": "OR",
+    f"screen.{MOD}.logic.mode_xor": "XOR",
+    f"screen.{MOD}.logic.mode_and_tip": "AND: on while both frequencies are on, at the weaker strength. Click for OR (Shift-click goes back).",
+    f"screen.{MOD}.logic.mode_or_tip": "OR: on while either frequency is on, at the stronger strength. Click for XOR.",
+    f"screen.{MOD}.logic.mode_xor_tip": "XOR: on while exactly one of them is on, at its strength. Click for AND.",
+    f"screen.{MOD}.logic.hearing": "Hearing %s on %s and %s on %s",
+    f"screen.{MOD}.logic.nothing": "nothing",
+    f"screen.{MOD}.logic.output": "Output: %s",
+    f"screen.{MOD}.logic.output_off": "Output: off",
+    f"screen.{MOD}.logic.deaf": "Deaf: %s is encrypted by %s, so it hears nothing there",
+    f"jade.{MOD}.input_first": "First: %s",
+    f"jade.{MOD}.input_second": "Second: %s",
+    f"jade.{MOD}.logic_mode": "Mode: %s",
+    f"jade.{MOD}.logic_and": "AND",
+    f"jade.{MOD}.logic_or": "OR",
+    f"jade.{MOD}.logic_xor": "XOR",
+    f"jade.{MOD}.logic_hearing": "Hearing: %s and %s",
+    f"jade.{MOD}.nothing": "nothing",
+    f"jade.{MOD}.deaf_second": "Second deaf: encrypted by %s",
+    f"item.{MOD}.signal_meter": "Signal Meter",
+    f"message.{MOD}.meter_sound_on": "Signal Meter: tick ON",
+    f"message.{MOD}.meter_sound_off": "Signal Meter: tick OFF",
+    f"message.{MOD}.frequency_copied_meter": "Signal Meter now measures frequency %s",
+    f"tooltip.{MOD}.meter_ticking": "Tick: on",
+    f"tooltip.{MOD}.meter_silent": "Tick: off",
+    f"tooltip.{MOD}.meter_help": "Hold it to see the strength where you stand. Right-click: tick on/off. Sneak + right-click: frequency",
+    f"screen.{MOD}.tuner.meter_sound": "Tick",
+    f"screen.{MOD}.tuner.meter_sound_tooltip": "Ticks like a Geiger counter while you hold it: faster and higher the stronger the signal",
+    f"hud.{MOD}.meter_frequency": "Meter: %s",
+    f"hud.{MOD}.meter_off": "off",
+    f"hud.{MOD}.meter_detail": "%s, %s",
+    f"hud.{MOD}.meter_towers_one": "1 tower",
+    f"hud.{MOD}.meter_towers": "%s towers",
+    f"hud.{MOD}.meter_edge_blocks": "%s blocks to the edge",
+    f"hud.{MOD}.meter_edge_block": "1 block to the edge",
+    f"hud.{MOD}.meter_edge_at": "right at the edge",
+    f"hud.{MOD}.meter_out_of_reach": "Out of every tower's reach",
+    f"hud.{MOD}.meter_encrypted": "Encrypted by %s",
+    f"hud.{MOD}.meter_encrypted_hint": "It can't measure this frequency",
     f"block.{MOD}.radio_inverted_receiver.tooltip": "Outputs full strength while its frequency is silent, and nothing while it's on.",
     f"block.{MOD}.radio_repeater": "Radio Repeater",
     f"block.{MOD}.radio_repeater.tooltip": "Picks up its frequency and broadcasts it again from its own height, to chain towers across long distances. Needs no redstone.",
@@ -788,7 +861,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.no_favorites": "No favorites yet. Save some in its frequency screen",
     f"tooltip.{MOD}.scanner_use": "Lists every frequency you can hear where you stand",
     f"tooltip.{MOD}.scanner_open": "Right-click to open it",
-    f"tooltip.{MOD}.scanner_tune": "Its Tune buttons set the tuner, remote or pager in your other hand",
+    f"tooltip.{MOD}.scanner_tune": "Its Tune buttons set the tuner, remote, pager or meter in your other hand",
     f"screen.{MOD}.scanner.scanning": "Scanning...",
     f"screen.{MOD}.scanner.nothing": "Nothing heard here",
     f"screen.{MOD}.scanner.heard_one": "1 frequency heard here",
@@ -809,7 +882,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.scanner.plus_one": "%s, plus 1 tower",
     f"screen.{MOD}.scanner.plus_many": "%s, plus %s towers",
     f"screen.{MOD}.scanner.tune": "Tune",
-    f"screen.{MOD}.scanner.tune_hint": "Hold a tuner, remote or pager in your other hand to tune it",
+    f"screen.{MOD}.scanner.tune_hint": "Hold a tuner, remote, pager or meter in your other hand to tune it",
     f"screen.{MOD}.scanner.tune_tooltip": "Set %s to frequency %s",
     f"screen.{MOD}.scanner.tuned": "%s tuned to frequency %s",
     f"screen.{MOD}.scanner.more": "Showing %s-%s of %s, scroll for more",
@@ -1203,6 +1276,18 @@ recipes["radio_toggle_receiver"] = ({
 }, f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
 
+recipes["radio_logic_receiver"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:quartz"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_logic_receiver"},
+}, f"{MOD}:radio_receiver")
+recipes["signal_meter"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "tools",
+    "ingredients": [{"item": f"{MOD}:compact_radio_receiver"}, {"item": "minecraft:comparator"}, {"item": "minecraft:iron_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:signal_meter"},
+}, f"{MOD}:compact_radio_receiver")
 recipes["radio_inverted_receiver"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1258,15 +1343,16 @@ for name, (recipe, trigger) in recipes.items():
 
 # ---------------------------------------------------------------- loot tables
 
-for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_repeater", "radio_converter",
-             "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
+for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
+             "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
             "source": "block_entity",
-            "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency"] if name == "radio_converter" else []),
+            "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency"] if name == "radio_converter" else [])
+                       + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
         "type": "minecraft:block",
@@ -1282,7 +1368,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 # ---------------------------------------------------------------- tags
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
-    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+    "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
+               f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]
 })

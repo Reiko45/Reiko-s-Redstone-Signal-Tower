@@ -62,6 +62,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** Pager only: its Sound and Chat log settings (null for the tuner and remote). */
     private @Nullable Boolean pagerSound;
     private boolean pagerChatLog;
+    /** Signal Meter (v0.40.0): the pager's screen with only a Sound button (its tick). */
+    private boolean meter;
     private final Button[] presetButtons = new Button[TunerPresets.COUNT];
     /** Tuner only: the name of the typed frequency (shared by everyone in the world). */
     private @Nullable EditBox nameBox;
@@ -111,6 +113,12 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
         this(hand, frequency, title, null, null, presets);
         this.pagerSound = sound;
         this.pagerChatLog = chatLog;
+    }
+
+    /** A Signal Meter's screen (v0.40.0): like the pager's, with only a Sound button for its tick. */
+    public FrequencyScreen(InteractionHand hand, int frequency, Component title, TunerPresets presets, boolean sound) {
+        this(hand, frequency, title, presets, sound, true);
+        this.meter = true;
     }
 
     @Override
@@ -251,7 +259,14 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             updateLengthButton();
             buttonsY += 24;
         }
-        if (pagerSound != null) {
+        if (meter) {
+            addRenderableWidget(Button.builder(pagerSoundLabel(), button -> {
+                pagerSound = !pagerSound;
+                button.setMessage(pagerSoundLabel());
+            }).tooltip(Tooltip.create(Component.translatable(KEY + ".meter_sound_tooltip")))
+                    .bounds(centerX - 102, buttonsY, 204, 20).build());
+            buttonsY += 24;
+        } else if (pagerSound != null) {
             addRenderableWidget(Button.builder(pagerSoundLabel(), button -> {
                 pagerSound = !pagerSound;
                 button.setMessage(pagerSoundLabel());
@@ -555,7 +570,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     }
 
     private Component pagerSoundLabel() {
-        return CommonComponents.optionNameValue(Component.translatable(KEY + ".pager_sound"),
+        return CommonComponents.optionNameValue(Component.translatable(KEY + (meter ? ".meter_sound" : ".pager_sound")),
                 CommonComponents.optionStatus(Boolean.TRUE.equals(pagerSound)));
     }
 

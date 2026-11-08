@@ -24,6 +24,8 @@ import com.reiko.signaltower.item.MultiRemoteItem;
 import com.reiko.signaltower.item.PagerItem;
 import com.reiko.signaltower.item.ScannerTarget;
 import com.reiko.signaltower.item.SignalScannerItem;
+import com.reiko.signaltower.item.SignalMeterItem;
+import com.reiko.signaltower.block.RadioLogicReceiverBlock;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
@@ -66,6 +68,18 @@ public final class ModRegistry {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OUTPUT_FREQUENCY =
             DATA_COMPONENTS.registerComponentType("output_frequency", builder -> builder
                     .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A Radio Logic Receiver's second frequency, kept on the item when it's broken (v0.40.0). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SECOND_FREQUENCY =
+            DATA_COMPONENTS.registerComponentType("second_frequency", builder -> builder
+                    .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A Radio Logic Receiver's mode (0 AND, 1 OR, 2 XOR), kept on the item when it's broken (v0.40.0). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> LOGIC_MODE =
+            DATA_COMPONENTS.registerComponentType("logic_mode", builder -> builder
+                    .persistent(Codec.intRange(0, 2))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
     /** Whether a Remote Control is in toggle mode (true) or pulse mode (false, the default). */
@@ -168,6 +182,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** A receiver on two frequencies that outputs on AND, OR or XOR (v0.40.0). */
+    public static final DeferredBlock<RadioLogicReceiverBlock> RADIO_LOGIC_RECEIVER = BLOCKS.register("radio_logic_receiver",
+            () -> new RadioLogicReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
     /** Listens for its frequency and broadcasts it again from its own height. */
     public static final DeferredBlock<RadioRepeaterBlock> RADIO_REPEATER = BLOCKS.register("radio_repeater",
             () -> new RadioRepeaterBlock(BlockBehaviour.Properties.of()
@@ -256,6 +279,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_toggle_receiver", RADIO_TOGGLE_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_INVERTED_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_inverted_receiver", RADIO_INVERTED_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_LOGIC_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_logic_receiver", RADIO_LOGIC_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -280,6 +305,8 @@ public final class ModRegistry {
             ITEMS.register("multi_remote", () -> new MultiRemoteItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<PagerItem> PAGER =
             ITEMS.register("pager", () -> new PagerItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<SignalMeterItem> SIGNAL_METER =
+            ITEMS.register("signal_meter", () -> new SignalMeterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<SignalScannerItem> SIGNAL_SCANNER =
             ITEMS.register("signal_scanner", () -> new SignalScannerItem(new Item.Properties().stacksTo(1)));
 
@@ -293,7 +320,7 @@ public final class ModRegistry {
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
                             RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get(),
-                            RADIO_INVERTED_RECEIVER.get()).build(null));
+                            RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",

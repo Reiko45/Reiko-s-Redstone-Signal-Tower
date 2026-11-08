@@ -65,7 +65,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
             return true;
         }
         return payload.converter().filter(pos -> player.canInteractWithBlock(pos, 1.0)
-                && player.level().getBlockState(pos).getBlock() instanceof RadioConverterBlock).isPresent();
+                && (player.level().getBlockState(pos).getBlock() instanceof RadioConverterBlock
+                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock)).isPresent();
     }
 
     public static boolean holdsRadioItem(Player player) {
@@ -74,7 +75,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
 
     private static boolean isRadioItem(Item item) {
         return item instanceof FrequencyTunerItem || item instanceof RemoteControlItem || item instanceof MultiRemoteItem
-                || item instanceof PagerItem || item instanceof SignalScannerItem;
+                || item instanceof PagerItem || item instanceof SignalScannerItem
+                || item instanceof com.reiko.signaltower.item.SignalMeterItem;
     }
 
     /**
