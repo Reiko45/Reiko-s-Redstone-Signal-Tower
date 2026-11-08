@@ -7410,6 +7410,8 @@ public final class SignalTowerGameTests {
                 .thenExecute(() -> helper.setBlock(new BlockPos(4, 1, 1), Blocks.REDSTONE_BLOCK))
                 .thenIdle(5)
                 .thenExecute(() -> {
+                    BlockPos at = helper.absolutePos(tx);
+                    dev.setPos(at.getX() + 0.5, at.getY() + 1, at.getZ() + 0.5); // so the map's square is the tower's own
                     var id = com.reiko.signaltower.item.CoverageMapItem.draw(level, dev, map);
                     var drawn = level.getMapData(id);
                     check(drawn != null && map.get(net.minecraft.core.component.DataComponents.MAP_ID).equals(id) && drawn.scale == 2
@@ -7418,7 +7420,6 @@ public final class SignalTowerGameTests {
                     for (int i = 0; i < 128 / com.reiko.signaltower.item.CoverageMapItem.ROWS_PER_TICK; i++) {
                         map.getItem().inventoryTick(map, level, dev, 0, true);
                     }
-                    BlockPos at = helper.absolutePos(tx);
                     int px = Math.floorDiv(at.getX(), 4) - Math.floorDiv(drawn.centerX, 4) + 64;
                     int pz = Math.floorDiv(at.getZ(), 4) - Math.floorDiv(drawn.centerZ, 4) + 64;
                     check(drawn.colors[px + pz * 128] == com.reiko.signaltower.item.CoverageMapItem.colorFor(15), "Painted green round the tower");
@@ -7426,7 +7427,10 @@ public final class SignalTowerGameTests {
                     for (var decoration : drawn.getDecorations()) {
                         if (decoration.type().equals(net.minecraft.world.level.saveddata.maps.MapDecorationTypes.RED_MARKER)) marked = true;
                     }
-                    check(marked, "A red marker on the transmitter");
+                    // Vanilla leaves markers off the outermost pixel all round, so only ask for one further in.
+                    double fx = (at.getX() + 0.5 - drawn.centerX) / 4.0;
+                    double fz = (at.getZ() + 0.5 - drawn.centerZ) / 4.0;
+                    check(marked || Math.abs(fx) > 62.5 || Math.abs(fz) > 62.5, "A red marker on the transmitter (" + fx + ", " + fz + ")");
                     map.set(ModRegistry.COVERAGE_ZOOM.get(), 0);
                     check(!com.reiko.signaltower.item.CoverageMapItem.draw(level, dev, map).equals(id)
                             && level.getMapData(map.get(net.minecraft.core.component.DataComponents.MAP_ID)).scale == 0, "A new zoom: a new map");
