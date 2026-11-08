@@ -7574,4 +7574,211 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.51.0: the mast builder and the Radio Telegraph
+
+    /**
+     * The mast builder: a mast used on a tower's mast goes in under the top, lifting it (with its
+     * frequency and antenna) and a beacon standing on it; the network follows, the reach grows and
+     * redstone still comes up the column; one mast is used up; using it on the top works too; a
+     * bare column grows on top, a lightning rod riding up; no room above refuses, and so does
+     * someone else's private frequency (nothing changes, nothing used up).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void mastBuilder(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        BlockPos mast = new BlockPos(1, 1, 1);
+        helper.setBlock(mast, ModRegistry.RADIO_MAST.get());
+        place(helper, new BlockPos(1, 2, 1), ModRegistry.RADIO_TRANSMITTER.get(), 4531);
+        helper.setBlock(new BlockPos(1, 2, 1), helper.getBlockState(new BlockPos(1, 2, 1))
+                .setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY, com.reiko.signaltower.radio.AntennaTier.DIAMOND));
+        helper.setBlock(new BlockPos(1, 3, 1), ModRegistry.AVIATION_BEACON.get());
+        helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK);
+        List<Component> bar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, bar, new java.util.ArrayList<>());
+        ItemStack masts = new ItemStack(ModRegistry.RADIO_MAST_ITEM.get(), 4);
+        int[] reach = new int[2];
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.radio.MastBuilder.builds(helper.getBlockState(mast))
+                            && com.reiko.signaltower.radio.MastBuilder.builds(helper.getBlockState(new BlockPos(1, 2, 1)))
+                            && !com.reiko.signaltower.radio.MastBuilder.builds(Blocks.STONE.defaultBlockState()), "Masts and tower tops build");
+                    reach[0] = com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, helper.absolutePos(new BlockPos(1, 2, 1)),
+                            helper.getBlockState(new BlockPos(1, 2, 1)));
+                    Component added = com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(mast), masts);
+                    BlockPos top = new BlockPos(1, 3, 1);
+                    check(added != null && keyOf(added).endsWith("mast_added") && masts.getCount() == 3
+                            && helper.getBlockState(new BlockPos(1, 2, 1)).is(ModRegistry.RADIO_MAST.get())
+                            && helper.getBlockState(top).is(ModRegistry.RADIO_TRANSMITTER.get())
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(top)) == com.reiko.signaltower.radio.AntennaTier.DIAMOND
+                            && frequencyAt(helper, top) == 4531
+                            && helper.getBlockState(new BlockPos(1, 4, 1)).is(ModRegistry.AVIATION_BEACON.get()),
+                            "Lifted, with its frequency, antenna and beacon: " + added);
+                    SignalNetwork network = SignalNetwork.get(level);
+                    check(network.transmitterFrequencyAt(helper.absolutePos(top)).orElse(-1) == 4531
+                            && network.transmitterFrequencyAt(helper.absolutePos(new BlockPos(1, 2, 1))).isEmpty(), "The network moved with it");
+                    reach[1] = com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, helper.absolutePos(top), helper.getBlockState(top));
+                    Object[] args = ((TranslatableContents) added.getContents()).getArgs();
+                    check(reach[1] > reach[0] && args[1].equals(2) && args[2].equals(reach[0]) && args[3].equals(reach[1]),
+                            "Two masts up now, reach " + reach[0] + " -> " + reach[1] + ": " + java.util.Arrays.toString(args));
+                    Component again = com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(top), masts);
+                    check(again != null && keyOf(again).endsWith("mast_added") && masts.getCount() == 2
+                            && helper.getBlockState(new BlockPos(1, 4, 1)).is(ModRegistry.RADIO_TRANSMITTER.get())
+                            && helper.getBlockState(new BlockPos(1, 5, 1)).is(ModRegistry.AVIATION_BEACON.get()), "Used on the top itself: " + again);
+                })
+                .thenWaitUntil(() -> check(SignalNetwork.get(level).listen(level, 4531, helper.absolutePos(new BlockPos(1, 4, 1))).power() == 15,
+                        "Redstone still comes up the column"))
+                .thenExecute(() -> {
+                    helper.setBlock(new BlockPos(1, 6, 1), Blocks.STONE);
+                    Component blocked = com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(mast), masts);
+                    check(blocked != null && keyOf(blocked).endsWith("mast_no_room") && masts.getCount() == 2
+                            && helper.getBlockState(new BlockPos(1, 4, 1)).is(ModRegistry.RADIO_TRANSMITTER.get()), "No room: " + blocked);
+
+                    helper.setBlock(new BlockPos(5, 1, 1), ModRegistry.RADIO_MAST.get());
+                    helper.setBlock(new BlockPos(5, 2, 1), ModRegistry.RADIO_MAST.get());
+                    Component grown = com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(new BlockPos(5, 1, 1)), masts);
+                    check(grown != null && keyOf(grown).endsWith("mast_grown") && masts.getCount() == 1
+                            && helper.getBlockState(new BlockPos(5, 3, 1)).is(ModRegistry.RADIO_MAST.get()), "A bare column grows on top: " + grown);
+                    helper.setBlock(new BlockPos(5, 4, 1), Blocks.LIGHTNING_ROD);
+                    com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(new BlockPos(5, 2, 1)), masts);
+                    check(masts.isEmpty() && helper.getBlockState(new BlockPos(5, 4, 1)).is(ModRegistry.RADIO_MAST.get())
+                            && helper.getBlockState(new BlockPos(5, 5, 1)).is(Blocks.LIGHTNING_ROD), "A lightning rod rides up");
+
+                    UUID owner = UUID.randomUUID();
+                    claims.put(4532, owner, "Owner", java.util.Map.of(), List.of(), false);
+                    try {
+                        helper.setBlock(new BlockPos(9, 1, 1), ModRegistry.RADIO_MAST.get());
+                        place(helper, new BlockPos(9, 2, 1), ModRegistry.RADIO_TRANSMITTER.get(), 4532);
+                        RadioBlockEntity owned = helper.getBlockEntity(new BlockPos(9, 2, 1));
+                        owned.setTunedBy(owner);
+                        ItemStack one = new ItemStack(ModRegistry.RADIO_MAST_ITEM.get());
+                        Component refused = com.reiko.signaltower.radio.MastBuilder.build(dev, helper.absolutePos(new BlockPos(9, 1, 1)), one);
+                        check(refused != null && keyOf(refused).endsWith("private_refused_block") && one.getCount() == 1
+                                && helper.getBlockState(new BlockPos(9, 2, 1)).is(ModRegistry.RADIO_TRANSMITTER.get()),
+                                "Someone else's private tower: refused " + refused);
+                    } finally {
+                        claims.remove(4532);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Radio Telegraph: a message (cleaned, at most 64 characters) goes out from where it
+     * stands; another telegraph on the frequency nearby reads it (it clicks and pulses, and its
+     * screen shows it), one on another frequency doesn't; too fast, empty, and from a non-member
+     * on a private frequency are refused; pagers in reach get it in chat (and one back from being
+     * away is told what it missed); a Status Board row would
+     * show it; Jade shows the last one; it's saved; on an encrypted frequency a non-member's
+     * telegraph can't read it, and the log keeps it; the screen re-tunes and round-trips.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void telegraph(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        BlockPos a = new BlockPos(1, 1, 1);
+        BlockPos b = new BlockPos(4, 1, 1);
+        BlockPos other = new BlockPos(7, 1, 1);
+        BlockPos c = new BlockPos(10, 1, 1);
+        BlockPos d = new BlockPos(13, 1, 1);
+        place(helper, a, ModRegistry.RADIO_TELEGRAPH.get(), 4533);
+        place(helper, b, ModRegistry.RADIO_TELEGRAPH.get(), 4533);
+        place(helper, other, ModRegistry.RADIO_TELEGRAPH.get(), 4534);
+        place(helper, c, ModRegistry.RADIO_TELEGRAPH.get(), 4535);
+        place(helper, d, ModRegistry.RADIO_TELEGRAPH.get(), 4535);
+        UUID owner = UUID.randomUUID();
+        UUID alex = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        List<Component> chat = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, bar, chat);
+        Player boss = namedPlayer(helper, new BlockPos(13, 1, 0), owner, "Owner", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack pager = new ItemStack(ModRegistry.PAGER.get());
+        PagerItem.setFrequency(pager, 4533);
+        pager.set(ModRegistry.PAGER_AWAY_SINCE.get(), 0L); // as if Dev had logged out before any message (the inventory gets a copy)
+        dev.getInventory().add(pager);
+        BlockPos absA = helper.absolutePos(a);
+        BlockPos absB = helper.absolutePos(b);
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.radio.Telegraph.clean("x".repeat(80)).length() == 64
+                            && com.reiko.signaltower.radio.Telegraph.clean("  Hello\u0007 there  ").equals("Hello there"), "Cleaned and cut to 64");
+                    var sent = com.reiko.signaltower.radio.Telegraph.send(level, absA, dev, "  Hello\u0007 there  ");
+                    check(sent != null && sent.sent() && sent.telegraphs() == 1 && keyOf(sent.message()).endsWith("remote_result"),
+                            "Sent, read by the other telegraph on 4533: " + (sent == null ? null : sent.message()));
+                    SignalNetwork network = SignalNetwork.get(level);
+                    List<SignalNetwork.Message> kept = network.messages(4533);
+                    check(!kept.isEmpty() && kept.get(kept.size() - 1).text().equals("Hello there") && kept.get(kept.size() - 1).name().equals("Dev"),
+                            "Remembered: " + kept);
+                    check(helper.getBlockState(b).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED)
+                            && !helper.getBlockState(other).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED)
+                            && !helper.getBlockState(a).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED),
+                            "The one on 4533 pulses, not the one on 4534 (or the sender)");
+                    List<com.reiko.signaltower.radio.Telegraph.Line> feed = com.reiko.signaltower.radio.Telegraph.feed(level, absB, 4533, null);
+                    check(!feed.isEmpty() && feed.get(feed.size() - 1).text().equals("Hello there") && feed.get(feed.size() - 1).who().equals("Dev"),
+                            "Its screen shows it: " + feed);
+                    check(com.reiko.signaltower.radio.Telegraph.feed(level, helper.absolutePos(other), 4534, null).isEmpty(), "Nothing on 4534");
+                    var fast = com.reiko.signaltower.radio.Telegraph.send(level, absA, dev, "again");
+                    var empty = com.reiko.signaltower.radio.Telegraph.send(level, absB, dev, "   ");
+                    check(!fast.sent() && keyOf(fast.message()).endsWith("telegraph_too_fast")
+                            && !empty.sent() && keyOf(empty.message()).endsWith("telegraph_empty"), "Too fast, and empty: refused");
+
+                    List<Component> caught = PagerItem.catchUp(level, dev, true);
+                    check(caught.stream().anyMatch(line -> keyOf(line).endsWith("pager_catchup_message")), "Back from away: the pager says what it missed " + caught);
+                    check(PagerItem.deliverMessage(level, dev, 4533, kept.get(kept.size() - 1)) == 1 && lastKey(bar).endsWith("pager_message")
+                            && !chat.isEmpty() && keyOf(chat.get(chat.size() - 1)).endsWith("pager_log"), "A pager in reach gets it, in chat too");
+                    check(PagerItem.deliverMessage(level, dev, 4534, kept.get(kept.size() - 1)) == 0, "Not a pager on another frequency");
+                    check(network.lastMessageAt(4533, absB, level.getGameTime() - com.reiko.signaltower.radio.Telegraph.BOARD_TICKS) != null,
+                            "A Status Board row would show it");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absB);
+                    check(info.getString("telegraph_text").equals("Hello there") && info.getString("telegraph_from").equals("Dev")
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(b), info)).contains("telegraph_last"),
+                            "Jade: the last message " + info);
+                    SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+                    List<SignalNetwork.Message> saved = loaded.messages(4533);
+                    check(!saved.isEmpty() && saved.get(saved.size() - 1).text().equals("Hello there")
+                            && SignalNetwork.covers(saved.get(saved.size() - 1).coverage(), absB), "Saved");
+                })
+                .thenWaitUntil(() -> check(!helper.getBlockState(b).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED), "Its pulse ends"))
+                .thenExecute(() -> {
+                    claims.put(4535, owner, "Owner", java.util.Map.of(), List.of(), true);
+                    try {
+                        RadioBlockEntity theirs = helper.getBlockEntity(c);
+                        theirs.setTunedBy(alex);
+                        RadioBlockEntity bosses = helper.getBlockEntity(d);
+                        bosses.setTunedBy(owner);
+                        var refused = com.reiko.signaltower.radio.Telegraph.send(level, helper.absolutePos(d), dev, "nope");
+                        check(!refused.sent() && keyOf(refused.message()).endsWith("private_refused_telegraph"), "A non-member can't send on it");
+                        var secret = com.reiko.signaltower.radio.Telegraph.send(level, helper.absolutePos(d), boss, "secret");
+                        check(secret.sent() && secret.telegraphs() == 0
+                                && !helper.getBlockState(c).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED),
+                                "Sent, but a non-member's telegraph can't read it");
+                        var lines = com.reiko.signaltower.radio.Telegraph.feed(level, helper.absolutePos(c), 4535, alex);
+                        check(!lines.isEmpty() && lines.get(lines.size() - 1).encrypted() && lines.get(lines.size() - 1).text().isEmpty(),
+                                "Its screen shows it's encrypted, not the text");
+                        CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(c));
+                        check(!info.contains("telegraph_text") && info.contains("deaf_to"), "Jade: deaf, no text " + info);
+                        var log = com.reiko.signaltower.radio.FrequencyLog.log(level.getServer(), 4535);
+                        check(!log.isEmpty() && log.get(0).kind() == SignalNetwork.CauseKind.TELEGRAPH && log.get(0).detail().equals("secret")
+                                && log.get(0).who().equals("Owner") && log.get(0).pos().isPresent(), "The log keeps it: " + log);
+                    } finally {
+                        claims.remove(4535);
+                    }
+
+                    var answer = com.reiko.signaltower.network.TelegraphActionPayload.apply(dev,
+                            new com.reiko.signaltower.network.TelegraphActionPayload(absB, 4536, "", true));
+                    RadioBlockEntity tuned = helper.getBlockEntity(b);
+                    check(answer != null && tuned.getFrequency() == 4536 && dev.getUUID().equals(tuned.getTunedBy())
+                            && answer.header().frequency() == 4536 && answer.notice().isPresent()
+                            && keyOf(answer.notice().get()).endsWith("telegraph_tuned") && !answer.sent(), "The screen re-tunes it");
+                    var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), level.registryAccess());
+                    com.reiko.signaltower.network.TelegraphFeedPayload.STREAM_CODEC.encode(buffer, answer);
+                    var back = com.reiko.signaltower.network.TelegraphFeedPayload.STREAM_CODEC.decode(buffer);
+                    check(back.header().equals(answer.header()) && back.lines().equals(answer.lines()) && back.notice().isPresent(),
+                            "Screen packet round trip");
+                })
+                .thenSucceed();
+    }
 }

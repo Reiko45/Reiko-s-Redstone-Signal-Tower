@@ -313,6 +313,7 @@ write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_f
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
 write(items / "radio_battery.json", {"parent": f"{MOD}:block/radio_battery_4"})  # v0.49.0
 write(items / "solar_panel.json", {"parent": f"{MOD}:block/solar_panel"})  # v0.50.0
+write(items / "radio_telegraph.json", {"parent": f"{MOD}:block/radio_telegraph"})  # v0.51.0
 write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
 
 for tier in ("iron", "gold", "diamond", "netherite", "dish", "ender"):
@@ -538,6 +539,54 @@ write(models / "solar_panel.json", {
 })
 write(states / "solar_panel.json", {"variants": {"": {"model": f"{MOD}:block/solar_panel"}}})
 
+# v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
+# with a lamp at the back; facing north here, turned by the blockstate.
+def telegraph_model(lit):
+    def box(frm, to, tex_name, faces=("north", "south", "east", "west", "up", "down"), uv=None, glow=False, cull=None):
+        element = {"from": frm, "to": to, "faces": {}}
+        for face in faces:
+            entry = {"texture": tex_name}
+            if uv and face in uv:
+                entry["uv"] = uv[face]
+            if cull and face in cull:
+                entry["cullface"] = face
+            element["faces"][face] = entry
+        if glow:
+            element["neoforge_data"] = GLOW
+        return element
+    elements = [
+        # the desk: a 4-pixel slab of dark wood with a steel band
+        box([0, 0, 0], [16, 4, 16], "#side", faces=("north", "south", "east", "west"),
+            uv={f: [0, 12, 16, 16] for f in ("north", "south", "east", "west")}, cull=("north", "south", "east", "west")),
+        box([0, 0, 0], [16, 4, 16], "#top", faces=("up",), uv={"up": [0, 0, 16, 16]}),
+        box([0, 0, 0], [16, 4, 16], "#bottom", faces=("down",), cull=("down",)),
+        # the key: a brass bar on a pivot, with a black knob at the front
+        box([7, 4, 4], [9, 6, 11], "#brass", uv={"north": [7, 6, 9, 8], "south": [7, 6, 9, 8], "east": [4, 6, 11, 8],
+                                                "west": [4, 6, 11, 8], "up": [7, 4, 9, 11], "down": [7, 4, 9, 11]}),
+        box([6, 4, 8], [10, 5, 10], "#brass"),
+        box([6.5, 6, 2], [9.5, 8, 5], "#knob"),
+        # the sounder at the back, its lamp facing the front
+        box([3, 4, 11], [13, 10, 15], "#sounder", faces=("south", "east", "west", "up"),
+            uv={"south": [3, 6, 13, 12], "east": [11, 6, 15, 12], "west": [1, 6, 5, 12], "up": [3, 1, 13, 5]}),
+        box([3, 4, 11], [13, 10, 15], "#lamp", faces=("north",), uv={"north": [3, 6, 13, 12]}, glow=lit),
+    ]
+    return {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": tex("radio_telegraph_top"), "top": tex("radio_telegraph_top"), "side": tex("radio_telegraph_side"),
+                     "bottom": tex("radio_bottom"), "brass": tex("radio_telegraph_brass"), "knob": tex("radio_telegraph_knob"),
+                     "sounder": tex("radio_telegraph_sounder"), "lamp": tex("radio_telegraph_lamp" + ("_on" if lit else ""))},
+        "elements": elements,
+    }
+
+
+write(models / "radio_telegraph.json", telegraph_model(False))
+write(models / "radio_telegraph_on.json", telegraph_model(True))
+write(states / "radio_telegraph.json", {"variants": {
+    f"facing={facing},powered={powered}": {"model": f"{MOD}:block/radio_telegraph" + ("_on" if powered == "true" else ""),
+                                            **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for powered in ("false", "true")
+}})
+
 # v0.49.0: the Radio Battery, its bars lit by charge
 for n in range(5):
     write(models / f"radio_battery_{n}.json", {"parent": "minecraft:block/cube_bottom_top", "textures": {
@@ -698,6 +747,53 @@ for color in ("red", "white"):
 write(states / "aviation_beacon.json", {"variants": beacon_variants})
 
 write(ASSETS / "lang" / "en_us.json", {
+    # v0.51.0: the mast builder and the Radio Telegraph
+    f"tooltip.{MOD}.mast_builder": "Right-click a tower's mast or top with this to add a mast under the top. Sneak to place it normally.",
+    f"message.{MOD}.mast_added": "Mast added: the %1$s is %2$s masts up, reach %3$s \u2192 %4$s blocks",
+    f"message.{MOD}.mast_grown": "Mast added on top: %s masts tall",
+    f"message.{MOD}.mast_no_room": "No room to raise it: %1$s is in the way at %2$s",
+    f"message.{MOD}.mast_too_high": "It can't go any higher: that's the top of the world",
+    f"block.{MOD}.radio_telegraph": "Radio Telegraph",
+    f"block.{MOD}.radio_telegraph.tooltip": "Type short messages onto a frequency. Pagers, other telegraphs and Status Boards on it in reach read them.",
+    f"tooltip.{MOD}.telegraph_use": "Right-click to open it. When a message arrives it clicks and gives a 1-second redstone pulse.",
+    f"message.{MOD}.telegraph_status": "Radio Telegraph | Frequency %1$s | %2$s messages here | Reach %3$s",
+    f"message.{MOD}.telegraph_empty": "Type a message first",
+    f"message.{MOD}.telegraph_too_fast": "Wait a moment between messages",
+    f"message.{MOD}.private_refused_telegraph": "Can't send: %s is private to %s",
+    f"message.{MOD}.telegraph_sent": "Sent on %1$s (reach %2$s)",
+    f"message.{MOD}.telegraph_read_none": "No pager or telegraph in range",
+    f"message.{MOD}.telegraph_one_pager": "1 pager",
+    f"message.{MOD}.telegraph_pagers": "%s pagers",
+    f"message.{MOD}.telegraph_one_telegraph": "1 telegraph",
+    f"message.{MOD}.telegraph_telegraphs": "%s telegraphs",
+    f"message.{MOD}.telegraph_and": "%s and %s",
+    f"message.{MOD}.telegraph_read": "Read by %s",
+    f"message.{MOD}.telegraph_tuned": "Tuned to %s",
+    f"message.{MOD}.pager_message": "%1$s: message on %2$s from %3$s: \u201c%4$s\u201d",
+    f"message.{MOD}.pager_catchup_message": "%1$s: while you were away, a message on %2$s from %3$s (Day %4$s, %5$s): \u201c%6$s\u201d",
+    f"message.{MOD}.pager_catchup_messages": "%1$s: while you were away, %3$s messages on %2$s; the last from %4$s (Day %5$s, %6$s): \u201c%7$s\u201d",
+    f"message.{MOD}.intruder_telegraph": "%1$s tried to send a telegraph message on %3$s, but it's private: refused",
+    f"screen.{MOD}.telegraph.frequency": "Frequency",
+    f"screen.{MOD}.telegraph.directory": "Pick from the directory",
+    f"screen.{MOD}.telegraph.message": "Message",
+    f"screen.{MOD}.telegraph.hint": "Type a message...",
+    f"screen.{MOD}.telegraph.send": "Send",
+    f"screen.{MOD}.telegraph.tune": "Tune",
+    f"screen.{MOD}.telegraph.reach": "Reach: %s",
+    f"screen.{MOD}.telegraph.empty": "No messages have reached it yet",
+    f"screen.{MOD}.telegraph.deaf": "Encrypted by %s: this telegraph can't read it",
+    f"screen.{MOD}.telegraph.encrypted": "(encrypted)",
+    f"screen.{MOD}.telegraph.when": "Day %s, %s (%s)",
+    f"screen.{MOD}.audit.kind_telegraph": "Radio Telegraph",
+    f"screen.{MOD}.log.kind_telegraph": "Telegraph",
+    f"screen.{MOD}.log.kind_telegraph_text": "Telegraph: \u201c%s\u201d",
+    f"screen.{MOD}.log.tip_telegraph": "Sent by %s",
+    f"screen.{MOD}.log.tip_other_telegraph": "Sent by %s (not a member)",
+    f"jade.{MOD}.telegraph_last": "Last message (%3$s): \u201c%1$s\u201d from %2$s",
+    f"jade.{MOD}.telegraph_count": "Messages here: %s",
+    f"jade.{MOD}.telegraph_none": "No messages have reached it yet",
+    f"jade.{MOD}.telegraph_arrived": "A message just arrived",
+    f"jade.{MOD}.board_message": "  Last message: %s",
     f"block.{MOD}.radio_transmitter": "Radio Transmitter",
     f"block.{MOD}.radio_transmitter.tooltip": "Broadcasts the redstone signal it receives. The higher it sits, the farther it reaches. Also relays nearby Remote Control presses.",
     f"block.{MOD}.radio_receiver": "Radio Receiver",
@@ -1989,6 +2085,12 @@ recipes["solar_panel"] = ({  # v0.50.0
     "key": {"G": {"item": "minecraft:glass_pane"}, "C": {"item": "minecraft:copper_ingot"}, "D": {"item": "minecraft:daylight_detector"}},
     "result": {"count": 1, "id": f"{MOD}:solar_panel"},
 }, "minecraft:daylight_detector")
+recipes["radio_telegraph"] = ({  # v0.51.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:writable_book"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_telegraph"},
+}, f"{MOD}:radio_transmitter")
 recipes["coverage_map"] = ({  # v0.49.0
     "type": "minecraft:crafting_shapeless",
     "category": "misc",
@@ -2118,7 +2220,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
-             "radio_battery", "solar_panel"):
+             "radio_battery", "solar_panel", "radio_telegraph"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2170,7 +2272,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
-               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel"]
+               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

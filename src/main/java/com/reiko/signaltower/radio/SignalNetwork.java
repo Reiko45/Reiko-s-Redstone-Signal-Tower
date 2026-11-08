@@ -959,7 +959,9 @@ public final class SignalNetwork extends SavedData {
 
     /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name, sent by ordinal: only add at the end. */
     public enum CauseKind {
-        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE, TIMER, RECORDER;
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE, TIMER, RECORDER,
+        /** v0.51.0: a Radio Telegraph message (in the log only; it doesn't turn the frequency on). */
+        TELEGRAPH;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1080,6 +1082,97 @@ public final class SignalNetwork extends SavedData {
             }
         }
         return heard;
+    }
+
+    // ---- Telegraph messages (v0.51.0) ----
+
+    /** The most telegraph messages remembered per frequency. */
+    public static final int MAX_MESSAGES = 16;
+
+    /**
+     * One message sent from a Radio Telegraph: when, where it could be read (the telegraph's own
+     * reach, towers that relayed it, repeaters on its frequency), the telegraph it came from, who
+     * sent it, and the text.
+     */
+    public record Message(long gameTime, long dayTime, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text) {
+        public Message {
+            coverage = List.copyOf(coverage);
+            from = from.immutable();
+        }
+    }
+
+    private final Map<Integer, ArrayDeque<Message>> messages = new HashMap<>();
+    /** Loaded telegraphs by frequency, with who tuned them (not saved; they check in like receivers). */
+    private final Map<Integer, Map<BlockPos, TrackedReceiver>> telegraphs = new HashMap<>();
+    private final Map<BlockPos, Integer> telegraphFrequencies = new HashMap<>();
+
+    /** Remembers a message sent on {@code frequency} over {@code coverage}, and returns it. */
+    public Message recordMessage(int frequency, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text) {
+        Message message = new Message(now, nowDayTime, coverage, from, who, name, text);
+        ArrayDeque<Message> list = messages.computeIfAbsent(frequency, f -> new ArrayDeque<>());
+        list.addLast(message);
+        while (list.size() > MAX_MESSAGES) {
+            list.removeFirst();
+        }
+        bump(frequency); // so Status Boards on it look again at once
+        setDirty();
+        return message;
+    }
+
+    /** Every remembered message on {@code frequency} in this dimension, oldest first. */
+    public List<Message> messages(int frequency) {
+        ArrayDeque<Message> list = messages.get(frequency);
+        return list == null ? List.of() : List.copyOf(list);
+    }
+
+    /** The messages on {@code frequency} that could be read at {@code pos}, oldest first. */
+    public List<Message> messagesAt(int frequency, BlockPos pos) {
+        List<Message> heard = new ArrayList<>();
+        for (Message message : messages(frequency)) {
+            if (covers(message.coverage(), pos)) {
+                heard.add(message);
+            }
+        }
+        return heard;
+    }
+
+    /** The newest message on {@code frequency} readable at {@code pos} sent after {@code sinceGameTime}, or null. */
+    public @Nullable Message lastMessageAt(int frequency, BlockPos pos, long sinceGameTime) {
+        List<Message> heard = messagesAt(frequency, pos);
+        Message last = heard.isEmpty() ? null : heard.get(heard.size() - 1);
+        return last != null && last.gameTime() > sinceGameTime ? last : null;
+    }
+
+    /** A loaded telegraph says which frequency it's on (first tick, re-tune, new tuner). */
+    public void trackTelegraph(BlockPos pos, int frequency, @Nullable UUID tunedBy) {
+        BlockPos key = pos.immutable();
+        Integer previous = telegraphFrequencies.put(key, frequency);
+        if (previous != null && previous != frequency) {
+            Map<BlockPos, TrackedReceiver> old = telegraphs.get(previous);
+            if (old != null) {
+                old.remove(key);
+                if (old.isEmpty()) telegraphs.remove(previous);
+            }
+        }
+        telegraphs.computeIfAbsent(frequency, f -> new HashMap<>()).put(key, new TrackedReceiver(key, tunedBy));
+    }
+
+    /** A telegraph was broken or its chunk unloaded. */
+    public void untrackTelegraph(BlockPos pos) {
+        Integer previous = telegraphFrequencies.remove(pos);
+        if (previous != null) {
+            Map<BlockPos, TrackedReceiver> old = telegraphs.get(previous);
+            if (old != null) {
+                old.remove(pos);
+                if (old.isEmpty()) telegraphs.remove(previous);
+            }
+        }
+    }
+
+    /** The loaded telegraphs on {@code frequency}. */
+    public List<TrackedReceiver> telegraphsOn(int frequency) {
+        Map<BlockPos, TrackedReceiver> on = telegraphs.get(frequency);
+        return on == null ? List.of() : List.copyOf(on.values());
     }
 
     /** Ends pulses whose time is up. Called every server tick for each dimension. */
@@ -2380,6 +2473,36 @@ public final class SignalNetwork extends SavedData {
             }
         });
         tag.put("turn_ons", turnOns);
+        ListTag messageList = new ListTag(); // v0.51.0
+        messages.forEach((frequency, recent) -> {
+            for (Message message : recent) {
+                CompoundTag entry = new CompoundTag();
+                entry.putInt("frequency", frequency);
+                entry.putLong("time", message.gameTime());
+                entry.putLong("day_time", message.dayTime());
+                entry.putLong("from", message.from().asLong());
+                if (message.who() != null) {
+                    entry.putUUID("who", message.who());
+                }
+                entry.putString("name", message.name());
+                entry.putString("text", message.text());
+                ListTag areas = new ListTag();
+                for (Coverage area : message.coverage()) {
+                    CompoundTag areaTag = new CompoundTag();
+                    areaTag.putLong("pos", area.origin().asLong());
+                    areaTag.putInt("reach", area.reach());
+                    areaTag.putBoolean("tower", area.tower());
+                    if (area.aim() >= 0) {
+                        areaTag.putInt("far", area.far());
+                        areaTag.putInt("aim", area.aim());
+                    }
+                    areas.add(areaTag);
+                }
+                entry.put("coverage", areas);
+                messageList.add(entry);
+            }
+        });
+        tag.put("messages", messageList);
         return tag;
     }
 
@@ -2477,6 +2600,24 @@ public final class SignalNetwork extends SavedData {
             }
             recent.addLast(new TurnOn(entry.getLong("time"), entry.getLong("day_time"), coverage, cause, entry.getInt("from")));
             while (recent.size() > MAX_HISTORY) {
+                recent.removeFirst();
+            }
+        }
+        ListTag messageList = tag.getList("messages", Tag.TAG_COMPOUND);
+        for (int i = 0; i < messageList.size(); i++) {
+            CompoundTag entry = messageList.getCompound(i);
+            List<Coverage> coverage = new ArrayList<>();
+            ListTag areas = entry.getList("coverage", Tag.TAG_COMPOUND);
+            for (int j = 0; j < areas.size(); j++) {
+                CompoundTag area = areas.getCompound(j);
+                coverage.add(area.contains("aim")
+                        ? new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), area.getBoolean("tower"), area.getInt("far"), area.getInt("aim"))
+                        : new Coverage(BlockPos.of(area.getLong("pos")), area.getInt("reach"), area.getBoolean("tower")));
+            }
+            ArrayDeque<Message> recent = network.messages.computeIfAbsent(Frequency.clamp(entry.getInt("frequency")), f -> new ArrayDeque<>());
+            recent.addLast(new Message(entry.getLong("time"), entry.getLong("day_time"), coverage, BlockPos.of(entry.getLong("from")),
+                    entry.hasUUID("who") ? entry.getUUID("who") : null, entry.getString("name"), entry.getString("text")));
+            while (recent.size() > MAX_MESSAGES) {
                 recent.removeFirst();
             }
         }

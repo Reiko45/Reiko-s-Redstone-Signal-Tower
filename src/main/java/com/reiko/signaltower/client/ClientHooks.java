@@ -131,6 +131,18 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new RecorderScreen(state));
     }
 
+    /** v0.51.0: a Radio Telegraph's screen: open it, or update the one that's open. */
+    public static void onTelegraphFeed(com.reiko.signaltower.network.TelegraphFeedPayload feed) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (feed.open()) {
+            minecraft.setScreen(new TelegraphScreen(feed));
+        } else if (minecraft.screen instanceof TelegraphScreen screen) {
+            screen.onFeed(feed);
+        } else if (minecraft.player != null && feed.notice().isPresent()) {
+            minecraft.player.displayClientMessage(feed.notice().get(), true);
+        }
+    }
+
     /** A recorder's status arrived: hand it to its open screen, if there is one. */
     public static void onRecorderStatus(com.reiko.signaltower.network.RecorderStatus status) {
         if (Minecraft.getInstance().screen instanceof RecorderScreen screen) {

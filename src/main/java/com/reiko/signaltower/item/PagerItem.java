@@ -155,6 +155,22 @@ public class PagerItem extends Item {
             if (!FrequencyClaims.mayHear(level, frequency, player.getUUID())) {
                 continue; // someone else's encrypted frequency: the pager heard nothing
             }
+            // v0.51.0: telegraph messages it missed, the last one in full.
+            List<SignalNetwork.Message> missed = new java.util.ArrayList<>();
+            for (SignalNetwork.Message message : network.messagesAt(frequency, player.blockPosition())) {
+                if (message.gameTime() > since) {
+                    missed.add(message);
+                }
+            }
+            if (!missed.isEmpty()) {
+                SignalNetwork.Message last = missed.get(missed.size() - 1);
+                Object[] at = dayAndTime(last.dayTime());
+                lines.add((missed.size() == 1
+                        ? Component.translatable(KEY + "pager_catchup_message", label(pager), FrequencyNames.label(level, frequency),
+                                last.name(), at[0], at[1], last.text())
+                        : Component.translatable(KEY + "pager_catchup_messages", label(pager), FrequencyNames.label(level, frequency),
+                                missed.size(), last.name(), at[0], at[1], last.text())).withStyle(ChatFormatting.YELLOW));
+            }
             List<SignalNetwork.TurnOn> heard = network.turnOnsSince(frequency, since, player.blockPosition());
             if (heard.isEmpty()) {
                 continue;
@@ -234,6 +250,42 @@ public class PagerItem extends Item {
             stack.set(ModRegistry.PAGER_BEEPS.get(), BEEPS - 1);
         }
         return alert;
+    }
+
+    /**
+     * v0.51.0: a telegraph message on {@code frequency} reached the pagers in {@code player}'s
+     * inventory, if the player is where it can be read (and may read it, if it's encrypted): one
+     * line in chat and above the hotbar, and two beeps (unless every pager on it is silent).
+     * Returns how many pagers on it they carry (0 if it didn't reach them).
+     */
+    public static int deliverMessage(ServerLevel level, Player player, int frequency, SignalNetwork.Message message) {
+        if (!SignalNetwork.covers(message.coverage(), player.blockPosition())
+                || !FrequencyClaims.mayHear(level, frequency, player.getUUID())) {
+            return 0;
+        }
+        ItemStack first = null;
+        ItemStack beeping = null;
+        int count = 0;
+        for (ItemStack pager : pagersOf(player)) {
+            if (FrequencyTunerItem.getFrequency(pager) != frequency) {
+                continue;
+            }
+            count++;
+            if (first == null) first = pager;
+            if (beeping == null && !isSilent(pager)) beeping = pager;
+        }
+        if (first == null) {
+            return 0;
+        }
+        Component line = Component.translatable(KEY + "pager_message", label(first), FrequencyNames.label(level, frequency),
+                message.name(), message.text()).withStyle(ChatFormatting.YELLOW);
+        player.displayClientMessage(line, true);
+        player.displayClientMessage(chatLine(message.dayTime(), line), false);
+        if (beeping != null) {
+            beep(player);
+            beeping.set(ModRegistry.PAGER_BEEPS.get(), 1);
+        }
+        return count;
     }
 
     /** One beep, heard only by the pager's owner. */

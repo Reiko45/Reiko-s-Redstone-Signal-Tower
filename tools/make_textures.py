@@ -507,6 +507,73 @@ def solar_side():
     return img
 
 
+def telegraph_top():
+    """The Radio Telegraph's desk (v0.51.0): dark walnut with a grain, a steel rim."""
+    rnd = random.Random(5100)
+    img = blank()
+    px = img.load()
+    wood = [(58, 34, 20, 255), (74, 45, 26, 255), (90, 56, 33, 255)]
+    rim = (118, 123, 134, 255)
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15):
+                px[x, y] = rim
+            else:
+                grain = (y * 3 + (x // 5)) % 7
+                px[x, y] = wood[0] if grain == 0 else wood[2] if rnd.random() < 0.12 else wood[1]
+    return img
+
+
+def telegraph_side():
+    """Its edge (the bottom four rows show): walnut between two steel bands."""
+    img = telegraph_top()
+    px = img.load()
+    for x in range(16):
+        px[x, 12] = (156, 162, 175, 255)
+        px[x, 15] = (60, 63, 71, 255)
+    return img
+
+
+def telegraph_brass():
+    rnd = random.Random(5101)
+    img = blank()
+    px = img.load()
+    shades = [(150, 112, 40, 255), (190, 150, 60, 255), (224, 184, 84, 255)]
+    for y in range(16):
+        for x in range(16):
+            px[x, y] = shades[2] if y % 4 == 0 else shades[0] if rnd.random() < 0.2 else shades[1]
+    return img
+
+
+def telegraph_knob():
+    img = blank((24, 24, 28, 255))
+    px = img.load()
+    for x in range(16):
+        px[x, 0] = (70, 70, 78, 255)
+    return img
+
+
+def telegraph_sounder():
+    """The sounder's steel case."""
+    return casing(5102, rivets=False)
+
+
+def telegraph_lamp(lit):
+    """The sounder's front: steel, with a round amber lamp (lit when a message arrives)."""
+    img = casing(5102, rivets=False)
+    px = img.load()
+    glass = [(255, 240, 180, 255), (255, 200, 80, 255), (214, 140, 30, 255)] if lit \
+        else [(140, 100, 30, 255), (100, 70, 20, 255), (70, 46, 12, 255)]
+    for y in range(6, 12):
+        for x in range(3, 13):
+            d = (x - 7.5) ** 2 + (y - 8.5) ** 2
+            if d <= 5.5:
+                px[x, y] = glass[0] if d < 1.2 else glass[1] if d < 3.5 else glass[2]
+            elif d <= 8:
+                px[x, y] = (38, 40, 46, 255)
+    return img
+
+
 def coverage_map_item():
     """The Coverage Map (v0.49.0): a paper map with coverage rings in green, yellow and red around a tower dot."""
     import math
@@ -1086,6 +1153,13 @@ blocks = {
     "radio_battery_top": battery_top(),
     "solar_panel_top": solar_top(),
     "solar_panel_side": solar_side(),
+    "radio_telegraph_top": telegraph_top(),
+    "radio_telegraph_side": telegraph_side(),
+    "radio_telegraph_brass": telegraph_brass(),
+    "radio_telegraph_knob": telegraph_knob(),
+    "radio_telegraph_sounder": telegraph_sounder(),
+    "radio_telegraph_lamp": telegraph_lamp(False),
+    "radio_telegraph_lamp_on": telegraph_lamp(True),
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
     "compact_radio_transmitter": compact_transmitter(False),

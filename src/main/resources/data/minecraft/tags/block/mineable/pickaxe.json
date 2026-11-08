@@ -22,6 +22,7 @@
     "reikos_signal_tower:code_keypad",
     "reikos_signal_tower:radio_mast",
     "reikos_signal_tower:radio_battery",
-    "reikos_signal_tower:solar_panel"
+    "reikos_signal_tower:solar_panel",
+    "reikos_signal_tower:radio_telegraph"
   ]
 }

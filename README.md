@@ -30,11 +30,12 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
+| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
 | **Radio Jammer** | A tower top that drowns out one frequency around it while it gets redstone. Everything there that listens on that frequency hears that much less, and a full-strength signal silences it completely. It reaches half as far as a transmitter at the same height. On someone else's private frequency it does nothing, and the owner is told. |
-| **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
+| **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. Right-click a tower's mast with another one and it goes in under the top, so you can raise a tower from the ground. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
@@ -49,7 +50,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 
 ## How to use it
 
-1. **Build a tower.** Stack Radio Masts and put a Radio Transmitter on top.
+1. **Build a tower.** Stack Radio Masts and put a Radio Transmitter on top. (Or put the transmitter on one mast and right-click the mast with more: each goes in under the top, see Mast builder.)
 2. **Power it from the ground.** Put a lever, redstone wire, or any other signal next to any mast in the column, or next to the transmitter itself.
 3. **Tune it.** Right-click the air with a Frequency Tuner and type a frequency (any whole number from 1 to 999,999,999). Then right-click the transmitter with the tuner.
 
@@ -608,6 +609,33 @@ A **Solar Panel** (since 0.50) is a flat panel you put on top of a Radio Battery
 
 ![Dev looking at a Radio Transmitter on 4480 at night: Jade saying "Sending: nothing" and "Out of power: needs a charged Radio Battery next to it or its mast"; Dev right-clicking the Radio Battery next to it with a stack of redstone: "Radio Battery: +64,000 charge (64,000 / 100,000)", three bars lit, Jade "Charge: 63,999 / 100,000 (64%)", "Powering towers: 0.88 a second (about 20h 19m left)"; the tower sending again, Jade "Sending: 15", "Battery: 64% (about 20h 18m left at 0.88 a second)"; and Alex holding a Coverage Map of 4460 at 1:2: a green disc round the transmitter's red marker, fading through yellow and orange to red at the edge, a blue marker on the repeater and a red X on the jammer](docs/images/power-cost-and-coverage-map.png)
 
+### Mast builder
+
+Since 0.51, a **Radio Mast** in your hand raises a tower: right-click any mast of the tower (or its top) and a new mast goes in **under the top**, lifting the top one block. So you can build a tall tower standing on the ground, one click per mast.
+
+- The top keeps everything: its frequency, its antenna (and where a dish points, or where an Ender Antenna sends), its schedule or recording, who tuned it. An Aviation Beacon standing on it or a Lightning Rod on it goes up with it.
+- The message says how far up it is and how far it reaches now: "Mast added: the Radio Transmitter is 3 masts up, reach 72 → 80 blocks".
+- A mast column with nothing on top grows from the top instead ("Mast added on top: 5 masts tall").
+- It needs room: if something solid is in the way above, it says what and where. It can't go past the top of the world.
+- On someone else's private frequency, only its owner and members can raise the tower (like fitting an antenna).
+- Sneak + right-click to place a mast the normal way, next to the one you click.
+
+### Radio Telegraph
+
+A **Radio Telegraph** (since 0.51) is a desk for sending short text messages over the radio. Right-click it to open its screen: its frequency (with "..." for the directory), how far it reaches, the last 6 messages that reached it, and a box to type one (up to 64 characters). **Send** or Enter sends it (changing the frequency box re-tunes it first).
+
+- A message goes out like a Remote Control press from where the telegraph stands: its reach by its height, plus every tower within that reach passing it on with its own reach, plus repeaters on the frequency.
+- **Who reads it** (on the same frequency, where it reaches):
+  - **Pagers** anywhere in a player's inventory: a line in chat and above the hotbar, "Radio Pager: message on 4600 from Dev: “Front gate is open, come on over”", and two beeps (unless the pager is silent). A pager whose owner was offline says at the next login what it missed, the last message in full.
+  - **Other telegraphs:** it shows in their screens (also ones that weren't loaded at the time), and a loaded one clicks three times, lights its lamp and gives a **1-second redstone pulse** (strongly powering the block under it), so it can ring a bell or light a lamp.
+  - **Status Boards** showing that frequency: the last message, small and yellow under its row, for 5 minutes.
+- The sender sees who got it: "Sent on 4600 (reach 56 blocks + 2 towers) | Read by 1 pager and 1 telegraph".
+- Messages don't turn the frequency on (receivers don't react). One telegraph can send one every 2 seconds. Each dimension keeps the last 16 per frequency.
+- **Private frequencies:** only the owner and members can send (others are refused, and the owner is told). On an encrypted one only members' pagers and telegraphs (and boards set by members) can read the text; others see that a message came, but "(encrypted)". The frequency log lists messages with who sent them, where from, and the text.
+- Jade: "Last message (just now): “Lights on in the hall too” from Dev", "Messages here: 2", "A message just arrived" while its lamp is lit.
+
+![Dev raising the tower on 4601 by right-clicking its bottom mast with a Radio Mast: "Mast added: the Radio Transmitter is 3 masts up, reach 72 → 80 blocks", Jade on the mast "Top: Radio Transmitter, 3 blocks up"; the raised tower with its Aviation Beacon still on top, Jade "Reach: 80 blocks", "Battery: 80% (about 17h 45m left at 1.25 a second)"; Dev's Radio Telegraph screen on 4600 with two messages and "Sent on 4600 (reach 56 blocks + 2 towers) | Read by 1 pager and 1 telegraph"; Alex 40 blocks away by his own telegraph, its lamp lit, Jade "Last message (just now): “Lights on in the hall too” from Dev", "A message just arrived", and his pager's line in chat; the Status Board with the message under row 4600; and Alex logging back in to "Radio Pager: while you were away, a message on 4600 from Dev (Day 1, 12:00): “Back in 5 minutes”"](docs/images/mast-builder-and-telegraph.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -763,6 +791,8 @@ I = Iron Ingot   C = Copper Ingot   B = Block of Redstone
 G = Glass Pane   C = Copper Ingot   D = Daylight Detector
 ```
 
+**Radio Telegraph:** a Radio Transmitter, a Radio Receiver and a Book and Quill, in any arrangement in the crafting grid.
+
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
 **Radio Jammer:** a Radio Transmitter, a Note Block and a Redstone Dust, in any arrangement in the crafting grid.
@@ -864,6 +894,12 @@ src/main/java/com/reiko/signaltower/
   radio/CrossDimension.java              Ender Antenna links: where a tower arrives in another dimension, which one
   block/SolarPanelBlock.java             the flat panel on a battery
   blockentity/SolarPanelBlockEntity.java  sunlight (like a Daylight Detector) into charge for the battery under it
+  radio/MastBuilder.java                 a mast used on a tower goes in under its top (lifting the top and what's on it)
+  radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
+  block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
+  blockentity/TelegraphBlockEntity.java  checks in with the network; clicks and pulses; sending cooldown
+  client/TelegraphScreen.java            the telegraph's screen (frequency, messages, typing)
+  network/TelegraphFeedPayload.java, TelegraphActionPayload.java  telegraph screen <-> server
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -1122,9 +1158,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 154. power cost (in a batch of its own, with it on; every other test runs with it off): a transmitter with no battery, or an empty one, is out of power (its light off, Jade says so, its receiver dark); repeaters and jammers need one too, compact transmitters don't; a battery by its mast feeds the tower on top; three Redstone Dust (3,000) bring it back, it uses 1 a second per 64 blocks of reach, Jade shows both ends, and it goes quiet when the charge runs out; a hopper puts Blocks of Redstone in, FE charges it, it's full at 100,000, a comparator reads 15 full and 8 at half, and the item keeps its charge;
 155. the Coverage Map: green, yellow, orange, red, blank; every pixel of a map at 1:4 painted from the network (heard inside the 100-block reach, blank in a jammer's 20 and beyond); drawn in the world it's a real map at 1:4, the same map again in the same square, painted green round a transmitter with a red marker on it after a whole pass while held, and a new map at a new zoom;
 156. the Ender Antenna: 1/8 into the Nether and back (rounding down), 1:1 into the End, the height kept inside the world; the Nether from the Overworld and the Overworld from elsewhere to start with, and the next dimension round after that; a repeater can't take one; fitted to a transmitter, the Nether hears it at the spot it arrives, out to its reach and no farther (the meter's edge too), Jade says where it goes, and the Nether knows at once when it turns off; another one moves it on to the End (nothing used up) and the Nether stops hearing it; saved in the network and the block; gone with the tower;
-157. the Solar Panel: 3 a second in full sun and a third at 5; fractions add up from one second to the next; with no battery under it Jade says so; on a battery it charges it by day (Jade on both) and not in the dark.
+157. the Solar Panel: 3 a second in full sun and a third at 5; fractions add up from one second to the next; with no battery under it Jade says so; on a battery it charges it by day (Jade on both) and not in the dark;
+158. the mast builder: a mast used on a tower's bottom mast goes in under the top, lifting it with its frequency, its Diamond Antenna and the beacon on it, the network following and the reach growing (the message says 2 masts up, the reach before and after); used on the top itself it works too, and redstone still comes up the column; with stone in the way it says there's no room; a bare column grows on top, and a lightning rod rides up; someone else's private tower is refused (nothing used up);
+159. the Radio Telegraph: messages are cleaned and cut to 64 characters; one sent on 4533 is remembered and read by the other telegraph on 4533 (it pulses, its screen shows it), not one on 4534 or the sender; sending again at once, or nothing, is refused; a pager back from being away says what it missed, and one in reach gets it (in chat too), not one on another frequency; a Status Board row would show it; Jade shows the last one; saved; the pulse ends; on an encrypted frequency a non-member can't send, and the owner's message isn't readable on a non-member's telegraph (its screen says "encrypted", Jade says deaf) but the log keeps it; the screen re-tunes it, and its packet round-trips.
 
-All 157 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 159 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

@@ -36,12 +36,15 @@ public class StatusBoardBlockEntity extends BlockEntity {
     private static final String FREQUENCIES_TAG = "board_frequencies";
     private static final String STRENGTHS_TAG = "board_strengths";
     private static final String DEAF_TAG = "board_deaf";
+    private static final String MESSAGES_TAG = "board_messages";
     private static final String TUNED_BY_TAG = "tuned_by";
     private static final int RECHECK_INTERVAL = 20;
 
     private final int[] frequencies = new int[ROWS];
     private final int[] strengths = new int[ROWS];
     private final boolean[] deaf = new boolean[ROWS];
+    /** v0.51.0: each row's last telegraph message ("Dev: hello"), for {@link com.reiko.signaltower.radio.Telegraph#BOARD_TICKS}; "" for none. */
+    private final String[] messages = {"", "", "", ""};
     private final long[] seenRevisions = new long[ROWS];
     private @Nullable UUID tunedBy;
     private int timer;
@@ -64,6 +67,11 @@ public class StatusBoardBlockEntity extends BlockEntity {
 
     public boolean isDeaf(int row) {
         return deaf[row];
+    }
+
+    /** Row {@code row}'s last telegraph message as shown ("Dev: hello"), or "" (v0.51.0). */
+    public String getMessage(int row) {
+        return messages[row];
     }
 
     public List<Integer> frequencyList() {
@@ -121,9 +129,18 @@ public class StatusBoardBlockEntity extends BlockEntity {
                 deafHere = !FrequencyClaims.mayHear(serverLevel, frequency, board.tunedBy);
                 strength = deafHere ? 0 : network.listen(serverLevel, frequency, pos).power();
             }
-            if (strength != board.strengths[i] || deafHere != board.deaf[i]) {
+            String message = "";
+            if (frequency > 0 && !deafHere) {
+                SignalNetwork.Message last = network.lastMessageAt(frequency, pos,
+                        serverLevel.getGameTime() - com.reiko.signaltower.radio.Telegraph.BOARD_TICKS);
+                if (last != null) {
+                    message = last.name() + ": " + last.text();
+                }
+            }
+            if (strength != board.strengths[i] || deafHere != board.deaf[i] || !message.equals(board.messages[i])) {
                 board.strengths[i] = strength;
                 board.deaf[i] = deafHere;
+                board.messages[i] = message;
                 updated = true;
             }
         }
@@ -156,16 +173,18 @@ public class StatusBoardBlockEntity extends BlockEntity {
         if (tag.contains(STRENGTHS_TAG)) {
             int[] heard = tag.getIntArray(STRENGTHS_TAG);
             byte[] deafRows = tag.getByteArray(DEAF_TAG);
+            net.minecraft.nbt.ListTag shown = tag.getList(MESSAGES_TAG, net.minecraft.nbt.Tag.TAG_STRING);
             for (int i = 0; i < ROWS; i++) {
                 strengths[i] = i < heard.length ? heard[i] : 0;
                 deaf[i] = i < deafRows.length && deafRows[i] != 0;
+                messages[i] = i < shown.size() ? shown.getString(i) : "";
             }
         }
         Arrays.fill(seenRevisions, -1);
         dirtyRows = true;
     }
 
-    /** What clients get: the rows, the strengths and the deaf rows (not who set it). */
+    /** What clients get: the rows, the strengths, the deaf rows and the messages (not who set it). */
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
@@ -176,6 +195,11 @@ public class StatusBoardBlockEntity extends BlockEntity {
             deafRows[i] = (byte) (deaf[i] ? 1 : 0);
         }
         tag.putByteArray(DEAF_TAG, deafRows);
+        net.minecraft.nbt.ListTag shown = new net.minecraft.nbt.ListTag();
+        for (String message : messages) {
+            shown.add(net.minecraft.nbt.StringTag.valueOf(message));
+        }
+        tag.put(MESSAGES_TAG, shown);
         return tag;
     }
 

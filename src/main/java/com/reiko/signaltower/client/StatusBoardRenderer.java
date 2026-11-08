@@ -18,7 +18,8 @@ import org.joml.Matrix4f;
 /**
  * Draws a Radio Status Board's rows on its face (v0.43.0): for each frequency a light (green while
  * it's heard, dark red while off, grey if the board can't hear it), its name (or number) and, on
- * the right, the strength, "off" or "enc". Full bright, so it reads at night. Only drawn within 32
+ * the right, the strength, "off" or "enc"; under it, small, the last telegraph message for 5
+ * minutes (v0.51.0), else the number under a name. Full bright, so it reads at night. Only drawn within 32
  * blocks, like sign text.
  */
 public class StatusBoardRenderer implements BlockEntityRenderer<StatusBoardBlockEntity> {
@@ -30,6 +31,7 @@ public class StatusBoardRenderer implements BlockEntityRenderer<StatusBoardBlock
     private static final int TEXT = 0xFFE8E8E8;
     private static final int DIM = 0xFF9A9A9A;
     private static final int RED = 0xFFFF5555;
+    private static final int MESSAGE = 0xFFFFE070;
 
     private final Font font;
 
@@ -71,12 +73,18 @@ public class StatusBoardRenderer implements BlockEntityRenderer<StatusBoardBlock
                 cut = font.plainSubstrByWidth(label, room - font.width("…")) + "…";
             }
             draw(cut, -32, y, TEXT, matrix, buffer);
-            if (name != null) {
-                // The number under the name, small and dim.
+            String message = board.getMessage(i);
+            if (!message.isEmpty() || name != null) {
+                // Small under the row: the last telegraph message (v0.51.0), else the number under the name.
                 poseStack.pushPose();
                 poseStack.translate(-32, y + 9, 0);
                 poseStack.scale(0.6F, 0.6F, 0.6F);
-                font.drawInBatch(Integer.toString(frequency), 0, 0, DIM, false, poseStack.last().pose(), buffer,
+                String small = message.isEmpty() ? Integer.toString(frequency) : message;
+                int smallRoom = (int) (72 / 0.6F);
+                if (font.width(small) > smallRoom) {
+                    small = font.plainSubstrByWidth(small, smallRoom - font.width("…")) + "…";
+                }
+                font.drawInBatch(small, 0, 0, message.isEmpty() ? DIM : MESSAGE, false, poseStack.last().pose(), buffer,
                         Font.DisplayMode.POLYGON_OFFSET, 0, LightTexture.FULL_BRIGHT);
                 poseStack.popPose();
             }

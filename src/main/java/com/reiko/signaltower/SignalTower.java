@@ -179,6 +179,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenSpeakerScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSpeakerScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureSpeakerPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureSpeakerPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureSpeakerPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.TelegraphFeedPayload.TYPE, // v0.51.0
+                com.reiko.signaltower.network.TelegraphFeedPayload.STREAM_CODEC, com.reiko.signaltower.network.TelegraphFeedPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.TelegraphActionPayload.TYPE,
+                com.reiko.signaltower.network.TelegraphActionPayload.STREAM_CODEC, com.reiko.signaltower.network.TelegraphActionPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenBoardScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenBoardScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenBoardScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureBoardPayload.TYPE,
@@ -290,6 +294,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_LAMP_ITEM.get());
             event.accept(ModRegistry.RADIO_BATTERY_ITEM.get());
             event.accept(ModRegistry.SOLAR_PANEL_ITEM.get());
+            event.accept(ModRegistry.RADIO_TELEGRAPH_ITEM.get());
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

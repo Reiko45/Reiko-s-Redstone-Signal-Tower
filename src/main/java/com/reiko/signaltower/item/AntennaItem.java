@@ -155,8 +155,16 @@ public class AntennaItem extends Item {
         return true;
     }
 
-    /** The red refusal (and the owner's alert) if the tower sends on someone else's private frequency, else null. */
+    /** {@link #towerRefusal}. */
     private static @Nullable Component refusal(Player player, BlockPos pos, BlockState state) {
+        return towerRefusal(player, pos, state);
+    }
+
+    /**
+     * The red refusal (and the owner's alert) if the tower top at {@code pos} sends on someone else's
+     * private frequency, else null. Also for raising it with a mast (v0.51.0).
+     */
+    public static @Nullable Component towerRefusal(Player player, BlockPos pos, BlockState state) {
         if (!(player.level().getBlockEntity(pos) instanceof RadioBlockEntity radio)) {
             return null;
         }
@@ -170,7 +178,7 @@ public class AntennaItem extends Item {
     }
 
     /** The reach shown in the messages: a tower's (a jammer's jamming reach), in the weather where it stands now. */
-    private static int reachShown(Level level, BlockPos pos, BlockState state) {
+    public static int reachShown(Level level, BlockPos pos, BlockState state) {
         if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
             return RadioHelper.towerReach(level, pos, state);
         }

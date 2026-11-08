@@ -54,7 +54,14 @@ public abstract class RadioBlock extends BaseEntityBlock {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
-        // Empty hand: fall through to the status readout. Holding anything else (the tuner, a mast,
+        // v0.51.0: a mast on a tower top goes in under it (sneak to place it the normal way).
+        if (stack.is(ModRegistry.RADIO_MAST_ITEM.get()) && com.reiko.signaltower.radio.MastBuilder.builds(state)) {
+            if (!level.isClientSide) {
+                com.reiko.signaltower.radio.MastBuilder.build(player, pos, stack);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+        // Empty hand: fall through to the status readout. Holding anything else (the tuner,
         // another block) skips the readout so that item gets used normally.
         return stack.isEmpty()
                 ? ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION
@@ -102,6 +109,10 @@ public abstract class RadioBlock extends BaseEntityBlock {
         }
         if (entity instanceof RadioRepeaterBlockEntity relay && relay.isConverter()) {
             return FrequencyClaims.deafness(level, relay.getFrequency(), relay.getTunedBy(), "encrypted_deaf");
+        }
+        if (entity instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraph) {
+            // v0.51.0: it can't read messages on someone else's encrypted frequency.
+            return FrequencyClaims.deafness(level, telegraph.getFrequency(), telegraph.getTunedBy(), "encrypted_deaf");
         }
         return null;
     }

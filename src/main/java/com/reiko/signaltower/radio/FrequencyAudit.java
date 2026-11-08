@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP, JAMMER;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP, JAMMER, TELEGRAPH;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -149,6 +149,13 @@ public final class FrequencyAudit {
                 Status status = FrequencyClaims.mayHear(level, frequency, tunedBy) ? Status.WORKING : Status.DEAF;
                 found.add(row(server, claim, kind, dimension, receiver.pos(), tunedBy, status,
                         state.getValue(RadioReceiverBlock.POWER)));
+            }
+
+            // v0.51.0: loaded Radio Telegraphs on it, and whether they can read it.
+            for (SignalNetwork.TrackedReceiver telegraph : network.telegraphsOn(frequency)) {
+                UUID tunedBy = level.getBlockEntity(telegraph.pos()) instanceof RadioBlockEntity radio ? radio.getTunedBy() : telegraph.tunedBy();
+                found.add(row(server, claim, Kind.TELEGRAPH, dimension, telegraph.pos(), tunedBy,
+                        FrequencyClaims.mayHear(level, frequency, tunedBy) ? Status.WORKING : Status.DEAF, 0));
             }
 
             for (Entry entry : found) {

@@ -18,7 +18,8 @@ import java.util.UUID;
  * Like the audit, it shows where a transmitter is only if it's the owner's, a member's or one
  * with no recorded tuner; another player's is named but not located. Remote presses never have a
  * position (where someone stood isn't kept). A Code Keypad's turn-on (v0.37.0) shows the keypad and
- * who typed the code; a Radio Motion Sensor's (v0.39.0) shows the sensor and who it saw.
+ * who typed the code; a Radio Motion Sensor's (v0.39.0) shows the sensor and who it saw. Radio
+ * Telegraph messages (v0.51.0) are listed too, with the telegraph, who sent them and the text.
  */
 public final class FrequencyLog {
     /** The most rows shown: as many as one dimension remembers per frequency. */
@@ -54,6 +55,19 @@ public final class FrequencyLog {
             java.util.Collections.reverse(history); // newest first, so equal times keep that order below
             for (SignalNetwork.TurnOn turnOn : history) {
                 entries.add(entry(server, claim, frequency, dimension, turnOn));
+            }
+            // v0.51.0: telegraph messages, with the telegraph (on a private frequency only members send) and the text.
+            List<SignalNetwork.Message> messages = new ArrayList<>(SignalNetwork.get(level).messages(frequency));
+            java.util.Collections.reverse(messages);
+            for (SignalNetwork.Message message : messages) {
+                FrequencyAudit.Who whoKind = message.who() == null ? FrequencyAudit.Who.UNKNOWN
+                        : message.who().equals(claim.owner()) ? FrequencyAudit.Who.OWNER
+                        : claim.allows(message.who()) ? FrequencyAudit.Who.MEMBER : FrequencyAudit.Who.OTHER;
+                String who = message.who() == null ? message.name()
+                        : whoKind == FrequencyAudit.Who.OTHER ? message.name() : FrequencyAudit.nameOf(server, claim, message.who());
+                entries.add(new Entry(SignalNetwork.CauseKind.TELEGRAPH, dimension,
+                        whoKind == FrequencyAudit.Who.OTHER ? Optional.empty() : Optional.of(message.from()),
+                        who, whoKind, message.gameTime(), message.dayTime(), 0, message.text()));
             }
         }
         entries.sort(Comparator.comparingLong(Entry::gameTime).reversed());

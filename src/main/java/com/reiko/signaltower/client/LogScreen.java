@@ -170,6 +170,8 @@ public class LogScreen extends Screen {
     private static Component what(FrequencyLog.Entry entry) {
         Component kind = entry.kind() == SignalNetwork.CauseKind.KEYPAD && !entry.detail().isEmpty()
                 ? Component.translatable(KEY + "kind_keypad_guest", entry.detail())
+                : entry.kind() == SignalNetwork.CauseKind.TELEGRAPH
+                ? Component.translatable(KEY + "kind_telegraph_text", entry.detail()).withStyle(ChatFormatting.YELLOW)
                 : Component.translatable(KEY + "kind_" + entry.kind().name().toLowerCase(java.util.Locale.ROOT));
         return entry.from() != 0 ? Component.translatable(KEY + "kind_from", kind, entry.from()).withStyle(ChatFormatting.AQUA) : kind;
     }
@@ -262,6 +264,13 @@ public class LogScreen extends Screen {
                 lines.add((entry.whoKind() == FrequencyAudit.Who.OTHER
                         ? Component.translatable(KEY + "tip_other_keypad", entry.who()).withStyle(ChatFormatting.RED)
                         : Component.translatable(KEY + "tip_keypad", entry.who()).withStyle(ChatFormatting.YELLOW)));
+                entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
+            }
+            case TELEGRAPH -> {
+                lines.add(Component.literal(entry.detail()).withStyle(ChatFormatting.YELLOW));
+                lines.add((entry.whoKind() == FrequencyAudit.Who.OTHER
+                        ? Component.translatable(KEY + "tip_other_telegraph", entry.who()).withStyle(ChatFormatting.RED)
+                        : Component.translatable(KEY + "tip_telegraph", entry.who()).withStyle(ChatFormatting.YELLOW)));
                 entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
             }
             case SENSOR -> {

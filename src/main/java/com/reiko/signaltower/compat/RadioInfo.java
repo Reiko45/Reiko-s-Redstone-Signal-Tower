@@ -126,7 +126,8 @@ public final class RadioInfo {
                     }
                 }
                 if (level.getBlockEntity(pos) instanceof RadioBlockEntity radio
-                        && (radio instanceof RadioReceiverBlockEntity || radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter())) {
+                        && (radio instanceof RadioReceiverBlockEntity || radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter()
+                            || radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity)) {
                     FrequencyClaims.Claim heard = FrequencyClaims.get(level.getServer()).get(radio.getFrequency());
                     if (heard != null && !heard.hears(radio.getTunedBy()) && radio.getTunedBy() != null) {
                         tag.putString("deaf_to", heard.ownerName());
@@ -237,6 +238,18 @@ public final class RadioInfo {
                     tag.putInt("threshold", converter.getThreshold());
                     tag.putInt("gate_heard", converter.gateHeard(level));
                 }
+            }
+        } else if (radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraph) {
+            // v0.51.0: how far it sends, how many messages reached it, and the last one (unless it can't read them).
+            tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            tag.putBoolean("telegraph", true);
+            List<SignalNetwork.Message> heard = SignalNetwork.get(level).messagesAt(frequency, pos);
+            tag.putInt("telegraph_count", heard.size());
+            if (!heard.isEmpty() && FrequencyClaims.mayHear(level, frequency, telegraph.getTunedBy())) {
+                SignalNetwork.Message last = heard.get(heard.size() - 1);
+                tag.putString("telegraph_from", last.name());
+                tag.putString("telegraph_text", last.text());
+                tag.putLong("telegraph_ago", Math.max(0, (level.getGameTime() - last.gameTime()) / 20));
             }
         } else if (block instanceof CodeKeypadBlock && radio instanceof CodeKeypadBlockEntity keypad) {
             // v0.37.0: whose it is, whether it has a code (never the code) and how far its pulse reaches.
@@ -420,7 +433,7 @@ public final class RadioInfo {
             lines.add(Component.translatable(LANG + "jammed", data.getInt("jammed")).withStyle(ChatFormatting.LIGHT_PURPLE));
         }
         boolean deaf = data != null && data.contains("deaf_to");
-        boolean receiver = state.getBlock() instanceof RadioReceiverBlock;
+        boolean receiver = state.getBlock() instanceof RadioReceiverBlock || state.getBlock() instanceof com.reiko.signaltower.block.RadioTelegraphBlock;
         // A deaf receiver's own frequency is the one it can't hear: one line says both.
         if (data != null && data.contains("private_to") && !(deaf && receiver)) {
             Component owner = Component.literal(data.getString("private_to"));
@@ -513,6 +526,27 @@ public final class RadioInfo {
             } else {
                 lines.add(frequencyLine(data));
                 addNoteLine(lines, data, "note");
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.RadioTelegraphBlock) {
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                if (data.contains("telegraph_text")) {
+                    lines.add(Component.translatable(LANG + "telegraph_last", Component.literal(data.getString("telegraph_text")),
+                            Component.literal(data.getString("telegraph_from")),
+                            com.reiko.signaltower.radio.Telegraph.ago(data.getLong("telegraph_ago"))).withStyle(ChatFormatting.YELLOW));
+                    lines.add(Component.translatable(LANG + "telegraph_count", data.getInt("telegraph_count")).withStyle(ChatFormatting.GRAY));
+                } else if (data.getInt("telegraph_count") == 0) {
+                    lines.add(Component.translatable(LANG + "telegraph_none").withStyle(ChatFormatting.GRAY));
+                }
+            }
+            if (state.getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED)) {
+                lines.add(Component.translatable(LANG + "telegraph_arrived").withStyle(ChatFormatting.GREEN));
+            }
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }
             return lines;
         }
@@ -786,6 +820,9 @@ public final class RadioInfo {
                 row.putString("name", name);
             }
             row.putInt("strength", board.getStrength(i));
+            if (!board.getMessage(i).isEmpty()) {
+                row.putString("message", board.getMessage(i)); // v0.51.0
+            }
             if (board.isDeaf(i)) {
                 FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
                 row.putString("deaf_to", claim != null ? claim.ownerName() : "?");
@@ -886,6 +923,9 @@ public final class RadioInfo {
                     ? Component.translatable(LANG + "board_row_deaf", frequency, Component.literal(row.getString("deaf_to"))).withStyle(ChatFormatting.RED)
                     : strength > 0 ? Component.translatable(LANG + "board_row_on", frequency, value(strength))
                     : Component.translatable(LANG + "board_row_off", frequency).withStyle(ChatFormatting.GRAY));
+            if (row.contains("message")) {
+                lines.add(Component.translatable(LANG + "board_message", Component.literal(row.getString("message"))).withStyle(ChatFormatting.YELLOW));
+            }
         }
         return lines;
     }

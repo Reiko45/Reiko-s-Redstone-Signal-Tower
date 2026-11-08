@@ -50,7 +50,7 @@ public final class IntruderAlerts extends SavedData {
 
     /** What the intruder tried. Saved by name. KEYPAD (v0.37.0): three wrong codes in a row on the owner's Code Keypad. */
     public enum Kind {
-        REMOTE, TUNE, SILENT, DEAF, KEYPAD
+        REMOTE, TUNE, SILENT, DEAF, KEYPAD, TELEGRAPH
     }
 
     /**
