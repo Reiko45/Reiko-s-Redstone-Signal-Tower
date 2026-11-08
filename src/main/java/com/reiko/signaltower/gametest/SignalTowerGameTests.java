@@ -7064,42 +7064,42 @@ public final class SignalTowerGameTests {
 
         SignalNetwork network = new SignalNetwork().attachTo(level);
         BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000); // not loaded: no hills, no block checks
-        network.updateTransmitter(far, 4381, 15, 100);
-        SignalNetwork.Reception near = network.listen(level, 4381, far.east(40));
+        network.updateTransmitter(far, 4491, 15, 100);
+        SignalNetwork.Reception near = network.listen(level, 4491, far.east(40));
         check(near.power() == 15 && near.faded() == 0, "Full strength at 40 of 100: " + near);
-        SignalNetwork.Reception out = network.listen(level, 4381, far.east(75));
+        SignalNetwork.Reception out = network.listen(level, 4491, far.east(75));
         check(out.power() == 8 && out.faded() == 7, "8 at 75: " + out);
-        SignalNetwork.Reception edge = network.listen(level, 4381, far.east(100));
+        SignalNetwork.Reception edge = network.listen(level, 4491, far.east(100));
         check(edge.power() == 1 && edge.faded() == 14, "1 at the very edge: " + edge);
-        check(network.listen(level, 4381, far.east(101)).power() == 0, "Nothing beyond it");
-        check(network.listen(level, 4381, far.north(60).east(60)).power() == SignalNetwork.fade(15, Math.sqrt(7200) / 100),
+        check(network.listen(level, 4491, far.east(101)).power() == 0, "Nothing beyond it");
+        check(network.listen(level, 4491, far.north(60).east(60)).power() == SignalNetwork.fade(15, Math.sqrt(7200) / 100),
                 "By distance, whichever way");
 
-        network.updateRepeater(far.east(90), 4381, 64);
-        check(network.listen(level, 4381, far.east(110)).power() == 15, "A repeater 90 out sends it on at full strength");
-        check(network.listen(level, 4381, far.east(95)).power() == 15, "Near the repeater it's strong again");
-        check(network.listen(level, 4381, far.east(90 + 48)).power() == 8, "And it fades out toward the repeater's edge");
+        network.updateRepeater(far.east(90), 4491, 64);
+        check(network.listen(level, 4491, far.east(110)).power() == 15, "A repeater 90 out sends it on at full strength");
+        check(network.listen(level, 4491, far.east(95)).power() == 15, "Near the repeater it's strong again");
+        check(network.listen(level, 4491, far.east(90 + 48)).power() == 8, "And it fades out toward the repeater's edge");
 
-        network.updateTransmitter(far.north(400), 4383, 15, 16, null, true);
-        check(network.listen(level, 4383, far.north(400).east(16)).power() == 15, "A compact transmitter doesn't fade");
+        network.updateTransmitter(far.north(400), 4492, 15, 16, null, true);
+        check(network.listen(level, 4492, far.north(400).east(16)).power() == 15, "A compact transmitter doesn't fade");
 
         BlockPos jamAt = far.south(800);
-        network.updateTransmitter(jamAt.west(1), 4384, 15, 100);
-        network.updateJammer(jamAt, 4384, 15, 40, null);
-        check(network.listen(level, 4384, jamAt.east(10)).power() == 0, "Close to a jammer: silenced");
-        SignalNetwork.Reception jammed = network.listen(level, 4384, jamAt.east(30));
+        network.updateTransmitter(jamAt.west(1), 4493, 15, 100);
+        network.updateJammer(jamAt, 4493, 15, 40, null);
+        check(network.listen(level, 4493, jamAt.east(10)).power() == 0, "Close to a jammer: silenced");
+        SignalNetwork.Reception jammed = network.listen(level, 4493, jamAt.east(30));
         check(jammed.jammed() == 8 && jammed.power() == 7, "Three quarters out it jams 8: " + jammed);
 
         var packet = com.reiko.signaltower.network.MeterReadingPayload.of(
-                new com.reiko.signaltower.item.SignalMeterItem.Reading(4381, 8, 1, 25, false, 2, 3, 7));
+                new com.reiko.signaltower.item.SignalMeterItem.Reading(4491, 8, 1, 25, false, 2, 3, 7));
         check(packet.faded() == 7 && packet.hills() == 2 && packet.jammed() == 3, "The meter's packet carries it");
 
         BlockPos tx = new BlockPos(1, 1, 1);
-        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4385);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4494);
         int reach = RadioHelper.reachAt(level, helper.absolutePos(tx));
         int distance = Math.min(reach * 3 / 4, 120);
         BlockPos rx = tx.east(distance);
-        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4385);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4494);
         int expected = SignalNetwork.fade(15, distance / (double) reach);
         check(expected < 15, "Far enough out to fade: " + distance + " of " + reach);
         helper.startSequence()
@@ -7136,37 +7136,37 @@ public final class SignalTowerGameTests {
 
         SignalNetwork network = new SignalNetwork().attachTo(level);
         BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000);
-        network.updateTransmitter(far, 4391, 15, 64);
+        network.updateTransmitter(far, 4496, 15, 64);
         network.setDish(far, 4);
         check(Integer.valueOf(4).equals(network.dishAim(far)), "Aimed east");
-        check(network.listen(level, 4391, far.east(192)).power() == 15 && network.listen(level, 4391, far.east(193)).power() == 0,
+        check(network.listen(level, 4496, far.east(192)).power() == 15 && network.listen(level, 4496, far.east(193)).power() == 0,
                 "192 blocks east");
-        check(network.listen(level, 4391, far.west(64)).power() == 15 && network.listen(level, 4391, far.west(65)).power() == 0
-                && network.listen(level, 4391, far.south(100)).power() == 0, "64 every other way");
-        check(network.edgeMargin(level, 4391, far.east(150)) == 42, "The meter's edge is out at 192 that way");
+        check(network.listen(level, 4496, far.west(64)).power() == 15 && network.listen(level, 4496, far.west(65)).power() == 0
+                && network.listen(level, 4496, far.south(100)).power() == 0, "64 every other way");
+        check(network.edgeMargin(level, 4496, far.east(150)) == 42, "The meter's edge is out at 192 that way");
         SignalNetwork.Coverage relayed = new SignalNetwork.Coverage(far, 64, true, 192, 4);
         check(relayed.reaches(far.east(150)) && !relayed.reaches(far.west(150)) && relayed.reaches(far.west(60)), "A press it relays goes as far");
         SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
         check(Integer.valueOf(4).equals(loaded.dishAim(far)), "It survives saving");
         network.setDish(far, -1);
-        check(network.listen(level, 4391, far.east(150)).power() == 0 && network.dishAim(far) == null, "Without it: 64 that way too");
+        check(network.listen(level, 4496, far.east(150)).power() == 0 && network.dishAim(far) == null, "Without it: 64 that way too");
 
         BlockPos jamAt = far.south(500);
-        network.updateTransmitter(jamAt.west(1), 4392, 15, 200);
-        network.updateJammer(jamAt, 4392, 15, 32, null);
+        network.updateTransmitter(jamAt.west(1), 4497, 15, 200);
+        network.updateJammer(jamAt, 4497, 15, 32, null);
         network.setDish(jamAt, 0);
-        check(network.listen(level, 4392, jamAt.north(90)).power() == 0 && network.listen(level, 4392, jamAt.south(40)).power() == 15,
+        check(network.listen(level, 4497, jamAt.north(90)).power() == 0 && network.listen(level, 4497, jamAt.south(40)).power() == 15,
                 "A jammer's dish jams 96 north, 32 elsewhere");
 
         BlockPos tx = new BlockPos(1, 1, 1);
-        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4393);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4498);
         BlockPos absTx = helper.absolutePos(tx);
         int reach = RadioHelper.reachAt(level, absTx);
         int beam = com.reiko.signaltower.radio.AntennaTier.dishReach(reach);
         int east = Math.min(beam - 2, 125);
         check(east > reach, "The receiver is beyond the usual reach: " + east + " > " + reach);
         BlockPos rx = tx.east(east);
-        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4393);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4498);
         Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
         dev.setYRot(-90F); // looking east
         ItemStack dishes = new ItemStack(ModRegistry.DISH_ANTENNA.get());
