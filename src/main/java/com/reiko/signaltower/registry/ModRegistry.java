@@ -87,6 +87,42 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(0, 1200))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** A Radio Timer Transmitter's schedule, kept on the item (v0.42.0): mode (0 interval, 1 daily), interval and pulse in ticks, and on hour × 24 + off hour. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> TIMER_MODE =
+            DATA_COMPONENTS.registerComponentType("timer_mode", builder -> builder
+                    .persistent(Codec.intRange(0, 1))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> TIMER_INTERVAL =
+            DATA_COMPONENTS.registerComponentType("timer_interval", builder -> builder
+                    .persistent(Codec.intRange(1, 24000))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> TIMER_PULSE =
+            DATA_COMPONENTS.registerComponentType("timer_pulse", builder -> builder
+                    .persistent(Codec.intRange(1, 200))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> TIMER_HOURS =
+            DATA_COMPONENTS.registerComponentType("timer_hours", builder -> builder
+                    .persistent(Codec.intRange(0, 575))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A Radio Counter Receiver's settings, kept on the item (v0.42.0): its target, whether it stays on, when it forgets (ticks) and its reset frequency (0: none). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COUNTER_TARGET =
+            DATA_COMPONENTS.registerComponentType("counter_target", builder -> builder
+                    .persistent(Codec.intRange(1, 64))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COUNTER_LATCH =
+            DATA_COMPONENTS.registerComponentType("counter_latch", builder -> builder
+                    .persistent(Codec.intRange(0, 1))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COUNTER_FORGET =
+            DATA_COMPONENTS.registerComponentType("counter_forget", builder -> builder
+                    .persistent(Codec.intRange(0, 1200))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> RESET_FREQUENCY =
+            DATA_COMPONENTS.registerComponentType("reset_frequency", builder -> builder
+                    .persistent(Codec.intRange(0, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     /** A Radio Logic Receiver's second frequency, kept on the item when it's broken (v0.40.0). */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> SECOND_FREQUENCY =
             DATA_COMPONENTS.registerComponentType("second_frequency", builder -> builder
@@ -208,6 +244,24 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** A receiver that counts its frequency's turn-ons and turns on at a set number (v0.42.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioCounterReceiverBlock> RADIO_COUNTER_RECEIVER = BLOCKS.register("radio_counter_receiver",
+            () -> new com.reiko.signaltower.block.RadioCounterReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
+    /** A transmitter with a built-in clock (v0.42.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioTimerTransmitterBlock> RADIO_TIMER_TRANSMITTER = BLOCKS.register("radio_timer_transmitter",
+            () -> new com.reiko.signaltower.block.RadioTimerTransmitterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+
     /** A receiver with a delay and a hold (v0.41.0). */
     public static final DeferredBlock<RadioDelayReceiverBlock> RADIO_DELAY_RECEIVER = BLOCKS.register("radio_delay_receiver",
             () -> new RadioDelayReceiverBlock(BlockBehaviour.Properties.of()
@@ -309,6 +363,10 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_logic_receiver", RADIO_LOGIC_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_DELAY_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_delay_receiver", RADIO_DELAY_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_COUNTER_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_counter_receiver", RADIO_COUNTER_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_TIMER_TRANSMITTER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_timer_transmitter", RADIO_TIMER_TRANSMITTER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -348,7 +406,8 @@ public final class ModRegistry {
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
                             RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get(),
-                            RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get(), RADIO_DELAY_RECEIVER.get()).build(null));
+                            RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get(), RADIO_DELAY_RECEIVER.get(),
+                            RADIO_COUNTER_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",
@@ -357,6 +416,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MotionSensorBlockEntity>> MOTION_SENSOR_BE =
             BLOCK_ENTITIES.register("radio_motion_sensor",
                     () -> BlockEntityType.Builder.of(MotionSensorBlockEntity::new, RADIO_MOTION_SENSOR.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity>> TIMER_TRANSMITTER_BE =
+            BLOCK_ENTITIES.register("radio_timer_transmitter",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity::new, RADIO_TIMER_TRANSMITTER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CodeKeypadBlockEntity>> CODE_KEYPAD_BE =
             BLOCK_ENTITIES.register("code_keypad",

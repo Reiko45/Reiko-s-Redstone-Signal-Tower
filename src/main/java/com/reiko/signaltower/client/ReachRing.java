@@ -265,6 +265,7 @@ public final class ReachRing {
             case ReachPreviewPayload.KEYPAD -> "code_keypad";
             case ReachPreviewPayload.COMPACT_TRANSMITTER -> "compact_radio_transmitter";
             case ReachPreviewPayload.MOTION_SENSOR -> "radio_motion_sensor";
+            case ReachPreviewPayload.TIMER_TRANSMITTER -> "radio_timer_transmitter";
             default -> "radio_transmitter";
         };
         Component first = Component.translatable(KEY, Component.translatable("block." + SignalTower.MOD_ID + "." + block),

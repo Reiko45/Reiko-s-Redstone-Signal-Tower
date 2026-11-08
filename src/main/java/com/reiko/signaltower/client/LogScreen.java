@@ -190,6 +190,7 @@ public class LogScreen extends Screen {
         if (entry.pos().isEmpty()) {
             // Another player's transmitter isn't located, and where a remote was pressed isn't kept.
             return (entry.kind() == SignalNetwork.CauseKind.TRANSMITTER || entry.kind() == SignalNetwork.CauseKind.GATE
+                    || entry.kind() == SignalNetwork.CauseKind.TIMER
                     ? Component.translatable(AUDIT_KEY + "hidden") : Component.literal("-")).withStyle(ChatFormatting.DARK_GRAY);
         }
         BlockPos pos = entry.pos().get();
@@ -239,7 +240,7 @@ public class LogScreen extends Screen {
         }
         switch (entry.kind()) {
             case UNKNOWN -> lines.add(Component.translatable(KEY + "tip_unknown").withStyle(ChatFormatting.DARK_GRAY));
-            case TRANSMITTER, GATE -> {
+            case TRANSMITTER, GATE, TIMER -> {
                 lines.add(switch (entry.whoKind()) {
                     case OWNER -> Component.translatable(AUDIT_KEY + "tip_owner", entry.who()).withStyle(ChatFormatting.GOLD);
                     case MEMBER -> Component.translatable(AUDIT_KEY + "tip_member", entry.who()).withStyle(ChatFormatting.YELLOW);

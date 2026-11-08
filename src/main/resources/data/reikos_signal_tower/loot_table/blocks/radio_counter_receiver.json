@@ -1,0 +1,34 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "reikos_signal_tower:radio_counter_receiver",
+          "functions": [
+            {
+              "function": "minecraft:copy_components",
+              "source": "block_entity",
+              "include": [
+                "reikos_signal_tower:frequency",
+                "reikos_signal_tower:counter_target",
+                "reikos_signal_tower:counter_latch",
+                "reikos_signal_tower:counter_forget",
+                "reikos_signal_tower:reset_frequency"
+              ]
+            }
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "reikos_signal_tower:blocks/radio_counter_receiver"
+}

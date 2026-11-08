@@ -5770,4 +5770,275 @@ public final class SignalTowerGameTests {
                                 && Integer.valueOf(600).equals(stack.get(ModRegistry.HOLD_TICKS.get()))), "Dropped with its timings"))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.42.0: timer transmitter
+
+    /**
+     * The timer transmitter: set to every 1 s with a 0.25 s pulse (by Dev's packet), a receiver on
+     * its frequency turns on every 20 ticks for about 5, and the log names the timer; a pulse longer
+     * than half the interval is cut to half; redstone into it pauses it, and it starts again once
+     * that's gone; a daily timer is on during its hours and off outside them. Jade, the screen packet
+     * (round trip) and the item know its schedule; a stranger can't change it on someone else's
+     * private frequency, nor anyone out of reach; it's saved.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void timerTransmitter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos pause = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TIMER_TRANSMITTER.get(), 4001);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4001);
+        com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity timer = helper.getBlockEntity(tx);
+        BlockPos abs = helper.absolutePos(tx);
+        SignalNetwork network = SignalNetwork.get(level);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        List<Integer> samples = new java.util.ArrayList<>();
+
+        // The clock's arithmetic: day time 0 is 06:00, 18,000 midnight.
+        check(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(0) == 6
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(18_000) == 0
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(23_999) == 5
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(36_000) == 18, "Hours");
+        check(!com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.dailyOn(0, 18, 6)
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.dailyOn(12_000, 18, 6)
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.dailyOn(18_000, 18, 6)
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.dailyOn(6_000, 9, 17)
+                && !com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.dailyOn(6_000, 12, 12), "Daily hours");
+        check(firstArg(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.durationLabel(6000)).equals("5")
+                && keyOf(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.durationLabel(6000)).endsWith("time_minutes")
+                && firstArg(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.durationLabel(5)).equals("0.25")
+                && com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourLabel(6).getString().equals("06:00"), "Labels");
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    Component set = com.reiko.signaltower.network.ConfigureTimerPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureTimerPayload(abs, false, 20, 5, 18, 6));
+                    check(set != null && keyOf(set).endsWith("timer_set"), "Set: " + set);
+                    check(!timer.isDaily() && timer.getInterval() == 20 && timer.effectivePulse() == 5, "Every 1s, 0.25s pulse");
+                })
+                .thenExecuteFor(61, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    List<Integer> rises = new java.util.ArrayList<>();
+                    List<Integer> falls = new java.util.ArrayList<>();
+                    for (int i = 1; i < samples.size(); i++) {
+                        if (samples.get(i) > 0 && samples.get(i - 1) == 0) rises.add(i);
+                        if (samples.get(i) == 0 && samples.get(i - 1) > 0) falls.add(i);
+                    }
+                    check(rises.size() >= 2, "Pulses: " + samples);
+                    for (int i = 1; i < rises.size(); i++) {
+                        int gap = rises.get(i) - rises.get(i - 1);
+                        check(gap >= 19 && gap <= 21, "Every 20 ticks: " + samples);
+                    }
+                    for (int rise : rises) {
+                        falls.stream().filter(fall -> fall > rise).findFirst().ifPresent(fall ->
+                                check(fall - rise >= 4 && fall - rise <= 6, "About 5 ticks on: " + samples));
+                    }
+                    var history = network.history(4001);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.TIMER
+                            && abs.equals(history.get(history.size() - 1).cause().pos()), "The log names the timer");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info));
+                    check(keys.contains("timer_schedule") && (keys.contains("timer_next_pulse") || keys.contains("timer_pulse_ends")), "Jade: " + keys);
+                    var screen = com.reiko.signaltower.network.OpenTimerScreenPayload.of(level, timer);
+                    check(screen.frequency() == 4001 && !screen.daily() && screen.interval() == 20 && screen.pulse() == 5
+                            && !screen.paused() && !screen.silenced() && screen.changeIn() != 0, "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenTimerScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenTimerScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    var settings = new com.reiko.signaltower.network.ConfigureTimerPayload(abs, true, 200, 20, 18, 6);
+                    buffer.clear();
+                    com.reiko.signaltower.network.ConfigureTimerPayload.STREAM_CODEC.encode(buffer, settings);
+                    check(com.reiko.signaltower.network.ConfigureTimerPayload.STREAM_CODEC.decode(buffer).equals(settings), "Settings packet round trip");
+
+                    timer.setTiming(false, 20, 200, 18, 6, level.getGameTime());
+                    check(timer.getPulse() == 200 && timer.effectivePulse() == 10, "A pulse is at most half the interval");
+                    timer.setTiming(false, 7, 3, 18, 6, level.getGameTime());
+                    check(timer.getInterval() == com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.DEFAULT_INTERVAL
+                            && timer.getPulse() == com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.DEFAULT_PULSE, "Times it doesn't offer become the defaults");
+                    timer.setTiming(false, 20, 10, 18, 6, level.getGameTime());
+                    helper.setBlock(pause, Blocks.REDSTONE_BLOCK);
+                    samples.clear();
+                })
+                .thenExecuteFor(45, () -> samples.add(outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    // The first sample comes before the receiver has heard about the pause.
+                    check(samples.stream().skip(2).allMatch(v -> v == 0), "Paused: " + samples);
+                    check(timer.isPaused(level) && com.reiko.signaltower.network.OpenTimerScreenPayload.of(level, timer).paused(), "It knows it's paused");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("timer_paused"), "Jade says paused");
+                    helper.setBlock(pause, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "It starts again"))
+                .thenExecute(() -> {
+                    int hour = com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(level.getDayTime());
+                    timer.setTiming(true, 200, 20, hour, (hour + 2) % 24, level.getGameTime());
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "Daily: on during its hours"))
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 15, "Daily: stays on");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("timer_on_until"), "Jade: on until");
+                    int hour = com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourOf(level.getDayTime());
+                    timer.setTiming(true, 200, 20, (hour + 2) % 24, (hour + 3) % 24, level.getGameTime());
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Daily: off outside its hours"))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("timer_turns_on_at"), "Jade: turns on at");
+                    var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+                    claims.put(4001, UUID.randomUUID(), "Owner", java.util.Map.of());
+                    try {
+                        Component refused = com.reiko.signaltower.network.ConfigureTimerPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureTimerPayload(abs, false, 20, 5, 18, 6));
+                        check(refused != null && keyOf(refused).endsWith("private_refused_block") && timer.isDaily(),
+                                "A stranger can't change it on someone else's private frequency");
+                    } finally {
+                        claims.remove(4001);
+                    }
+                    check(com.reiko.signaltower.network.ConfigureTimerPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureTimerPayload(abs, false, 20, 5, 18, 6)) == null && timer.isDaily(), "Out of reach");
+                    timer.setTiming(true, 600, 40, 20, 4, level.getGameTime());
+                    CompoundTag saved = timer.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity(abs, helper.getBlockState(tx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.isDaily() && copy.getInterval() == 600 && copy.getPulse() == 40 && copy.getOnHour() == 20
+                            && copy.getOffHour() == 4 && copy.getFrequency() == 4001, "Saved");
+                    level.destroyBlock(abs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get())
+                                && Integer.valueOf(1).equals(stack.get(ModRegistry.TIMER_MODE.get()))
+                                && Integer.valueOf(600).equals(stack.get(ModRegistry.TIMER_INTERVAL.get()))
+                                && Integer.valueOf(20 * 24 + 4).equals(stack.get(ModRegistry.TIMER_HOURS.get()))), "Dropped with its schedule"))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.42.0: counter receiver
+
+    /** Adds a pulse on the transmitter fed by {@code input}: on for {@code on} ticks, then off for {@code off}. */
+    private static void pulseInput(GameTestHelper helper, net.minecraft.gametest.framework.GameTestSequence sequence,
+                                   BlockPos input, int on, int off) {
+        sequence.thenExecute(() -> helper.setBlock(input, Blocks.REDSTONE_BLOCK)).thenIdle(on)
+                .thenExecute(() -> helper.setBlock(input, Blocks.AIR)).thenIdle(off);
+    }
+
+    /**
+     * The counter receiver: set (by Dev's packet) to 3 with a reset frequency, it stays off for two
+     * turn-ons and pulses on the third (back to 0, off again after 1 s); with a 1 s forget time, a
+     * pause forgets the count; its reset frequency clears it; set to stay on at 2, it stays on through
+     * more turn-ons until the reset frequency turns on. Jade, the screen packet (round trip), Reset
+     * count, saving and the item keep up; nobody out of reach can set it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 600)
+    public static void counterReceiver(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos txA = new BlockPos(2, 1, 1);
+        BlockPos inA = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        BlockPos txB = new BlockPos(10, 1, 1);
+        BlockPos inB = new BlockPos(11, 1, 1);
+        place(helper, txA, ModRegistry.RADIO_TRANSMITTER.get(), 4051);
+        place(helper, txB, ModRegistry.RADIO_TRANSMITTER.get(), 4052);
+        place(helper, rx, ModRegistry.RADIO_COUNTER_RECEIVER.get(), 4051);
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity counter = helper.getBlockEntity(rx);
+        BlockPos abs = helper.absolutePos(rx);
+        Player dev = namedPlayer(helper, new BlockPos(6, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+
+        check(keyOf(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.counterText(3, false, 0)).endsWith("counter_text_pulse")
+                && keyOf(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.counterText(3, true, 20)).endsWith("counter_text_stay")
+                && com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.counterText(3, true, 20).getSiblings().size() == 1
+                && com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.validCount(17) == 3
+                && com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.validCount(64) == 64, "Texts and counts");
+
+        var sequence = helper.startSequence();
+        sequence.thenExecute(() -> {
+            Component set = com.reiko.signaltower.network.ConfigureCounterPayload.apply(dev,
+                    new com.reiko.signaltower.network.ConfigureCounterPayload(abs, 3, false, 0, 4052, false));
+            check(set != null && keyOf(set).endsWith("counter_set") && counter.getCounterTarget() == 3 && !counter.isCounterLatch()
+                    && counter.getResetFrequency() == 4052 && dev.getUUID().equals(counter.getTunedBy()), "Set: " + set);
+            check(com.reiko.signaltower.network.ConfigureCounterPayload.apply(far,
+                    new com.reiko.signaltower.network.ConfigureCounterPayload(abs, 5, true, 0, 0, false)) == null
+                    && counter.getCounterTarget() == 3, "Out of reach");
+        }).thenIdle(3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenExecute(() -> check(counter.getCount() == 2 && outputAt(helper, rx) == 0, "Two: still off, count " + counter.getCount()));
+        pulseInput(helper, sequence, inA, 3, 0);
+        sequence.thenExecute(() -> check(outputAt(helper, rx) == 15 && counter.isCounterOn() && counter.getCount() == 0,
+                        "Three: on, counting from 0 again"))
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Off after its pulse"))
+                .thenExecute(() -> counter.setCounter(3, false, 20, 4052))
+                .thenIdle(3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenExecute(() -> {
+                    check(counter.getCount() == 2 && counter.forgetIn(level.getGameTime()) > 0, "Two, forgetting soon");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info));
+                    check(keys.equals(List.of("counter_counts", "counter_reset", "counter_count", "counter_settings", "counter_forgets_in",
+                            "switched_off", "towers")), "Jade while counting: " + keys);
+                })
+                .thenIdle(25)
+                .thenExecute(() -> check(counter.getCount() == 0 && outputAt(helper, rx) == 0, "A pause forgets the count"));
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenExecute(() -> check(counter.getCount() == 1, "One"));
+        pulseInput(helper, sequence, inB, 3, 3);
+        sequence.thenExecute(() -> {
+            check(counter.getCount() == 0, "Its reset frequency clears the count");
+            counter.setCounter(2, true, 0, 4052);
+        }).thenIdle(3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenExecute(() -> check(outputAt(helper, rx) == 15 && counter.getCount() == 2, "Two: on"));
+        pulseInput(helper, sequence, inA, 3, 3);
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenIdle(25)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 15 && counter.getCount() == 2, "Stays on through more turn-ons");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info));
+                    check(keys.equals(List.of("counter_counts", "counter_reset", "counter_reached_stay", "counter_settings", "switched_on",
+                            "towers")), "Jade while on: " + keys);
+                    var screen = com.reiko.signaltower.network.OpenCounterScreenPayload.of(level, counter);
+                    check(screen.frequency() == 4051 && screen.target() == 2 && screen.latch() && screen.reset() == 4052 && screen.on()
+                            && screen.count() == 2 && screen.deaf() == 0 && screen.forgetIn() == 0, "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenCounterScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenCounterScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    var settings = new com.reiko.signaltower.network.ConfigureCounterPayload(abs, 2, true, 40, 4052, true);
+                    buffer.clear();
+                    com.reiko.signaltower.network.ConfigureCounterPayload.STREAM_CODEC.encode(buffer, settings);
+                    check(com.reiko.signaltower.network.ConfigureCounterPayload.STREAM_CODEC.decode(buffer).equals(settings), "Settings packet round trip");
+                    CompoundTag saved = counter.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.RadioReceiverBlockEntity(abs, helper.getBlockState(rx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getCount() == 2 && copy.isCounterOn() && copy.isCounterLatch() && copy.getCounterTarget() == 2
+                            && copy.getResetFrequency() == 4052, "Saved with its count");
+                });
+        pulseInput(helper, sequence, inB, 3, 3);
+        sequence.thenExecute(() -> check(outputAt(helper, rx) == 0 && counter.getCount() == 0 && !counter.isCounterOn(), "Reset: off"));
+        pulseInput(helper, sequence, inA, 3, 3);
+        sequence.thenExecute(() -> {
+                    check(counter.getCount() == 1, "Counting again");
+                    Component cleared = com.reiko.signaltower.network.ConfigureCounterPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureCounterPayload(abs, 2, true, 0, 4052, true));
+                    check(cleared != null && keyOf(cleared).endsWith("counter_cleared") && counter.getCount() == 0, "Reset count: " + cleared);
+                    Component none = com.reiko.signaltower.network.ConfigureCounterPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureCounterPayload(abs, 2, true, 0, 0, false));
+                    check(none != null && counter.getResetFrequency() == 0, "No reset frequency");
+                    counter.setCounter(5, true, 40, 4052);
+                    level.destroyBlock(abs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_COUNTER_RECEIVER_ITEM.get())
+                                && Integer.valueOf(5).equals(stack.get(ModRegistry.COUNTER_TARGET.get()))
+                                && Integer.valueOf(1).equals(stack.get(ModRegistry.COUNTER_LATCH.get()))
+                                && Integer.valueOf(40).equals(stack.get(ModRegistry.COUNTER_FORGET.get()))
+                                && Integer.valueOf(4052).equals(stack.get(ModRegistry.RESET_FREQUENCY.get()))), "Dropped with its settings"))
+                .thenSucceed();
+    }
 }

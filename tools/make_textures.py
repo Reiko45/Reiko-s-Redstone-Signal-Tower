@@ -222,6 +222,53 @@ def delay_receiver_side(lit):
     return img
 
 
+def timer_transmitter_side(lit):
+    """A clock face between outgoing waves (v0.42.0): the hands glow red while it's sending."""
+    r = ON if lit else OFF
+    img = casing(13)
+    px = img.load()
+    vents(img)
+    # Clock rim: a small circle around (7.5, 5.5)
+    for (x, y) in [(6, 2), (7, 2), (8, 2), (9, 2), (5, 3), (10, 3), (4, 4), (11, 4), (4, 5), (11, 5), (4, 6), (11, 6),
+                   (4, 7), (11, 7), (5, 8), (10, 8), (6, 9), (7, 9), (8, 9), (9, 9)]:
+        px[x, y] = O
+    for y in range(3, 9):
+        for x in range(5, 11):
+            if px[x, y] != O and not ((x, y) in [(5, 3), (10, 3), (5, 8), (10, 8)]):
+                px[x, y] = H
+    # Hands: up to 12 and across to 3, meeting in the middle
+    for y in (3, 4, 5):
+        px[7, y] = r[1]
+    px[7, 6] = r[2]
+    for x in (8, 9):
+        px[x, 6] = r[1]
+    # Outgoing waves left and right
+    for (x, y) in [(2, 4), (1, 5), (1, 6), (2, 7)]:
+        px[x, y] = r[1] if lit else r[0]
+        px[15 - x, y] = px[x, y]
+    for x in range(5, 11):
+        px[x, 10] = O
+    return img
+
+
+def counter_receiver_side(lit):
+    """Incoming waves above tally marks (v0.42.0): four strokes and one across, red while it's on."""
+    r = ON if lit else OFF
+    img = casing(14)
+    px = img.load()
+    vents(img)
+    for p in [(6, 3), (7, 2), (8, 2), (9, 3)]:
+        px[p] = r[1]
+    px[7, 4] = px[8, 4] = r[2] if lit else r[1]
+    for x in (5, 7, 9, 11):
+        for y in range(5, 11):
+            px[x, y] = O
+        px[x, 5] = D
+    for (x, y) in [(4, 10), (5, 9), (6, 9), (7, 8), (8, 8), (9, 7), (10, 7), (11, 6), (12, 6)]:
+        px[x, y] = r[2] if lit else r[1]
+    return img
+
+
 def repeater_side(lit, palette=None):
     """An amber mast with arcs passing through it: picked up on the left, sent on to the right.
     The converter uses the same picture in teal (palette = (off, on))."""
@@ -752,6 +799,12 @@ blocks = {
     "radio_toggle_receiver_side_on": toggle_receiver_side(True),
     "radio_inverted_receiver_side": inverted_receiver_side(False),
     "radio_logic_receiver_side": logic_receiver_side(False),
+    "radio_counter_receiver_side": counter_receiver_side(False),
+    "radio_counter_receiver_side_on": counter_receiver_side(True),
+    "radio_timer_transmitter_side": timer_transmitter_side(False),
+    "radio_timer_transmitter_side_on": timer_transmitter_side(True),
+    "radio_timer_transmitter_top": top(False, receiver=False),
+    "radio_timer_transmitter_top_on": top(True, receiver=False),
     "radio_delay_receiver_side": delay_receiver_side(False),
     "radio_delay_receiver_side_on": delay_receiver_side(True),
     "radio_logic_receiver_side_on": logic_receiver_side(True),

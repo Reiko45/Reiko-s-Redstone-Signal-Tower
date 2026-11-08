@@ -111,6 +111,8 @@ for lit in (False, True):
     write(models / f"radio_inverted_receiver{suffix}.json", receiver_model(lit, "radio_inverted_receiver_side"))
     write(models / f"radio_logic_receiver{suffix}.json", receiver_model(lit, "radio_logic_receiver_side"))
     write(models / f"radio_delay_receiver{suffix}.json", receiver_model(lit, "radio_delay_receiver_side"))
+    write(models / f"radio_counter_receiver{suffix}.json", receiver_model(lit, "radio_counter_receiver_side"))
+    write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -297,7 +299,7 @@ write(models / "radio_mast.json", {
 
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_delay_receiver", "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -398,6 +400,13 @@ write(states / "radio_receiver.json", {"variants": {
 write(states / "radio_toggle_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+write(states / "radio_counter_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_counter_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
+write(states / "radio_timer_transmitter.json", {"variants": {
+    "powered=false": {"model": f"{MOD}:block/radio_timer_transmitter"},
+    "powered=true": {"model": f"{MOD}:block/radio_timer_transmitter_on"},
+}})
 write(states / "radio_delay_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_delay_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -462,6 +471,89 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.42.0: Radio Timer Transmitter and Radio Counter Receiver
+    f"block.{MOD}.radio_timer_transmitter": "Radio Timer Transmitter",
+    f"block.{MOD}.radio_timer_transmitter.tooltip": "A transmitter with a clock: it sends full strength every few seconds or minutes, or between two times of day. A redstone signal into it pauses it. Right-click it with an empty hand to set its schedule.",
+    f"block.{MOD}.radio_counter_receiver": "Radio Counter Receiver",
+    f"block.{MOD}.radio_counter_receiver.tooltip": "Counts how many times its frequency turns on, and turns on at a set number: for a 1-second pulse, or until its reset frequency turns on. Right-click it with an empty hand to set it up.",
+    f"message.{MOD}.time_minutes": "%s min",
+    f"message.{MOD}.timer_interval": "every %s, %s pulse",
+    f"message.{MOD}.timer_daily": "on %s to %s",
+    f"message.{MOD}.timer_status": "Timer Transmitter | Frequency %s | %s | Sending %s | Reach %s blocks",
+    f"message.{MOD}.timer_set": "Radio Timer Transmitter: %s",
+    f"message.{MOD}.counter_text_pulse": "on at %s turn-ons, then a 1s pulse",
+    f"message.{MOD}.counter_text_stay": "on at %s turn-ons, until reset",
+    f"message.{MOD}.counter_text_forget": "; forgets after %s",
+    f"message.{MOD}.counter_status": "Counter Receiver | Frequency %s | Count %s of %s | %s",
+    f"message.{MOD}.counter_set": "Radio Counter Receiver: %s",
+    f"message.{MOD}.counter_cleared": "Radio Counter Receiver: count back to 0",
+    f"tooltip.{MOD}.timer_schedule": "Timer: %s",
+    f"tooltip.{MOD}.counter_settings": "Counter: %s",
+    f"tooltip.{MOD}.counter_reset": "Reset by: %s",
+    f"jade.{MOD}.timer_schedule": "Timer: %s",
+    f"jade.{MOD}.timer_paused": "Paused: a redstone signal reaches it",
+    f"jade.{MOD}.timer_next_pulse": "Next pulse in %s",
+    f"jade.{MOD}.timer_pulse_ends": "Pulse ends in %s",
+    f"jade.{MOD}.timer_on_until": "On until %s",
+    f"jade.{MOD}.timer_turns_on_at": "Turns on at %s",
+    f"jade.{MOD}.counter_counts": "Counts: %s",
+    f"jade.{MOD}.counter_reset": "Reset by: %s",
+    f"jade.{MOD}.counter_count": "Count: %s of %s",
+    f"jade.{MOD}.counter_reached_pulse": "Reached %s: pulsing",
+    f"jade.{MOD}.counter_reached_stay": "Reached %s: on until reset",
+    f"jade.{MOD}.counter_settings": "Set: %s",
+    f"jade.{MOD}.counter_forgets_in": "Forgets the count in %s",
+    f"jade.{MOD}.counter_reset_deaf": "Can't hear its reset frequency: encrypted by %s",
+    f"screen.{MOD}.log.kind_timer": "Timer",
+    f"screen.{MOD}.audit.kind_timer_transmitter": "Timer Transmitter",
+    f"screen.{MOD}.audit.kind_counter_receiver": "Counter Receiver",
+    f"screen.{MOD}.timer.mode": "Mode",
+    f"screen.{MOD}.timer.mode_interval": "Repeating",
+    f"screen.{MOD}.timer.mode_daily": "Daily",
+    f"screen.{MOD}.timer.mode_interval_tip": "Sends a pulse again and again, a set time apart.",
+    f"screen.{MOD}.timer.mode_daily_tip": "On between two in-game times every day (18:00 to 06:00 is every night).",
+    f"screen.{MOD}.timer.interval": "Every",
+    f"screen.{MOD}.timer.interval_tip": "How long from one pulse to the next. Shift-click or scroll to go back.",
+    f"screen.{MOD}.timer.pulse": "Pulse",
+    f"screen.{MOD}.timer.pulse_tip": "How long each pulse lasts (at most half the time between pulses).",
+    f"screen.{MOD}.timer.on_hour": "On at",
+    f"screen.{MOD}.timer.on_hour_tip": "The in-game time it turns on. Shift-click or scroll to go back.",
+    f"screen.{MOD}.timer.off_hour": "Off at",
+    f"screen.{MOD}.timer.off_hour_tip": "The in-game time it turns off. Shift-click or scroll to go back.",
+    f"screen.{MOD}.timer.frequency": "Sends on %s",
+    f"screen.{MOD}.timer.sending": "Sending 15 on %s",
+    f"screen.{MOD}.timer.not_sending": "Not sending right now",
+    f"screen.{MOD}.timer.paused": "Paused: a redstone signal reaches it",
+    f"screen.{MOD}.timer.silenced": "Silent: %s is private to %s",
+    f"screen.{MOD}.timer.next_pulse": "Next pulse in %s",
+    f"screen.{MOD}.timer.pulse_ends": "Pulse ends in %s",
+    f"screen.{MOD}.timer.clock_on": "It's %s: on until %s",
+    f"screen.{MOD}.timer.clock_off": "It's %s: turns on at %s",
+    f"screen.{MOD}.timer.never": "On and off at the same time: never on",
+    f"screen.{MOD}.timer.preview": "Once saved: %s, starting now",
+    f"screen.{MOD}.timer.preview_daily": "Once saved: %s (%s hours a day)",
+    f"screen.{MOD}.timer.hint": "A redstone signal into it (or its masts) pauses it",
+    f"screen.{MOD}.counter.frequency": "Counts turn-ons of %s",
+    f"screen.{MOD}.counter.target": "Turn on at",
+    f"screen.{MOD}.counter.target_tip": "How many turn-ons of its frequency it counts before it turns on. Shift-click or scroll to go back.",
+    f"screen.{MOD}.counter.latch": "Then",
+    f"screen.{MOD}.counter.latch_pulse": "1s pulse, count again",
+    f"screen.{MOD}.counter.latch_stay": "Stay on until reset",
+    f"screen.{MOD}.counter.latch_pulse_tip": "Outputs 15 for a second, then counts from 0 again.",
+    f"screen.{MOD}.counter.latch_stay_tip": "Outputs 15 until its reset frequency turns on (or Reset count is pressed).",
+    f"screen.{MOD}.counter.forget": "Forget after",
+    f"screen.{MOD}.counter.forget_tip": "Starts the count over after this long without a turn-on, for a quick knock. None: never.",
+    f"screen.{MOD}.counter.reset": "Reset by",
+    f"screen.{MOD}.counter.reset_none": "none",
+    f"screen.{MOD}.counter.reset_tip": "A turn-on of this frequency sets the count back to 0 and switches it off. Leave it empty for none.",
+    f"screen.{MOD}.counter.directory": "Pick from the frequency directory",
+    f"screen.{MOD}.counter.clear": "Reset count",
+    f"screen.{MOD}.counter.clear_tip": "Saves, and sets the count back to 0",
+    f"screen.{MOD}.counter.count": "Count: %s of %s | hearing %s",
+    f"screen.{MOD}.counter.reached": "Reached %s: on | hearing %s",
+    f"screen.{MOD}.counter.nothing": "nothing",
+    f"screen.{MOD}.counter.deaf": "Deaf: %s is encrypted by %s",
+    f"screen.{MOD}.counter.forgets_in": "Forgets the count in %s",
     # v0.41.0: signal gate and Radio Delay Receiver
     f"block.{MOD}.radio_delay_receiver": "Radio Delay Receiver",
     f"block.{MOD}.radio_delay_receiver.tooltip": "A receiver with a timer: it turns on and off its delay after its frequency does, and stays on for its hold after it turns off. Right-click it to set them.",
@@ -1328,6 +1420,20 @@ recipes["radio_toggle_receiver"] = ({
 }, f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
 
+recipes["radio_counter_receiver"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:hopper"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_counter_receiver"},
+}, f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_counter"] = (shapeless("radio_counter_receiver", "radio_receiver"), f"{MOD}:radio_counter_receiver")
+recipes["radio_timer_transmitter"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "minecraft:clock"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_timer_transmitter"},
+}, f"{MOD}:radio_transmitter")
+recipes["radio_transmitter_from_timer"] = (shapeless("radio_timer_transmitter", "radio_transmitter"), f"{MOD}:radio_timer_transmitter")
 recipes["radio_delay_receiver"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1403,7 +1509,8 @@ for name, (recipe, trigger) in recipes.items():
 # ---------------------------------------------------------------- loot tables
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_delay_receiver", "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
+             "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter",
+             "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
@@ -1412,6 +1519,10 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
             "source": "block_entity",
             "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency", f"{MOD}:converter_gate"] if name == "radio_converter" else [])
                        + ([f"{MOD}:delay_ticks", f"{MOD}:hold_ticks"] if name == "radio_delay_receiver" else [])
+                       + ([f"{MOD}:counter_target", f"{MOD}:counter_latch", f"{MOD}:counter_forget", f"{MOD}:reset_frequency"]
+                          if name == "radio_counter_receiver" else [])
+                       + ([f"{MOD}:timer_mode", f"{MOD}:timer_interval", f"{MOD}:timer_pulse", f"{MOD}:timer_hours"]
+                          if name == "radio_timer_transmitter" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
@@ -1429,7 +1540,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
-               f"{MOD}:radio_delay_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+               f"{MOD}:radio_delay_receiver", f"{MOD}:radio_counter_receiver", f"{MOD}:radio_timer_transmitter",
+               f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]
 })

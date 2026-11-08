@@ -58,7 +58,7 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
 
     /**
      * True if the player holds a radio item (the directory opens from their screens), or is within
-     * reach of the converter whose screen they opened it from.
+     * reach of the converter (or logic or counter receiver) whose screen they opened it from.
      */
     public static boolean mayAsk(Player player, DirectoryRequestPayload payload) {
         if (holdsRadioItem(player)) {
@@ -66,7 +66,8 @@ public record DirectoryRequestPayload(Optional<BlockPos> converter) implements C
         }
         return payload.converter().filter(pos -> player.canInteractWithBlock(pos, 1.0)
                 && (player.level().getBlockState(pos).getBlock() instanceof RadioConverterBlock
-                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock)).isPresent();
+                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock
+                    || player.level().getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock)).isPresent();
     }
 
     public static boolean holdsRadioItem(Player player) {

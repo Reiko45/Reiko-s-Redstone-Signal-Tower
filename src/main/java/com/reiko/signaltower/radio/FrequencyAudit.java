@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -100,7 +100,8 @@ public final class FrequencyAudit {
             String dimension = level.dimension().location().toString();
             List<Entry> found = new ArrayList<>();
 
-            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, !tx.compact() ? Kind.TRANSMITTER
+            network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, !tx.compact()
+                    ? (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? Kind.TIMER_TRANSMITTER : Kind.TRANSMITTER)
                     : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? Kind.MOTION_SENSOR
                     : Kind.COMPACT_TRANSMITTER,
                     dimension, pos, tx.tunedBy(), network.isSilenced(level, pos) ? Status.SILENT : Status.WORKING, tx.power())));
@@ -135,6 +136,7 @@ public final class FrequencyAudit {
                         : block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock ? Kind.INVERTED_RECEIVER
                         : block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock ? Kind.LOGIC_RECEIVER
                         : block instanceof com.reiko.signaltower.block.RadioDelayReceiverBlock ? Kind.DELAY_RECEIVER
+                        : block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock ? Kind.COUNTER_RECEIVER
                         : block instanceof CompactRadioReceiverBlock ? Kind.COMPACT_RECEIVER : Kind.RECEIVER;
                 Status status = FrequencyClaims.mayHear(level, frequency, tunedBy) ? Status.WORKING : Status.DEAF;
                 found.add(row(server, claim, kind, dimension, receiver.pos(), tunedBy, status,

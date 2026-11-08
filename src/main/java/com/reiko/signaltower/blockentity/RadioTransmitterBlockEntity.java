@@ -63,6 +63,10 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
      * a Radio Motion Sensor (v0.39.0) full strength while it sees someone, whatever redstone is around.
      */
     public static int inputOf(Level level, BlockPos pos, BlockState state) {
+        if (state.getBlock() instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock) {
+            // v0.42.0: full strength while its clock is on, unless redstone pauses it.
+            return level.getBlockEntity(pos) instanceof TimerTransmitterBlockEntity timer ? timer.output(level) : 0;
+        }
         if (state.getBlock() instanceof RadioMotionSensorBlock) {
             return level.getBlockEntity(pos) instanceof MotionSensorBlockEntity sensor && sensor.isSensing() ? 15 : 0;
         }

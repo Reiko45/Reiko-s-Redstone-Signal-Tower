@@ -3,6 +3,7 @@ package com.reiko.signaltower.blockentity;
 import com.reiko.signaltower.block.RadioInvertedReceiverBlock;
 import com.reiko.signaltower.block.RadioLogicReceiverBlock;
 import com.reiko.signaltower.block.RadioDelayReceiverBlock;
+import com.reiko.signaltower.block.RadioCounterReceiverBlock;
 import com.reiko.signaltower.radio.Frequency;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -35,7 +36,10 @@ import java.util.UUID;
  * (v0.41.0) outputs 15 while what it heard {@link #getDelayTicks() delay} ago was on, and stays on
  * for its {@link #getHoldTicks() hold} after that turns off; while a change is under way it checks
  * every tick. Its timings are saved, what's in progress isn't (it starts again from what it hears
- * when loaded or re-tuned). A toggle
+ * when loaded or re-tuned). A counter receiver (v0.42.0) counts its frequency's turn-ons and
+ * turns on when the count reaches its target: for a 1-second pulse (then it counts again), or until
+ * its reset frequency turns on. It can forget the count after a while without a turn-on, and its
+ * reset frequency also clears the count; it's tracked on both. Its count is saved. A toggle
  * receiver doesn't pass the signal through: it flips between off and on (full strength) each time
  * its frequency turns on (goes from silent to any strength) where it stands. It starts listening
  * without flipping when it's placed, loaded or re-tuned, so an already-on frequency doesn't count
@@ -51,6 +55,19 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     private static final String MODE_TAG = "logic_mode";
     private static final String DELAY_TAG = "delay_ticks";
     private static final String HOLD_TAG = "hold_ticks";
+    private static final String TARGET_TAG = "counter_target";
+    private static final String LATCH_TAG = "counter_latch";
+    private static final String FORGET_TAG = "counter_forget";
+    private static final String RESET_TAG = "reset_frequency";
+    private static final String COUNT_TAG = "count";
+    private static final String COUNTER_ON_TAG = "counter_on";
+    private static final String LAST_COUNT_TAG = "counter_last";
+    private static final String UNTIL_TAG = "counter_until";
+    /** The counts a counter receiver can wait for: 1 to 16, 20, 24, 32, 48 and 64. */
+    public static final int[] COUNTS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 48, 64};
+    public static final int DEFAULT_COUNT = 3;
+    /** How long a counter receiver's pulse lasts when it reaches its count (and doesn't stay on). */
+    public static final int COUNTER_PULSE_TICKS = 20;
     /** The delays and holds a delay receiver offers, in ticks: none, 0.5, 1, 2, 3, 5, 10, 30 and 60 seconds. */
     public static final int[] TIMES = {0, 10, 20, 40, 60, 100, 200, 600, 1200};
     /** The most changes a delay receiver keeps waiting (more are merged into the last one). */
@@ -121,7 +138,19 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     private boolean delayedOn;
     private long delayedOffSince;
     private boolean delayOutputOn;
-    /** Logic receiver: what it heard on each frequency at the last check (not saved; for the screen). */
+    /** Counter receiver: its target, whether it stays on, when it forgets and its reset frequency (0: none). Saved. */
+    private int counterTarget = DEFAULT_COUNT;
+    private boolean counterLatch;
+    private int forgetTicks;
+    private int resetFrequency;
+    /** Counter receiver: the count, whether it's on, when it last counted and when its pulse ends (game times). Saved. */
+    private int count;
+    private boolean counterOn;
+    private long lastCountAt;
+    private long counterOnUntil;
+    /** Counter receiver: whether it heard its reset frequency at the last check (not saved). */
+    private boolean lastReset;
+    /** Logic receiver: what it heard on each frequency at the last check (not saved; for the screen). A counter's second is its reset frequency. */
     private int heardA;
     private int heardB;
 
@@ -266,6 +295,149 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         }
     }
 
+    // ---- Counter receiver (v0.42.0) ----
+
+    /** True if this is a Radio Counter Receiver. */
+    public boolean isCounter() {
+        return getBlockState().getBlock() instanceof RadioCounterReceiverBlock;
+    }
+
+    public int getCount() {
+        return count;
+    }
+
+    public int getCounterTarget() {
+        return counterTarget;
+    }
+
+    /** True if it stays on when it reaches its count (until reset), false if it pulses and counts again. */
+    public boolean isCounterLatch() {
+        return counterLatch;
+    }
+
+    public int getForgetTicks() {
+        return forgetTicks;
+    }
+
+    /** Its reset frequency, 0 if none. */
+    public int getResetFrequency() {
+        return resetFrequency;
+    }
+
+    public boolean isCounterOn() {
+        return counterOn;
+    }
+
+    /** {@code target} if it's one of {@link #COUNTS}, else the default (3). */
+    public static int validCount(int target) {
+        for (int allowed : COUNTS) {
+            if (allowed == target) {
+                return target;
+            }
+        }
+        return DEFAULT_COUNT;
+    }
+
+    /**
+     * A counter receiver's settings (values it doesn't offer become the defaults; a reset frequency
+     * below 1 means none). Changing any of them starts the count over, switched off.
+     */
+    public void setCounter(int target, boolean latch, int forget, int reset) {
+        int t = validCount(target);
+        int f = validTime(forget);
+        int r = reset <= 0 ? 0 : Frequency.clamp(reset);
+        if (t != counterTarget || latch != counterLatch || f != forgetTicks || r != resetFrequency) {
+            counterTarget = t;
+            counterLatch = latch;
+            forgetTicks = f;
+            resetFrequency = r;
+            seenRevisionB = -1;
+            primed = false;
+            resetCount();
+        }
+    }
+
+    /** Back to 0, switched off (it checks again on its next tick). */
+    public void resetCount() {
+        count = 0;
+        counterOn = false;
+        seenRevision = -1;
+        setChanged();
+    }
+
+    /** Ticks until a counter receiver forgets its count, or 0 if it won't (nothing counted, no forget time, or on until reset). */
+    public long forgetIn(long now) {
+        if (!isCounter() || count == 0 || forgetTicks == 0 || counterLatch && counterOn) {
+            return 0;
+        }
+        return Math.max(1, lastCountAt + forgetTicks - now);
+    }
+
+    /** True while a counter receiver has something to time (a pulse to end, a count to forget), so it checks every tick. */
+    private boolean counterTiming() {
+        return isCounter() && (counterOn && !counterLatch || count > 0 && forgetTicks > 0 && !(counterLatch && counterOn));
+    }
+
+    /** What a counter receiver outputs at {@code now}, hearing {@code heard} and {@code reset} on its two frequencies. */
+    private int counterOutput(long now, int heard, int reset) {
+        boolean hearing = heard > 0;
+        boolean resetting = reset > 0;
+        if (!primed) {
+            // Placed, loaded or re-tuned: whatever is on now isn't a turn-on.
+            primed = true;
+        } else {
+            if (resetting && !lastReset) {
+                resetCount();
+            }
+            if (hearing && !lastHeard) {
+                countTurnOn(now);
+            }
+        }
+        lastHeard = hearing;
+        lastReset = resetting;
+        if (count > 0 && forgetTicks > 0 && !(counterLatch && counterOn) && now - lastCountAt >= forgetTicks) {
+            count = 0;
+            setChanged();
+        }
+        if (counterOn && !counterLatch && now >= counterOnUntil) {
+            counterOn = false;
+            setChanged();
+        }
+        return counterOn ? 15 : 0;
+    }
+
+    private void countTurnOn(long now) {
+        if (counterLatch && counterOn) {
+            return; // reached and staying on: it waits for a reset
+        }
+        if (count > 0 && forgetTicks > 0 && now - lastCountAt >= forgetTicks) {
+            count = 0;
+        }
+        count++;
+        lastCountAt = now;
+        if (count >= counterTarget) {
+            counterOn = true;
+            if (counterLatch) {
+                count = counterTarget;
+            } else {
+                count = 0;
+                counterOnUntil = now + COUNTER_PULSE_TICKS;
+            }
+        }
+        setChanged();
+    }
+
+    /** "on at 3 turn-ons, then a 1s pulse" (and "; forgets after 2s"). */
+    public static net.minecraft.network.chat.Component counterText(int target, boolean latch, int forget) {
+        String key = "message." + com.reiko.signaltower.SignalTower.MOD_ID + ".";
+        net.minecraft.network.chat.MutableComponent text = net.minecraft.network.chat.Component.translatable(
+                key + (latch ? "counter_text_stay" : "counter_text_pulse"), validCount(target));
+        if (validTime(forget) > 0) {
+            text.append(net.minecraft.network.chat.Component.translatable(key + "counter_text_forget", timeLabel(validTime(forget))));
+        }
+        return text;
+    }
+
     /** True if this is a Radio Logic Receiver. */
     public boolean isLogic() {
         return getBlockState().getBlock() instanceof RadioLogicReceiverBlock;
@@ -308,6 +480,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     public int deafFrequency(Level level) {
         if (!FrequencyClaims.mayHear(level, getFrequency(), getTunedBy())) {
             return getFrequency();
+        }
+        if (isCounter()) {
+            return resetFrequency > 0 && !FrequencyClaims.mayHear(level, resetFrequency, getTunedBy()) ? resetFrequency : -1;
         }
         return isLogic() && !FrequencyClaims.mayHear(level, secondFrequency, getTunedBy()) ? secondFrequency : -1;
     }
@@ -368,12 +543,14 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         int frequency = be.getFrequency();
         long revision = network.revision(frequency);
         boolean logic = be.isLogic();
-        int second = logic ? be.secondFrequency : -1;
-        long revisionB = logic ? network.revision(second) : 0;
+        boolean counter = be.isCounter();
+        // A logic receiver's second frequency, or a counter's reset frequency (v0.42.0): -1 if none.
+        int second = logic ? be.secondFrequency : counter && be.resetFrequency > 0 ? be.resetFrequency : -1;
+        long revisionB = second > 0 ? network.revision(second) : 0;
 
         boolean changed = revision != be.seenRevision || frequency != be.seenFrequency
-                || logic && (revisionB != be.seenRevisionB || second != be.seenSecond)
-                || be.timing() || be.isDelay() && !be.primed;
+                || second != be.seenSecond || second > 0 && revisionB != be.seenRevisionB
+                || be.timing() || be.isDelay() && !be.primed || be.counterTiming();
         if (!changed && be.timer-- > 0) {
             return;
         }
@@ -400,6 +577,11 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             be.heardA = heard;
             be.heardB = deafB ? 0 : network.listen(serverLevel, second, pos).power();
             power = be.logicMode.combine(be.heardA, be.heardB);
+        } else if (counter) {
+            boolean deafB = second > 0 && !FrequencyClaims.mayHear(serverLevel, second, tunedBy);
+            be.heardA = heard;
+            be.heardB = second > 0 && !deafB ? network.listen(serverLevel, second, pos).power() : 0;
+            power = be.counterOutput(serverLevel.getGameTime(), heard, be.heardB);
         } else if (be.isDelay()) {
             power = be.delayOutput(serverLevel.getGameTime(), heard);
         } else {
@@ -431,6 +613,16 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             tag.putInt(DELAY_TAG, delayTicks);
             tag.putInt(HOLD_TAG, holdTicks);
         }
+        if (isCounter()) {
+            tag.putInt(TARGET_TAG, counterTarget);
+            tag.putBoolean(LATCH_TAG, counterLatch);
+            tag.putInt(FORGET_TAG, forgetTicks);
+            tag.putInt(RESET_TAG, resetFrequency);
+            tag.putInt(COUNT_TAG, count);
+            tag.putBoolean(COUNTER_ON_TAG, counterOn);
+            tag.putLong(LAST_COUNT_TAG, lastCountAt);
+            tag.putLong(UNTIL_TAG, counterOnUntil);
+        }
     }
 
     @Override
@@ -442,6 +634,15 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         seenRevisionB = -1;
         delayTicks = tag.contains(DELAY_TAG) ? validTime(tag.getInt(DELAY_TAG)) : 20;
         holdTicks = validTime(tag.getInt(HOLD_TAG));
+        counterTarget = tag.contains(TARGET_TAG) ? validCount(tag.getInt(TARGET_TAG)) : DEFAULT_COUNT;
+        counterLatch = tag.getBoolean(LATCH_TAG);
+        forgetTicks = validTime(tag.getInt(FORGET_TAG));
+        int reset = tag.getInt(RESET_TAG);
+        resetFrequency = reset <= 0 ? 0 : Frequency.clamp(reset);
+        count = Math.max(0, Math.min(counterTarget, tag.getInt(COUNT_TAG)));
+        counterOn = tag.getBoolean(COUNTER_ON_TAG);
+        lastCountAt = tag.getLong(LAST_COUNT_TAG);
+        counterOnUntil = tag.getLong(UNTIL_TAG);
         primed = false;
     }
 
@@ -466,6 +667,22 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         if (hold != null) {
             holdTicks = validTime(hold);
         }
+        Integer target = componentInput.get(ModRegistry.COUNTER_TARGET.get());
+        if (target != null) {
+            counterTarget = validCount(target);
+        }
+        Integer latch = componentInput.get(ModRegistry.COUNTER_LATCH.get());
+        if (latch != null) {
+            counterLatch = latch == 1;
+        }
+        Integer forget = componentInput.get(ModRegistry.COUNTER_FORGET.get());
+        if (forget != null) {
+            forgetTicks = validTime(forget);
+        }
+        Integer reset = componentInput.get(ModRegistry.RESET_FREQUENCY.get());
+        if (reset != null) {
+            resetFrequency = reset <= 0 ? 0 : Frequency.clamp(reset);
+        }
     }
 
     @Override
@@ -479,6 +696,12 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             components.set(ModRegistry.DELAY_TICKS.get(), delayTicks);
             components.set(ModRegistry.HOLD_TICKS.get(), holdTicks);
         }
+        if (isCounter()) {
+            components.set(ModRegistry.COUNTER_TARGET.get(), counterTarget);
+            components.set(ModRegistry.COUNTER_LATCH.get(), counterLatch ? 1 : 0);
+            components.set(ModRegistry.COUNTER_FORGET.get(), forgetTicks);
+            components.set(ModRegistry.RESET_FREQUENCY.get(), resetFrequency);
+        }
     }
 
     @Override
@@ -488,5 +711,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         tag.remove(MODE_TAG);
         tag.remove(DELAY_TAG);
         tag.remove(HOLD_TAG);
+        tag.remove(TARGET_TAG);
+        tag.remove(LATCH_TAG);
+        tag.remove(FORGET_TAG);
+        tag.remove(RESET_TAG);
     }
 }

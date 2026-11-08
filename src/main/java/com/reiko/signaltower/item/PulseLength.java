@@ -14,6 +14,19 @@ public final class PulseLength {
 
     private PulseLength() {}
 
+    /** The presets, shortest first (a copy). */
+    public static int[] presets() {
+        return PRESETS.clone();
+    }
+
+    /** True if {@code ticks} is one of the presets. */
+    public static boolean isPreset(int ticks) {
+        for (int preset : PRESETS) {
+            if (preset == ticks) return true;
+        }
+        return false;
+    }
+
     public static int clamp(int ticks) {
         return Math.max(MIN_TICKS, Math.min(MAX_TICKS, ticks));
     }

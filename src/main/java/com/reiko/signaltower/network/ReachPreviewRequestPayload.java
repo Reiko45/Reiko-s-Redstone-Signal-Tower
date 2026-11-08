@@ -67,6 +67,7 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
                 : block instanceof RadioRepeaterBlock ? ReachPreviewPayload.REPEATER
                 : block instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? ReachPreviewPayload.MOTION_SENSOR
                 : block instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock ? ReachPreviewPayload.COMPACT_TRANSMITTER
+                : block instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? ReachPreviewPayload.TIMER_TRANSMITTER
                 : block instanceof RadioTransmitterBlock ? ReachPreviewPayload.TRANSMITTER
                 : block instanceof CodeKeypadBlock ? ReachPreviewPayload.KEYPAD
                 : -1;

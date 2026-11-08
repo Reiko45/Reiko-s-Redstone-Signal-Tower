@@ -868,7 +868,7 @@ public final class SignalNetwork extends SavedData {
 
     /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name, sent by ordinal: only add at the end. */
     public enum CauseKind {
-        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE;
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE, TIMER;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -919,6 +919,11 @@ public final class SignalNetwork extends SavedData {
         /** A converter's signal gate opened (v0.41.0): where the converter is, and who tuned it. */
         public static Cause gate(BlockPos pos, @Nullable UUID tunedBy) {
             return new Cause(CauseKind.GATE, pos.immutable(), tunedBy, "");
+        }
+
+        /** A Radio Timer Transmitter's clock (v0.42.0): where it is and who tuned it. */
+        public static Cause timer(BlockPos pos, @Nullable UUID tunedBy) {
+            return new Cause(CauseKind.TIMER, pos.immutable(), tunedBy, "");
         }
 
         /** A Radio Motion Sensor saw someone (v0.39.0): where the sensor is, and who it saw first. */

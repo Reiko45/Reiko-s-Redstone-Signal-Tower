@@ -102,6 +102,16 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new SensorScreen(state));
     }
 
+    /** Opens a Radio Timer Transmitter's screen (v0.42.0). */
+    public static void openTimerScreen(com.reiko.signaltower.network.OpenTimerScreenPayload state) {
+        Minecraft.getInstance().setScreen(new TimerScreen(state));
+    }
+
+    /** Opens a Radio Counter Receiver's screen (v0.42.0). */
+    public static void openCounterScreen(com.reiko.signaltower.network.OpenCounterScreenPayload state) {
+        Minecraft.getInstance().setScreen(new CounterScreen(state));
+    }
+
     /** Opens a Radio Delay Receiver's screen (sent by the server when the block is right-clicked). */
     public static void openDelayScreen(com.reiko.signaltower.network.OpenDelayScreenPayload state) {
         Minecraft.getInstance().setScreen(new DelayScreen(state));

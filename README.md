@@ -9,6 +9,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | | What it does |
 |---|---|
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
+| **Radio Timer Transmitter** | A transmitter with a clock. It sends full strength on a schedule: a pulse every 1 second to 20 minutes, or on between two in-game times (on at 18:00, off at 06:00 lights the night). A redstone signal into it pauses it. Otherwise it's a full-size transmitter, with reach by height. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. Its **signal gate** can make it a wireless comparator (send only at a level or more) or a wireless NOT gate (send 15 while it hears nothing). |
@@ -16,6 +17,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Inverted Receiver** | A receiver with a redstone torch built in: full strength while its frequency is silent, nothing while it's on. Turning a frequency on can then switch something off. |
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
+| **Radio Counter Receiver** | Counts how many times its frequency turns on, and turns on once the count reaches a set number (1 to 64): for a 1-second pulse, or until a second **reset frequency** turns on. It can forget the count after a pause, so three quick presses work and three slow ones don't (a secret knock). |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
@@ -384,6 +386,36 @@ A **Radio Delay Receiver** (since 0.41) is a receiver with a timer. It outputs f
 
 ![A NOT gate set on the converter's screen; Jade counting down on the delay receiver while the lever is on; with the lever off, the NOT gate's lamp lit and the delay receiver's lamp held on; Alex seeing the same from across the row; the delay receiver's screen counting down; and the gate on the converter's item](docs/images/signal-gate-and-delay-receiver.png)
 
+### Timer transmitters
+
+A **Radio Timer Transmitter** (since 0.42) sends full strength (15) on its frequency on a schedule, with nothing wired to it. Right-click it with an empty hand to open its screen:
+
+| Mode | Settings | Sends |
+|---|---|---|
+| **Repeating** (the default) | **Every** 1, 2, 3, 5, 10, 15 or 30 seconds, or 1, 2, 5, 10 or 20 minutes (default 10 seconds); **Pulse** 0.1 to 10 seconds (default 1 second) | a pulse every interval, starting when you press Done. A pulse is at most half the interval. |
+| **Daily** | **On at** and **Off at**, whole in-game hours (default 18:00 and 06:00) | 15 between those times every in-game day. On and off at the same time means never. |
+
+- **Pausing:** a redstone signal into it (or into a mast under it) stops it sending. A lever next to it is an off switch, and a daylight sensor can keep a repeating timer quiet by day.
+- **The screen** shows what it's doing ("Sending 15 on 4400", "Not sending right now", "Paused: a redstone signal reaches it") and what's next: "Next pulse in 1.5s" counting down, or for a daily timer "It's 14:20: turns on at 18:00". While you change something, a yellow line says what Done will set ("Once saved: every 2s, 0.5s pulse, starting now", "Once saved: on 18:00 to 06:00 (12 hours a day)"). Click a button for the next value; Shift-click or scroll goes back.
+- **Jade** shows its schedule ("Timer: every 2s, 0.5s pulse") and "Next pulse in 0.8s" / "Pulse ends in 0.1s", "On until 06:00" / "Turns on at 18:00", or "Paused".
+- **It's a transmitter:** reach by height and masts, relaying remote presses, the tuner and the red reach ring work as usual ("Reach ring: Radio Timer Transmitter on 4400, 56 blocks"). On a private frequency it only sends if a member placed or tuned it, and only members can change its schedule (others get a red refusal, and the owner an alert). The log lists its turn-ons as "Timer", with where it is; the audit as "Timer Transmitter".
+- Breaking it keeps its frequency and schedule on the dropped item, and the item's tooltip shows the schedule ("Timer: every 2s, 0.5s pulse").
+
+### Counter receivers
+
+A **Radio Counter Receiver** (since 0.42) counts how many times its frequency turns on where it stands (from off to any strength) and outputs full strength (15) when the count reaches its target. Right-click it with an empty hand to open its screen:
+
+- **Turn on at:** 1 to 16, 20, 24, 32, 48 or 64 turn-ons (default 3).
+- **Then:** **1s pulse, count again** (the default: on for a second, back to 0), or **Stay on until reset**.
+- **Forget after:** none (the default), or 0.5 seconds to 60 seconds without a turn-on, after which the count starts over. With 5 seconds, three quick presses open the door but three slow ones don't.
+- **Reset by:** a second frequency (empty for none, with "..." for the directory). When it turns on, the count goes back to 0 and the receiver switches off. **Reset count** in the screen does the same.
+- **The screen and Jade** show the count ("Count: 2 of 3", "Reached 3: on until reset"), what it hears, and "Forgets the count in 2.7s" counting down.
+- **An example:** a Remote Control on 4410 and another on 4411; a counter receiver counting 4410, Turn on at 3, Stay on until reset, Forget after 5s, Reset by 4411. Three quick presses of the first remote light its lamp, and one press of the second puts it out.
+- It counts as a receiver on both frequencies ("Heard by", the remote's light, the locator, the audit as "Counter Receiver"). Pressing Done makes you its tuner, like the logic receiver's screen; on someone else's encrypted frequency it hears nothing there ("Can't hear its reset frequency: encrypted by Dev"). Its count is saved with the world, but turn-ons while its chunk isn't loaded aren't counted.
+- Breaking it keeps its frequency and settings (not the count) on the dropped item.
+
+![The timer's screen set to a 0.5 s pulse every 2 s; its daily mode before saving; Jade on the timer mid-pulse with the lamp lit; the counter's screen at 2 of 3 and forgetting in 2.7 s; Jade on the counter at "Reached 3: on until reset" with its lamp lit; and Alex's lever pausing the timer](docs/images/timer-transmitter-and-counter-receiver.png)
+
 ### Code Keypad
 
 A **Code Keypad** is a thin panel you put on a wall, floor or ceiling. Type its code and it sends a pulse on its frequency, from where it is, like a remote pressed there (towers in its reach relay it). For as long as the pulse lasts, its display lights green and, like a button, it powers the block it's on, so an iron door next to that block opens without any radio at all.
@@ -475,6 +507,10 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Logic Receiver:** two Radio Receivers and a Nether Quartz, in any arrangement in the crafting grid.
 
+**Radio Timer Transmitter:** a Radio Transmitter and a Clock, in any arrangement in the crafting grid. Put a timer transmitter in the grid on its own to get the Radio Transmitter back.
+
+**Radio Counter Receiver:** a Radio Receiver and a Hopper, in any arrangement in the crafting grid. Put a counter receiver in the grid on its own to get the Radio Receiver back.
+
 **Radio Delay Receiver:** a Radio Receiver and a Redstone Repeater, in any arrangement in the crafting grid. Put a delay receiver in the grid on its own to get the Radio Receiver back.
 
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
@@ -540,6 +576,13 @@ src/main/java/com/reiko/signaltower/
   block/RadioDelayReceiverBlock.java     receiver with a delay and a hold; opens its screen
   client/DelayScreen.java                the delay receiver's screen
   network/OpenDelayScreenPayload.java, ConfigureDelayPayload.java  delay receiver screen <-> server
+  block/RadioTimerTransmitterBlock.java  transmitter on a schedule; opens its screen
+  blockentity/TimerTransmitterBlockEntity.java  the timer's clock: interval or daily, pause, labels
+  client/TimerScreen.java                the timer transmitter's screen
+  network/OpenTimerScreenPayload.java, ConfigureTimerPayload.java  timer screen <-> server
+  block/RadioCounterReceiverBlock.java   receiver that counts turn-ons; opens its screen
+  client/CounterScreen.java              the counter receiver's screen
+  network/OpenCounterScreenPayload.java, ConfigureCounterPayload.java  counter screen <-> server
   item/SignalMeterItem.java              handheld meter: reads a frequency where you stand
   network/MeterReadingPayload.java       server -> client: the meter's reading
   client/SignalMeterHud.java             the meter's panel beside the hotbar, its tick and needle
@@ -754,9 +797,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 134. the logic receiver: AND is the weaker, OR the stronger, XOR the one that's on; with both off AND is off and it's tracked on both frequencies (counted for Heard by on the second); with only the first on AND stays off, a player out of reach can't change it, Dev's packet sets OR (and tunes it) and it lights a lamp; Jade and the screen packet (round trip) show both frequencies, the mode and what it hears; XOR is on with one, off with both; AND is on with both; the audit lists it; on Rex's tuning with Dev's encrypted second frequency it's deaf there (notice, screen flag, Jade line); it's saved; re-tuning the second moves its tracking; broken, it drops with both frequencies and XOR, and placed again from that item it has them back;
 135. the Signal Meter: two blocks from a transmitter it reads 15 and its reach minus 2 to the edge, out of reach nothing and -1; with the transmitter off 0 but still inside; on someone else's encrypted frequency deaf with nothing else, while its owner reads it; the edge is 20 at 30 blocks into a 50 reach, 0 exactly at it, -1 a block past it, and an off tower beside counts; the reading packet survives the network (-1 too); its settings packet sets the frequency and turns the tick off; it scrolls, takes the scanner's Tune and opens the directory; sneak-clicking a converter measures what it sends;
 136. the signal gate, with a transmitter sending 11: Pass sends 11, At least 8 sends 11 (set by Dev's packet), At least 12 nothing, Below 12 sends 15 (the log names the gate), Below 11 nothing, and Below 1 nothing until the transmitter goes quiet, then 15; Jade, the screen and settings packets (round trips) know it; on a fresh network a gate is a source, saved with what it sends, and a press isn't carried through it (only through a plain converter); a NOT gate feeding itself blinks, never changing twice in a row within 2 ticks; it's saved, and drops with its gate;
-137. the delay receiver: with a 1 s delay and 2 s hold it turns on 20 to 24 ticks after its frequency and off 60 to 65 ticks after it goes quiet, saying when (Jade's lines, the screen packet and a round trip); with no delay and a 2 s hold a 4-tick pulse turns it on at once and holds it 40 ticks; a player out of reach can't set it, times it doesn't offer become none, time labels read 0.5s, 60s and none (and countdowns 2.4s, 2s, 0.1s); it's saved, and drops with its timings.
+137. the delay receiver: with a 1 s delay and 2 s hold it turns on 20 to 24 ticks after its frequency and off 60 to 65 ticks after it goes quiet, saying when (Jade's lines, the screen packet and a round trip); with no delay and a 2 s hold a 4-tick pulse turns it on at once and holds it 40 ticks; a player out of reach can't set it, times it doesn't offer become none, time labels read 0.5s, 60s and none (and countdowns 2.4s, 2s, 0.1s); it's saved, and drops with its timings;
+138. the timer transmitter: set by Dev's packet to every 1 s with a 0.25 s pulse, a receiver turns on every 19 to 21 ticks for 4 to 6, and the log names the timer; Jade, the screen and settings packets (round trips) know it; a 10 s pulse is cut to half the interval, and times it doesn't offer become the defaults; a redstone block next to it pauses it (and Jade and the screen say so) until it's gone; a daily timer is on during its hours and off outside them (Jade says until when, or when it turns on), and the clock's hours and labels are right; on someone else's private frequency a stranger's packet is refused, and one out of reach does nothing; it's saved, and drops with its schedule;
+139. the counter receiver: set by Dev's packet to 3 with reset frequency 4052 (Dev becomes its tuner; out of reach does nothing), two turn-ons leave it off and the third pulses it on and counts from 0 again; with a 1 s forget time a pause forgets the count (Jade's lines while counting); its reset frequency clears the count; set to stay on at 2, it stays on through more turn-ons (Jade, the screen packet and a round trip, saved with its count) until the reset frequency turns on; Reset count, no reset frequency, and it drops with its settings.
 
-All 137 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 139 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

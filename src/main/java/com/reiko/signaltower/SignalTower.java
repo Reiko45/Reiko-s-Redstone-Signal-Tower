@@ -165,6 +165,14 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenDelayScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenDelayScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureDelayPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureDelayPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureDelayPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenTimerScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenTimerScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTimerScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureTimerPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureTimerPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureTimerPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenCounterScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenCounterScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenCounterScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureCounterPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureCounterPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureCounterPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenLogicScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenLogicScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureLogicPayload.TYPE,
@@ -224,12 +232,14 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_INVERTED_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_LOGIC_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_DELAY_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.RADIO_COUNTER_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.CODE_KEYPAD_ITEM.get());
             event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
+            event.accept(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());

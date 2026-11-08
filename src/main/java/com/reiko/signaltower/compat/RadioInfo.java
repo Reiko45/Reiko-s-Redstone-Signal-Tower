@@ -142,7 +142,8 @@ public final class RadioInfo {
                     || top instanceof RadioRepeaterBlock)
                     && level.getBlockEntity(cursor) instanceof RadioBlockEntity radio) {
                 tag.putString("top", top instanceof RadioConverterBlock ? "converter"
-                        : top instanceof RadioRepeaterBlock ? "repeater" : "transmitter");
+                        : top instanceof RadioRepeaterBlock ? "repeater"
+                        : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 tag.putInt("frequency", radio.getFrequency());
                 if (top instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
@@ -160,6 +161,17 @@ public final class RadioInfo {
             // A compact one (v0.38.0) reads only what's around it and has its fixed reach.
             tag.putInt("power", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, pos, state));
             tag.putInt("reach", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, pos, state));
+            if (radio instanceof com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity timer) {
+                // v0.42.0: its schedule, whether redstone pauses it, and its interval's next change.
+                tag.putBoolean("timer_daily", timer.isDaily());
+                tag.putInt("timer_interval", timer.getInterval());
+                tag.putInt("timer_pulse", timer.getPulse());
+                tag.putInt("timer_on", timer.getOnHour());
+                tag.putInt("timer_off", timer.getOffHour());
+                tag.putBoolean("timer_paused", timer.isPaused(level));
+                tag.putBoolean("timer_clock", timer.clockOn(level));
+                tag.putLong("change_in", timer.changeIn(level));
+            }
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
@@ -192,6 +204,18 @@ public final class RadioInfo {
                 tag.putInt("hold", delay.getHoldTicks());
                 tag.putInt("heard", reception.power());
                 tag.putLong("change_in", delay.changeIn(level.getGameTime()));
+            } else if (block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock && radio instanceof RadioReceiverBlockEntity counter) {
+                // v0.42.0: the count, its settings and its reset frequency (as "second", so it gets a name, note and deafness).
+                tag.putInt("count", counter.getCount());
+                tag.putInt("counter_target", counter.getCounterTarget());
+                tag.putBoolean("counter_latch", counter.isCounterLatch());
+                tag.putInt("counter_forget", counter.getForgetTicks());
+                tag.putBoolean("counter_on", counter.isCounterOn());
+                tag.putLong("forget_in", counter.forgetIn(level.getGameTime()));
+                tag.putInt("heard", reception.power());
+                if (counter.getResetFrequency() > 0) {
+                    tag.putInt("second", counter.getResetFrequency());
+                }
             } else if (block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock && radio instanceof RadioReceiverBlockEntity logic) {
                 // v0.40.0: both frequencies, the mode and what it hears on each.
                 tag.putInt("second", logic.getSecondFrequency());
@@ -293,6 +317,40 @@ public final class RadioInfo {
             }
             return lines;
         }
+        if (block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock) {
+            // v0.42.0: what it counts and what resets it, the count, its settings, then the output.
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "counter_counts", number(data, "frequency", "name")));
+                addNoteLine(lines, data, "note");
+                if (data.contains("second")) {
+                    lines.add(Component.translatable(LANG + "counter_reset", number(data, "second", "second_name")));
+                    addNoteLine(lines, data, "second_note");
+                }
+                int target = data.getInt("counter_target");
+                lines.add(data.getBoolean("counter_on")
+                        ? Component.translatable(LANG + (data.getBoolean("counter_latch") ? "counter_reached_stay" : "counter_reached_pulse"),
+                                value(target)).withStyle(ChatFormatting.GREEN)
+                        : Component.translatable(LANG + "counter_count", value(data.getInt("count")), target));
+                lines.add(Component.translatable(LANG + "counter_settings", RadioReceiverBlockEntity.counterText(target,
+                        data.getBoolean("counter_latch"), data.getInt("counter_forget"))).withStyle(ChatFormatting.GRAY));
+                long forget = data.getLong("forget_in");
+                if (forget > 0) {
+                    lines.add(Component.translatable(LANG + "counter_forgets_in", RadioReceiverBlockEntity.countdownLabel(forget))
+                            .withStyle(ChatFormatting.YELLOW));
+                }
+            }
+            int power = state.getValue(RadioReceiverBlock.POWER);
+            lines.add(power > 0 ? Component.translatable(LANG + "switched_on").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "switched_off").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
+                if (data.contains("deaf_b_to")) {
+                    lines.add(Component.translatable(LANG + "counter_reset_deaf", Component.literal(data.getString("deaf_b_to")))
+                            .withStyle(ChatFormatting.RED));
+                }
+            }
+            return lines;
+        }
         if (block instanceof RadioConverterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioRepeaterBlock.LIT);
             if (hasData) {
@@ -345,6 +403,25 @@ public final class RadioInfo {
             lines.add(!on ? Component.translatable(LANG + "sending_nothing").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "sending", value(data.getInt("power")))
                     : Component.translatable(LANG + "broadcasting").withStyle(ChatFormatting.GREEN));
+            if (hasData && data.contains("timer_daily")) {
+                // v0.42.0: a timer's schedule, then a pause or what happens next.
+                boolean daily = data.getBoolean("timer_daily");
+                lines.add(Component.translatable(LANG + "timer_schedule", com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.scheduleText(
+                        daily, data.getInt("timer_interval"), data.getInt("timer_pulse"), data.getInt("timer_on"), data.getInt("timer_off")))
+                        .withStyle(ChatFormatting.YELLOW));
+                long change = data.getLong("change_in");
+                if (data.getBoolean("timer_paused")) {
+                    lines.add(Component.translatable(LANG + "timer_paused").withStyle(ChatFormatting.GOLD));
+                } else if (!daily && change != 0) {
+                    lines.add(Component.translatable(LANG + (change > 0 ? "timer_next_pulse" : "timer_pulse_ends"),
+                            RadioReceiverBlockEntity.countdownLabel(Math.abs(change))).withStyle(ChatFormatting.YELLOW));
+                } else if (daily && data.getInt("timer_on") != data.getInt("timer_off")) {
+                    boolean clock = data.getBoolean("timer_clock");
+                    lines.add(Component.translatable(LANG + (clock ? "timer_on_until" : "timer_turns_on_at"),
+                            com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity.hourLabel(
+                                    clock ? data.getInt("timer_off") : data.getInt("timer_on"))).withStyle(ChatFormatting.YELLOW));
+                }
+            }
             if (hasData) {
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }
