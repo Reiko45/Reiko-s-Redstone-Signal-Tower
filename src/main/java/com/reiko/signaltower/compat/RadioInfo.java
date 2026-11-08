@@ -232,6 +232,10 @@ public final class RadioInfo {
             if (reception.jammed() > 0) {
                 tag.putInt("jammed", reception.jammed());
             }
+            // v0.47.0: it only hears its tower because it stands higher up.
+            if (reception.lifted()) {
+                tag.putInt("lifted", SignalNetwork.get(level).ear(level, pos));
+            }
             if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
                 tag.putBoolean("toggled_on", toggle.isToggledOn());
                 tag.putInt("heard", reception.power());
@@ -270,8 +274,16 @@ public final class RadioInfo {
         return tag;
     }
 
-    /** v0.46.0: the weather a tower is in, if it shortens its reach ("weather", "weather_loss" in percent). */
+    /**
+     * v0.46.0: the weather a tower is in, if it shortens its reach ("weather", "weather_loss" in
+     * percent); v0.47.0: how long until it's back if lightning knocked it out ("struck", ticks).
+     */
     private static void putWeather(ServerLevel level, BlockPos pos, CompoundTag tag) {
+        long struck = SignalNetwork.get(level).outageTicks(pos);
+        if (struck > 0) {
+            tag.putLong("struck", struck);
+            tag.putInt("power", 0); // it sends (relays, jams) nothing until it's back
+        }
         com.reiko.signaltower.radio.Weather weather = SignalNetwork.get(level).weatherAt(level, pos);
         if (weather.loss() > 0) {
             tag.putInt("weather", weather.ordinal());
@@ -294,6 +306,13 @@ public final class RadioInfo {
             // v0.46.0: rain or a thunderstorm where a tower stands shortens its reach (the reach shown already is).
             lines.add(Component.translatable(LANG + "weather", com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
                     data.getInt("weather_loss")).withStyle(ChatFormatting.DARK_AQUA));
+        }
+        if (data != null && data.contains("struck")) {
+            lines.add(Component.translatable(LANG + "struck", RadioReceiverBlockEntity.countdownLabel(data.getLong("struck")))
+                    .withStyle(ChatFormatting.YELLOW));
+        }
+        if (data != null && data.contains("lifted")) {
+            lines.add(Component.translatable(LANG + "lifted", data.getInt("lifted")).withStyle(ChatFormatting.GREEN));
         }
         if (data != null && data.contains("hills")) {
             lines.add(Component.translatable(LANG + "hills", data.getInt("hills")).withStyle(ChatFormatting.GOLD));
@@ -462,7 +481,9 @@ public final class RadioInfo {
                 addNoteLine(lines, data, "note");
             }
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
-            lines.add(!on ? Component.translatable(LANG + "jammer_off").withStyle(ChatFormatting.GRAY)
+            if (!on && hasData && data.contains("struck")) {
+                // Knocked out by lightning (v0.47.0): the "struck" line says why, not "no redstone".
+            } else lines.add(!on ? Component.translatable(LANG + "jammer_off").withStyle(ChatFormatting.GRAY)
                     : hasData ? Component.translatable(LANG + "jamming", Component.literal(Integer.toString(data.getInt("power")))
                             .withStyle(ChatFormatting.LIGHT_PURPLE))
                     : Component.translatable(LANG + "jamming_on").withStyle(ChatFormatting.LIGHT_PURPLE));

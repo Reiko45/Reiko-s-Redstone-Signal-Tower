@@ -72,6 +72,7 @@ public final class SignalTower {
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedOut);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
         NeoForge.EVENT_BUS.addListener(SignalTower::onServerTick);
+        NeoForge.EVENT_BUS.addListener(SignalTower::onEntityJoin);
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -242,6 +243,15 @@ public final class SignalTower {
             SignalNetwork network = SignalNetwork.get(serverLevel);
             network.tick(serverLevel.getGameTime(), serverLevel.getDayTime());
             network.watchWeather(serverLevel); // v0.46.0: rain and thunder shorten reach
+            com.reiko.signaltower.radio.Lightning.tick(serverLevel, network); // v0.47.0: lightning strikes towers
+        }
+    }
+
+    /** v0.47.0: a lightning bolt landing on a tower (vanilla lightning, a trident, /summon) knocks it out. */
+    private static void onEntityJoin(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent event) {
+        if (!event.loadedFromDisk() && event.getLevel() instanceof ServerLevel serverLevel
+                && event.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt) {
+            com.reiko.signaltower.radio.Lightning.onBoltJoined(serverLevel, bolt);
         }
     }
 

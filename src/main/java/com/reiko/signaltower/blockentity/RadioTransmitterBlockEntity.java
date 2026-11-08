@@ -48,7 +48,8 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             return;
         }
         int power = inputOf(serverLevel, worldPosition, state);
-        boolean powered = power > 0;
+        // Its light goes out while lightning has it knocked out (v0.47.0); the network keeps what it would send.
+        boolean powered = power > 0 && !SignalNetwork.get(serverLevel).isKnockedOut(worldPosition);
         if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
             serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
         }

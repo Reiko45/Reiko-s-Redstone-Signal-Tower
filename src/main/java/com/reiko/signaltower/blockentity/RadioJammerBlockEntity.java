@@ -33,7 +33,7 @@ public class RadioJammerBlockEntity extends RadioTransmitterBlockEntity {
             return;
         }
         int power = RadioHelper.readTransmitterInput(serverLevel, worldPosition);
-        boolean powered = power > 0;
+        boolean powered = power > 0 && !SignalNetwork.get(serverLevel).isKnockedOut(worldPosition);
         if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
             serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
         }

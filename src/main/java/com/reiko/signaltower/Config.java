@@ -62,6 +62,25 @@ public final class Config {
                     "count. 0 means terrain doesn't matter.")
             .defineInRange("terrainBlocksPerStrength", 8, 0, 100_000);
 
+    public static final ModConfigSpec.IntValue RECEIVER_HEIGHT_PERCENT = BUILDER
+            .comment("Receivers (and repeaters, converters, pagers, meters and scanners) standing higher than a tower hear it",
+                    "from farther: as far as this percent of what a transmitter at the receiver's height would reach",
+                    "(if that's more than the tower's own reach). Compact transmitters and motion sensors keep their",
+                    "short reach. 0 means a receiver's height doesn't matter.")
+            .defineInRange("receiverHeightPercent", 100, 0, 1000);
+
+    public static final ModConfigSpec.DoubleValue LIGHTNING_STRIKES_PER_HOUR = BUILDER
+            .comment("How often, on average, lightning strikes a tower 64 blocks above sea level while a thunderstorm",
+                    "rages where it stands, in strikes per hour (a tower half as high, half as often). Only towers open",
+                    "to the sky can be hit. A Lightning Rod within 2 blocks of the tower's top takes the hit instead.",
+                    "Bolts that land on a tower some other way (vanilla lightning, a channeling trident, /summon) count",
+                    "too. 0 means lightning never picks towers.")
+            .defineInRange("lightningStrikesPerHour", 6.0, 0.0, 3600.0);
+
+    public static final ModConfigSpec.IntValue LIGHTNING_OUTAGE_SECONDS = BUILDER
+            .comment("How long, in seconds, a tower struck by lightning stays quiet (sends, relays and jams nothing).")
+            .defineInRange("lightningOutageSeconds", 5, 1, 600);
+
     public static final ModConfigSpec.IntValue JAMMER_REACH_PERCENT = BUILDER
             .comment("How far a Radio Jammer reaches, in percent of what a transmitter at the same height",
                     "(with the same antenna) would.")

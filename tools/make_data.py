@@ -632,6 +632,12 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.47.0: receiver height and lightning
+    f"jade.{MOD}.lifted": "Up high: hears lower towers up to %s blocks away",
+    f"jade.{MOD}.struck": "Struck by lightning: back in %s",
+    f"{MOD}.configuration.receiverHeightPercent": "Receiver height reach (% of a transmitter's there; 0 = off)",
+    f"{MOD}.configuration.lightningStrikesPerHour": "Lightning strikes per hour on a tower 64 high (0 = never)",
+    f"{MOD}.configuration.lightningOutageSeconds": "Seconds a struck tower stays quiet",
     # v0.46.0: weather and terrain, and the Radio Jammer
     f"block.{MOD}.radio_jammer": "Radio Jammer",
     f"block.{MOD}.radio_jammer.tooltip": "A tower top that drowns out its frequency around it while redstone reaches it (or a mast under it): everything there hears that much less, and full strength (15) silences it. It reaches half as far as a transmitter at the same height; masts and antennas help.",

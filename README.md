@@ -514,6 +514,27 @@ Since 0.46 the world gets in the way of signals:
 - Jade shows what hills take off a receiver's signal ("Hills in the way: -4"), and the Signal Meter adds a line ("Hills -4").
 - The numbers are in the server config: `rainReachLoss` and `thunderReachLoss` (percent; 0 = off) and `terrainBlocksPerStrength` (0 = hills don't matter).
 
+### Receiver height
+
+Since 0.47 a receiver standing **higher than a tower** hears it from farther: as far as a transmitter would reach where the receiver stands. A Radio Receiver on top of a 12-mast pillar, 15 blocks above sea level, hears towers below it up to 152 blocks away (32 + 8 × 15), even a transmitter on the ground whose own reach is 56.
+
+- It works for everything that listens: receivers of every kind, lamps, speakers, status boards, repeaters and converters (so a tall repeater picks up low towers from farther), and the pager, meter and scanner in your hand.
+- Only when the receiver is the higher one. A receiver lower than the tower, or at the same height, hears it within the tower's own reach as before. Compact transmitters and motion sensors keep their short reach, and remote presses and jammers aren't affected.
+- Weather still applies (where the tower stands), and so do hills.
+- Jade says when a signal is heard thanks to the height: "Up high: hears lower towers up to 152 blocks away". The meter's distance to the edge counts it too.
+- `receiverHeightPercent` in the server config (100 by default) is how much of a transmitter's reach a high receiver gets; 0 switches it off.
+
+### Lightning
+
+Since 0.47 **lightning strikes tall towers** during thunderstorms:
+
+- Each tower open to the sky (a full-size transmitter, timer, recorder, repeater, converter or jammer) has a chance of being hit while a storm rages where it stands: about 6 times an hour at 64 blocks above sea level, half as often at 32 (`lightningStrikesPerHour`). Compact transmitters and motion sensors are never hit.
+- **A struck tower goes quiet** for 5 seconds (`lightningOutageSeconds`): it sends, relays and jams nothing, its light goes out, sparks crackle round its antenna, and its receivers go off. Then it comes back by itself. Jade shows "Struck by lightning: back in 3.5s".
+- **A Lightning Rod** within 2 blocks of the tower's top (on its side, on top of it, or on a mast or post beside it) takes the hit instead: the rod gives its redstone pulse and the tower stays on.
+- The mod's own bolts don't start fires or hurt anyone. A bolt that lands on a tower some other way (vanilla lightning, a Trident with Channeling, `/summon lightning_bolt`) knocks it out too, unless a rod protects it.
+
+![A lime Radio Lamp on top of a 12-mast pillar, lit, and one on the ground at its foot, dark: both on a transmitter 80 blocks away whose reach is 56; Jade on the high lamp saying "Up high: hears lower towers up to 152 blocks away" (the meter: 15, 70 blocks to the edge); lightning striking Dev's tower in a thunderstorm ("Sending: nothing", "Struck by lightning: back in 4.7s"); sparks round the dark tower ("back in 3.5s"); and the same tower with a Lightning Rod on its side, still "Sending: 15" after the next strike](docs/images/receiver-height-and-lightning.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -577,7 +598,7 @@ Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size 
 
 ### Reach
 
-Reach is measured horizontally from the transmitter (or repeater), so a receiver works at any height inside that circle.
+Reach is measured horizontally from the transmitter (or repeater), so a receiver works at any height inside that circle, and one higher than the tower hears it even farther (see Receiver height).
 
 ```
 reach = 32 + 8 × (blocks above sea level)
@@ -728,6 +749,7 @@ src/main/java/com/reiko/signaltower/
   block/RadioJammerBlock.java            tower top that drowns out its frequency around it while powered
   blockentity/RadioJammerBlockEntity.java  tells the network how strongly and how far it jams
   radio/Weather.java                     clear, rain, thunder: how much reach each takes off (config)
+  radio/Lightning.java                   lightning strikes on towers: chance, outages, lightning rods
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -979,7 +1001,10 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 148. jammers in the network: 5 off 12 leaves 7 and 15 silences it, inside its reach only and on its own frequency; the scanner hears nothing either; a repeater inside it has nothing to pass on; switched off it's heard (and passed on) again; saved and loaded with the world;
 149. the Radio Jammer: powered by redstone it silences a receiver near it and not one far away, at half a transmitter's reach; Jade says "Jammed" on the receiver and what it jams on the jammer; the meter says "Jammed"; it sends nothing itself; a stranger's jammer on someone else's private frequency is silent (and says so, and shows in the audit); and broken, it stops and keeps its frequency on the item.
 
-All 149 also pass with `-PnoJade`, so the mod runs the same without Jade.
+150. receiver height: 4 blocks up a receiver hears a tower 30 blocks past its reach (3 up doesn't), one lower than the tower gains nothing, a compact transmitter keeps its short reach, a repeater up high picks it up and passes it on, and the meter and scanner go by it; a real receiver 11 blocks above a transmitter hears it from 98 blocks (Jade says why) and one at the transmitter's height doesn't;
+151. lightning: the chance grows with height (none below sea level); struck, a transmitter on masts goes quiet for 5 seconds (receiver off, light out, Jade counts down) and comes back; a Lightning Rod beside its top takes the next hit (the rod pulses, the tower stays on) but one 3 blocks away is too far; a bolt that isn't the mod's knocks it out too; compact transmitters can't be struck, repeaters can.
+
+All 151 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

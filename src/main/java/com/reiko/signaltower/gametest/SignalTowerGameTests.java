@@ -6902,4 +6902,134 @@ public final class SignalTowerGameTests {
                                 && Integer.valueOf(4391).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Broken: gone, and dropped with its frequency"))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.47.0: receiver height
+
+    /**
+     * Receiver height: a receiver higher than a tower hears it as far as a transmitter at the
+     * receiver's height would reach (here 4 blocks up covers 30 more blocks), not 3 blocks up;
+     * one lower than the tower gains nothing; a compact transmitter keeps its short reach; a repeater
+     * up high picks the signal up and passes it on; the meter's edge and the scanner go by it. A
+     * real receiver 11 blocks above a transmitter hears it from 98 blocks (beyond its 64), Jade says
+     * why, and one at the transmitter's height 98 blocks away hears nothing.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void receiverHeight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 31000); // not loaded: no hills
+        int ground = RadioHelper.reachAt(level, far);
+        network.updateTransmitter(far, 4471, 15, ground);
+        BlockPos spot = far.east(ground + 30);
+        BlockPos high = spot.above(4);
+        check(network.listen(level, 4471, spot).power() == 0, "Too far at the tower's height");
+        check(RadioHelper.reachAt(level, high) >= ground + 30 && RadioHelper.reachAt(level, spot.above(3)) < ground + 30, "The heights are right");
+        var lifted = network.listen(level, 4471, high);
+        check(lifted.power() == 15 && lifted.lifted(), "4 blocks up it hears it: " + lifted);
+        check(network.listen(level, 4471, spot.above(3)).power() == 0, "3 blocks up isn't enough");
+        check(!network.listen(level, 4471, far.east(10).above(4)).lifted(), "Within the tower's own reach it isn't thanks to height");
+        check(network.ear(level, high) == RadioHelper.reachAt(level, high), "Its ear: a transmitter's reach there");
+        check(network.edgeMargin(level, 4471, high) == RadioHelper.reachAt(level, high) - (ground + 30), "The meter's edge goes by it");
+        check(network.scanAt(level, high).stream().anyMatch(heard -> heard.frequency() == 4471 && heard.power() == 15), "So does the scanner");
+        network.updateTransmitter(far.north(600).above(10), 4472, 15, 50);
+        check(network.listen(level, 4472, far.north(600).east(60)).power() == 0, "Lower than the tower: nothing gained");
+        network.updateTransmitter(far.south(600), 4473, 15, 16, null, true);
+        check(network.listen(level, 4473, far.south(600).east(20).above(40)).power() == 0, "A compact transmitter keeps its short reach");
+        network.updateRepeater(high, 4471, 100);
+        check(network.repeaterPower(level, high) == 15 && network.listen(level, 4471, spot.east(90)).power() == 15,
+                "A repeater up high picks it up and passes it on");
+
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos upRx = new BlockPos(100, 12, 1);
+        BlockPos lowRx = new BlockPos(100, 1, 2);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4474);
+        place(helper, upRx, ModRegistry.RADIO_RECEIVER.get(), 4474);
+        place(helper, lowRx, ModRegistry.RADIO_RECEIVER.get(), 4474);
+        check(RadioHelper.reachAt(level, helper.absolutePos(tx)) < 98 && RadioHelper.reachAt(level, helper.absolutePos(upRx)) >= 98,
+                "98 blocks: out of the transmitter's reach, in the high receiver's");
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, upRx, 15))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, lowRx, 0);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(upRx),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(upRx))));
+                    check(keys.contains("lifted"), "Jade says it's thanks to its height: " + keys);
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.47.0: lightning
+
+    /**
+     * Lightning: the chance grows with height (none below sea level). Struck, a transmitter on masts
+     * goes quiet for 5 seconds (its receiver goes off, its light out, Jade counts down) and comes
+     * back by itself. A Lightning Rod next to its top takes the next hit (the rod gives its pulse)
+     * and the tower stays on; one 3 blocks away is too far. A bolt that isn't the mod's (here one
+     * spawned on top of it) knocks it out too. Compact transmitters can't be struck; repeaters can.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 600)
+    public static void lightningStrikesTowers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos top = new BlockPos(10, 4, 1);
+        BlockPos rx = new BlockPos(20, 1, 1);
+        BlockPos rod = new BlockPos(11, 4, 1);
+        for (int y = 0; y < 4; y++) {
+            helper.setBlock(new BlockPos(10, y, 1), ModRegistry.RADIO_MAST.get());
+        }
+        place(helper, top, ModRegistry.RADIO_TRANSMITTER.get(), 4481);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4481);
+        place(helper, new BlockPos(30, 1, 1), ModRegistry.COMPACT_RADIO_TRANSMITTER.get(), 4482);
+        place(helper, new BlockPos(32, 1, 1), ModRegistry.RADIO_REPEATER.get(), 4482);
+        BlockPos absTop = helper.absolutePos(top);
+        SignalNetwork network = SignalNetwork.get(level);
+        int height = RadioHelper.heightAboveSeaLevel(level, absTop);
+        check(Math.abs(com.reiko.signaltower.radio.Lightning.chancePerSecond(level, absTop) - 6.0 / 3600 * height / 64) < 1e-12
+                && com.reiko.signaltower.radio.Lightning.chancePerSecond(level, absTop.below(200)) == 0, "Chance by height");
+        check(!com.reiko.signaltower.radio.Lightning.isTower(level, helper.absolutePos(new BlockPos(30, 1, 1)))
+                && com.reiko.signaltower.radio.Lightning.isTower(level, helper.absolutePos(new BlockPos(32, 1, 1)))
+                && com.reiko.signaltower.radio.Lightning.isTower(level, absTop), "Which blocks are towers");
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(11, 0, 1), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.radio.Lightning.strike(level, absTop) == null, "No rod: the tower takes it");
+                    check(network.isKnockedOut(absTop) && network.outageTicks(absTop) > 90, "Knocked out for 5 seconds");
+                    check(!helper.getEntities(EntityType.LIGHTNING_BOLT).isEmpty(), "A bolt came down");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> {
+                    check(!helper.getBlockState(top).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Its light is out");
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(top),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, absTop)));
+                    check(keys.contains("struck"), "Jade counts down: " + keys);
+                })
+                .thenWaitUntil(() -> {
+                    assertOutput(helper, rx, 15);
+                    check(!network.isKnockedOut(absTop), "Back by itself");
+                    helper.assertBlockProperty(top, com.reiko.signaltower.block.RadioTransmitterBlock.POWERED, true);
+                })
+                .thenExecute(() -> {
+                    helper.setBlock(new BlockPos(13, 4, 1), Blocks.LIGHTNING_ROD);
+                    check(com.reiko.signaltower.radio.Lightning.rodNear(level, absTop) == null, "3 blocks away is too far");
+                    helper.setBlock(new BlockPos(13, 4, 1), Blocks.AIR);
+                    helper.setBlock(rod, Blocks.LIGHTNING_ROD);
+                    check(helper.absolutePos(rod).equals(com.reiko.signaltower.radio.Lightning.strike(level, absTop)), "The rod takes it");
+                    check(!network.isKnockedOut(absTop) && helper.getBlockState(rod).getValue(net.minecraft.world.level.block.LightningRodBlock.POWERED),
+                            "The tower stays on; the rod gives its pulse");
+                })
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    assertOutput(helper, rx, 15);
+                    helper.setBlock(rod, Blocks.AIR);
+                    net.minecraft.world.entity.LightningBolt bolt = EntityType.LIGHTNING_BOLT.create(level);
+                    bolt.moveTo(Vec3.atBottomCenterOf(absTop.above()));
+                    bolt.setVisualOnly(true);
+                    level.addFreshEntity(bolt);
+                    check(network.isKnockedOut(absTop), "Any bolt landing on it knocks it out");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenSucceed();
+    }
 }
