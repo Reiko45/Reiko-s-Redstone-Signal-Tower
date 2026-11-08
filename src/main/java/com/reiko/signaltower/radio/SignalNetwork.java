@@ -140,13 +140,38 @@ public final class SignalNetwork extends SavedData {
      * on {@code output} with its reach. A repeater sends on the frequency it listens on; a
      * converter on another one. What it sends is worked out by {@link #resolve}.
      */
-    public record Repeater(int frequency, int output, int reach, @Nullable UUID tunedBy) {
+    public record Repeater(int frequency, int output, int reach, @Nullable UUID tunedBy, int gate, int threshold) {
+        /** A converter's signal gate (v0.41.0): none (it passes what it hears on). */
+        public static final int GATE_NONE = 0;
+        /** Sends what it hears when that's at least the threshold, else nothing. */
+        public static final int GATE_AT_LEAST = 1;
+        /** Sends 15 while what it hears is below the threshold (at 1: while it hears nothing), else nothing. */
+        public static final int GATE_BELOW = 2;
+
         public Repeater(int frequency, int reach) {
             this(frequency, frequency, reach, null);
         }
 
         public Repeater(int frequency, int output, int reach) {
             this(frequency, output, reach, null);
+        }
+
+        public Repeater(int frequency, int output, int reach, @Nullable UUID tunedBy) {
+            this(frequency, output, reach, tunedBy, GATE_NONE, 1);
+        }
+
+        /** True for a converter with a signal gate: what it sends is decided by its block entity, see {@link #setGateOutput}. */
+        public boolean gated() {
+            return gate != GATE_NONE;
+        }
+
+        /** What a gate with this mode and threshold sends when it hears {@code heard}. */
+        public static int gateOutput(int gate, int threshold, int heard) {
+            return switch (gate) {
+                case GATE_AT_LEAST -> heard >= threshold ? heard : 0;
+                case GATE_BELOW -> heard < threshold ? 15 : 0;
+                default -> heard;
+            };
         }
 
         /** True for a converter (sends on another frequency than it listens on). */
@@ -161,6 +186,8 @@ public final class SignalNetwork extends SavedData {
     private final Map<BlockPos, Transmitter> transmitters = new HashMap<>();
     private final Map<Integer, Map<BlockPos, Transmitter>> byFrequency = new HashMap<>();
     private final Map<BlockPos, Repeater> repeaters = new HashMap<>();
+    /** What each gated converter sends (v0.41.0), as its block entity last decided; absent = nothing. Saved. */
+    private final Map<BlockPos, Integer> gateOutputs = new HashMap<>();
     /** Repeaters and converters by the frequency they listen on. */
     private final Map<Integer, Map<BlockPos, Repeater>> repeatersByInput = new HashMap<>();
     /** Repeaters and converters by the frequency they send on. */
@@ -350,14 +377,22 @@ public final class SignalNetwork extends SavedData {
 
     /** {@link #updateRepeater(BlockPos, int, int, int)}, with the player who last tuned or placed it. */
     public void updateRepeater(BlockPos pos, int frequency, int output, int reach, @Nullable UUID tunedBy) {
+        updateRepeater(pos, frequency, output, reach, tunedBy, Repeater.GATE_NONE, 1);
+    }
+
+    /** {@link #updateRepeater(BlockPos, int, int, int, UUID)} for a converter with a signal gate (v0.41.0). */
+    public void updateRepeater(BlockPos pos, int frequency, int output, int reach, @Nullable UUID tunedBy, int gate, int threshold) {
         BlockPos key = pos.immutable();
-        Repeater next = new Repeater(frequency, output, reach, tunedBy);
+        Repeater next = new Repeater(frequency, output, reach, tunedBy, gate, threshold);
         Repeater previous = repeaters.put(key, next);
         if (next.equals(previous)) {
             return;
         }
         if (previous != null) {
             removeRepeaterFromIndex(key, previous);
+        }
+        if (!next.gated() || previous == null || previous.output() != output) {
+            gateOutputs.remove(key); // a new gate (or a new output frequency) starts quiet until its block entity decides
         }
         repeatersByInput.computeIfAbsent(frequency, f -> new HashMap<>()).put(key, next);
         repeatersByOutput.computeIfAbsent(output, f -> new HashMap<>()).put(key, next);
@@ -369,6 +404,7 @@ public final class SignalNetwork extends SavedData {
 
     public void removeRepeater(BlockPos pos) {
         Repeater previous = repeaters.remove(pos);
+        gateOutputs.remove(pos);
         if (previous != null) {
             removeRepeaterFromIndex(pos, previous);
             setDirty();
@@ -388,6 +424,49 @@ public final class SignalNetwork extends SavedData {
         relayEpoch++;
         bump(repeater.output()); // first, while it can't ripple through this repeater any more
         bump(repeater.frequency());
+    }
+
+    /**
+     * A gated converter's output, as decided by its block entity (v0.41.0): {@code power} goes out on
+     * its output frequency like a transmitter's, over its reach. A change bumps that frequency, and a
+     * turn-on is remembered for the log and pagers (as the gate's). Returns true if it changed.
+     */
+    public boolean setGateOutput(BlockPos pos, int power) {
+        Repeater repeater = repeaters.get(pos);
+        if (repeater == null || !repeater.gated()) {
+            return false;
+        }
+        BlockPos key = pos.immutable();
+        int previous = gateOutputs.getOrDefault(key, 0);
+        if (previous == power) {
+            return false;
+        }
+        if (power > 0) {
+            gateOutputs.put(key, power);
+        } else {
+            gateOutputs.remove(key);
+        }
+        relayEpoch++;
+        if (previous == 0 && !blocked(null, repeater.output(), repeater.tunedBy())) {
+            recordTurnOn(repeater.output(), ownCoverage(key, repeater.reach()), Cause.gate(key, repeater.tunedBy()));
+        }
+        bump(repeater.output());
+        setDirty();
+        return true;
+    }
+
+    /** What the gated converter at {@code pos} sends right now, as last decided (0 if nothing or none). */
+    public int gateOutput(BlockPos pos) {
+        return gateOutputs.getOrDefault(pos, 0);
+    }
+
+    /** What a gated converter at {@code pos} hears on the frequency it listens on (0 if it's deaf there, or there's none). */
+    public int gateInput(ServerLevel level, BlockPos pos) {
+        Repeater repeater = repeaters.get(pos);
+        if (repeater == null || deaf(level, repeater.frequency(), repeater.tunedBy())) {
+            return 0;
+        }
+        return listen(level, repeater.frequency(), pos).power();
     }
 
     /** The frequency the repeater or converter at {@code pos} listens on, or empty if there's none in the network there. */
@@ -471,6 +550,11 @@ public final class SignalNetwork extends SavedData {
                 // It sends on someone else's private frequency, or listens on someone else's encrypted one: it stays quiet.
                 silenced.add(pos);
                 power.put(pos, 0);
+            } else if (repeater.gated()) {
+                // A gate (v0.41.0) sends what its block entity decided, like a transmitter: it's a source
+                // here, and nothing spreads into it (that would make an inverting loop impossible to settle).
+                silenced.add(pos);
+                power.put(pos, gateOutputs.getOrDefault(pos, 0));
             } else {
                 power.put(pos, listenDirect(level, repeater.frequency(), pos).power());
             }
@@ -592,7 +676,7 @@ public final class SignalNetwork extends SavedData {
             for (Map.Entry<BlockPos, Repeater> entry : listening.entrySet()) {
                 BlockPos pos = entry.getKey();
                 Repeater repeater = entry.getValue();
-                if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos)
+                if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos) || repeater.gated()
                         || blocked(level, repeater.output(), repeater.tunedBy())
                         || deaf(level, repeater.frequency(), repeater.tunedBy())) {
                     continue;
@@ -784,7 +868,7 @@ public final class SignalNetwork extends SavedData {
 
     /** What turned a frequency on (v0.35.0), for the frequency log. Saved by name, sent by ordinal: only add at the end. */
     public enum CauseKind {
-        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR;
+        UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -830,6 +914,11 @@ public final class SignalNetwork extends SavedData {
         /** {@link #keypad(BlockPos, UUID, String)} with the guest code's name (v0.38.0), or "" for the keypad's own code. */
         public static Cause keypad(BlockPos pos, UUID player, String name, String guestCode) {
             return new Cause(CauseKind.KEYPAD, pos.immutable(), player, name, guestCode == null ? "" : guestCode);
+        }
+
+        /** A converter's signal gate opened (v0.41.0): where the converter is, and who tuned it. */
+        public static Cause gate(BlockPos pos, @Nullable UUID tunedBy) {
+            return new Cause(CauseKind.GATE, pos.immutable(), tunedBy, "");
         }
 
         /** A Radio Motion Sensor saw someone (v0.39.0): where the sensor is, and who it saw first. */
@@ -1340,6 +1429,11 @@ public final class SignalNetwork extends SavedData {
             if (repeater.tunedBy() != null) {
                 entry.putUUID("tuned_by", repeater.tunedBy());
             }
+            if (repeater.gated()) {
+                entry.putInt("gate", repeater.gate());
+                entry.putInt("threshold", repeater.threshold());
+                entry.putInt("gate_output", gateOutputs.getOrDefault(pos, 0));
+            }
             repeaterList.add(entry);
         });
         tag.put("repeaters", repeaterList);
@@ -1432,8 +1526,12 @@ public final class SignalNetwork extends SavedData {
             int frequency = Frequency.clamp(entry.getInt("frequency"));
             int output = entry.contains("output") ? Frequency.clamp(entry.getInt("output")) : frequency;
             Repeater repeater = new Repeater(frequency, output, entry.getInt("reach"),
-                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
+                    entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null,
+                    Math.max(0, Math.min(2, entry.getInt("gate"))), Math.max(1, Math.min(15, entry.contains("threshold") ? entry.getInt("threshold") : 1)));
             network.repeaters.put(pos, repeater);
+            if (repeater.gated() && entry.getInt("gate_output") > 0) {
+                network.gateOutputs.put(pos, Math.min(15, entry.getInt("gate_output")));
+            }
             network.repeatersByInput.computeIfAbsent(repeater.frequency(), f -> new HashMap<>()).put(pos, repeater);
             network.repeatersByOutput.computeIfAbsent(repeater.output(), f -> new HashMap<>()).put(pos, repeater);
         }

@@ -26,6 +26,7 @@ import com.reiko.signaltower.item.ScannerTarget;
 import com.reiko.signaltower.item.SignalScannerItem;
 import com.reiko.signaltower.item.SignalMeterItem;
 import com.reiko.signaltower.block.RadioLogicReceiverBlock;
+import com.reiko.signaltower.block.RadioDelayReceiverBlock;
 import com.reiko.signaltower.item.TunerPresets;
 import com.reiko.signaltower.item.PulseLength;
 import com.reiko.signaltower.item.RemoteButtons;
@@ -68,6 +69,22 @@ public final class ModRegistry {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OUTPUT_FREQUENCY =
             DATA_COMPONENTS.registerComponentType("output_frequency", builder -> builder
                     .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A Radio Converter's signal gate, kept on the item (v0.41.0): mode × 16 + threshold (mode 1 at least, 2 below; threshold 1-15). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> CONVERTER_GATE =
+            DATA_COMPONENTS.registerComponentType("converter_gate", builder -> builder
+                    .persistent(Codec.intRange(0, 47))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** A Radio Delay Receiver's delay and hold, in ticks, kept on the item (v0.41.0). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> DELAY_TICKS =
+            DATA_COMPONENTS.registerComponentType("delay_ticks", builder -> builder
+                    .persistent(Codec.intRange(0, 1200))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> HOLD_TICKS =
+            DATA_COMPONENTS.registerComponentType("hold_ticks", builder -> builder
+                    .persistent(Codec.intRange(0, 1200))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
     /** A Radio Logic Receiver's second frequency, kept on the item when it's broken (v0.40.0). */
@@ -191,6 +208,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
 
+    /** A receiver with a delay and a hold (v0.41.0). */
+    public static final DeferredBlock<RadioDelayReceiverBlock> RADIO_DELAY_RECEIVER = BLOCKS.register("radio_delay_receiver",
+            () -> new RadioDelayReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioReceiverBlock.POWER) > 0 ? 5 : 0)));
+
     /** Listens for its frequency and broadcasts it again from its own height. */
     public static final DeferredBlock<RadioRepeaterBlock> RADIO_REPEATER = BLOCKS.register("radio_repeater",
             () -> new RadioRepeaterBlock(BlockBehaviour.Properties.of()
@@ -281,6 +307,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_inverted_receiver", RADIO_INVERTED_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_LOGIC_RECEIVER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_logic_receiver", RADIO_LOGIC_RECEIVER);
+    public static final DeferredItem<BlockItem> RADIO_DELAY_RECEIVER_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_delay_receiver", RADIO_DELAY_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -320,7 +348,7 @@ public final class ModRegistry {
             BLOCK_ENTITIES.register("radio_receiver",
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
                             RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get(),
-                            RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get()).build(null));
+                            RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get(), RADIO_DELAY_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",

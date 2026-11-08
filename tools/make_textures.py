@@ -199,6 +199,29 @@ def logic_receiver_side(lit):
     return img
 
 
+def delay_receiver_side(lit):
+    """Incoming waves above a small hourglass (v0.41.0): the sand glows red while it's on."""
+    r = ON if lit else OFF
+    img = casing(12)
+    px = img.load()
+    vents(img)
+    for p in [(6, 3), (7, 2), (8, 2), (9, 3)]:
+        px[p] = r[1]
+    px[7, 4] = px[8, 4] = r[2] if lit else r[1]
+    # Hourglass: frame top and bottom, glass sides narrowing to the middle
+    for x in range(5, 11):
+        px[x, 5] = O
+        px[x, 10] = O
+    for (x, y) in [(5, 6), (10, 6), (6, 7), (9, 7), (6, 8), (9, 8), (5, 9), (10, 9)]:
+        px[x, y] = L
+    # Sand: a little left on top, a heap at the bottom
+    px[7, 6] = px[8, 6] = r[1]
+    px[7, 7] = r[0]
+    px[7, 8] = r[0]
+    px[6, 9] = px[7, 9] = px[8, 9] = px[9, 9] = r[2] if lit else r[1]
+    return img
+
+
 def repeater_side(lit, palette=None):
     """An amber mast with arcs passing through it: picked up on the left, sent on to the right.
     The converter uses the same picture in teal (palette = (off, on))."""
@@ -729,6 +752,8 @@ blocks = {
     "radio_toggle_receiver_side_on": toggle_receiver_side(True),
     "radio_inverted_receiver_side": inverted_receiver_side(False),
     "radio_logic_receiver_side": logic_receiver_side(False),
+    "radio_delay_receiver_side": delay_receiver_side(False),
+    "radio_delay_receiver_side_on": delay_receiver_side(True),
     "radio_logic_receiver_side_on": logic_receiver_side(True),
     "radio_inverted_receiver_side_on": inverted_receiver_side(True),
     "radio_receiver_side": receiver_side(False),

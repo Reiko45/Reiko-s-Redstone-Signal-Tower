@@ -110,6 +110,7 @@ for lit in (False, True):
     write(models / f"radio_toggle_receiver{suffix}.json", receiver_model(lit, "radio_toggle_receiver_side"))
     write(models / f"radio_inverted_receiver{suffix}.json", receiver_model(lit, "radio_inverted_receiver_side"))
     write(models / f"radio_logic_receiver{suffix}.json", receiver_model(lit, "radio_logic_receiver_side"))
+    write(models / f"radio_delay_receiver{suffix}.json", receiver_model(lit, "radio_delay_receiver_side"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -296,7 +297,7 @@ write(models / "radio_mast.json", {
 
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_delay_receiver", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
@@ -397,6 +398,9 @@ write(states / "radio_receiver.json", {"variants": {
 write(states / "radio_toggle_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_toggle_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
+write(states / "radio_delay_receiver.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_delay_receiver" + ("_on" if p > 0 else "")} for p in range(16)
+}})
 write(states / "radio_logic_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_logic_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -458,6 +462,53 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.41.0: signal gate and Radio Delay Receiver
+    f"block.{MOD}.radio_delay_receiver": "Radio Delay Receiver",
+    f"block.{MOD}.radio_delay_receiver.tooltip": "A receiver with a timer: it turns on and off its delay after its frequency does, and stays on for its hold after it turns off. Right-click it to set them.",
+    f"tooltip.{MOD}.delay_timing": "Delay: %s, hold: %s",
+    f"message.{MOD}.time_none": "none",
+    f"message.{MOD}.time_seconds": "%ss",
+    f"message.{MOD}.delay_status": "Delay Receiver | Frequency %s | Delay %s, hold %s | Hearing %s | %s",
+    f"message.{MOD}.delay_set": "Radio Delay Receiver: delay %s, hold %s",
+    f"screen.{MOD}.audit.kind_delay_receiver": "Delay Receiver",
+    f"screen.{MOD}.delay.frequency": "Frequency %s",
+    f"screen.{MOD}.delay.delay": "Delay",
+    f"screen.{MOD}.delay.hold": "Hold",
+    f"screen.{MOD}.delay.delay_tip": "It turns on and off this long after its frequency does, like a long redstone repeater. Shift-click or scroll to go back.",
+    f"screen.{MOD}.delay.hold_tip": "It stays on this long after that turns off, so a short pulse keeps it on for a while.",
+    f"screen.{MOD}.delay.explain": "Outputs 15 while on",
+    f"screen.{MOD}.delay.status": "Hearing %s, output %s",
+    f"screen.{MOD}.delay.nothing": "nothing",
+    f"screen.{MOD}.delay.on": "on",
+    f"screen.{MOD}.delay.off": "off",
+    f"screen.{MOD}.delay.turns_on": "Turns on in %s",
+    f"screen.{MOD}.delay.turns_off": "Turns off in %s",
+    f"screen.{MOD}.delay.deaf": "Deaf: %s is encrypted by %s, so it hears nothing",
+    f"jade.{MOD}.delay_timing": "Delay: %s, hold: %s",
+    f"jade.{MOD}.delay_turns_on": "Turns on in %s",
+    f"jade.{MOD}.delay_turns_off": "Turns off in %s",
+    f"jade.{MOD}.gate": "Gate: %s (hearing %s)",
+    f"message.{MOD}.converter_set_gate": "Radio Converter: listens on %s, sends on %s, %s",
+    f"message.{MOD}.gate_at_least": "only at %s or more",
+    f"message.{MOD}.gate_below": "15 while below %s",
+    f"message.{MOD}.gate_not": "15 while it hears nothing",
+    f"tooltip.{MOD}.converter_gate": "Gate: %s",
+    f"screen.{MOD}.converter.gate": "Gate",
+    f"screen.{MOD}.converter.gate_0": "Pass",
+    f"screen.{MOD}.converter.gate_1": "At least",
+    f"screen.{MOD}.converter.gate_2": "Below",
+    f"screen.{MOD}.converter.gate_0_tip": "Pass: sends what it hears, at the same strength. Click for At least (Shift-click goes back).",
+    f"screen.{MOD}.converter.gate_1_tip": "At least: sends what it hears only when it's at least the level on the right, like a comparator. Click for Below.",
+    f"screen.{MOD}.converter.gate_2_tip": "Below: sends 15 while what it hears is below the level on the right. At 1, while it hears nothing: a NOT gate. Click for Pass.",
+    f"screen.{MOD}.converter.threshold": "Level",
+    f"screen.{MOD}.converter.threshold_tip": "The gate's level, 1 to 15. Click for more, Shift-click for less.",
+    f"screen.{MOD}.converter.gate_preview": "Once saved: sends %s on %s",
+    f"screen.{MOD}.converter.gate_preview_closed": "Once saved: nothing sent on %s",
+    f"screen.{MOD}.converter.gate_sending": "Sending %s on %s",
+    f"screen.{MOD}.converter.gate_closed": "Gate closed: nothing sent on %s",
+    f"screen.{MOD}.converter.reach_gate": "Reach: %s blocks | hearing %s",
+    f"screen.{MOD}.converter.heard_nothing": "nothing",
+    f"screen.{MOD}.log.kind_gate": "Converter gate",
     f"block.{MOD}.radio_logic_receiver.tooltip": "Listens on two frequencies and outputs when both are on (AND), either is on (OR) or exactly one is on (XOR). Right-click it to set them.",
     f"tooltip.{MOD}.logic_inputs": "Listens on: %s %s %s",
     f"message.{MOD}.logic_and": "AND",
@@ -519,7 +570,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_converter.tooltip": "Picks up one frequency and broadcasts it on another, from its own height. Needs no redstone.",
     f"tooltip.{MOD}.converter_listens": "Listens on: %s",
     f"tooltip.{MOD}.converter_sends": "Sends on: %s",
-    f"tooltip.{MOD}.converter_hint": "Right-click it with an empty hand to set both frequencies. The tuner sets the one it listens on",
+    f"tooltip.{MOD}.converter_hint": "Right-click it with an empty hand to set both frequencies and its gate. The tuner sets the one it listens on",
     f"screen.{MOD}.converter.listens": "Listens on",
     f"screen.{MOD}.converter.sends": "Sends on",
     f"screen.{MOD}.converter.range": "Frequencies %s to %s",
@@ -1049,6 +1100,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.converting": "Converting: %s",
     f"jade.{MOD}.converting_on": "Converting",
     f"jade.{MOD}.converting_nothing": "Nothing to convert",
+    f"jade.{MOD}.gate_closed": "Gate closed: sending nothing",
     f"jade.{MOD}.private": "Private to %s",
     f"jade.{MOD}.encrypted": "Encrypted by %s",
     f"jade.{MOD}.deaf": "Deaf: encrypted by %s",
@@ -1276,6 +1328,13 @@ recipes["radio_toggle_receiver"] = ({
 }, f"{MOD}:radio_receiver")
 recipes["radio_receiver_from_toggle"] = (shapeless("radio_toggle_receiver", "radio_receiver"), f"{MOD}:radio_toggle_receiver")
 
+recipes["radio_delay_receiver"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:repeater"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_delay_receiver"},
+}, f"{MOD}:radio_receiver")
+recipes["radio_receiver_from_delay"] = (shapeless("radio_delay_receiver", "radio_receiver"), f"{MOD}:radio_delay_receiver")
 recipes["radio_logic_receiver"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1344,14 +1403,15 @@ for name, (recipe, trigger) in recipes.items():
 # ---------------------------------------------------------------- loot tables
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
-             "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
+             "radio_delay_receiver", "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name not in ("radio_mast", "wall_redstone"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
             "source": "block_entity",
-            "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency"] if name == "radio_converter" else [])
+            "include": [f"{MOD}:frequency"] + ([f"{MOD}:output_frequency", f"{MOD}:converter_gate"] if name == "radio_converter" else [])
+                       + ([f"{MOD}:delay_ticks", f"{MOD}:hold_ticks"] if name == "radio_delay_receiver" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
@@ -1369,7 +1429,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
-               f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
+               f"{MOD}:radio_delay_receiver", f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]
 })

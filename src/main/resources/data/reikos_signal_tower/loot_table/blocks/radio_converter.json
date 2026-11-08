@@ -14,7 +14,8 @@
               "source": "block_entity",
               "include": [
                 "reikos_signal_tower:frequency",
-                "reikos_signal_tower:output_frequency"
+                "reikos_signal_tower:output_frequency",
+                "reikos_signal_tower:converter_gate"
               ]
             }
           ]

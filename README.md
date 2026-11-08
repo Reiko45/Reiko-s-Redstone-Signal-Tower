@@ -11,10 +11,11 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength. Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the same strength, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
-| **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. |
+| **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. Its **signal gate** can make it a wireless comparator (send only at a level or more) or a wireless NOT gate (send 15 while it hears nothing). |
 | **Radio Toggle Receiver** | A receiver that works like a light switch: each time its frequency turns on, it flips between off and on (full strength). A pulse remote, a button or a pressure plate then switches things on with one press and off with the next. |
 | **Radio Inverted Receiver** | A receiver with a redstone torch built in: full strength while its frequency is silent, nothing while it's on. Turning a frequency on can then switch something off. |
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
+| **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
@@ -332,9 +333,25 @@ A **Radio Converter** works like a repeater, but it sends on a **different** fre
 - **No loops:** even two converters feeding each other (2026 to 3001 and 3001 back to 2026) go quiet as soon as the real source does.
 - **Remote presses:** a press on 2026 that reaches the converter is carried over to 3001. The message counts it ("reach 56 blocks + 2 towers + 1 repeater + 1 converter"), and "Heard by" and the signal light include the receivers on 3001.
 - **Everything else:** pagers on 3001 go off from it, the Signal Scanner lists it under the frequency it sends on ("Converter, 52 blocks west"), and the pager catch-up remembers turn-ons it carried. Jade shows both frequencies.
-- Breaking it keeps both frequencies on the dropped item.
+- Breaking it keeps both frequencies (and its gate) on the dropped item.
 
 ![The converter's screen being set to listen on 2026 and send on 3001; Jade showing it converting; the scanner hearing both frequencies; and the receiver on 3001 lit](docs/images/radio-converter.png)
+
+#### Signal gate
+
+Since 0.41, the converter's screen has a **Gate** button and a **Level** button (1 to 15) under the two frequencies:
+
+| Gate | Sends | Like |
+|---|---|---|
+| **Pass** (the default) | what it hears, at the same strength | a plain converter |
+| **At least** | what it hears, but only when it's at the level or more | a comparator |
+| **Below** | 15 while what it hears is below the level | at level 1, a NOT gate: 15 while its frequency is silent |
+
+- **An example:** a lever on 4300, and a converter listening on 4300 and sending on 4301 with **Below 1**. A lamp on a 4301 receiver lights when the lever is off and goes out when it's on. With **At least 8**, a 4301 receiver only lights when 4300 arrives at 8 or more.
+- **The screen** shows what it sends right now ("Sending 15 on 4301" or "Gate closed: nothing sent on 4301") and what it hears ("Reach: 56 blocks | hearing nothing"). Changing the gate shows what it will send once saved, in yellow ("Once saved: sends 15 on 4301").
+- **A gate is a new source,** like a transmitter: when its frequency turns on, the log lists a "Converter gate", with where it is and who tuned it, and it doesn't carry remote presses across (a press on 4300 doesn't become one on 4301).
+- **Loops are safe:** a NOT gate listening on what it sends blinks on and off, but no faster than every 2 ticks, so it never hangs the server. That makes a simple wireless clock.
+- **Jade** says "Sending: 15" or "Gate closed: sending nothing", and "Gate: 15 while it hears nothing (hearing nothing)". The item's tooltip shows the gate too.
 
 ### Logic receivers
 
@@ -352,6 +369,20 @@ A **Radio Logic Receiver** (since 0.40) listens on two frequencies and outputs a
 - **Encrypted frequencies:** on someone else's encrypted frequency it hears nothing there (that input counts as off). It says so when you set it, and Jade shows "Second deaf: encrypted by Dev".
 - **Jade** shows both frequencies, the mode, "Hearing: 15 and nothing" and the output.
 - Breaking it keeps both frequencies and the mode on the dropped item.
+
+### Delay receivers
+
+A **Radio Delay Receiver** (since 0.41) is a receiver with a timer. It outputs full strength (15) while it's on.
+
+- **Delay:** it turns on this long after its frequency turns on, and off this long after it turns off. Every change comes through, in order, just later, like a very long redstone repeater (none, 0.5, 1, 2, 3, 5, 10, 30 or 60 seconds; default 1 second).
+- **Hold:** it stays on this long after it would turn off (none by default, up to 60 seconds). A button pressed for a moment on a remote can then keep a hallway lit for 30 seconds.
+- **Setting it up:** right-click it with an empty hand to open its screen. Click **Delay** or **Hold** for the next time (Shift-click or scroll to go back), then **Done** ("Radio Delay Receiver: delay 1s, hold 2s"). The screen also shows what it hears, whether it's on, and when it next changes ("Turns off in 1.1s", counting down). The Frequency Tuner sets its frequency like any receiver.
+- **Jade** shows the delay and hold, what it hears, and "Turns on in 0.4s" or "Turns off in 2.1s" while a change is under way.
+- **When it's loaded or re-tuned** it starts from what its frequency is doing right then, with nothing under way.
+- **Counts as a receiver:** "Heard by", a remote's signal light, the locator and the audit ("Delay Receiver") all count it. On someone else's encrypted frequency it hears nothing.
+- Breaking it keeps its frequency, delay and hold on the dropped item, and the item's tooltip shows them.
+
+![A NOT gate set on the converter's screen; Jade counting down on the delay receiver while the lever is on; with the lever off, the NOT gate's lamp lit and the delay receiver's lamp held on; Alex seeing the same from across the row; the delay receiver's screen counting down; and the gate on the converter's item](docs/images/signal-gate-and-delay-receiver.png)
 
 ### Code Keypad
 
@@ -444,6 +475,8 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 
 **Radio Logic Receiver:** two Radio Receivers and a Nether Quartz, in any arrangement in the crafting grid.
 
+**Radio Delay Receiver:** a Radio Receiver and a Redstone Repeater, in any arrangement in the crafting grid. Put a delay receiver in the grid on its own to get the Radio Receiver back.
+
 **Compact Radio Receiver:** put one Radio Receiver in the crafting grid to get a Compact Radio Receiver. It works the other way too, so you can switch back any time.
 
 **Compact Radio Transmitter:** put one Radio Transmitter in the crafting grid to get a Compact Radio Transmitter, and back again the same way.
@@ -504,6 +537,9 @@ src/main/java/com/reiko/signaltower/
   block/RadioLogicReceiverBlock.java     receiver on two frequencies (AND / OR / XOR); opens its screen
   client/LogicScreen.java                the logic receiver's screen
   network/OpenLogicScreenPayload.java, ConfigureLogicPayload.java  logic receiver screen <-> server
+  block/RadioDelayReceiverBlock.java     receiver with a delay and a hold; opens its screen
+  client/DelayScreen.java                the delay receiver's screen
+  network/OpenDelayScreenPayload.java, ConfigureDelayPayload.java  delay receiver screen <-> server
   item/SignalMeterItem.java              handheld meter: reads a frequency where you stand
   network/MeterReadingPayload.java       server -> client: the meter's reading
   client/SignalMeterHud.java             the meter's panel beside the hotbar, its tick and needle
@@ -549,7 +585,7 @@ src/main/java/com/reiko/signaltower/
   client/DirectoryScreen.java            the frequency directory
   network/DirectoryRequestPayload.java, DirectoryResultPayload.java  the directory asking the server what's on
   client/MultiRemoteScreen.java          the Multi-Button Remote keypad
-  client/ConverterScreen.java            the Radio Converter's two frequencies
+  client/ConverterScreen.java            the Radio Converter's two frequencies and its signal gate
   block/CodeKeypadBlock.java             the Code Keypad: attaches like a button, opens its screen, powers the block it's on
   blockentity/CodeKeypadBlockEntity.java its owner, code (server only), pulse length, lockouts, and sending the pulse
   client/KeypadScreen.java               the keypad's screen
@@ -716,9 +752,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 132. the inverted receiver: on (15, a lamp next to it lit) while its frequency is silent, off (0, the lamp out) while it's on, and on again once it's silent; on someone else's encrypted frequency it hears nothing and stays on; Jade (with and without server data), the readout and the audit know it;
 133. the motion sensor: placing it makes it the placer's (and tuned by them); it sees the nearest player in its 6-block range with a clear line from its face, not someone too far, behind a block or a spectator (and someone farther once the range is 12); only its owner changes the settings (7 blocks, which isn't offered, becomes 6); strangers-only ignores the owner and, on a private frequency, its friends; redstone around it doesn't make it send; seeing Rex it lights and sends over its 16-block reach (not past it, not a relay tower), and the log names Rex (red) at the sensor; Jade shows the owner its settings and who it sees, and Alex neither; the screen packet (with a round trip), the audit and the reach ring know it; it keeps sending for 2 seconds with nobody in sight, then stops; Alex can't re-tune it; it keeps its owner, range and mode when saved, and its frequency when it pops off.;
 134. the logic receiver: AND is the weaker, OR the stronger, XOR the one that's on; with both off AND is off and it's tracked on both frequencies (counted for Heard by on the second); with only the first on AND stays off, a player out of reach can't change it, Dev's packet sets OR (and tunes it) and it lights a lamp; Jade and the screen packet (round trip) show both frequencies, the mode and what it hears; XOR is on with one, off with both; AND is on with both; the audit lists it; on Rex's tuning with Dev's encrypted second frequency it's deaf there (notice, screen flag, Jade line); it's saved; re-tuning the second moves its tracking; broken, it drops with both frequencies and XOR, and placed again from that item it has them back;
-135. the Signal Meter: two blocks from a transmitter it reads 15 and its reach minus 2 to the edge, out of reach nothing and -1; with the transmitter off 0 but still inside; on someone else's encrypted frequency deaf with nothing else, while its owner reads it; the edge is 20 at 30 blocks into a 50 reach, 0 exactly at it, -1 a block past it, and an off tower beside counts; the reading packet survives the network (-1 too); its settings packet sets the frequency and turns the tick off; it scrolls, takes the scanner's Tune and opens the directory; sneak-clicking a converter measures what it sends.
+135. the Signal Meter: two blocks from a transmitter it reads 15 and its reach minus 2 to the edge, out of reach nothing and -1; with the transmitter off 0 but still inside; on someone else's encrypted frequency deaf with nothing else, while its owner reads it; the edge is 20 at 30 blocks into a 50 reach, 0 exactly at it, -1 a block past it, and an off tower beside counts; the reading packet survives the network (-1 too); its settings packet sets the frequency and turns the tick off; it scrolls, takes the scanner's Tune and opens the directory; sneak-clicking a converter measures what it sends;
+136. the signal gate, with a transmitter sending 11: Pass sends 11, At least 8 sends 11 (set by Dev's packet), At least 12 nothing, Below 12 sends 15 (the log names the gate), Below 11 nothing, and Below 1 nothing until the transmitter goes quiet, then 15; Jade, the screen and settings packets (round trips) know it; on a fresh network a gate is a source, saved with what it sends, and a press isn't carried through it (only through a plain converter); a NOT gate feeding itself blinks, never changing twice in a row within 2 ticks; it's saved, and drops with its gate;
+137. the delay receiver: with a 1 s delay and 2 s hold it turns on 20 to 24 ticks after its frequency and off 60 to 65 ticks after it goes quiet, saying when (Jade's lines, the screen packet and a round trip); with no delay and a 2 s hold a 4-tick pulse turns it on at once and holds it 40 ticks; a player out of reach can't set it, times it doesn't offer become none, time labels read 0.5s, 60s and none (and countdowns 2.4s, 2s, 0.1s); it's saved, and drops with its timings.
 
-All 135 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 137 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

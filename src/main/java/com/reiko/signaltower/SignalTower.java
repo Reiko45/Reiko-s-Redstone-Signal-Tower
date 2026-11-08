@@ -161,6 +161,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.KeypadGuestCodesPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestCodesPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.KeypadGuestListPayload.TYPE,
                 com.reiko.signaltower.network.KeypadGuestListPayload.STREAM_CODEC, com.reiko.signaltower.network.KeypadGuestListPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenDelayScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenDelayScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenDelayScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureDelayPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureDelayPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureDelayPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenLogicScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenLogicScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureLogicPayload.TYPE,
@@ -219,6 +223,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_TOGGLE_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_INVERTED_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_LOGIC_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.RADIO_DELAY_RECEIVER_ITEM.get());
             event.accept(ModRegistry.RADIO_REPEATER_ITEM.get());
             event.accept(ModRegistry.RADIO_CONVERTER_ITEM.get());
             event.accept(ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get());

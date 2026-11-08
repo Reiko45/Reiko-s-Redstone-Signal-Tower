@@ -25,14 +25,32 @@ import net.minecraft.world.level.block.state.BlockState;
  * <p>
  * A repeater always sends on the frequency it listens on. A converter sends on
  * {@link #getOutputFrequency()}, which is saved with it and kept on the item when it's broken.
+ * <p>
+ * A converter can have a signal gate (v0.41.0, {@link #getGate()}): "at least N" sends what it hears
+ * only when that's N or more; "below N" sends 15 while what it hears is under N (at 1, a NOT gate).
+ * A gated converter's output isn't worked out by the network's relay chain: this block entity
+ * checks what it hears whenever that frequency changes (and once a second), and tells the network
+ * ({@link SignalNetwork#setGateOutput}), at most once every {@link #GATE_MIN_TICKS} ticks, so a gate
+ * feeding itself blinks like a redstone clock instead of locking up.
  */
 public class RadioRepeaterBlockEntity extends RadioBlockEntity {
     private static final int RECHECK_INTERVAL = 20;
     private static final String OUTPUT_TAG = "output_frequency";
+    private static final String GATE_TAG = "gate";
+    private static final String THRESHOLD_TAG = "gate_threshold";
+    /** The fewest ticks between two changes of a gate's output. */
+    public static final int GATE_MIN_TICKS = 2;
 
     private int outputFrequency = Frequency.DEFAULT;
     private long seenRevision = -1;
     private int timer;
+    /** Converter: its signal gate ({@link SignalNetwork.Repeater#GATE_NONE}, AT_LEAST or BELOW) and threshold (1-15). Saved. */
+    private int gate = SignalNetwork.Repeater.GATE_NONE;
+    private int threshold = 1;
+    /** Gate: the revision of the input frequency at the last check, when the output last changed, and whether a change waits. Not saved. */
+    private long seenInputRevision = -1;
+    private long gateChangedAt = Long.MIN_VALUE / 2;
+    private boolean gatePending;
 
     public RadioRepeaterBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.RADIO_REPEATER_BE.get(), pos, state);
@@ -51,6 +69,28 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
     /** The frequency this sends on: the output frequency for a converter, its own frequency for a repeater. */
     public int getSendFrequency() {
         return isConverter() ? outputFrequency : getFrequency();
+    }
+
+    public int getGate() {
+        return isConverter() ? gate : SignalNetwork.Repeater.GATE_NONE;
+    }
+
+    public int getThreshold() {
+        return threshold;
+    }
+
+    /** Sets a converter's signal gate (v0.41.0); a threshold outside 1-15 is clamped. Then tells the network. */
+    public void setGate(int newGate, int newThreshold) {
+        int g = Math.max(SignalNetwork.Repeater.GATE_NONE, Math.min(SignalNetwork.Repeater.GATE_BELOW, newGate));
+        int t = Math.max(1, Math.min(15, newThreshold));
+        if (g != gate || t != threshold) {
+            gate = g;
+            threshold = t;
+            seenInputRevision = -1;
+            gatePending = true;
+            setChanged();
+            refresh();
+        }
     }
 
     /** Sets both frequencies at once (the converter's screen), then tells the network. */
@@ -76,7 +116,7 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
         }
         SignalNetwork network = SignalNetwork.get(serverLevel);
         network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.reachAt(serverLevel, worldPosition),
-                getTunedBy());
+                getTunedBy(), getGate(), threshold);
         seenRevision = network.revision(getSendFrequency());
         updateLight(serverLevel, network);
     }
@@ -102,14 +142,53 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
         refresh();
     }
 
+    /**
+     * A gated converter: if what it hears changed (or a change is waiting), works out what to send
+     * and tells the network, unless its output changed less than {@link #GATE_MIN_TICKS} ago.
+     */
+    private void tickGate(ServerLevel level, SignalNetwork network, boolean force) {
+        long revision = network.revision(getFrequency());
+        if (!force && !gatePending && revision == seenInputRevision) {
+            return;
+        }
+        seenInputRevision = revision;
+        int heard = network.gateInput(level, worldPosition);
+        int wanted = SignalNetwork.Repeater.gateOutput(gate, threshold, heard);
+        int current = network.gateOutput(worldPosition);
+        if (wanted == current) {
+            gatePending = false;
+            return;
+        }
+        long now = level.getGameTime();
+        if (now - gateChangedAt < GATE_MIN_TICKS) {
+            gatePending = true; // try again next tick
+            return;
+        }
+        gatePending = false;
+        gateChangedAt = now;
+        network.setGateOutput(worldPosition, wanted);
+    }
+
+    /** What a gated converter hears on its input frequency right now (for its screen and Jade). */
+    public int gateHeard(ServerLevel level) {
+        return SignalNetwork.get(level).gateInput(level, worldPosition);
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadioRepeaterBlockEntity be) {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
+        boolean gated = be.getGate() != SignalNetwork.Repeater.GATE_NONE;
         if (be.timer-- <= 0) {
             be.timer = RECHECK_INTERVAL;
             be.refresh();
+            if (gated) {
+                be.tickGate(serverLevel, SignalNetwork.get(serverLevel), true);
+            }
             return;
+        }
+        if (gated) {
+            be.tickGate(serverLevel, SignalNetwork.get(serverLevel), false);
         }
         // What it sends changes with what it hears; converters bump the frequency they send on
         // whenever the one they listen on changes, so watching that one is enough.
@@ -128,6 +207,10 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
         super.saveAdditional(tag, registries);
         if (isConverter()) {
             tag.putInt(OUTPUT_TAG, outputFrequency);
+            if (gate != SignalNetwork.Repeater.GATE_NONE) {
+                tag.putInt(GATE_TAG, gate);
+                tag.putInt(THRESHOLD_TAG, threshold);
+            }
         }
     }
 
@@ -135,6 +218,9 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         outputFrequency = tag.contains(OUTPUT_TAG) ? Frequency.clamp(tag.getInt(OUTPUT_TAG)) : Frequency.DEFAULT;
+        gate = Math.max(SignalNetwork.Repeater.GATE_NONE, Math.min(SignalNetwork.Repeater.GATE_BELOW, tag.getInt(GATE_TAG)));
+        threshold = tag.contains(THRESHOLD_TAG) ? Math.max(1, Math.min(15, tag.getInt(THRESHOLD_TAG))) : 1;
+        seenInputRevision = -1;
     }
 
     @Override
@@ -144,6 +230,11 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
         if (stored != null) {
             outputFrequency = Frequency.clamp(stored);
         }
+        Integer storedGate = componentInput.get(ModRegistry.CONVERTER_GATE.get());
+        if (storedGate != null) {
+            gate = Math.max(0, Math.min(2, storedGate / 16));
+            threshold = Math.max(1, Math.min(15, storedGate % 16));
+        }
     }
 
     @Override
@@ -151,6 +242,9 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
         super.collectImplicitComponents(components);
         if (isConverter()) {
             components.set(ModRegistry.OUTPUT_FREQUENCY.get(), outputFrequency);
+            if (gate != SignalNetwork.Repeater.GATE_NONE) {
+                components.set(ModRegistry.CONVERTER_GATE.get(), gate * 16 + threshold);
+            }
         }
     }
 
@@ -158,5 +252,7 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
     public void removeComponentsFromTag(CompoundTag tag) {
         super.removeComponentsFromTag(tag);
         tag.remove(OUTPUT_TAG);
+        tag.remove(GATE_TAG);
+        tag.remove(THRESHOLD_TAG);
     }
 }

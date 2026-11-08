@@ -102,6 +102,11 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new SensorScreen(state));
     }
 
+    /** Opens a Radio Delay Receiver's screen (sent by the server when the block is right-clicked). */
+    public static void openDelayScreen(com.reiko.signaltower.network.OpenDelayScreenPayload state) {
+        Minecraft.getInstance().setScreen(new DelayScreen(state));
+    }
+
     /** Opens a Radio Logic Receiver's screen (sent by the server when the block is right-clicked). */
     public static void openLogicScreen(com.reiko.signaltower.network.OpenLogicScreenPayload state) {
         Minecraft.getInstance().setScreen(new LogicScreen(state));

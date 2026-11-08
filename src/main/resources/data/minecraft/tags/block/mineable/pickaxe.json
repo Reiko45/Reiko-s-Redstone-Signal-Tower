@@ -5,6 +5,7 @@
     "reikos_signal_tower:radio_toggle_receiver",
     "reikos_signal_tower:radio_inverted_receiver",
     "reikos_signal_tower:radio_logic_receiver",
+    "reikos_signal_tower:radio_delay_receiver",
     "reikos_signal_tower:radio_repeater",
     "reikos_signal_tower:radio_converter",
     "reikos_signal_tower:compact_radio_receiver",

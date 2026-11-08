@@ -19,7 +19,12 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /** Client to server: Done was pressed in a Radio Converter's screen. */
-public record ConfigureConverterPayload(BlockPos pos, int listen, int send) implements CustomPacketPayload {
+public record ConfigureConverterPayload(BlockPos pos, int listen, int send, int gate, int threshold) implements CustomPacketPayload {
+    /** No signal gate: it passes on what it hears (as before v0.41.0). */
+    public ConfigureConverterPayload(BlockPos pos, int listen, int send) {
+        this(pos, listen, send, 0, 1);
+    }
+
     public static final Type<ConfigureConverterPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "configure_converter"));
 
@@ -27,11 +32,23 @@ public record ConfigureConverterPayload(BlockPos pos, int listen, int send) impl
             BlockPos.STREAM_CODEC, ConfigureConverterPayload::pos,
             ByteBufCodecs.VAR_INT, ConfigureConverterPayload::listen,
             ByteBufCodecs.VAR_INT, ConfigureConverterPayload::send,
+            ByteBufCodecs.VAR_INT, ConfigureConverterPayload::gate,
+            ByteBufCodecs.VAR_INT, ConfigureConverterPayload::threshold,
             ConfigureConverterPayload::new);
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
+    }
+
+    /** "only at 8 or more" / "15 while below 8" / "15 while it hears nothing" (v0.41.0); empty for no gate. */
+    public static Component gateText(int gate, int threshold) {
+        String key = "message." + SignalTower.MOD_ID + ".";
+        return switch (gate) {
+            case 1 -> Component.translatable(key + "gate_at_least", threshold);
+            case 2 -> threshold == 1 ? Component.translatable(key + "gate_not") : Component.translatable(key + "gate_below", threshold);
+            default -> Component.empty();
+        };
     }
 
     /** Runs on the server's main thread. */
@@ -60,14 +77,18 @@ public record ConfigureConverterPayload(BlockPos pos, int listen, int send) impl
         }
         converter.setTunedBy(player.getUUID());
         converter.setFrequencies(payload.listen(), payload.send());
+        converter.setGate(payload.gate(), payload.threshold());
         // Set, but on someone else's encrypted frequency it won't hear anything: say so instead.
         Component deaf = player.level() instanceof ServerLevel level ? RadioBlock.deafNotice(level, pos) : null;
         if (deaf != null) {
             com.reiko.signaltower.radio.IntruderAlerts.report(player.getServer(), converter.getFrequency(), player,
                     com.reiko.signaltower.radio.IntruderAlerts.Kind.DEAF, player.level().getBlockState(pos).getBlock());
         }
-        player.displayClientMessage(deaf != null ? deaf : Component.translatable("message." + SignalTower.MOD_ID + ".converter_set",
-                converter.getFrequency(), converter.getOutputFrequency()).withStyle(ChatFormatting.AQUA), true);
+        net.minecraft.network.chat.MutableComponent set = converter.getGate() == 0
+                ? Component.translatable("message." + SignalTower.MOD_ID + ".converter_set", converter.getFrequency(), converter.getOutputFrequency())
+                : Component.translatable("message." + SignalTower.MOD_ID + ".converter_set_gate", converter.getFrequency(), converter.getOutputFrequency(),
+                        gateText(converter.getGate(), converter.getThreshold()));
+        player.displayClientMessage(deaf != null ? deaf : set.withStyle(ChatFormatting.AQUA), true);
         return true;
     }
 }

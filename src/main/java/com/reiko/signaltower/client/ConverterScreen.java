@@ -9,6 +9,7 @@ import com.reiko.signaltower.radio.FrequencyNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,11 +19,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.OptionalInt;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A Radio Converter's screen: the frequency it listens on and the one it sends on, plus what it's
  * converting right now (as it was when the screen opened). Tab moves between the boxes; Enter or
- * Done saves, Escape cancels.
+ * Done saves, Escape cancels. Since v0.41.0 it also has the signal gate: Pass, At least N or
+ * Below N, with the threshold N (1-15).
  */
 public class ConverterScreen extends Screen {
     private static final String KEY = "screen." + SignalTower.MOD_ID + ".converter.";
@@ -35,16 +38,22 @@ public class ConverterScreen extends Screen {
     /** Frequencies picked in the directory for the two boxes, used when this screen is shown again. */
     private OptionalInt pickedListen = OptionalInt.empty();
     private OptionalInt pickedSend = OptionalInt.empty();
+    /** The signal gate being set (v0.41.0): 0 pass, 1 at least, 2 below; and its threshold. */
+    private int gate;
+    private int threshold;
+    private @Nullable CycleButton<Integer> thresholdButton;
 
     public ConverterScreen(OpenConverterScreenPayload state) {
         super(Component.translatable("block." + SignalTower.MOD_ID + ".radio_converter"));
         this.state = state;
+        this.gate = state.gate();
+        this.threshold = Math.max(1, Math.min(15, state.threshold()));
     }
 
     @Override
     protected void init() {
         int centerX = width / 2;
-        top = height / 2 - 66;
+        top = height / 2 - 80;
         // init() runs again after the directory (or a window resize): keep what was typed, or use what was picked.
         String keepListen = listenBox != null ? listenBox.getValue() : Integer.toString(state.listen());
         String keepSend = sendBox != null ? sendBox.getValue() : Integer.toString(state.send());
@@ -60,10 +69,24 @@ public class ConverterScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("..."), b -> openDirectory(false))
                 .tooltip(Tooltip.create(Component.translatable(KEY + "directory_sends")))
                 .bounds(centerX + 102, top + 60, 16, 20).build());
+        addRenderableWidget(CycleButton.<Integer>builder(value -> Component.translatable(KEY + "gate_" + value))
+                .withValues(0, 1, 2)
+                .withInitialValue(gate)
+                .withTooltip(value -> Tooltip.create(Component.translatable(KEY + "gate_" + value + "_tip")))
+                .create(centerX - 102, top + 86, 140, 20, Component.translatable(KEY + "gate"), (button, value) -> {
+                    gate = value;
+                    updateThresholdButton();
+                }));
+        thresholdButton = addRenderableWidget(CycleButton.<Integer>builder(value -> Component.literal(Integer.toString(value)))
+                .withValues(java.util.stream.IntStream.rangeClosed(1, 15).boxed().toList())
+                .withInitialValue(threshold)
+                .withTooltip(value -> Tooltip.create(Component.translatable(KEY + "threshold_tip")))
+                .create(centerX + 42, top + 86, 60, 20, Component.translatable(KEY + "threshold"), (button, value) -> threshold = value));
+        updateThresholdButton();
         doneButton = addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> save())
-                .bounds(centerX - 102, top + 122, 100, 20).build());
+                .bounds(centerX - 102, top + 146, 100, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
-                .bounds(centerX + 2, top + 122, 100, 20).build());
+                .bounds(centerX + 2, top + 146, 100, 20).build());
         setInitialFocus(listenBox);
         updateDoneButton();
     }
@@ -100,6 +123,12 @@ public class ConverterScreen extends Screen {
         return value >= Frequency.MIN && value <= Frequency.MAX ? OptionalInt.of((int) value) : OptionalInt.empty();
     }
 
+    private void updateThresholdButton() {
+        if (thresholdButton != null) {
+            thresholdButton.active = gate != 0;
+        }
+    }
+
     private void updateDoneButton() {
         if (doneButton != null) {
             doneButton.active = parse(listenBox).isPresent() && parse(sendBox).isPresent();
@@ -110,7 +139,7 @@ public class ConverterScreen extends Screen {
         OptionalInt listen = parse(listenBox);
         OptionalInt send = parse(sendBox);
         if (listen.isPresent() && send.isPresent()) {
-            PacketDistributor.sendToServer(new ConfigureConverterPayload(state.pos(), listen.getAsInt(), send.getAsInt()));
+            PacketDistributor.sendToServer(new ConfigureConverterPayload(state.pos(), listen.getAsInt(), send.getAsInt(), gate, threshold));
             onClose();
         }
     }
@@ -143,12 +172,41 @@ public class ConverterScreen extends Screen {
                 : state.deaf()
                 ? Component.translatable(KEY + "deaf", FrequencyNames.label(null, state.listen()),
                         listenClaim != null ? listenClaim.ownerName() : "?").withStyle(ChatFormatting.RED)
+                : previewing()
+                ? preview()
+                : state.gate() != 0
+                ? (state.power() > 0
+                    ? Component.translatable(KEY + "gate_sending", state.power(), FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(KEY + "gate_closed", FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GRAY))
                 : state.power() > 0
                 ? Component.translatable(KEY + "converting", state.power(), FrequencyNames.label(null, state.listen()),
                         FrequencyNames.label(null, state.send())).withStyle(ChatFormatting.GREEN)
                 : Component.translatable(KEY + "quiet", FrequencyNames.label(null, state.listen())).withStyle(ChatFormatting.GRAY);
-        graphics.drawCenteredString(font, status, centerX, top + 90, 0xFFFFFF);
-        graphics.drawCenteredString(font, Component.translatable(KEY + "reach", state.reach()), centerX, top + 104, 0xA0A0A0);
+        graphics.drawCenteredString(font, status, centerX, top + 112, 0xFFFFFF);
+        Component reach = Component.translatable(KEY + "reach", state.reach());
+        if (state.gate() != 0) {
+            reach = Component.translatable(KEY + "reach_gate", state.reach(),
+                    state.heard() > 0 ? Integer.toString(state.heard()) : Component.translatable(KEY + "heard_nothing"));
+        }
+        graphics.drawCenteredString(font, reach, centerX, top + 126, 0xA0A0A0);
+    }
+
+    /**
+     * Whether the gate picked here differs from the converter's, while it still listens on the same
+     * frequency: then the status says what it would send once saved.
+     */
+    private boolean previewing() {
+        boolean changed = gate != state.gate() || gate != 0 && threshold != state.threshold();
+        return changed && parse(listenBox).equals(OptionalInt.of(state.listen()));
+    }
+
+    /** What the converter would send with the gate picked here, from what it hears now. */
+    private Component preview() {
+        int power = com.reiko.signaltower.radio.SignalNetwork.Repeater.gateOutput(gate, threshold, state.heard());
+        Object send = FrequencyNames.label(null, parse(sendBox).orElse(state.send()));
+        return power > 0
+                ? Component.translatable(KEY + "gate_preview", power, send).withStyle(ChatFormatting.YELLOW)
+                : Component.translatable(KEY + "gate_preview_closed", send).withStyle(ChatFormatting.YELLOW);
     }
 
     /** The typed frequency's name (if it has one) to the right of its box, cut to fit. */

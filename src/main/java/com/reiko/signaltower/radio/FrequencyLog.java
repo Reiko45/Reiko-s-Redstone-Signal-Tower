@@ -77,7 +77,8 @@ public final class FrequencyLog {
         // private frequency only a member's keypad or sensor sends.
         Optional<BlockPos> pos = cause.pos() == null ? Optional.empty()
                 : cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR ? Optional.of(cause.pos())
-                : cause.kind() == SignalNetwork.CauseKind.TRANSMITTER && whoKind != FrequencyAudit.Who.OTHER ? Optional.of(cause.pos())
+                : (cause.kind() == SignalNetwork.CauseKind.TRANSMITTER || cause.kind() == SignalNetwork.CauseKind.GATE)
+                    && whoKind != FrequencyAudit.Who.OTHER ? Optional.of(cause.pos())
                 : Optional.empty();
         int from = turnOn.from() != 0 && turnOn.from() != frequency ? turnOn.from() : 0;
         return new Entry(cause.kind(), dimension, pos, who, whoKind, turnOn.gameTime(), turnOn.dayTime(), from, cause.detail());

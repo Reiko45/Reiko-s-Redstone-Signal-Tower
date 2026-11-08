@@ -165,6 +165,12 @@ public final class RadioInfo {
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
             if (block instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
                 tag.putInt("output", converter.getOutputFrequency());
+                if (converter.getGate() != 0) {
+                    // v0.41.0: its signal gate and what it hears on the frequency it listens on.
+                    tag.putInt("gate", converter.getGate());
+                    tag.putInt("threshold", converter.getThreshold());
+                    tag.putInt("gate_heard", converter.gateHeard(level));
+                }
             }
         } else if (block instanceof CodeKeypadBlock && radio instanceof CodeKeypadBlockEntity keypad) {
             // v0.37.0: whose it is, whether it has a code (never the code) and how far its pulse reaches.
@@ -180,6 +186,12 @@ public final class RadioInfo {
                 tag.putInt("heard", reception.power());
             } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {
                 tag.putInt("heard", reception.power());
+            } else if (block instanceof com.reiko.signaltower.block.RadioDelayReceiverBlock && radio instanceof RadioReceiverBlockEntity delay) {
+                // v0.41.0: its timings, what it hears and its next change.
+                tag.putInt("delay", delay.getDelayTicks());
+                tag.putInt("hold", delay.getHoldTicks());
+                tag.putInt("heard", reception.power());
+                tag.putLong("change_in", delay.changeIn(level.getGameTime()));
             } else if (block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock && radio instanceof RadioReceiverBlockEntity logic) {
                 // v0.40.0: both frequencies, the mode and what it hears on each.
                 tag.putInt("second", logic.getSecondFrequency());
@@ -289,9 +301,17 @@ public final class RadioInfo {
                 lines.add(Component.translatable(LANG + "sends", number(data, "output", "output_name")));
                 addNoteLine(lines, data, "output_note");
             }
-            lines.add(!on ? Component.translatable(LANG + "converting_nothing").withStyle(ChatFormatting.GRAY)
+            boolean gated = hasData && data.contains("gate");
+            lines.add(!on && gated ? Component.translatable(LANG + "gate_closed").withStyle(ChatFormatting.GRAY)
+                    : !on ? Component.translatable(LANG + "converting_nothing").withStyle(ChatFormatting.GRAY)
+                    : gated ? Component.translatable(LANG + "sending", value(data.getInt("power")))
                     : hasData ? Component.translatable(LANG + "converting", value(data.getInt("power")))
                     : Component.translatable(LANG + "converting_on").withStyle(ChatFormatting.GREEN));
+            if (hasData && data.contains("gate")) {
+                lines.add(Component.translatable(LANG + "gate",
+                        com.reiko.signaltower.network.ConfigureConverterPayload.gateText(data.getInt("gate"), data.getInt("threshold")),
+                        heardValue(data.getInt("gate_heard"))).withStyle(ChatFormatting.YELLOW));
+            }
             if (hasData) {
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }
@@ -345,6 +365,24 @@ public final class RadioInfo {
                 int heard = data.getInt("heard");
                 lines.add(heard > 0 ? Component.translatable(LANG + "hearing", value(heard))
                         : Component.translatable(LANG + "hearing_nothing").withStyle(ChatFormatting.GRAY));
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
+            }
+        } else if (block instanceof com.reiko.signaltower.block.RadioDelayReceiverBlock) {
+            // v0.41.0: on or off (the block state says which), its timings, what it hears and its next change.
+            boolean on = state.getValue(RadioReceiverBlock.POWER) > 0;
+            lines.add(on ? Component.translatable(LANG + "switched_on").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "switched_off").withStyle(ChatFormatting.GRAY));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "delay_timing", RadioReceiverBlockEntity.timeLabel(data.getInt("delay")),
+                        RadioReceiverBlockEntity.timeLabel(data.getInt("hold"))));
+                int heard = data.getInt("heard");
+                lines.add(heard > 0 ? Component.translatable(LANG + "hearing", value(heard))
+                        : Component.translatable(LANG + "hearing_nothing").withStyle(ChatFormatting.GRAY));
+                long change = data.getLong("change_in");
+                if (change != 0) {
+                    lines.add(Component.translatable(LANG + (change > 0 ? "delay_turns_on" : "delay_turns_off"),
+                            RadioReceiverBlockEntity.countdownLabel(Math.abs(change))).withStyle(ChatFormatting.YELLOW));
+                }
                 lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
         } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {

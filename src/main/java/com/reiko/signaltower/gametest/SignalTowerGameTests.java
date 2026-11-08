@@ -5541,4 +5541,233 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.41.0: signal gate
+
+    /** The strength the receiver at {@code pos} outputs. */
+    private static int outputAt(GameTestHelper helper, BlockPos pos) {
+        return helper.getBlockState(pos).getValue(RadioReceiverBlock.POWER);
+    }
+
+    /**
+     * The converter's signal gate, with a transmitter sending 11: Pass sends 11; At least 8 sends
+     * 11, At least 12 nothing; Below 12 sends 15, Below 11 nothing; Below 1 (a NOT gate) nothing,
+     * and 15 once the transmitter goes quiet (remembered as the gate's turn-on). The settings packet,
+     * the screen packet (round trip), Jade and the item keep the gate. A NOT gate feeding itself
+     * blinks, never changing twice within 2 ticks. A gate is a source for the network (saved with
+     * what it sends) and doesn't carry remote presses.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void signalGate(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos input = new BlockPos(8, 1, 1);
+        BlockPos conv = new BlockPos(12, 1, 1);
+        BlockPos rx = new BlockPos(16, 1, 1);
+        BlockPos clock = new BlockPos(22, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 3901);
+        for (int x = 3; x <= 7; x++) {
+            helper.setBlock(new BlockPos(x, 0, 1), Blocks.STONE); // wire needs something to sit on
+            helper.setBlock(new BlockPos(x, 1, 1), Blocks.REDSTONE_WIRE);
+        }
+        helper.setBlock(input, Blocks.REDSTONE_BLOCK);
+        place(helper, conv, ModRegistry.RADIO_CONVERTER.get(), 3901);
+        com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity converter = helper.getBlockEntity(conv);
+        converter.setFrequencies(3901, 3902);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 3902);
+        place(helper, clock, ModRegistry.RADIO_CONVERTER.get(), 3903);
+        com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity selfLoop = helper.getBlockEntity(clock);
+        selfLoop.setFrequencies(3903, 3903);
+        BlockPos convAbs = helper.absolutePos(conv);
+        BlockPos clockAbs = helper.absolutePos(clock);
+        SignalNetwork network = SignalNetwork.get(level);
+        Player dev = namedPlayer(helper, new BlockPos(12, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        List<Integer> blinks = new java.util.ArrayList<>();
+
+        helper.startSequence()
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 11, "Pass: 11 through, got " + outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    boolean set = com.reiko.signaltower.network.ConfigureConverterPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureConverterPayload(convAbs, 3901, 3902, 1, 8));
+                    check(set && converter.getGate() == 1 && converter.getThreshold() == 8, "At least 8, from the screen's packet");
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 11, "At least 8: 11 goes through"))
+                .thenExecute(() -> converter.setGate(1, 12))
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "At least 12: nothing"))
+                .thenExecute(() -> converter.setGate(2, 12))
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "Below 12: 15"))
+                .thenExecute(() -> {
+                    var history = network.history(3902);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.GATE
+                            && convAbs.equals(history.get(history.size() - 1).cause().pos()), "The gate's turn-on is remembered");
+                    converter.setGate(2, 11);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Below 11: nothing"))
+                .thenExecute(() -> converter.setGate(2, 1))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 0, "NOT gate while 3901 is on: nothing");
+                    helper.setBlock(input, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "NOT gate once 3901 is quiet: 15"))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, convAbs);
+                    check(info != null && info.getInt("gate") == 2 && info.getInt("threshold") == 1 && info.getInt("gate_heard") == 0
+                            && info.getInt("power") == 15, "Jade data: " + info);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(conv), info)).contains("gate"), "Jade's gate line");
+                    var screen = new com.reiko.signaltower.network.OpenConverterScreenPayload(convAbs, 3901, 3902, 15, 50, 0,
+                            converter.getGate(), converter.getThreshold(), converter.gateHeard(level));
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenConverterScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenConverterScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    var settings = new com.reiko.signaltower.network.ConfigureConverterPayload(convAbs, 3901, 3902, 2, 1);
+                    buffer.clear();
+                    com.reiko.signaltower.network.ConfigureConverterPayload.STREAM_CODEC.encode(buffer, settings);
+                    check(com.reiko.signaltower.network.ConfigureConverterPayload.STREAM_CODEC.decode(buffer).equals(settings), "Settings packet round trip");
+
+                    // A fresh network: a gate is a source there, saved with what it sends, and doesn't carry remote presses.
+                    SignalNetwork fresh = new SignalNetwork().attachTo(level);
+                    BlockPos far = new BlockPos(8_500_000, 70, 0);
+                    fresh.updateRepeater(far, 3904, 3905, 50, null, 2, 1);
+                    check(fresh.setGateOutput(far, 15) && !fresh.setGateOutput(far, 15), "Set once");
+                    check(fresh.listen(level, 3905, far.offset(40, 0, 0), null).power() == 15, "Heard as a source");
+                    SignalNetwork loaded = SignalNetwork.load(fresh.save(new CompoundTag(), level.registryAccess()), level.registryAccess()).attachTo(level);
+                    check(loaded.gateOutput(far) == 15 && loaded.repeaterAt(far).gate() == 2
+                            && loaded.listen(level, 3905, far.offset(40, 0, 0), null).power() == 15, "Saved with its gate and what it sends");
+                    BlockPos far2 = new BlockPos(8_600_000, 70, 0);
+                    fresh.updateTransmitter(far2, 3906, 15, 50, null);
+                    fresh.updateRepeater(far2.offset(10, 0, 0), 3906, 3907, 50, null, 1, 1);
+                    fresh.updateRepeater(far2.offset(20, 0, 0), 3906, 3908, 50, null);
+                    var carried = fresh.carried(level, 3906, List.of(new SignalNetwork.Coverage(far2, 50, false)));
+                    check(carried.on(3907).isEmpty() && !carried.on(3908).isEmpty(), "A press is carried through a plain converter, not a gate");
+
+                    selfLoop.setGate(2, 1);
+                })
+                .thenExecuteFor(30, () -> blinks.add(network.gateOutput(clockAbs)))
+                .thenExecute(() -> {
+                    check(blinks.contains(0) && blinks.contains(15), "A NOT gate feeding itself blinks: " + blinks);
+                    for (int i = 1; i + 1 < blinks.size(); i++) {
+                        check(!(blinks.get(i - 1).intValue() != blinks.get(i) && blinks.get(i).intValue() != blinks.get(i + 1)),
+                                "Never two changes in a row: " + blinks);
+                    }
+                    selfLoop.setGate(0, 1);
+                    CompoundTag saved = converter.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.RadioRepeaterBlockEntity(convAbs, helper.getBlockState(conv));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getGate() == 2 && copy.getThreshold() == 1 && copy.getOutputFrequency() == 3902, "Its block entity saves the gate");
+                    level.destroyBlock(convAbs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_CONVERTER_ITEM.get())
+                                && Integer.valueOf(2 * 16 + 1).equals(stack.get(ModRegistry.CONVERTER_GATE.get()))), "Dropped with its gate"))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.41.0: delay receiver
+
+    /**
+     * The delay receiver: with a 1 s delay and a 2 s hold it turns on 1 s after its frequency does
+     * and off 3 s after it goes quiet (and says when, in Jade and its screen packet); with no delay
+     * and a 2 s hold, a 4-tick pulse turns it on at once and keeps it on for 2 s more. Times it
+     * doesn't offer become none, out of reach changes nothing, and it keeps its timings when saved
+     * and on its item.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void delayReceiver(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos input = new BlockPos(2, 1, 0);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 3951);
+        helper.setBlock(rx, ModRegistry.RADIO_DELAY_RECEIVER.get());
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity delay = helper.getBlockEntity(rx);
+        delay.setFrequency(3951);
+        BlockPos absolute = helper.absolutePos(rx);
+        Player dev = namedPlayer(helper, new BlockPos(6, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(60, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        long[] since = new long[1];
+
+        check(firstArg(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.timeLabel(10)).equals("0.5")
+                && firstArg(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.timeLabel(1200)).equals("60")
+                && keyOf(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.timeLabel(0)).endsWith("time_none")
+                && firstArg(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.countdownLabel(47)).equals("2.4")
+                && firstArg(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.countdownLabel(40)).equals("2")
+                && firstArg(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.countdownLabel(1)).equals("0.1"), "Time labels");
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.network.ConfigureDelayPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureDelayPayload(absolute, 40, 40)) == null, "Out of reach: nothing");
+                    Component set = com.reiko.signaltower.network.ConfigureDelayPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureDelayPayload(absolute, 20, 40));
+                    check(set != null && keyOf(set).endsWith("delay_set") && delay.getDelayTicks() == 20 && delay.getHoldTicks() == 40,
+                            "1 s delay, 2 s hold");
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 0, "Off while 3951 is quiet");
+                    helper.setBlock(input, Blocks.REDSTONE_BLOCK);
+                    since[0] = level.getGameTime();
+                })
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 0, "Not yet on after 5 ticks");
+                    long change = delay.changeIn(level.getGameTime());
+                    check(change > 0 && change <= 16, "It turns on soon: " + change);
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absolute);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info))
+                            .equals(List.of("frequency", "switched_off", "delay_timing", "hearing", "delay_turns_on", "towers")),
+                            "Jade while waiting: " + lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info)));
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "On"))
+                .thenExecute(() -> {
+                    long waited = level.getGameTime() - since[0];
+                    check(waited >= 20 && waited <= 24, "On 1 s after its frequency: " + waited);
+                    helper.setBlock(input, Blocks.AIR);
+                    since[0] = level.getGameTime();
+                })
+                .thenIdle(30)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 15, "Still on 1.5 s later (delay, then hold)");
+                    check(delay.changeIn(level.getGameTime()) < 0, "It says it turns off");
+                    var screen = com.reiko.signaltower.network.OpenDelayScreenPayload.of(level, delay);
+                    check(screen.frequency() == 3951 && screen.delay() == 20 && screen.hold() == 40 && screen.output() == 15
+                            && screen.changeIn() < 0 && !screen.deaf(), "Screen: " + screen);
+                    var buffer = Unpooled.buffer();
+                    com.reiko.signaltower.network.OpenDelayScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenDelayScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Off"))
+                .thenExecute(() -> {
+                    long waited = level.getGameTime() - since[0];
+                    check(waited >= 60 && waited <= 65, "Off 3 s after its frequency went quiet (1 s delay + 2 s hold): " + waited);
+                    delay.setTiming(0, 40);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> helper.setBlock(input, Blocks.REDSTONE_BLOCK))
+                .thenIdle(4)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 15, "No delay: on at once");
+                    helper.setBlock(input, Blocks.AIR);
+                    since[0] = level.getGameTime();
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Then off"))
+                .thenExecute(() -> {
+                    long held = level.getGameTime() - since[0];
+                    check(held >= 40 && held <= 44, "Held 2 s after a 4-tick pulse: " + held);
+                    delay.setTiming(7, 1300);
+                    check(delay.getDelayTicks() == 0 && delay.getHoldTicks() == 0, "Times it doesn't offer become none");
+                    delay.setTiming(100, 600);
+                    CompoundTag saved = delay.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.RadioReceiverBlockEntity(absolute, helper.getBlockState(rx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getDelayTicks() == 100 && copy.getHoldTicks() == 600 && copy.getFrequency() == 3951, "Saved");
+                    level.destroyBlock(absolute, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_DELAY_RECEIVER_ITEM.get())
+                                && Integer.valueOf(100).equals(stack.get(ModRegistry.DELAY_TICKS.get()))
+                                && Integer.valueOf(600).equals(stack.get(ModRegistry.HOLD_TICKS.get()))), "Dropped with its timings"))
+                .thenSucceed();
+    }
 }

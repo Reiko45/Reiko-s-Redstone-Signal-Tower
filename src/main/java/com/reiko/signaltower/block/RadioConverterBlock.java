@@ -67,7 +67,8 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                     | (network.isDeaf(serverLevel, pos) ? OpenConverterScreenPayload.DEAF : 0);
             PacketDistributor.sendToPlayer(serverPlayer, new OpenConverterScreenPayload(pos, converter.getFrequency(),
                     converter.getOutputFrequency(), network.repeaterPower(serverLevel, pos),
-                    RadioHelper.reachAt(serverLevel, pos), quiet));
+                    RadioHelper.reachAt(serverLevel, pos), quiet, converter.getGate(), converter.getThreshold(),
+                    converter.gateHeard(serverLevel)));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
@@ -102,6 +103,11 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
         if (send != null) {
             tooltip.add(Component.translatable(prefix + "converter_sends", FrequencyNames.label(null, send)).withStyle(ChatFormatting.AQUA));
             FrequencyNotes.addTooltipLine(send, tooltip);
+        }
+        Integer gate = stack.get(ModRegistry.CONVERTER_GATE.get());
+        if (gate != null && gate / 16 != 0) {
+            tooltip.add(Component.translatable(prefix + "converter_gate",
+                    com.reiko.signaltower.network.ConfigureConverterPayload.gateText(gate / 16, gate % 16)).withStyle(ChatFormatting.YELLOW));
         }
         tooltip.add(Component.translatable(prefix + "converter_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
