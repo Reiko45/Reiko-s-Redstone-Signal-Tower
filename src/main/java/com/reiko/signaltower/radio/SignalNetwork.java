@@ -405,6 +405,7 @@ public final class SignalNetwork extends SavedData {
 
     public void removeTransmitter(BlockPos pos) {
         dishes.remove(pos);
+        forgetPower(pos);
         Transmitter previous = transmitters.remove(pos);
         if (previous != null) {
             removeFromIndex(pos, previous.frequency());
@@ -464,6 +465,7 @@ public final class SignalNetwork extends SavedData {
 
     public void removeRepeater(BlockPos pos) {
         dishes.remove(pos);
+        forgetPower(pos);
         Repeater previous = repeaters.remove(pos);
         gateOutputs.remove(pos);
         if (previous != null) {
@@ -614,7 +616,7 @@ public final class SignalNetwork extends SavedData {
         for (BlockPos pos : positions) {
             Repeater repeater = repeaters.get(pos);
             if (blocked(level, repeater.output(), repeater.tunedBy()) || deaf(level, repeater.frequency(), repeater.tunedBy())
-                    || isKnockedOut(pos)) {
+                    || isDown(pos)) {
                 // It sends on someone else's private frequency, or listens on someone else's encrypted one, or
                 // lightning knocked it out (v0.47.0): it stays quiet.
                 silenced.add(pos);
@@ -852,7 +854,7 @@ public final class SignalNetwork extends SavedData {
         List<BlockPos> stale = null;
         for (Map.Entry<BlockPos, Transmitter> entry : transmitters.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (!own.reaches(pos) || entry.getValue().compact() || isKnockedOut(pos)) {
+            if (!own.reaches(pos) || entry.getValue().compact() || isDown(pos)) {
                 continue;
             }
             if (level.isLoaded(pos) && !(level.getBlockState(pos).getBlock() instanceof RadioTransmitterBlock)) {
@@ -868,7 +870,7 @@ public final class SignalNetwork extends SavedData {
         List<BlockPos> staleRepeaters = null;
         for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (!own.reaches(pos) || isKnockedOut(pos)) {
+            if (!own.reaches(pos) || isDown(pos)) {
                 continue;
             }
             if (level.isLoaded(pos) && !(level.getBlockState(pos).getBlock() instanceof RadioRepeaterBlock)) {
@@ -1325,7 +1327,7 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            int power = tx.power() > 0 && !isKnockedOut(at)
+            int power = tx.power() > 0 && !isDown(at)
                     ? Math.max(0, (tx.compact() ? tx.power() : fade(tx.power(), fadeFraction(distSq, reach))) - hillLoss(level, at, pos)) : 0;
             offer(best, tx.frequency(), new BestTransmitter(power, distSq, at, 1, Source.TRANSMITTER));
         }
@@ -1614,7 +1616,7 @@ public final class SignalNetwork extends SavedData {
             }
             heard++;
             // v0.48.0: it fades toward the edge, unless a relay is listening (or it's a compact one).
-            best.offer(level, isKnockedOut(pos) ? 0 : tx.power(), pos, receiverPos, distSq > own * own,
+            best.offer(level, isDown(pos) ? 0 : tx.power(), pos, receiverPos, distSq > own * own,
                     fades && !tx.compact() ? fadeFraction(distSq, reach) : -1);
         }
 
@@ -1645,6 +1647,7 @@ public final class SignalNetwork extends SavedData {
 
     public void removeJammer(BlockPos pos) {
         dishes.remove(pos);
+        forgetPower(pos);
         Jammer previous = jammers.remove(pos);
         if (previous != null) {
             removeJammerFromIndex(pos, previous.frequency());
@@ -1695,7 +1698,7 @@ public final class SignalNetwork extends SavedData {
         for (Map.Entry<BlockPos, Jammer> entry : onFrequency.entrySet()) {
             BlockPos at = entry.getKey();
             Jammer jammer = entry.getValue();
-            if (jammer.power() <= best || isKnockedOut(at)) {
+            if (jammer.power() <= best || isDown(at)) {
                 continue;
             }
             long reach = reachNow(level, at, dishReachToward(at, jammer.reach(), pos));
@@ -1843,6 +1846,103 @@ public final class SignalNetwork extends SavedData {
         });
         result.addAll(repeaters.keySet());
         result.addAll(jammers.keySet());
+        return result;
+    }
+
+    // ---- Power cost (v0.49.0) ----
+
+    /** Towers out of power (no charged Radio Battery when last checked; saved, so unloaded ones stay quiet). */
+    private final Set<BlockPos> drained = new HashSet<>();
+    /** Charge each tower owes, below 1 (it pays in whole units; not saved). */
+    private final Map<BlockPos, Double> owed = new HashMap<>();
+
+    /** True if the tower at {@code pos} sends (relays, jams) nothing right now: lightning or no power. */
+    public boolean isDown(BlockPos pos) {
+        return isKnockedOut(pos) || isDrained(pos);
+    }
+
+    /** True if the tower at {@code pos} is out of power (and power cost is on). */
+    public boolean isDrained(BlockPos pos) {
+        return !drained.isEmpty() && drained.contains(pos) && PowerCost.enabled();
+    }
+
+    /** Marks the tower at {@code pos} out of power or not; true if that changed (then everything listening re-checks). */
+    public boolean setDrained(BlockPos pos, boolean out) {
+        boolean changed = out ? drained.add(pos.immutable()) : drained.remove(pos);
+        if (changed) {
+            if (!out) owed.remove(pos);
+            relayEpoch++;
+            bumpTower(pos);
+            setDirty();
+        }
+        return changed;
+    }
+
+    /** Positions marked out of power (whether or not power cost is on now). */
+    public Set<BlockPos> drained() {
+        return Set.copyOf(drained);
+    }
+
+    /** The tower at {@code pos} used {@code amount} more charge; returns how many whole units it now owes (to pay with {@link #paid}). */
+    public int owe(BlockPos pos, double amount) {
+        double total = owed.merge(pos.immutable(), amount, Double::sum);
+        return (int) Math.min(Integer.MAX_VALUE, Math.floor(total));
+    }
+
+    /** The tower at {@code pos} paid {@code units} of what it owes. */
+    public void paid(BlockPos pos, int units) {
+        owed.computeIfPresent(pos, (key, total) -> total - units);
+    }
+
+    private void forgetPower(BlockPos pos) {
+        owed.remove(pos);
+        if (drained.remove(pos)) {
+            setDirty();
+        }
+    }
+
+    /** The stored (clear-weather, antenna included) reach of the tower at {@code pos}, or 0 if there's none. */
+    public int towerReach(BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        if (tx != null) return tx.reach();
+        Repeater repeater = repeaters.get(pos);
+        if (repeater != null) return repeater.reach();
+        Jammer jammer = jammers.get(pos);
+        return jammer != null ? jammer.reach() : 0;
+    }
+
+    /**
+     * True if the tower at {@code pos} would send something now if it had power: a transmitter with
+     * redstone, a jammer with redstone, a repeater or converter hearing something (a gate: its gate
+     * sending). That's when it uses charge.
+     */
+    public boolean wantsToSend(ServerLevel level, BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        if (tx != null) return !tx.compact() && tx.power() > 0;
+        Jammer jammer = jammers.get(pos);
+        if (jammer != null) return jammer.power() > 0;
+        Repeater repeater = repeaters.get(pos);
+        if (repeater == null) return false;
+        if (repeater.gated()) return gateOutputs.getOrDefault(pos, 0) > 0;
+        if (!isDown(pos)) return repeaterPower(level, pos) > 0;
+        return listen(level, repeater.frequency(), pos, null, false).power() > 0;
+    }
+
+    /**
+     * Towers on {@code frequency} (v0.49.0, for the Coverage Map's markers): transmitters sending on
+     * it (0), repeaters and converters sending on it (1), and jammers jamming it (2).
+     */
+    public List<Map.Entry<BlockPos, Integer>> towersOn(int frequency) {
+        List<Map.Entry<BlockPos, Integer>> result = new ArrayList<>();
+        transmitters.forEach((pos, tx) -> {
+            if (tx.frequency() == frequency) result.add(Map.entry(pos, 0));
+        });
+        repeaters.forEach((pos, repeater) -> {
+            if (repeater.output() == frequency) result.add(Map.entry(pos, 1));
+        });
+        jammers.forEach((pos, jammer) -> {
+            if (jammer.frequency() == frequency) result.add(Map.entry(pos, 2));
+        });
         return result;
     }
 
@@ -2059,6 +2159,10 @@ public final class SignalNetwork extends SavedData {
         });
         tag.put("dishes", dishList);
 
+        if (!drained.isEmpty()) {
+            tag.putLongArray("drained", drained.stream().mapToLong(BlockPos::asLong).toArray());
+        }
+
         ListTag latchList = new ListTag();
         latches.forEach((frequency, latch) -> {
             CompoundTag entry = new CompoundTag();
@@ -2168,6 +2272,9 @@ public final class SignalNetwork extends SavedData {
                     entry.getInt("reach"), entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
             network.jammers.put(pos, jammer);
             network.jammersByFrequency.computeIfAbsent(jammer.frequency(), f -> new HashMap<>()).put(pos, jammer);
+        }
+        for (long packed : tag.getLongArray("drained")) {
+            network.drained.add(BlockPos.of(packed));
         }
         ListTag dishList = tag.getList("dishes", Tag.TAG_COMPOUND);
         for (int i = 0; i < dishList.size(); i++) {

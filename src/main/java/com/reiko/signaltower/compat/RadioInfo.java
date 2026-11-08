@@ -70,6 +70,14 @@ public final class RadioInfo {
         if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.StatusBoardBlockEntity board) {
             return readBoard(level, board);
         }
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.RadioBatteryBlockEntity battery) {
+            // v0.49.0: how full it is, and how fast towers are using it.
+            CompoundTag tag = new CompoundTag();
+            tag.putInt("battery_charge", battery.getCharge());
+            tag.putInt("battery_capacity", battery.getCapacity());
+            tag.putDouble("battery_use", battery.usePerSecond(level.getGameTime()));
+            return tag;
+        }
         if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return readBeacon(level, pos);
         }
@@ -297,11 +305,41 @@ public final class RadioInfo {
             tag.putLong("struck", struck);
             tag.putInt("power", 0); // it sends (relays, jams) nothing until it's back
         }
+        putPower(level, pos, tag);
         com.reiko.signaltower.radio.Weather weather = SignalNetwork.get(level).weatherAt(level, pos);
         if (weather.loss() > 0) {
             tag.putInt("weather", weather.ordinal());
             tag.putInt("weather_loss", weather.loss());
         }
+    }
+
+    /**
+     * v0.49.0: a tower's power, if power cost is on: "unpowered" (out of power: it sends nothing), or
+     * its batteries' charge ("tower_charge", "tower_capacity") and what it uses a second while it
+     * sends ("tower_rate"; "tower_sending": it's sending, so using it now).
+     */
+    private static void putPower(ServerLevel level, BlockPos pos, CompoundTag tag) {
+        if (!com.reiko.signaltower.radio.PowerCost.enabled() || !com.reiko.signaltower.radio.PowerCost.pays(level, pos)) {
+            return;
+        }
+        SignalNetwork network = SignalNetwork.get(level);
+        if (network.isDrained(pos)) {
+            tag.putBoolean("unpowered", true);
+            tag.putInt("power", 0);
+            return;
+        }
+        var batteries = com.reiko.signaltower.radio.PowerCost.batteries(level, pos);
+        if (batteries.isEmpty()) {
+            return;
+        }
+        long capacity = 0;
+        for (var battery : batteries) {
+            capacity += battery.getCapacity();
+        }
+        tag.putLong("tower_charge", com.reiko.signaltower.radio.PowerCost.charge(batteries));
+        tag.putLong("tower_capacity", capacity);
+        tag.putDouble("tower_rate", com.reiko.signaltower.radio.PowerCost.perSecond(network.towerReach(pos)));
+        tag.putBoolean("tower_sending", network.wantsToSend(level, pos));
     }
 
     /**
@@ -333,6 +371,18 @@ public final class RadioInfo {
             lines.add(Component.translatable(LANG + "struck", RadioReceiverBlockEntity.countdownLabel(data.getLong("struck")))
                     .withStyle(ChatFormatting.YELLOW));
         }
+        if (data != null && data.getBoolean("unpowered")) {
+            lines.add(Component.translatable(LANG + "unpowered").withStyle(ChatFormatting.RED));
+        } else if (data != null && data.contains("tower_charge")) {
+            // v0.49.0: its batteries, and how long they last while it sends.
+            long charge = data.getLong("tower_charge");
+            double rate = data.getDouble("tower_rate");
+            int percent = com.reiko.signaltower.block.RadioBatteryBlock.percent(charge, data.getLong("tower_capacity"));
+            String perSecond = com.reiko.signaltower.radio.PowerCost.rateLabel(rate);
+            lines.add((data.getBoolean("tower_sending") && rate > 0
+                    ? Component.translatable(LANG + "tower_battery", percent, com.reiko.signaltower.radio.PowerCost.durationLabel(charge / rate), perSecond)
+                    : Component.translatable(LANG + "tower_battery_idle", percent, perSecond)).withStyle(ChatFormatting.RED));
+        }
         if (data != null && data.contains("lifted")) {
             lines.add(Component.translatable(LANG + "lifted", data.getInt("lifted")).withStyle(ChatFormatting.GREEN));
         }
@@ -362,10 +412,34 @@ public final class RadioInfo {
         return lines;
     }
 
+    /** v0.49.0: "Charge: 45,000 / 100,000 (45%)", then what towers are using, or that nothing is. */
+    private static List<Component> batteryLines(BlockState state, @Nullable CompoundTag data) {
+        List<Component> lines = new ArrayList<>();
+        if (data == null) {
+            lines.add(Component.translatable(LANG + "battery_bars", state.getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE))
+                    .withStyle(ChatFormatting.RED));
+            return lines;
+        }
+        long charge = data.getInt("battery_charge");
+        long capacity = data.getInt("battery_capacity");
+        lines.add(Component.translatable(LANG + "battery_charge", com.reiko.signaltower.radio.PowerCost.number(charge),
+                com.reiko.signaltower.radio.PowerCost.number(capacity), com.reiko.signaltower.block.RadioBatteryBlock.percent(charge, capacity))
+                .withStyle(ChatFormatting.RED));
+        double use = data.getDouble("battery_use");
+        lines.add(use > 0
+                ? Component.translatable(LANG + "battery_use", com.reiko.signaltower.radio.PowerCost.rateLabel(use),
+                        com.reiko.signaltower.radio.PowerCost.durationLabel(charge / use)).withStyle(ChatFormatting.GOLD)
+                : Component.translatable(LANG + "battery_idle").withStyle(ChatFormatting.GRAY));
+        return lines;
+    }
+
     private static List<Component> blockLines(BlockState state, @Nullable CompoundTag data) {
         Block block = state.getBlock();
         if (block instanceof com.reiko.signaltower.block.StatusBoardBlock) {
             return boardLines(data);
+        }
+        if (block instanceof com.reiko.signaltower.block.RadioBatteryBlock) {
+            return batteryLines(state, data);
         }
         if (block instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return beaconLines(state, data);

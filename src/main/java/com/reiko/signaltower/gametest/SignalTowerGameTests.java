@@ -77,15 +77,29 @@ public final class SignalTowerGameTests {
     /** v0.48.0: the tests that check signal fade run in a batch of their own, with it on (the default config). */
     private static final String FADE = "signal_fade";
 
-    /** Signal fade is off for every other test, which check other things at exact strengths (batches run one after another). */
+    /** v0.49.0: the power cost tests, in a batch of their own with it on (the default config). */
+    private static final String POWER = "power_cost";
+
+    /**
+     * Signal fade and power cost are off for every other test, which check other things at exact
+     * strengths with no batteries (batches run one after another).
+     */
     @net.minecraft.gametest.framework.BeforeBatch(batch = "defaultBatch")
     public static void withoutFade(ServerLevel level) {
         SignalNetwork.fadeForTests(false);
+        com.reiko.signaltower.radio.PowerCost.powerForTests(false);
     }
 
     @net.minecraft.gametest.framework.BeforeBatch(batch = FADE)
     public static void withFade(ServerLevel level) {
         SignalNetwork.fadeForTests(null);
+        com.reiko.signaltower.radio.PowerCost.powerForTests(false);
+    }
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = POWER)
+    public static void withPower(ServerLevel level) {
+        SignalNetwork.fadeForTests(false);
+        com.reiko.signaltower.radio.PowerCost.powerForTests(null);
     }
 
     // ---- helpers ----
@@ -7063,6 +7077,7 @@ public final class SignalTowerGameTests {
                 && SignalNetwork.fade(6, 0.75) == 3, "15 to half way, 8 at three quarters, 1 at the edge");
 
         SignalNetwork network = new SignalNetwork().attachTo(level);
+        network.forceWeather(com.reiko.signaltower.radio.Weather.CLEAR); // whatever the test world's weather is doing
         BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000); // not loaded: no hills, no block checks
         network.updateTransmitter(far, 4491, 15, 100);
         SignalNetwork.Reception near = network.listen(level, 4491, far.east(40));
@@ -7096,7 +7111,7 @@ public final class SignalTowerGameTests {
 
         BlockPos tx = new BlockPos(1, 1, 1);
         place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4494);
-        int reach = RadioHelper.reachAt(level, helper.absolutePos(tx));
+        int reach = RadioHelper.towerReachNow(level, helper.absolutePos(tx), ModRegistry.RADIO_TRANSMITTER.get().defaultBlockState()); // in the weather now
         int distance = Math.min(reach * 3 / 4, 120);
         BlockPos rx = tx.east(distance);
         place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4494);
@@ -7135,6 +7150,7 @@ public final class SignalTowerGameTests {
                 "×3 that way, ×1 elsewhere");
 
         SignalNetwork network = new SignalNetwork().attachTo(level);
+        network.forceWeather(com.reiko.signaltower.radio.Weather.CLEAR);
         BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000);
         network.updateTransmitter(far, 4496, 15, 64);
         network.setDish(far, 4);
@@ -7161,8 +7177,9 @@ public final class SignalTowerGameTests {
         BlockPos tx = new BlockPos(1, 1, 1);
         place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4498);
         BlockPos absTx = helper.absolutePos(tx);
-        int reach = RadioHelper.reachAt(level, absTx);
-        int beam = com.reiko.signaltower.radio.AntennaTier.dishReach(reach);
+        int reach = RadioHelper.towerReachNow(level, absTx, ModRegistry.RADIO_TRANSMITTER.get().defaultBlockState()); // in the weather now
+        int beam = com.reiko.signaltower.item.AntennaItem.dishReachShown(level, absTx, ModRegistry.RADIO_TRANSMITTER.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY, dish).setValue(com.reiko.signaltower.radio.AntennaTier.AIM, 4));
         int east = Math.min(beam - 2, 125);
         check(east > reach, "The receiver is beyond the usual reach: " + east + " > " + reach);
         BlockPos rx = tx.east(east);
@@ -7222,6 +7239,197 @@ public final class SignalTowerGameTests {
                     com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, com.reiko.signaltower.radio.AntennaTier.IRON, new ItemStack(ModRegistry.IRON_ANTENNA.get()));
                     check(dev.getInventory().countItem(ModRegistry.DISH_ANTENNA.get()) == 1 && SignalNetwork.get(level).dishAim(absTx) == null,
                             "An iron antenna replaces it; the dish comes back");
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.49.0: power cost and the Coverage Map
+
+    /**
+     * Power cost (the defaults, in a batch of its own): a tower with no battery, or an empty one, is
+     * out of power and sends nothing; charged (here with three Redstone Dust) it sends, using 1 a
+     * second for every 64 blocks of reach, and goes quiet when the charge runs out. A battery next
+     * to a mast feeds the tower on top; repeaters and jammers need one too, compact transmitters
+     * don't. Hoppers (the item capability) and FE charge it, it's full at 100,000, a comparator
+     * reads it, the item keeps its charge, and Jade shows both ends.
+     */
+    @GameTest(template = PLATFORM, batch = POWER, timeoutTicks = 400)
+    public static void powerCost(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        check(com.reiko.signaltower.radio.PowerCost.enabled(), "Power cost is on by default");
+        check(com.reiko.signaltower.radio.PowerCost.perSecond(64) == 1.0 && com.reiko.signaltower.radio.PowerCost.perSecond(56) == 0.875
+                && com.reiko.signaltower.radio.PowerCost.perSecond(2080) == 32.5, "1 a second per 64 blocks of reach");
+        check(com.reiko.signaltower.blockentity.RadioBatteryBlockEntity.bars(0, 100000) == 0
+                && com.reiko.signaltower.blockentity.RadioBatteryBlockEntity.bars(1, 100000) == 1
+                && com.reiko.signaltower.blockentity.RadioBatteryBlockEntity.bars(25001, 100000) == 2
+                && com.reiko.signaltower.blockentity.RadioBatteryBlockEntity.bars(100000, 100000) == 4, "Four bars");
+        check(com.reiko.signaltower.radio.PowerCost.durationLabel(13 * 3600 + 20 * 60) .equals("13h 20m")
+                && com.reiko.signaltower.radio.PowerCost.durationLabel(150).equals("2m")
+                && com.reiko.signaltower.radio.PowerCost.rateLabel(0.875).equals("0.88") && com.reiko.signaltower.radio.PowerCost.rateLabel(1.0).equals("1")
+                && com.reiko.signaltower.radio.PowerCost.number(45000).equals("45,000"), "Labels");
+
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(10, 1, 1);
+        BlockPos cell = new BlockPos(1, 1, 2);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4501);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4501);
+        BlockPos absTx = helper.absolutePos(tx);
+        BlockPos absCell = helper.absolutePos(cell);
+        // A tower on two masts with a battery by its bottom mast; a repeater, a jammer and a compact transmitter with none.
+        helper.setBlock(new BlockPos(20, 1, 1), ModRegistry.RADIO_MAST.get());
+        helper.setBlock(new BlockPos(20, 2, 1), ModRegistry.RADIO_MAST.get());
+        place(helper, new BlockPos(20, 3, 1), ModRegistry.RADIO_TRANSMITTER.get(), 4502);
+        helper.setBlock(new BlockPos(21, 1, 1), ModRegistry.RADIO_BATTERY.get());
+        place(helper, new BlockPos(30, 1, 1), ModRegistry.RADIO_REPEATER.get(), 4503);
+        place(helper, new BlockPos(40, 1, 1), ModRegistry.RADIO_JAMMER.get(), 4504);
+        helper.setBlock(new BlockPos(50, 1, 2), Blocks.STONE);
+        place(helper, new BlockPos(50, 1, 1), ModRegistry.COMPACT_RADIO_TRANSMITTER.get(), 4505);
+
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(0, 1, 1), Blocks.REDSTONE_BLOCK))
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    assertOutput(helper, rx, 0);
+                    check(network.isDrained(absTx) && !helper.getBlockState(tx).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED),
+                            "No battery: out of power, its light off");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    check(info.getBoolean("unpowered") && info.getInt("power") == 0
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("unpowered"),
+                            "Jade says so: " + info);
+                    check(network.isDrained(helper.absolutePos(new BlockPos(30, 1, 1))) && network.isDrained(helper.absolutePos(new BlockPos(40, 1, 1)))
+                            && !network.isDrained(helper.absolutePos(new BlockPos(50, 1, 1))), "Repeaters and jammers need one too; compact transmitters don't");
+                    var batteries = com.reiko.signaltower.radio.PowerCost.batteries(level, helper.absolutePos(new BlockPos(20, 3, 1)));
+                    check(batteries.size() == 1 && batteries.get(0).getBlockPos().equals(helper.absolutePos(new BlockPos(21, 1, 1))),
+                            "A battery by its mast feeds the tower on top");
+                    helper.setBlock(cell, ModRegistry.RADIO_BATTERY.get());
+                })
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(SignalNetwork.get(level).isDrained(absTx), "An empty battery doesn't help");
+                    var battery = (com.reiko.signaltower.blockentity.RadioBatteryBlockEntity) level.getBlockEntity(absCell);
+                    check(battery.insert(new ItemStack(net.minecraft.world.item.Items.REDSTONE, 3), false) == 3 && battery.getCharge() == 3000,
+                            "Three Redstone Dust: 3,000 charge");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenIdle(45)
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    var battery = (com.reiko.signaltower.blockentity.RadioBatteryBlockEntity) level.getBlockEntity(absCell);
+                    int reach = network.towerReach(absTx);
+                    double rate = com.reiko.signaltower.radio.PowerCost.perSecond(reach);
+                    check(!network.isDrained(absTx) && battery.getCharge() < 3000 && battery.getCharge() >= 3000 - 4 * rate - 1,
+                            "It's using it: " + battery.getCharge() + " left at " + rate + " a second");
+                    check(helper.getBlockState(cell).getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE) == 1, "One bar lit");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    check(info.getLong("tower_charge") == battery.getCharge() && info.getDouble("tower_rate") == rate && info.getBoolean("tower_sending")
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("tower_battery"),
+                            "Jade on the tower: " + info);
+                    CompoundTag cellInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absCell);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(cell), cellInfo));
+                    check(cellInfo.getInt("battery_charge") == battery.getCharge() && Math.abs(cellInfo.getDouble("battery_use") - rate) < 1e-9
+                            && keys.contains("battery_charge") && keys.contains("battery_use"), "Jade on the battery: " + cellInfo + " " + keys);
+                    battery.setCharge(2);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 0))
+                .thenExecute(() -> {
+                    SignalNetwork network = SignalNetwork.get(level);
+                    var battery = (com.reiko.signaltower.blockentity.RadioBatteryBlockEntity) level.getBlockEntity(absCell);
+                    check(network.isDrained(absTx) && battery.getCharge() == 0
+                            && helper.getBlockState(cell).getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE) == 0, "Ran dry: quiet again");
+                    var items = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, absCell, net.minecraft.core.Direction.UP);
+                    check(items != null && items.insertItem(0, new ItemStack(net.minecraft.world.item.Items.REDSTONE_BLOCK, 2), false).isEmpty()
+                            && battery.getCharge() == 18000, "A hopper puts Blocks of Redstone in: 18,000");
+                    check(items.insertItem(0, new ItemStack(net.minecraft.world.item.Items.DIRT), true).getCount() == 1, "Nothing else");
+                    var energy = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage.BLOCK, absCell, null);
+                    check(energy != null && energy.receiveEnergy(1005, false) == 1005 && battery.getCharge() == 18100 && !energy.canExtract(),
+                            "1,005 FE: 100 charge (and 5 kept for the next)");
+                    battery.setCharge(99000);
+                    check(battery.insert(new ItemStack(net.minecraft.world.item.Items.REDSTONE, 5), false) == 1 && battery.getCharge() == 100000
+                            && battery.insert(new ItemStack(net.minecraft.world.item.Items.REDSTONE), true) == 0, "Full at 100,000: only one more went in");
+                    check(battery.comparatorLevel() == 15 && helper.getBlockState(cell).getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE) == 4,
+                            "A comparator reads 15");
+                    battery.setCharge(50000);
+                    check(battery.comparatorLevel() == 8, "Half: 8");
+                    check(Integer.valueOf(50000).equals(battery.collectComponents().get(ModRegistry.BATTERY_CHARGE.get())), "The item keeps its charge");
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenSucceed();
+    }
+
+    /**
+     * The Coverage Map: strong signals green, weaker ones yellow, orange and red, nothing blank; it
+     * paints from the network, so a jammer leaves a hole and the reach ends where it ends. Drawing it
+     * makes a real map lined up like a vanilla one at its zoom (1:4 to start), the same map again in
+     * the same square, a new one at a new zoom; held, it paints itself and marks the towers on it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void coverageMap(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        check(com.reiko.signaltower.item.CoverageMapItem.colorFor(0) == 0
+                && com.reiko.signaltower.item.CoverageMapItem.colorFor(15) == net.minecraft.world.level.material.MapColor.EMERALD.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.HIGH)
+                && com.reiko.signaltower.item.CoverageMapItem.colorFor(13) == net.minecraft.world.level.material.MapColor.EMERALD.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.LOW)
+                && com.reiko.signaltower.item.CoverageMapItem.colorFor(8) == net.minecraft.world.level.material.MapColor.COLOR_YELLOW.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.NORMAL)
+                && com.reiko.signaltower.item.CoverageMapItem.colorFor(1) == net.minecraft.world.level.material.MapColor.COLOR_RED.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.LOW),
+                "Green, yellow, orange, red; blank for nothing");
+        check(com.reiko.signaltower.item.CoverageMapItem.blocksAcross(2) == 512, "1:4 is 512 blocks across");
+
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        network.forceWeather(com.reiko.signaltower.radio.Weather.CLEAR);
+        BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, 30000);
+        network.updateTransmitter(far, 4511, 15, 100);
+        network.updateJammer(far.east(60), 4511, 15, 20, null);
+        var data = net.minecraft.world.level.saveddata.maps.MapItemSavedData.createFresh(far.getX(), far.getZ(), (byte) 2, true, false, level.dimension());
+        com.reiko.signaltower.item.CoverageMapItem.paintRows(level, network, 4511, null, data, 0, 128, far.getY());
+        // Every pixel the map shows (it's lined up like a vanilla map, so part of the reach may be off it):
+        // heard (green: fade is off in this batch) inside the 100-block reach, blank in the jammer's 20 or beyond.
+        int heard = 0;
+        int wrong = 0;
+        for (int z = 0; z < 128; z++) {
+            for (int x = 0; x < 128; x++) {
+                long worldX = (data.centerX / 4 + x - 64) * 4L + 2;
+                long worldZ = (data.centerZ / 4 + z - 64) * 4L + 2;
+                long dx = worldX - far.getX();
+                long dz = worldZ - far.getZ();
+                long jx = worldX - far.getX() - 60;
+                boolean shouldHear = dx * dx + dz * dz <= 100L * 100 && jx * jx + dz * dz > 20L * 20;
+                byte color = data.colors[x + z * 128];
+                if (color != 0) heard++;
+                if (color != (shouldHear ? com.reiko.signaltower.item.CoverageMapItem.colorFor(15) : 0)) wrong++;
+            }
+        }
+        check(heard > 300 && wrong == 0, "Painted: " + heard + " pixels heard, " + wrong + " wrong");
+
+        BlockPos tx = new BlockPos(5, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4512);
+        Player dev = namedPlayer(helper, new BlockPos(6, 1, 1), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack map = new ItemStack(ModRegistry.COVERAGE_MAP.get());
+        FrequencyTunerItem.setFrequency(map, 4512);
+        dev.setItemInHand(InteractionHand.MAIN_HAND, map);
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(new BlockPos(4, 1, 1), Blocks.REDSTONE_BLOCK))
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    var id = com.reiko.signaltower.item.CoverageMapItem.draw(level, dev, map);
+                    var drawn = level.getMapData(id);
+                    check(drawn != null && map.get(net.minecraft.core.component.DataComponents.MAP_ID).equals(id) && drawn.scale == 2
+                            && drawn.dimension == level.dimension(), "A real map, 1:4");
+                    check(com.reiko.signaltower.item.CoverageMapItem.draw(level, dev, map).equals(id), "Drawn again in the same square: the same map");
+                    for (int i = 0; i < 128 / com.reiko.signaltower.item.CoverageMapItem.ROWS_PER_TICK; i++) {
+                        map.getItem().inventoryTick(map, level, dev, 0, true);
+                    }
+                    BlockPos at = helper.absolutePos(tx);
+                    int px = Math.floorDiv(at.getX(), 4) - Math.floorDiv(drawn.centerX, 4) + 64;
+                    int pz = Math.floorDiv(at.getZ(), 4) - Math.floorDiv(drawn.centerZ, 4) + 64;
+                    check(drawn.colors[px + pz * 128] == com.reiko.signaltower.item.CoverageMapItem.colorFor(15), "Painted green round the tower");
+                    boolean marked = false;
+                    for (var decoration : drawn.getDecorations()) {
+                        if (decoration.type().equals(net.minecraft.world.level.saveddata.maps.MapDecorationTypes.RED_MARKER)) marked = true;
+                    }
+                    check(marked, "A red marker on the transmitter");
+                    map.set(ModRegistry.COVERAGE_ZOOM.get(), 0);
+                    check(!com.reiko.signaltower.item.CoverageMapItem.draw(level, dev, map).equals(id)
+                            && level.getMapData(map.get(net.minecraft.core.component.DataComponents.MAP_ID)).scale == 0, "A new zoom: a new map");
                 })
                 .thenSucceed();
     }

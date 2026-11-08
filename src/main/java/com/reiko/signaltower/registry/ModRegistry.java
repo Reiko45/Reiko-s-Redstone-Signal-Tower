@@ -65,6 +65,18 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(Frequency.MIN, Frequency.MAX))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** v0.49.0: the charge in a Radio Battery, kept on the item when it's broken. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> BATTERY_CHARGE =
+            DATA_COMPONENTS.registerComponentType("battery_charge", builder -> builder
+                    .persistent(Codec.intRange(0, Integer.MAX_VALUE))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** v0.49.0: a Coverage Map's zoom, 0 (1:1) to 4 (1:16), like a vanilla map's scale. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COVERAGE_ZOOM =
+            DATA_COMPONENTS.registerComponentType("coverage_zoom", builder -> builder
+                    .persistent(Codec.intRange(0, 4))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     /** The frequency a Radio Converter sends on, kept on the item when it's broken. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> OUTPUT_FREQUENCY =
             DATA_COMPONENTS.registerComponentType("output_frequency", builder -> builder
@@ -297,6 +309,15 @@ public final class ModRegistry {
                     .sound(SoundType.GLASS)
                     .lightLevel(com.reiko.signaltower.block.RadioLampBlock::lightOf)));
 
+    /** v0.49.0: powers the towers next to it (or next to their mast) while they send. */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioBatteryBlock> RADIO_BATTERY = BLOCKS.register("radio_battery",
+            () -> new com.reiko.signaltower.block.RadioBatteryBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_RED)
+                    .strength(2.0F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .requiresCorrectToolForDrops()
+                    .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadioBatteryBlock.CHARGE) > 0 ? 3 : 0)));
+
     /** A transmitter that records a frequency and plays it back (v0.44.0). */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioSignalRecorderBlock> RADIO_SIGNAL_RECORDER = BLOCKS.register("radio_signal_recorder",
             () -> new com.reiko.signaltower.block.RadioSignalRecorderBlock(BlockBehaviour.Properties.of()
@@ -448,6 +469,11 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_jammer", RADIO_JAMMER);
     public static final DeferredItem<BlockItem> AVIATION_BEACON_ITEM =
             ITEMS.registerSimpleBlockItem("aviation_beacon", AVIATION_BEACON);
+    public static final DeferredItem<BlockItem> RADIO_BATTERY_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_battery", RADIO_BATTERY);
+    /** v0.49.0: a map that paints where a frequency can be heard. */
+    public static final DeferredItem<com.reiko.signaltower.item.CoverageMapItem> COVERAGE_MAP = ITEMS.register("coverage_map",
+            () -> new com.reiko.signaltower.item.CoverageMapItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> RADIO_LAMP_ITEM =
             ITEMS.registerSimpleBlockItem("radio_lamp", RADIO_LAMP);
     /** Antenna upgrades for tower tops (v0.45.0). */
@@ -532,6 +558,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.StatusBoardBlockEntity>> STATUS_BOARD_BE =
             BLOCK_ENTITIES.register("radio_status_board",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.StatusBoardBlockEntity::new, RADIO_STATUS_BOARD.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadioBatteryBlockEntity>> RADIO_BATTERY_BE =
+            BLOCK_ENTITIES.register("radio_battery",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadioBatteryBlockEntity::new, RADIO_BATTERY.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CodeKeypadBlockEntity>> CODE_KEYPAD_BE =
             BLOCK_ENTITIES.register("code_keypad",

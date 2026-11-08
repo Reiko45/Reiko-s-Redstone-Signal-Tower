@@ -68,6 +68,7 @@ public final class SignalTower {
         ModRegistry.register(modEventBus);
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
+        modEventBus.addListener(SignalTower::registerCapabilities);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedOut);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
@@ -76,6 +77,14 @@ public final class SignalTower {
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
+    }
+
+    /** v0.49.0: hoppers, pipes and FE cables can charge a Radio Battery. */
+    private static void registerCapabilities(net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.RADIO_BATTERY_BE.get(),
+                (battery, side) -> battery.items());
+        event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage.BLOCK, ModRegistry.RADIO_BATTERY_BE.get(),
+                (battery, side) -> battery.energy());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -244,6 +253,7 @@ public final class SignalTower {
             network.tick(serverLevel.getGameTime(), serverLevel.getDayTime());
             network.watchWeather(serverLevel); // v0.46.0: rain and thunder shorten reach
             com.reiko.signaltower.radio.Lightning.tick(serverLevel, network); // v0.47.0: lightning strikes towers
+            com.reiko.signaltower.radio.PowerCost.tick(serverLevel, network); // v0.49.0: towers pay for sending
         }
     }
 
@@ -278,6 +288,8 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.AVIATION_BEACON_ITEM.get());
             event.accept(ModRegistry.RADIO_LAMP_ITEM.get());
+            event.accept(ModRegistry.RADIO_BATTERY_ITEM.get());
+            event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());
             event.accept(ModRegistry.DIAMOND_ANTENNA.get());

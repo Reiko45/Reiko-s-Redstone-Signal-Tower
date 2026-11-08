@@ -20,6 +20,7 @@
     "reikos_signal_tower:compact_radio_transmitter",
     "reikos_signal_tower:radio_motion_sensor",
     "reikos_signal_tower:code_keypad",
-    "reikos_signal_tower:radio_mast"
+    "reikos_signal_tower:radio_mast",
+    "reikos_signal_tower:radio_battery"
   ]
 }

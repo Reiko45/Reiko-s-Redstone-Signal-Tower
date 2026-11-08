@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "side": "reikos_signal_tower:block/radio_battery_side_1",
+    "top": "reikos_signal_tower:block/radio_battery_top",
+    "bottom": "reikos_signal_tower:block/radio_bottom"
+  }
+}

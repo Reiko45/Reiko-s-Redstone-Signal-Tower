@@ -33,13 +33,14 @@ public class RadioJammerBlockEntity extends RadioTransmitterBlockEntity {
             return;
         }
         int power = RadioHelper.readTransmitterInput(serverLevel, worldPosition);
-        boolean powered = power > 0 && !SignalNetwork.get(serverLevel).isKnockedOut(worldPosition);
-        if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
-            serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
-        }
         SignalNetwork.get(serverLevel).updateJammer(worldPosition, getFrequency(), power,
                 jamReach(serverLevel, worldPosition, state), getTunedBy());
         SignalNetwork.get(serverLevel).setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state));
+        com.reiko.signaltower.radio.PowerCost.check(serverLevel, worldPosition); // v0.49.0
+        boolean powered = power > 0 && !SignalNetwork.get(serverLevel).isDown(worldPosition);
+        if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
+            serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
+        }
     }
 
     /** How strongly it jams now: the redstone reaching it or its masts (0-15). */

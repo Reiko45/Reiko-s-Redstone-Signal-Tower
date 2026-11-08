@@ -311,6 +311,9 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
+write(items / "radio_battery.json", {"parent": f"{MOD}:block/radio_battery_4"})  # v0.49.0
+write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
+
 for tier in ("iron", "gold", "diamond", "netherite", "dish"):
     write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
@@ -520,6 +523,11 @@ write(states / "radio_status_board.json", {"variants": {
     "facing=south": {"model": f"{MOD}:block/radio_status_board", "y": 180},
     "facing=west": {"model": f"{MOD}:block/radio_status_board", "y": 270},
 }})
+# v0.49.0: the Radio Battery, its bars lit by charge
+for n in range(5):
+    write(models / f"radio_battery_{n}.json", {"parent": "minecraft:block/cube_bottom_top", "textures": {
+        "side": tex(f"radio_battery_side_{n}"), "top": tex("radio_battery_top"), "bottom": tex("radio_bottom")}})
+write(states / "radio_battery.json", {"variants": {f"charge={n}": {"model": f"{MOD}:block/radio_battery_{n}"} for n in range(5)}})
 write(states / "radio_speaker.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_speaker" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -738,6 +746,33 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.antenna": "Antenna: %s (%s reach)",
     # v0.48.0: signal fade and the Dish Antenna
     f"jade.{MOD}.faded": "Faded: -%s (far out in its tower's reach)",
+    # v0.49.0: power cost and the Coverage Map
+    f"block.{MOD}.radio_battery": "Radio Battery",
+    f"jade.{MOD}.battery_charge": "Charge: %s / %s (%s%%)",
+    f"jade.{MOD}.battery_bars": "Charge: %s of 4 bars",
+    f"jade.{MOD}.battery_use": "Powering towers: %s a second (about %s left)",
+    f"jade.{MOD}.battery_idle": "Not powering anything right now",
+    f"jade.{MOD}.unpowered": "Out of power: needs a charged Radio Battery next to it or its mast",
+    f"jade.{MOD}.tower_battery": "Battery: %s%% (about %s left at %s a second)",
+    f"jade.{MOD}.tower_battery_idle": "Battery: %s%% (uses %s a second while it sends)",
+    f"message.{MOD}.battery_charged": "Radio Battery: +%s charge (%s / %s)",
+    f"message.{MOD}.battery_full": "This Radio Battery is full (%s)",
+    f"message.{MOD}.battery_status": "Radio Battery: %s / %s charge (%s%%)",
+    f"tooltip.{MOD}.battery_item": "Charge: %s / %s",
+    f"tooltip.{MOD}.battery_help": "Powers a tower next to it (or next to its mast) while the tower sends. Right-click it with Redstone Dust or Blocks of Redstone to charge it; hoppers, pipes and FE cables work too.",
+    f"item.{MOD}.coverage_map": "Coverage Map",
+    f"tooltip.{MOD}.coverage_zoom": "Zoom: 1:%s (%s blocks across)",
+    f"tooltip.{MOD}.coverage_legend": "Green: strong, yellow: fair, orange and red: weak, blank: not heard",
+    f"tooltip.{MOD}.coverage_help": "Right-click: draw it where you stand. Sneak + right-click: zoom out. Sneak + right-click a radio block: map its frequency.",
+    f"message.{MOD}.coverage_drawn": "Coverage Map: %s here, 1:%s (%s blocks across)",
+    f"message.{MOD}.coverage_zoom": "Coverage Map zoom: 1:%s (%s blocks across)",
+    f"message.{MOD}.coverage_copied": "Coverage Map: frequency %s",
+    f"message.{MOD}.coverage_deaf": "Can't map %s: it's encrypted by %s",
+    f"{MOD}.configuration.towersNeedPower": "Towers need power",
+    f"{MOD}.configuration.chargePerSecondPer64Blocks": "Charge a second per 64 blocks of reach",
+    f"{MOD}.configuration.batteryCapacity": "Radio Battery capacity",
+    f"{MOD}.configuration.chargePerRedstone": "Charge per Redstone Dust",
+    f"{MOD}.configuration.fePerCharge": "FE per charge",
     f"hud.{MOD}.meter_faded": "Fade -%s",
     f"jade.{MOD}.antenna_dish": "Antenna: %s, aimed %s (%s reach that way)",
     f"jade.{MOD}.dish_reach": "Reaches %2$s blocks to the %1$s",
@@ -1898,6 +1933,19 @@ recipes["dish_antenna"] = ({  # v0.48.0
     "key": {"I": {"item": "minecraft:iron_ingot"}, "A": {"item": f"{MOD}:iron_antenna"}},
     "result": {"count": 1, "id": f"{MOD}:dish_antenna"},
 }, f"{MOD}:iron_antenna")
+recipes["radio_battery"] = ({  # v0.49.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": ["ICI", "CBC", "ICI"],
+    "key": {"I": {"item": "minecraft:iron_ingot"}, "C": {"item": "minecraft:copper_ingot"}, "B": {"item": "minecraft:redstone_block"}},
+    "result": {"count": 1, "id": f"{MOD}:radio_battery"},
+}, "minecraft:redstone_block")
+recipes["coverage_map"] = ({  # v0.49.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "misc",
+    "ingredients": [{"item": "minecraft:map"}, {"item": f"{MOD}:compact_radio_receiver"}],
+    "result": {"count": 1, "id": f"{MOD}:coverage_map"},
+}, f"{MOD}:compact_radio_receiver")
 recipes["gold_antenna"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -2020,9 +2068,13 @@ for name, (recipe, trigger) in recipes.items():
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
-             "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
+             "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
+             "radio_battery"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
-    if name == "aviation_beacon":
+    if name == "radio_battery":
+        # v0.49.0: it keeps its charge.
+        entry["functions"] = [{"function": "minecraft:copy_components", "source": "block_entity", "include": [f"{MOD}:battery_charge"]}]
+    elif name == "aviation_beacon":
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
@@ -2069,7 +2121,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
-               f"{MOD}:radio_mast"]
+               f"{MOD}:radio_mast", f"{MOD}:radio_battery"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

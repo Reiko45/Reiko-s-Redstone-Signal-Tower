@@ -36,6 +36,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, RadioMastBlock.class);
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.StatusBoardBlock.class);
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.AviationBeaconBlock.class);
+        registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.RadioBatteryBlock.class);
     }
 
     @Override
@@ -44,6 +45,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockComponent(RadioProvider.INSTANCE, RadioMastBlock.class);
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.StatusBoardBlock.class);
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.AviationBeaconBlock.class);
+        registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.RadioBatteryBlock.class);
     }
 
     /** Sends the server's data along, and draws the lines on the client. */

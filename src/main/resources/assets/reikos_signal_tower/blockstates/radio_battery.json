@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "charge=0": {
+      "model": "reikos_signal_tower:block/radio_battery_0"
+    },
+    "charge=1": {
+      "model": "reikos_signal_tower:block/radio_battery_1"
+    },
+    "charge=2": {
+      "model": "reikos_signal_tower:block/radio_battery_2"
+    },
+    "charge=3": {
+      "model": "reikos_signal_tower:block/radio_battery_3"
+    },
+    "charge=4": {
+      "model": "reikos_signal_tower:block/radio_battery_4"
+    }
+  }
+}

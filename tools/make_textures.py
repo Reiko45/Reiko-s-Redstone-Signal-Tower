@@ -444,6 +444,66 @@ def dish_item():
     return img
 
 
+def battery_side(bars):
+    """The Radio Battery's side (v0.49.0): a steel cell with a window of four bars, lit from the bottom up."""
+    img = casing(4900 + bars, rivets=True)
+    px = img.load()
+    for y in range(1, 15):                      # the window
+        for x in range(5, 11):
+            px[x, y] = O if x in (5, 10) or y in (1, 14) else D
+    for i in range(4):                          # bars, bottom (i = 0) to top, a dark line between each
+        lit = i < bars
+        y0 = 12 - i * 3
+        for y in (y0, y0 + 1):
+            for x in range(6, 10):
+                px[x, y] = (ON[1] if (x + y) % 3 else ON[2]) if lit else OFF[0]
+    for x in range(1, 15):                      # a red band round the middle
+        if x < 5 or x > 10:
+            px[x, 7] = ON[0] if bars else OFF[1]
+            px[x, 8] = ON[0] if bars else OFF[1]
+    return img
+
+
+def battery_top():
+    """Its top: two terminals, + (red) and - (steel)."""
+    img = casing(4910)
+    px = img.load()
+    for (cx, color) in ((4, ON[1]), (11, L)):
+        for y in range(5, 11):
+            for x in range(cx - 2, cx + 2):
+                px[x, y] = O if x in (cx - 2, cx + 1) or y in (5, 10) else color
+    for x in range(3, 5):                       # the plus
+        px[x, 7] = H
+        px[x, 8] = H
+    px[11, 7] = O
+    px[10, 7] = O
+    return img
+
+
+def coverage_map_item():
+    """The Coverage Map (v0.49.0): a paper map with coverage rings in green, yellow and red around a tower dot."""
+    import math
+    img = blank()
+    px = img.load()
+    paper, edge = (222, 210, 170, 255), (150, 128, 84, 255)
+    for y in range(1, 15):
+        for x in range(1, 15):
+            px[x, y] = edge if x in (1, 14) or y in (1, 14) else paper
+    for y in range(2, 14):
+        for x in range(2, 14):
+            d = math.hypot(x - 6.5, y - 7.5)
+            if d < 2.2:
+                px[x, y] = (40, 200, 70, 255)
+            elif d < 4.0:
+                px[x, y] = (120, 210, 60, 255)
+            elif d < 5.4:
+                px[x, y] = (230, 200, 40, 255)
+            elif d < 6.4:
+                px[x, y] = (220, 90, 40, 255)
+    px[6, 7] = px[7, 7] = px[6, 8] = px[7, 8] = (150, 20, 20, 255)
+    return img
+
+
 def board_front():
     """The status board's face (v0.43.0): a dark screen in a steel frame (the rows are drawn on it)."""
     img = casing(16, rivets=False)
@@ -995,6 +1055,8 @@ def scanner_arrow():
 
 
 blocks = {
+    **{f"radio_battery_side_{n}": battery_side(n) for n in range(5)},
+    "radio_battery_top": battery_top(),
     "compact_radio_receiver": compact_receiver(False),
     "compact_radio_receiver_on": compact_receiver(True),
     "compact_radio_transmitter": compact_transmitter(False),
@@ -1070,7 +1132,7 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
          "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
          **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
-         "dish_antenna": dish_item()}
+         "dish_antenna": dish_item(), "coverage_map": coverage_map_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

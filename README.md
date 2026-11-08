@@ -27,6 +27,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
 | **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
+| **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
+| **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
 | **Radio Jammer** | A tower top that drowns out one frequency around it while it gets redstone. Everything there that listens on that frequency hears that much less, and a full-strength signal silences it completely. It reaches half as far as a transmitter at the same height. On someone else's private frequency it does nothing, and the owner is told. |
@@ -560,6 +562,29 @@ A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-si
 
 ![A row of Radio Lamps at night on a transmitter whose reach is 56, their light shrinking toward the edge of its reach; Jade on the lamp 48 blocks out saying "Light: 5" and "Faded: -10 (far out in its tower's reach)", with the meter reading 4, "Fade -11"; a transmitter with a Dish Antenna, Jade saying "Antenna: Dish Antenna, aimed east (×3 reach that way)" and "Reaches 168 blocks to the east", and the reach ring "56 blocks (168 to the east)"; and its reach ring from above: a keyhole, the circle with the beam reaching out east](docs/images/signal-fade-and-dish-antenna.png)
 
+### Power cost
+
+Since 0.49 **towers need power to send.** A full-size transmitter (plain, timer or recorder), repeater, converter or jammer uses charge from a **Radio Battery** next to it, or next to any mast in the column under it, while it sends. Without a battery, or with only empty ones, it's **out of power**: it sends, relays and jams nothing, and its light stays off, until a battery next to it has charge again.
+
+- **What it costs:** 1 charge a second for every 64 blocks of reach, only while it's sending (a transmitter with redstone, a repeater or converter hearing something, a jammer with redstone). A transmitter reaching 56 blocks uses 0.88 a second, so a full battery (100,000) lasts it over a day of sending; one with a Netherite Antenna reaching 2,080 blocks uses 32.5 a second. A Dish Antenna adds nothing to the cost.
+- **Charging a battery:** right-click it with Redstone Dust (1,000 charge each) or Blocks of Redstone (9,000); it takes as many as fit. Hoppers and item pipes can feed it redstone, and FE cables from other mods charge it too (10 FE a charge). It holds 100,000.
+- **Free:** compact transmitters, motion sensors, keypads, remotes, and everything that only listens.
+- Several batteries round one tower add up (it takes from them in turn), and one battery can feed several towers. A tower only uses charge while its chunk is loaded; an unloaded one stays as it was.
+- **You can see it:** the battery's four bars light up as it fills, and a comparator reads it (0 empty, 15 full). An empty-hand right-click says how full it is. Jade shows the battery's charge and what towers are using ("Powering towers: 0.88 a second (about 20h 19m left)"), and on a tower either "Battery: 64% (about 20h 18m left at 0.88 a second)" or "Out of power: needs a charged Radio Battery next to it or its mast". A battery keeps its charge when you break it.
+- **Upgrading an old world:** existing towers go quiet until they get a battery. To play without power cost, set `towersNeedPower` to false in the server config. The config also has `chargePerSecondPer64Blocks` (1), `batteryCapacity` (100,000), `chargePerRedstone` (1,000) and `fePerCharge` (10).
+
+### Coverage Map
+
+A **Coverage Map** (since 0.49) is a map for one frequency. Sneak + right-click a radio block to tune it to that block's frequency (a converter's output), then right-click the air to draw the map where you stand. While you hold it, it paints where the frequency can be heard, a few rows at a time (the whole map in under two seconds):
+
+- **Green** where the signal is strong (13–15), **light green** (10–12), **yellow** (7–9), **orange** (4–6) and **red** (1–3) as it gets weaker toward the edge (see Signal fade), behind hills or near a jammer, and **blank** where it isn't heard at all.
+- It goes by the same rules as a receiver on the ground at each spot: towers out of power or struck by lightning are silent, the weather shortens reach, a dish reaches far one way, repeaters carry it on.
+- **Markers:** a red one on each transmitter sending on the frequency, a blue one on each repeater or converter, a red X on each jammer, and the white arrow for you.
+- **Zoom:** sneak + right-click the air to step it out: 1:4 (512 blocks across) to start, then 1:8, 1:16, 1:1 and 1:2. Maps line up like vanilla maps of the same zoom, so they tile on a wall of item frames; drawing it in a new square (or at a new zoom) makes a new map.
+- It's a real map: it shows in your hand and in item frames like any other (a framed one shows how it was last painted). On someone else's encrypted frequency it stays blank.
+
+![Dev looking at a Radio Transmitter on 4480 at night: Jade saying "Sending: nothing" and "Out of power: needs a charged Radio Battery next to it or its mast"; Dev right-clicking the Radio Battery next to it with a stack of redstone: "Radio Battery: +64,000 charge (64,000 / 100,000)", three bars lit, Jade "Charge: 63,999 / 100,000 (64%)", "Powering towers: 0.88 a second (about 20h 19m left)"; the tower sending again, Jade "Sending: 15", "Battery: 64% (about 20h 18m left at 0.88 a second)"; and Alex holding a Coverage Map of 4460 at 1:2: a green disc round the transmitter's red marker, fading through yellow and orange to red at the edge, a blue marker on the repeater and a red X on the jammer](docs/images/power-cost-and-coverage-map.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -640,7 +665,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-An antenna multiplies a tower's reach (see Antennas; a Dish Antenna only in one direction), rain shortens it (see Weather and terrain), and the signal fades toward the edge of it (see Signal fade). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
+An antenna multiplies a tower's reach (see Antennas; a Dish Antenna only in one direction), rain shortens it (see Weather and terrain), and the signal fades toward the edge of it (see Signal fade). A tower needs a charged Radio Battery to send at all (see Power cost). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -691,6 +716,18 @@ I = Iron Ingot   R = Redstone Dust
 
 I = Iron Ingot   A = Iron Antenna
 ```
+
+**Radio Battery:**
+
+```
+     I  C  I
+     C  B  C
+     I  C  I
+
+I = Iron Ingot   C = Copper Ingot   B = Block of Redstone
+```
+
+**Coverage Map:** a Map (the empty one) and a Compact Radio Receiver, in any arrangement in the crafting grid.
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
@@ -786,6 +823,10 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioJammerBlockEntity.java  tells the network how strongly and how far it jams
   radio/Weather.java                     clear, rain, thunder: how much reach each takes off (config)
   radio/Lightning.java                   lightning strikes on towers: chance, outages, lightning rods
+  radio/PowerCost.java                   power cost: finding a tower's batteries, paying each second, out of power
+  block/RadioBatteryBlock.java           the battery: charging with redstone, its bars, the comparator
+  blockentity/RadioBatteryBlockEntity.java  its charge, hoppers and FE, the item keeping its charge
+  item/CoverageMapItem.java              a map that paints where a frequency is heard (colors, zoom, markers)
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -1040,9 +1081,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 150. receiver height: 4 blocks up a receiver hears a tower 30 blocks past its reach (3 up doesn't), one lower than the tower gains nothing, a compact transmitter keeps its short reach, a repeater up high picks it up and passes it on, and the meter and scanner go by it; a real receiver 11 blocks above a transmitter hears it from 98 blocks (Jade says why) and one at the transmitter's height doesn't;
 151. lightning: the chance grows with height (none below sea level); struck, a transmitter on masts goes quiet for 5 seconds (receiver off, light out, Jade counts down) and comes back; a Lightning Rod beside its top takes the next hit (the rod pulses, the tower stays on) but one 3 blocks away is too far; a bolt that isn't the mod's knocks it out too; compact transmitters can't be struck, repeaters can;
 152. signal fade (in a batch of its own; every other test runs with fading off, to check other things at exact strengths): 15 out to half the reach, 8 at three quarters and 1 at the very edge, the same in every direction; a repeater 90 blocks out sends it on at 15 and it fades again toward the repeater's edge; a compact transmitter doesn't fade; a jammer three quarters out jams 8; the meter's packet carries it; a real receiver three quarters out outputs what's left and Jade says how much faded;
-153. the Dish Antenna: looking north, east, south or west aims it 0, 4, 8 or 12; its beam is 15° either side; a tower reaches 192 blocks in its beam and 64 everywhere else (the meter's edge too, and a press it relays), saved and loaded; without it, 64 again; a jammer's dish jams farther that way only; fitted in the world it reaches a receiver 125 blocks east, Jade and the reach ring (a keyhole, also over the network) show it; a second dish turns it west (nothing used up, the receiver goes off), the same way again says it already faces there, and an iron antenna replaces it and gives the dish back.
+153. the Dish Antenna: looking north, east, south or west aims it 0, 4, 8 or 12; its beam is 15° either side; a tower reaches 192 blocks in its beam and 64 everywhere else (the meter's edge too, and a press it relays), saved and loaded; without it, 64 again; a jammer's dish jams farther that way only; fitted in the world it reaches a receiver 125 blocks east, Jade and the reach ring (a keyhole, also over the network) show it; a second dish turns it west (nothing used up, the receiver goes off), the same way again says it already faces there, and an iron antenna replaces it and gives the dish back;
+154. power cost (in a batch of its own, with it on; every other test runs with it off): a transmitter with no battery, or an empty one, is out of power (its light off, Jade says so, its receiver dark); repeaters and jammers need one too, compact transmitters don't; a battery by its mast feeds the tower on top; three Redstone Dust (3,000) bring it back, it uses 1 a second per 64 blocks of reach, Jade shows both ends, and it goes quiet when the charge runs out; a hopper puts Blocks of Redstone in, FE charges it, it's full at 100,000, a comparator reads 15 full and 8 at half, and the item keeps its charge;
+155. the Coverage Map: green, yellow, orange, red, blank; every pixel of a map at 1:4 painted from the network (heard inside the 100-block reach, blank in a jammer's 20 and beyond); drawn in the world it's a real map at 1:4, the same map again in the same square, painted green round a transmitter with a red marker on it after a whole pass while held, and a new map at a new zoom.
 
-All 153 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 155 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

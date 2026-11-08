@@ -102,6 +102,30 @@ public final class Config {
             .comment("How wide a Dish Antenna's beam is: this many degrees either side of where it's aimed.")
             .defineInRange("dishConeDegrees", 15, 1, 90);
 
+    public static final ModConfigSpec.BooleanValue TOWERS_NEED_POWER = BUILDER
+            .comment("Power cost: full-size transmitters (plain, timer, recorder), repeaters, converters and jammers use",
+                    "charge from a Radio Battery next to them (or next to a mast in their column) while they send; with",
+                    "none, or only empty ones, they go quiet. Compact transmitters, motion sensors, keypads and remotes",
+                    "are free. False: towers send for nothing, as before.")
+            .define("towersNeedPower", true);
+
+    public static final ModConfigSpec.DoubleValue CHARGE_PER_SECOND_PER_64_BLOCKS = BUILDER
+            .comment("How much charge a tower uses each second it sends, for every 64 blocks of its reach (with its",
+                    "antenna; a Dish Antenna counts as none). A transmitter reaching 56 blocks uses 0.875 a second.")
+            .defineInRange("chargePerSecondPer64Blocks", 1.0, 0.0, 10000.0);
+
+    public static final ModConfigSpec.IntValue BATTERY_CAPACITY = BUILDER
+            .comment("How much charge a Radio Battery holds.")
+            .defineInRange("batteryCapacity", 100000, 100, 1000000000);
+
+    public static final ModConfigSpec.IntValue CHARGE_PER_REDSTONE = BUILDER
+            .comment("How much charge one Redstone Dust puts in a Radio Battery (a Block of Redstone gives nine times as much).")
+            .defineInRange("chargePerRedstone", 1000, 1, 10000000);
+
+    public static final ModConfigSpec.IntValue FE_PER_CHARGE = BUILDER
+            .comment("How much energy (FE, from other mods' cables and generators) makes one charge in a Radio Battery.")
+            .defineInRange("fePerCharge", 10, 1, 1000000);
+
     public static final ModConfigSpec.IntValue JAMMER_REACH_PERCENT = BUILDER
             .comment("How far a Radio Jammer reaches, in percent of what a transmitter at the same height",
                     "(with the same antenna) would.")
