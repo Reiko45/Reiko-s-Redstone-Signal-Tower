@@ -84,7 +84,8 @@ public abstract class RadioBlock extends BaseEntityBlock {
         if (sends.isEmpty() || !network.isSilenced(level, pos)) {
             return null;
         }
-        return FrequencyClaims.refusal(level, sends.getAsInt(), null, "private_silenced");
+        return FrequencyClaims.refusal(level, sends.getAsInt(), null,
+                network.jammerAt(pos) != null ? "private_silenced_jammer" : "private_silenced");
     }
 
     /**

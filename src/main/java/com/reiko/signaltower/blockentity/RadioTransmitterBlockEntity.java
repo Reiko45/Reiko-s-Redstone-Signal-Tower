@@ -79,14 +79,26 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
                 : RadioHelper.readTransmitterInput(level, pos);
     }
 
-    /** How far a transmitter in {@code state} at {@code pos} reaches: by height, or a compact one's fixed reach (config, capped by maxReach). */
+    /**
+     * How far a transmitter in {@code state} at {@code pos} reaches: by height, or a compact one's
+     * fixed reach (config, capped by maxReach); a Radio Jammer (v0.46.0) its share of a transmitter's.
+     */
     public static int reachOf(Level level, BlockPos pos, BlockState state) {
         if (state.getBlock() instanceof CompactRadioTransmitterBlock) {
             int reach = Config.COMPACT_TRANSMITTER_REACH.get();
             int max = Config.MAX_REACH.get();
             return max > 0 ? Math.min(reach, max) : reach;
         }
+        if (state.getBlock() instanceof com.reiko.signaltower.block.RadioJammerBlock) {
+            return RadioJammerBlockEntity.jamReach(level, pos, state);
+        }
         return RadioHelper.towerReach(level, pos, state);
+    }
+
+    /** {@link #reachOf} in the weather where it stands now (v0.46.0; compact ones don't mind it). For status lines, Jade and the reach ring. */
+    public static int reachNow(ServerLevel level, BlockPos pos, BlockState state) {
+        int reach = reachOf(level, pos, state);
+        return state.getBlock() instanceof CompactRadioTransmitterBlock ? reach : SignalNetwork.get(level).reachNow(level, pos, reach);
     }
 
     @Override

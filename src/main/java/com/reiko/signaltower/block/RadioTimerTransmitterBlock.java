@@ -73,7 +73,7 @@ public class RadioTimerTransmitterBlock extends RadioTransmitterBlock {
             return Component.translatable(getDescriptionId());
         }
         return Component.translatable("message." + SignalTower.MOD_ID + ".timer_status", FrequencyNames.label(level, timer.getFrequency()),
-                timer.scheduleText(), timer.output(level), RadioTransmitterBlockEntity.reachOf(level, pos, state));
+                timer.scheduleText(), timer.output(level), RadioTransmitterBlockEntity.reachNow(level, pos, state));
     }
 
     @Override

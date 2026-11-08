@@ -75,7 +75,7 @@ public class RadioSignalRecorderBlock extends RadioTransmitterBlock {
         }
         return Component.translatable("message." + SignalTower.MOD_ID + ".recorder_status", FrequencyNames.label(level, recorder.getFrequency()),
                 SignalRecorderBlockEntity.tapeText(recorder.getLength(), recorder.getChanges().length), recorder.getOutput(),
-                RadioTransmitterBlockEntity.reachOf(level, pos, state));
+                RadioTransmitterBlockEntity.reachNow(level, pos, state));
     }
 
     @Override

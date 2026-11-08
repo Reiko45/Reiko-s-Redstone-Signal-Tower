@@ -9,7 +9,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
 
@@ -69,8 +72,24 @@ public final class SignalNetwork extends SavedData {
         }
     }
 
-    /** What a receiver can hear: the strongest signal, and how many transmitters reach it. */
-    public record Reception(int power, int transmittersInReach) {}
+    /**
+     * What a receiver can hear: the strongest signal, and how many transmitters reach it.
+     * {@code hills} (v0.46.0): how much of that signal's strength hills and other ground took off on
+     * the way (0: none; it can be all of it). {@code jammed}: how strong a Radio Jammer is here on
+     * the frequency (0: none), already taken off {@code power}.
+     */
+    public record Reception(int power, int transmittersInReach, int hills, int jammed) {
+        public Reception(int power, int transmittersInReach) {
+            this(power, transmittersInReach, 0, 0);
+        }
+    }
+
+    /**
+     * A Radio Jammer (v0.46.0): while {@code power} > 0 it takes that much off whatever anything
+     * inside its reach hears on {@code frequency} (minus hills between, like a signal). On a
+     * private frequency only the owner's and members' jammers count.
+     */
+    public record Jammer(int frequency, int power, int reach, @Nullable UUID tunedBy) {}
 
     /**
      * One area a remote signal goes out from: the player's own position, or a Radio Transmitter
@@ -209,6 +228,14 @@ public final class SignalNetwork extends SavedData {
     private final Map<BlockPos, Integer> receiverSeconds = new HashMap<>();
     /** Recent times each frequency turned on, oldest first, for the pagers' catch-up. Saved. */
     private final Map<Integer, ArrayDeque<TurnOn>> history = new HashMap<>();
+    private final Map<BlockPos, Jammer> jammers = new HashMap<>();
+    private final Map<Integer, Map<BlockPos, Jammer>> jammersByFrequency = new HashMap<>();
+    /** Whether it rains or snows where each tower stands (by biome; not saved). */
+    private final Map<BlockPos, Boolean> wetSpots = new HashMap<>();
+    /** The weather last seen in this dimension, to notice it changing (not saved). */
+    private @Nullable Weather lastWeather;
+    /** Weather the GameTests set for one network (null: the level's). */
+    private @Nullable Weather forcedWeather;
     /** The game time and day time of the last tick, used to stamp {@link TurnOn}s. */
     private long now;
     private long nowDayTime;
@@ -271,6 +298,10 @@ public final class SignalNetwork extends SavedData {
         if (tx != null) {
             return blocked(level, tx.frequency(), tx.tunedBy());
         }
+        Jammer jammer = jammers.get(pos);
+        if (jammer != null) {
+            return blocked(level, jammer.frequency(), jammer.tunedBy());
+        }
         Repeater repeater = repeaters.get(pos);
         return repeater != null && blocked(level, repeater.output(), repeater.tunedBy());
     }
@@ -287,6 +318,9 @@ public final class SignalNetwork extends SavedData {
         }
         for (Repeater repeater : repeatersByOutput.getOrDefault(frequency, Map.of()).values()) {
             if (repeater.tunedBy() != null && !allowed.test(repeater.tunedBy())) count++;
+        }
+        for (Jammer jammer : jammersByFrequency.getOrDefault(frequency, Map.of()).values()) {
+            if (jammer.tunedBy() != null && !allowed.test(jammer.tunedBy())) count++;
         }
         return count;
     }
@@ -489,6 +523,10 @@ public final class SignalNetwork extends SavedData {
         if (transmitter.isPresent()) {
             return transmitter;
         }
+        Jammer jammer = jammers.get(pos);
+        if (jammer != null) {
+            return OptionalInt.of(jammer.frequency());
+        }
         Repeater repeater = repeaters.get(pos);
         return repeater == null ? OptionalInt.empty() : OptionalInt.of(repeater.output());
     }
@@ -527,7 +565,8 @@ public final class SignalNetwork extends SavedData {
      * inside its reach that listen on the frequency it sends on. Because it only spreads outward
      * from real sources, repeaters and converters can't keep each other on in a loop (not even a
      * converter loop like 42 to 100 and back) once the source goes quiet. The strength is passed on
-     * unchanged.
+     * unchanged, less what hills between take off and what a jammer where the next one stands
+     * takes off (v0.46.0).
      * <p>
      * One answer covers the whole dimension, kept until anything a repeater or converter could
      * hear changes ({@link #relayEpoch}), and re-worked once a second anyway, for changes nothing
@@ -543,6 +582,7 @@ public final class SignalNetwork extends SavedData {
         dropStaleRepeaters(level);
         List<BlockPos> positions = new ArrayList<>(repeaters.keySet());
         Map<BlockPos, Integer> power = new HashMap<>();
+        Map<BlockPos, Integer> jamHere = new HashMap<>();
         Set<BlockPos> silenced = new HashSet<>();
         for (BlockPos pos : positions) {
             Repeater repeater = repeaters.get(pos);
@@ -556,7 +596,11 @@ public final class SignalNetwork extends SavedData {
                 silenced.add(pos);
                 power.put(pos, gateOutputs.getOrDefault(pos, 0));
             } else {
-                power.put(pos, listenDirect(level, repeater.frequency(), pos).power());
+                int jam = jamming(level, repeater.frequency(), pos);
+                if (jam > 0) {
+                    jamHere.put(pos, jam);
+                }
+                power.put(pos, Math.max(0, listenDirect(level, repeater.frequency(), pos).power() - jam));
             }
         }
         Set<BlockPos> done = new HashSet<>();
@@ -579,10 +623,17 @@ public final class SignalNetwork extends SavedData {
             if (listening == null) {
                 continue;
             }
-            Coverage area = new Coverage(next, from.reach(), true);
+            Coverage area = new Coverage(next, reachNow(level, next, from.reach()), true);
             for (BlockPos pos : listening.keySet()) {
                 if (power.get(pos) < nextPower && !done.contains(pos) && !silenced.contains(pos) && area.reaches(pos)) {
-                    power.put(pos, nextPower);
+                    // v0.46.0: minus a jammer where it stands, then minus the hills between.
+                    int got = nextPower - jamHere.getOrDefault(pos, 0);
+                    if (got > power.get(pos)) {
+                        got -= hillLoss(level, next, pos);
+                        if (got > power.get(pos)) {
+                            power.put(pos, got);
+                        }
+                    }
                 }
             }
         }
@@ -682,7 +733,7 @@ public final class SignalNetwork extends SavedData {
                     continue;
                 }
                 reached.add(pos);
-                Coverage own = new Coverage(pos, repeater.reach(), true);
+                Coverage own = new Coverage(pos, reachNow(level, pos, repeater.reach()), true);
                 List<Coverage> list = areas.computeIfAbsent(repeater.output(), f -> new ArrayList<>());
                 if (!list.contains(own)) { // a repeater is already there if it relayed the press as a tower
                     list.add(own);
@@ -780,7 +831,7 @@ public final class SignalNetwork extends SavedData {
                 stale.add(pos);
                 continue;
             }
-            coverage.add(new Coverage(pos, entry.getValue().reach(), true));
+            coverage.add(new Coverage(pos, reachNow(level, pos, entry.getValue().reach()), true));
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
@@ -796,7 +847,7 @@ public final class SignalNetwork extends SavedData {
                 staleRepeaters.add(pos);
                 continue;
             }
-            coverage.add(new Coverage(pos, entry.getValue().reach(), true));
+            coverage.add(new Coverage(pos, reachNow(level, pos, entry.getValue().reach()), true));
         }
         if (staleRepeaters != null) {
             staleRepeaters.forEach(this::removeRepeater);
@@ -1071,13 +1122,13 @@ public final class SignalNetwork extends SavedData {
         if (onFrequency != null) {
             for (Map.Entry<BlockPos, Transmitter> entry : onFrequency.entrySet()) {
                 if (!blocked(level, frequency, entry.getValue().tunedBy())) {
-                    best = Math.max(best, margin(entry.getKey(), entry.getValue().reach(), pos));
+                    best = Math.max(best, margin(entry.getKey(), reachNow(level, entry.getKey(), entry.getValue()), pos));
                 }
             }
         }
         for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
             if (entry.getValue().output() == frequency && !isSilenced(level, entry.getKey()) && !isDeaf(level, entry.getKey())) {
-                best = Math.max(best, margin(entry.getKey(), entry.getValue().reach(), pos));
+                best = Math.max(best, margin(entry.getKey(), reachNow(level, entry.getKey(), entry.getValue().reach()), pos));
             }
         }
         return best;
@@ -1231,7 +1282,8 @@ public final class SignalNetwork extends SavedData {
             BlockPos at = entry.getKey();
             Transmitter tx = entry.getValue();
             long distSq = horizontalDistSq(at, pos);
-            if (distSq > (long) tx.reach() * tx.reach() || blocked(level, tx.frequency(), tx.tunedBy())) {
+            long reach = reachNow(level, at, tx);
+            if (distSq > reach * reach || blocked(level, tx.frequency(), tx.tunedBy())) {
                 continue;
             }
             if (level.isLoaded(at) && !(level.getBlockState(at).getBlock() instanceof RadioTransmitterBlock)) {
@@ -1239,7 +1291,8 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
-            offer(best, tx.frequency(), new BestTransmitter(tx.power(), distSq, at, 1, Source.TRANSMITTER));
+            int power = tx.power() > 0 ? Math.max(0, tx.power() - hillLoss(level, at, pos)) : 0;
+            offer(best, tx.frequency(), new BestTransmitter(power, distSq, at, 1, Source.TRANSMITTER));
         }
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
@@ -1250,10 +1303,12 @@ public final class SignalNetwork extends SavedData {
             BlockPos at = entry.getKey();
             Repeater repeater = entry.getValue();
             long distSq = horizontalDistSq(at, pos);
-            if (distSq > (long) repeater.reach() * repeater.reach() || blocked(level, repeater.output(), repeater.tunedBy())) {
+            long reach = reachNow(level, at, repeater.reach());
+            if (distSq > reach * reach || blocked(level, repeater.output(), repeater.tunedBy())) {
                 continue;
             }
-            offer(best, repeater.output(), new BestTransmitter(sending.getOrDefault(at, 0), distSq, at, 1,
+            int sends = sending.getOrDefault(at, 0);
+            offer(best, repeater.output(), new BestTransmitter(sends > 0 ? Math.max(0, sends - hillLoss(level, at, pos)) : 0, distSq, at, 1,
                     repeater.converts() ? Source.CONVERTER : Source.REPEATER));
         }
         return best;
@@ -1307,13 +1362,14 @@ public final class SignalNetwork extends SavedData {
             BestTransmitter tx = best.get(frequency);
             int count = tx == null ? 0 : tx.count();
             Source remote = remotes.get(frequency);
+            int jam = jamming(level, frequency, pos); // v0.46.0
             if (remote != null) {
-                heard.add(new HeardFrequency(frequency, 15, remote, count, -1, -1));
+                heard.add(new HeardFrequency(frequency, Math.max(0, 15 - jam), remote, count, -1, -1));
             } else {
                 long dx = tx.at().getX() - pos.getX();
                 long dz = tx.at().getZ() - pos.getZ();
                 int distance = (int) Math.min(Integer.MAX_VALUE, Math.round(Math.sqrt(tx.distSq())));
-                heard.add(new HeardFrequency(frequency, tx.power(), tx.source(),
+                heard.add(new HeardFrequency(frequency, Math.max(0, tx.power() - jam), tx.source(),
                         count, distance, distance == 0 ? -1 : compassDirection(dx, dz)));
             }
         }
@@ -1341,6 +1397,17 @@ public final class SignalNetwork extends SavedData {
         if (deaf(level, frequency, listener)) {
             return new Reception(0, 0);
         }
+        Reception heard = listenRelayed(level, frequency, receiverPos);
+        // v0.46.0: a Radio Jammer here takes its strength off what's heard.
+        int jam = jamming(level, frequency, receiverPos);
+        if (jam <= 0) {
+            return heard;
+        }
+        return new Reception(Math.max(0, heard.power() - jam), heard.transmittersInReach(), heard.hills(), jam);
+    }
+
+    /** {@link #listen} before deafness and jammers: transmitters, remote presses, repeaters and converters. */
+    private Reception listenRelayed(ServerLevel level, int frequency, BlockPos receiverPos) {
         Reception direct = listenDirect(level, frequency, receiverPos);
         if (!repeatersByOutput.containsKey(frequency)) {
             return direct;
@@ -1350,34 +1417,75 @@ public final class SignalNetwork extends SavedData {
         if (onFrequency == null) { // resolving forgot the last ones (their blocks were gone)
             return direct;
         }
-        int best = direct.power();
+        Best best = new Best(direct);
         int heard = direct.transmittersInReach();
         for (Map.Entry<BlockPos, Repeater> entry : onFrequency.entrySet()) {
             BlockPos pos = entry.getKey();
             Repeater repeater = entry.getValue();
-            if (pos.equals(receiverPos) || horizontalDistSq(pos, receiverPos) > (long) repeater.reach() * repeater.reach()
+            long reach = reachNow(level, pos, repeater.reach());
+            if (pos.equals(receiverPos) || horizontalDistSq(pos, receiverPos) > reach * reach
                     || blocked(level, frequency, repeater.tunedBy())) {
                 continue;
             }
             heard++;
-            best = Math.max(best, repeating.getOrDefault(pos, 0));
+            best.offer(level, repeating.getOrDefault(pos, 0), pos, receiverPos);
         }
-        return new Reception(best, heard);
+        return best.reception(heard);
+    }
+
+    /**
+     * The strongest signal so far after hills (v0.46.0), and what it was before them. Among equally
+     * strong ones, the one that started stronger wins, so a signal hills block completely still
+     * shows how much they took.
+     */
+    private final class Best {
+        int power;
+        int raw;
+
+        Best() {}
+
+        Best(Reception start) {
+            power = start.power();
+            raw = start.power() + start.hills();
+        }
+
+        /** A signal of {@code raw} sent from {@code from}, heard at {@code at}. */
+        void offer(ServerLevel level, int sent, BlockPos from, BlockPos at) {
+            if (sent <= power) {
+                return; // can't beat it, so don't measure the hills
+            }
+            int after = Math.max(0, sent - hillLoss(level, from, at));
+            if (after > power || after == power && sent > raw) {
+                power = after;
+                raw = sent;
+            }
+        }
+
+        void offerClear(int sent) {
+            if (sent > power || sent == power && sent > raw) {
+                power = sent;
+                raw = sent;
+            }
+        }
+
+        Reception reception(int heard) {
+            return new Reception(power, heard, raw - power, 0);
+        }
     }
 
     /** What {@code receiverPos} hears straight from transmitters and remote presses, leaving repeaters out. */
     private Reception listenDirect(ServerLevel level, int frequency, BlockPos receiverPos) {
-        int best = 0;
+        Best best = new Best();
         int heard = 0;
         for (RemoteSignal remote : new RemoteSignal[] {pulses.get(frequency), latches.get(frequency)}) {
             if (remote != null && remote.reaches(level, receiverPos)) {
-                best = 15;
+                best.offerClear(15); // remote presses don't mind hills
                 heard++;
             }
         }
         Map<BlockPos, Transmitter> onFrequency = byFrequency.get(frequency);
         if (onFrequency == null) {
-            return new Reception(best, heard);
+            return best.reception(heard);
         }
         List<BlockPos> stale = null;
 
@@ -1386,7 +1494,7 @@ public final class SignalNetwork extends SavedData {
             Transmitter tx = entry.getValue();
             long dx = pos.getX() - receiverPos.getX();
             long dz = pos.getZ() - receiverPos.getZ();
-            long reach = tx.reach();
+            long reach = reachNow(level, pos, tx);
             if (dx * dx + dz * dz > reach * reach || blocked(level, frequency, tx.tunedBy())) {
                 continue;
             }
@@ -1397,13 +1505,247 @@ public final class SignalNetwork extends SavedData {
                 continue;
             }
             heard++;
-            best = Math.max(best, tx.power());
+            best.offer(level, tx.power(), pos, receiverPos);
         }
 
         if (stale != null) {
             stale.forEach(this::removeTransmitter);
         }
-        return new Reception(best, heard);
+        return best.reception(heard);
+    }
+
+    // ---- Radio Jammers (v0.46.0) ----
+
+    /** What the Radio Jammer at {@code pos} does now: placed, re-tuned, its redstone or reach changed, or it checks in. */
+    public void updateJammer(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy) {
+        BlockPos key = pos.immutable();
+        Jammer next = new Jammer(frequency, power, reach, tunedBy);
+        Jammer previous = jammers.put(key, next);
+        if (next.equals(previous)) {
+            return;
+        }
+        if (previous != null && previous.frequency() != frequency) {
+            removeJammerFromIndex(key, previous.frequency());
+        }
+        jammersByFrequency.computeIfAbsent(frequency, f -> new HashMap<>()).put(key, next);
+        relayEpoch++; // repeaters and converters inside it may hear less
+        bump(frequency);
+        setDirty();
+    }
+
+    public void removeJammer(BlockPos pos) {
+        Jammer previous = jammers.remove(pos);
+        if (previous != null) {
+            removeJammerFromIndex(pos, previous.frequency());
+            setDirty();
+        }
+    }
+
+    private void removeJammerFromIndex(BlockPos pos, int frequency) {
+        Map<BlockPos, Jammer> onFrequency = jammersByFrequency.get(frequency);
+        if (onFrequency != null) {
+            onFrequency.remove(pos);
+            if (onFrequency.isEmpty()) {
+                jammersByFrequency.remove(frequency);
+            }
+        }
+        relayEpoch++;
+        bump(frequency);
+    }
+
+    /** The Radio Jammer at {@code pos}, or null. */
+    public @Nullable Jammer jammerAt(BlockPos pos) {
+        return jammers.get(pos);
+    }
+
+    /** Every Radio Jammer on {@code frequency} whose block is still there (or not loaded), by position. For the audit. */
+    public Map<BlockPos, Jammer> jammersOn(ServerLevel level, int frequency) {
+        Map<BlockPos, Jammer> result = new java.util.TreeMap<>();
+        jammersByFrequency.getOrDefault(frequency, Map.of()).forEach((pos, jammer) -> {
+            if (!staleJammer(level, pos)) {
+                result.put(pos, jammer);
+            }
+        });
+        return result;
+    }
+
+    /**
+     * How strongly {@code frequency} is jammed at {@code pos}: the strongest running jammer on it
+     * whose reach (in the weather where it stands) covers it, minus the hills between; 0 if none.
+     * Jammers kept quiet on someone else's private frequency don't count.
+     */
+    public int jamming(@Nullable ServerLevel level, int frequency, BlockPos pos) {
+        Map<BlockPos, Jammer> onFrequency = jammersByFrequency.get(frequency);
+        if (onFrequency == null) {
+            return 0;
+        }
+        int best = 0;
+        List<BlockPos> stale = null;
+        for (Map.Entry<BlockPos, Jammer> entry : onFrequency.entrySet()) {
+            BlockPos at = entry.getKey();
+            Jammer jammer = entry.getValue();
+            if (jammer.power() <= best) {
+                continue;
+            }
+            long reach = reachNow(level, at, jammer.reach());
+            if (horizontalDistSq(at, pos) > reach * reach || blocked(level, frequency, jammer.tunedBy())) {
+                continue;
+            }
+            if (staleJammer(level, at)) {
+                if (stale == null) stale = new ArrayList<>();
+                stale.add(at);
+                continue;
+            }
+            best = Math.max(best, jammer.power() - hillLoss(level, at, pos));
+        }
+        if (stale != null) {
+            stale.forEach(this::removeJammer);
+        }
+        return best;
+    }
+
+    /** True if {@code pos} is loaded and holds no Radio Jammer any more. */
+    private boolean staleJammer(@Nullable ServerLevel level, BlockPos pos) {
+        ServerLevel at = level != null ? level : world;
+        return at != null && at.isLoaded(pos) && !(at.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioJammerBlock);
+    }
+
+    // ---- Weather and terrain (v0.46.0) ----
+
+    /** Ground this close (horizontally) to either end of a line doesn't count: a tower's own base, the building round a receiver. */
+    public static final int TERRAIN_SKIP = 8;
+    /** The most points checked along one line. */
+    private static final int TERRAIN_SAMPLES = 64;
+
+    /** For the GameTests: this network behaves as if the weather were {@code weather} (null: the level's again). */
+    public void forceWeather(@Nullable Weather weather) {
+        forcedWeather = weather;
+        relayEpoch++;
+        bumpEverything();
+    }
+
+    /** The weather in this dimension's sky now. */
+    public Weather weather(@Nullable ServerLevel level) {
+        if (forcedWeather != null) {
+            return forcedWeather;
+        }
+        ServerLevel at = level != null ? level : world;
+        return at == null ? Weather.CLEAR : Weather.of(at);
+    }
+
+    /** The weather a tower at {@code pos} is in: the dimension's, or clear where it never rains (by biome). */
+    public Weather weatherAt(@Nullable ServerLevel level, BlockPos pos) {
+        Weather now = weather(level);
+        ServerLevel at = level != null ? level : world;
+        if (now == Weather.CLEAR || at == null) {
+            return Weather.CLEAR;
+        }
+        Boolean wet = wetSpots.get(pos);
+        if (wet == null) {
+            // Biomes are known without loading the chunk; they hardly ever change, so remember them.
+            wet = Weather.wetBiome(at.getBiome(pos).value(), pos);
+            if (wetSpots.size() >= 8192) {
+                wetSpots.clear();
+            }
+            wetSpots.put(pos.immutable(), wet);
+        }
+        return wet ? now : Weather.CLEAR;
+    }
+
+    /** {@code reach} of a tower (not a compact transmitter) at {@code pos}, in the weather where it stands now. */
+    public int reachNow(@Nullable ServerLevel level, BlockPos pos, int reach) {
+        return weatherAt(level, pos).apply(reach);
+    }
+
+    private int reachNow(@Nullable ServerLevel level, BlockPos pos, Transmitter tx) {
+        return tx.compact() ? tx.reach() : reachNow(level, pos, tx.reach());
+    }
+
+    /** Checks once a tick whether the weather changed; if it did, everything on every frequency is worked out again. */
+    public void watchWeather(ServerLevel level) {
+        Weather now = weather(level);
+        if (now != lastWeather) {
+            boolean first = lastWeather == null;
+            lastWeather = now;
+            if (!first) {
+                relayEpoch++;
+                bumpEverything();
+            }
+        }
+    }
+
+    private void bumpEverything() {
+        Set<Integer> all = new HashSet<>(byFrequency.keySet());
+        all.addAll(repeatersByInput.keySet());
+        all.addAll(repeatersByOutput.keySet());
+        all.addAll(jammersByFrequency.keySet());
+        for (int frequency : all) {
+            revisions.merge(frequency, 1L, Long::sum);
+        }
+    }
+
+    /**
+     * How much strength the ground between a tower at {@code from} and a listener at {@code to}
+     * takes off (0-15): the straight line runs from the top of the tower to the middle of the
+     * listener's block, and every {@link com.reiko.signaltower.Config#TERRAIN_BLOCKS_PER_STRENGTH}
+     * blocks of it (measured horizontally) that run through solid ground take 1 off. "Ground" is a
+     * block that stops movement, or a liquid; leaves don't count (trees don't block it), nor does air
+     * (a cave it runs through, or a roof above it). Up to {@link #TERRAIN_SAMPLES} points along the line
+     * are checked. The first and last {@link #TERRAIN_SKIP} blocks don't count; chunks that aren't
+     * loaded count as clear (nothing is loaded to check).
+     */
+    public int hillLoss(@Nullable ServerLevel level, BlockPos from, BlockPos to) {
+        int per = terrainBlocksPerStrength();
+        ServerLevel at = level != null ? level : world;
+        if (per <= 0 || at == null) {
+            return 0;
+        }
+        double ax = from.getX() + 0.5, ay = from.getY() + 1.0, az = from.getZ() + 0.5;
+        double bx = to.getX() + 0.5, by = to.getY() + 0.5, bz = to.getZ() + 0.5;
+        double dx = bx - ax, dz = bz - az;
+        double length = Math.sqrt(dx * dx + dz * dz);
+        double span = length - 2.0 * TERRAIN_SKIP;
+        if (span <= 0) {
+            return 0;
+        }
+        int samples = (int) Math.min(TERRAIN_SAMPLES, Math.ceil(span));
+        double step = span / samples;
+        var chunks = at.getChunkSource();
+        int under = 0;
+        int lastChunkX = Integer.MIN_VALUE, lastChunkZ = Integer.MIN_VALUE;
+        LevelChunk chunk = null;
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < samples; i++) {
+            double t = (TERRAIN_SKIP + (i + 0.5) * step) / length;
+            int x = Mth.floor(ax + dx * t);
+            int z = Mth.floor(az + dz * t);
+            if (x >> 4 != lastChunkX || z >> 4 != lastChunkZ) {
+                lastChunkX = x >> 4;
+                lastChunkZ = z >> 4;
+                chunk = chunks.getChunkNow(lastChunkX, lastChunkZ);
+            }
+            if (chunk == null) {
+                continue;
+            }
+            double y = ay + (by - ay) * t;
+            // Above the highest solid block it's clear for sure; below it, look at the block itself
+            // (a roof or an overhang above the line isn't in the way, a cave it runs through isn't either).
+            if (y < chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15) + 1
+                    && isGround(chunk.getBlockState(cursor.set(x, Mth.floor(y), z)))) {
+                under++;
+            }
+        }
+        return (int) Math.min(15, Math.floor(under * step / per + 1e-9));
+    }
+
+    /** Solid ground for {@link #hillLoss}: blocks that stop movement, and liquids; not leaves (like the MOTION_BLOCKING_NO_LEAVES height map). */
+    private static boolean isGround(net.minecraft.world.level.block.state.BlockState state) {
+        return (state.blocksMotion() || !state.getFluidState().isEmpty()) && !state.is(net.minecraft.tags.BlockTags.LEAVES);
+    }
+
+        private static int terrainBlocksPerStrength() {
+        var setting = com.reiko.signaltower.Config.TERRAIN_BLOCKS_PER_STRENGTH;
+        return com.reiko.signaltower.Config.SPEC.isLoaded() ? setting.get() : setting.getDefault();
     }
 
     // ---- Saving ----
@@ -1447,6 +1789,20 @@ public final class SignalNetwork extends SavedData {
             repeaterList.add(entry);
         });
         tag.put("repeaters", repeaterList);
+
+        ListTag jammerList = new ListTag();
+        jammers.forEach((pos, jammer) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("pos", pos.asLong());
+            entry.putInt("frequency", jammer.frequency());
+            entry.putInt("power", jammer.power());
+            entry.putInt("reach", jammer.reach());
+            if (jammer.tunedBy() != null) {
+                entry.putUUID("tuned_by", jammer.tunedBy());
+            }
+            jammerList.add(entry);
+        });
+        tag.put("jammers", jammerList);
 
         ListTag latchList = new ListTag();
         latches.forEach((frequency, latch) -> {
@@ -1544,6 +1900,15 @@ public final class SignalNetwork extends SavedData {
             }
             network.repeatersByInput.computeIfAbsent(repeater.frequency(), f -> new HashMap<>()).put(pos, repeater);
             network.repeatersByOutput.computeIfAbsent(repeater.output(), f -> new HashMap<>()).put(pos, repeater);
+        }
+        ListTag jammerList = tag.getList("jammers", Tag.TAG_COMPOUND);
+        for (int i = 0; i < jammerList.size(); i++) {
+            CompoundTag entry = jammerList.getCompound(i);
+            BlockPos pos = BlockPos.of(entry.getLong("pos"));
+            Jammer jammer = new Jammer(Frequency.clamp(entry.getInt("frequency")), Math.max(0, Math.min(15, entry.getInt("power"))),
+                    entry.getInt("reach"), entry.hasUUID("tuned_by") ? entry.getUUID("tuned_by") : null);
+            network.jammers.put(pos, jammer);
+            network.jammersByFrequency.computeIfAbsent(jammer.frequency(), f -> new HashMap<>()).put(pos, jammer);
         }
         ListTag latchList = tag.getList("remote_latches", Tag.TAG_COMPOUND);
         for (int i = 0; i < latchList.size(); i++) {

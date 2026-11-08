@@ -70,7 +70,7 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                     | (network.isDeaf(serverLevel, pos) ? OpenConverterScreenPayload.DEAF : 0);
             PacketDistributor.sendToPlayer(serverPlayer, new OpenConverterScreenPayload(pos, converter.getFrequency(),
                     converter.getOutputFrequency(), network.repeaterPower(serverLevel, pos),
-                    RadioHelper.towerReach(serverLevel, pos, state), quiet, converter.getGate(), converter.getThreshold(),
+                    RadioHelper.towerReachNow(serverLevel, pos, state), quiet, converter.getGate(), converter.getThreshold(),
                     converter.gateHeard(serverLevel)));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
@@ -90,7 +90,7 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                 ? Component.translatable(key + "converter_converting", power)
                 : Component.translatable(key + "converter_quiet");
         return Component.translatable(key + "converter_status", FrequencyNames.label(level, listen), FrequencyNames.label(level, send),
-                converting, RadioHelper.towerReach(level, pos, state));
+                converting, RadioHelper.towerReachNow(level, pos, state));
     }
 
     @Override

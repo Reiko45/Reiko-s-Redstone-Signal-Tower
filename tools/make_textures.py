@@ -35,6 +35,10 @@ TEAL_ON = [(12, 160, 170, 255), (44, 222, 232, 255), (176, 250, 255, 255)]
 PURPLE_OFF = [(46, 20, 66, 255), (72, 34, 104, 255), (98, 52, 138, 255)]
 PURPLE_ON = [(140, 50, 220, 255), (192, 100, 255, 255), (238, 196, 255, 255)]
 
+# Radio Jammer (v0.46.0)
+MAGENTA_OFF = [(70, 14, 50, 255), (108, 26, 80, 255), (140, 38, 104, 255)]
+MAGENTA_ON = [(200, 30, 136, 255), (255, 80, 200, 255), (255, 196, 238, 255)]
+
 CLEAR = (0, 0, 0, 0)
 
 
@@ -292,6 +296,25 @@ def recorder_side(lit):
     return img
 
 
+def jammer_side(lit):
+    """A jagged burst of static struck through by a slash (v0.46.0): it glows magenta while jamming."""
+    r = MAGENTA_ON if lit else MAGENTA_OFF
+    img = casing(21)
+    px = img.load()
+    vents(img)
+    # A thin zigzag of static across the middle: bright tips, darker strokes between them
+    points = [(2, 6), (3, 4), (4, 7), (5, 3), (6, 6), (7, 2), (8, 7), (9, 4), (10, 8), (11, 3), (12, 6), (13, 5)]
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        for y in range(min(y0, y1) + 1, max(y0, y1)):
+            px[x1 if abs(y - y1) < abs(y - y0) else x0, y] = r[0] if not lit else r[1]
+    for (x, y) in points:
+        px[x, y] = r[2] if lit else r[1]
+    # The slash: no signal gets through
+    for i in range(10):
+        px[3 + i, 9 - i] = O
+    return img
+
+
 def beacon_dome(color):
     """An aviation light's glass (v0.44.0): red or white, darker at the edges, with a shine."""
     base = {"red": [(96, 14, 12, 255), (150, 24, 18, 255), (196, 44, 32, 255), (236, 120, 100, 255)],
@@ -524,11 +547,15 @@ def mast_lattice():
     return img
 
 
-def antenna_tip(lit, amber=False, teal=False):
+def antenna_tip(lit, amber=False, teal=False, magenta=False):
     """Warning light at the top of the antenna: red on a transmitter, amber on a repeater, teal on a converter."""
     img = blank()
     px = img.load()
-    if teal and lit:
+    if magenta and lit:
+        core, mid, rim = (255, 220, 246, 255), (255, 80, 200, 255), (196, 26, 132, 255)
+    elif magenta:
+        core, mid, rim = (140, 40, 108, 255), (100, 22, 76, 255), (62, 12, 46, 255)
+    elif teal and lit:
         core, mid, rim = (200, 255, 255, 255), (60, 226, 236, 255), (12, 150, 160, 255)
     elif teal:
         core, mid, rim = (40, 120, 126, 255), (18, 84, 90, 255), (8, 52, 56, 255)
@@ -970,6 +997,12 @@ blocks = {
     "radio_signal_recorder_side_on": recorder_side(True),
     "radio_signal_recorder_top": top(False, receiver=False),
     "radio_signal_recorder_top_on": top(True, receiver=False),
+    "radio_jammer_side": jammer_side(False),
+    "radio_jammer_side_on": jammer_side(True),
+    "radio_jammer_top": top(False, receiver=False, palette=MAGENTA_OFF),
+    "radio_jammer_top_on": top(True, receiver=False, palette=MAGENTA_ON),
+    "jammer_tip": antenna_tip(False, magenta=True),
+    "jammer_tip_on": antenna_tip(True, magenta=True),
     "radio_lamp_frame": lamp_frame(),
     "radio_lamp_glass": lamp_glass(),
     "aviation_beacon_red": beacon_dome("red"),

@@ -150,7 +150,8 @@ public final class RadioInfo {
                 tag.putString("top", top instanceof RadioConverterBlock ? "converter"
                         : top instanceof RadioRepeaterBlock ? "repeater"
                         : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter"
-                        : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder" : "transmitter");
+                        : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder"
+                        : top instanceof com.reiko.signaltower.block.RadioJammerBlock ? "jammer" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(level.getBlockState(cursor));
                 if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
@@ -171,7 +172,14 @@ public final class RadioInfo {
         if (block instanceof RadioTransmitterBlock) {
             // A compact one (v0.38.0) reads only what's around it and has its fixed reach.
             tag.putInt("power", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, pos, state));
-            tag.putInt("reach", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, pos, state));
+            tag.putInt("reach", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, pos, state));
+            if (!(block instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock)) {
+                putWeather(level, pos, tag);
+            }
+            if (block instanceof com.reiko.signaltower.block.RadioJammerBlock) {
+                // v0.46.0: how strongly it jams (its redstone), unless it's kept quiet.
+                tag.putBoolean("jammer", true);
+            }
             if (radio instanceof com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity timer) {
                 // v0.42.0: its schedule, whether redstone pauses it, and its interval's next change.
                 tag.putBoolean("timer_daily", timer.isDaily());
@@ -197,7 +205,8 @@ public final class RadioInfo {
             }
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
-            tag.putInt("reach", RadioHelper.towerReach(level, pos, state));
+            tag.putInt("reach", RadioHelper.towerReachNow(level, pos, state));
+            putWeather(level, pos, tag);
             if (block instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
                 tag.putInt("output", converter.getOutputFrequency());
                 if (converter.getGate() != 0) {
@@ -216,6 +225,13 @@ public final class RadioInfo {
             SignalNetwork.Reception reception = SignalNetwork.get(level).listen(level, frequency, pos, radio.getTunedBy());
             tag.putInt("power", state.getValue(RadioReceiverBlock.POWER));
             tag.putInt("towers", reception.transmittersInReach());
+            // v0.46.0: what hills took off the signal it hears, and how strongly it's jammed.
+            if (reception.hills() > 0) {
+                tag.putInt("hills", reception.hills());
+            }
+            if (reception.jammed() > 0) {
+                tag.putInt("jammed", reception.jammed());
+            }
             if (block instanceof RadioToggleReceiverBlock && radio instanceof RadioReceiverBlockEntity toggle) {
                 tag.putBoolean("toggled_on", toggle.isToggledOn());
                 tag.putInt("heard", reception.power());
@@ -254,6 +270,15 @@ public final class RadioInfo {
         return tag;
     }
 
+    /** v0.46.0: the weather a tower is in, if it shortens its reach ("weather", "weather_loss" in percent). */
+    private static void putWeather(ServerLevel level, BlockPos pos, CompoundTag tag) {
+        com.reiko.signaltower.radio.Weather weather = SignalNetwork.get(level).weatherAt(level, pos);
+        if (weather.loss() > 0) {
+            tag.putInt("weather", weather.ordinal());
+            tag.putInt("weather_loss", weather.loss());
+        }
+    }
+
     /**
      * The tooltip lines for a block in {@code state}. {@code data} is what {@link #read} sent, or
      * null if the server didn't send any; then only what the block state shows is listed.
@@ -264,6 +289,17 @@ public final class RadioInfo {
         if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
             // v0.45.0: its antenna, and how much farther that makes it reach.
             lines.add(Component.translatable(LANG + "antenna", antenna.label(), antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
+        }
+        if (data != null && data.contains("weather")) {
+            // v0.46.0: rain or a thunderstorm where a tower stands shortens its reach (the reach shown already is).
+            lines.add(Component.translatable(LANG + "weather", com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
+                    data.getInt("weather_loss")).withStyle(ChatFormatting.DARK_AQUA));
+        }
+        if (data != null && data.contains("hills")) {
+            lines.add(Component.translatable(LANG + "hills", data.getInt("hills")).withStyle(ChatFormatting.GOLD));
+        }
+        if (data != null && data.contains("jammed")) {
+            lines.add(Component.translatable(LANG + "jammed", data.getInt("jammed")).withStyle(ChatFormatting.LIGHT_PURPLE));
         }
         boolean deaf = data != null && data.contains("deaf_to");
         boolean receiver = state.getBlock() instanceof RadioReceiverBlock;
@@ -414,6 +450,22 @@ public final class RadioInfo {
                         com.reiko.signaltower.network.ConfigureConverterPayload.gateText(data.getInt("gate"), data.getInt("threshold")),
                         heardValue(data.getInt("gate_heard"))).withStyle(ChatFormatting.YELLOW));
             }
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.RadioJammerBlock) {
+            // v0.46.0: the frequency it jams, how strongly (its redstone) and how far.
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "jams", number(data, "frequency", "name")));
+                addNoteLine(lines, data, "note");
+            }
+            boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
+            lines.add(!on ? Component.translatable(LANG + "jammer_off").withStyle(ChatFormatting.GRAY)
+                    : hasData ? Component.translatable(LANG + "jamming", Component.literal(Integer.toString(data.getInt("power")))
+                            .withStyle(ChatFormatting.LIGHT_PURPLE))
+                    : Component.translatable(LANG + "jamming_on").withStyle(ChatFormatting.LIGHT_PURPLE));
             if (hasData) {
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }

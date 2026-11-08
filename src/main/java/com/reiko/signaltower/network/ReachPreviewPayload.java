@@ -28,6 +28,8 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
     public static final int TIMER_TRANSMITTER = 6;
     /** A Radio Signal Recorder (v0.44.0). */
     public static final int SIGNAL_RECORDER = 7;
+    /** A Radio Jammer (v0.46.0): the ring is how far it jams. */
+    public static final int JAMMER = 8;
 
     public static final Type<ReachPreviewPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "reach_preview"));

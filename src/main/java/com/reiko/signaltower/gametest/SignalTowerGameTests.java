@@ -6676,4 +6676,230 @@ public final class SignalTowerGameTests {
                         + helper.getEntities(EntityType.ITEM).stream().map(e -> e.getItem() + " " + e.getItem().getComponentsPatch()).toList()))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.46.0: weather and terrain
+
+    /**
+     * Weather: rain takes 15% off a tower's reach and a thunderstorm 30% (the defaults), measured
+     * where it stands; it rains on plains, never in a desert. A repeater's and a jammer's reach shrink
+     * too; a compact transmitter's doesn't. Changing the weather bumps every frequency so receivers
+     * re-check at once.
+     */
+    @GameTest(template = PLATFORM)
+    public static void weatherShortensReach(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var rain = com.reiko.signaltower.radio.Weather.RAIN;
+        var thunder = com.reiko.signaltower.radio.Weather.THUNDER;
+        check(com.reiko.signaltower.radio.Weather.CLEAR.apply(100) == 100 && rain.apply(100) == 85 && thunder.apply(100) == 70
+                && rain.loss() == 15 && thunder.loss() == 30, "15% in rain, 30% in a storm");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        BlockPos somewhere = helper.absolutePos(BlockPos.ZERO);
+        check(com.reiko.signaltower.radio.Weather.wetBiome(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS), somewhere)
+                && !com.reiko.signaltower.radio.Weather.wetBiome(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.DESERT), somewhere)
+                && !com.reiko.signaltower.radio.Weather.wetBiome(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.NETHER_WASTES), somewhere),
+                "It rains on plains, not in a desert or the Nether");
+
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos far = somewhere.offset(0, 0, 30000); // not loaded: no hills, no block checks
+        network.updateTransmitter(far, 4371, 15, 100);
+        network.updateRepeater(far.south(400), 4372, 100);
+        network.updateTransmitter(far.south(400).west(50), 4372, 15, 100);
+        network.updateTransmitter(far.north(400), 4373, 15, 16, null, true);
+        check(network.listen(level, 4371, far.east(90)).power() == 15, "Clear: heard at 90");
+        long before = network.revision(4371);
+        network.forceWeather(rain);
+        check(network.revision(4371) > before, "A change of weather bumps the frequency");
+        check(network.weatherAt(level, far) == rain && network.reachNow(level, far, 100) == 85, "Rain where it stands");
+        check(network.listen(level, 4371, far.east(90)).power() == 0 && network.listen(level, 4371, far.east(85)).power() == 15,
+                "Rain: 85 blocks, not 90");
+        check(network.edgeMargin(level, 4371, far.east(80)) == 5, "The meter's edge moves in too");
+        network.forceWeather(thunder);
+        check(network.listen(level, 4371, far.east(71)).power() == 0 && network.listen(level, 4371, far.east(70)).power() == 15,
+                "Thunderstorm: 70 blocks");
+        check(network.listen(level, 4372, far.south(400).east(70)).power() == 15 && network.listen(level, 4372, far.south(400).east(71)).power() == 0,
+                "A repeater's reach shrinks too");
+        check(network.listen(level, 4373, far.north(400).east(16)).power() == 15, "A compact transmitter doesn't mind the weather");
+        network.updateJammer(far.east(40), 4371, 15, 40, null);
+        check(network.listen(level, 4371, far.east(40 - 28)).power() == 0 && network.listen(level, 4371, far.east(40 - 29)).power() == 15,
+                "A jammer's reach shrinks too (40 to 28)");
+        network.forceWeather(null);
+        check(network.weather(level) == com.reiko.signaltower.radio.Weather.of(level), "Back to the level's weather");
+        helper.succeed();
+    }
+
+    /**
+     * Terrain: a 32-block hill between a transmitter and a receiver takes 4 off (1 per 8 blocks of
+     * ground, the default): the receiver outputs 11 and Jade says why. A repeater on top of the hill
+     * gets round it: 15 again. A roof over the line (the test's own barrier ceiling) doesn't count;
+     * the first and last 8 blocks don't either.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void hillsWeakenSignals(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos rx = new BlockPos(82, 1, 1);
+        BlockPos onHill = new BlockPos(45, 9, 1);
+        for (int x = 30; x <= 61; x++) {
+            for (int y = 0; y <= 5; y++) {
+                helper.setBlock(new BlockPos(x, y, 1), Blocks.STONE);
+            }
+        }
+        // A wall right by the receiver (inside the last 8 blocks): it doesn't count.
+        for (int y = 0; y <= 3; y++) {
+            helper.setBlock(new BlockPos(78, y, 1), Blocks.STONE);
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4381);
+        helper.setBlock(tx, helper.getBlockState(tx).setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY,
+                com.reiko.signaltower.radio.AntennaTier.NETHERITE)); // reach 128 or more: the receiver is 80 away
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4381);
+        BlockPos absTx = helper.absolutePos(tx);
+        BlockPos absRx = helper.absolutePos(rx);
+        SignalNetwork network = SignalNetwork.get(level);
+        check(network.hillLoss(level, absTx, absRx) == 4, "32 blocks of hill: 4 off, got " + network.hillLoss(level, absTx, absRx));
+        check(network.hillLoss(level, absTx.above(), absRx.above()) == 4, "Still under the hill one block up");
+        check(network.hillLoss(level, absTx, absTx.east(15)) == 0, "Too short to count");
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> assertOutput(helper, rx, 11))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, rx, 11);
+                    var heard = network.listen(level, 4381, absRx);
+                    check(heard.power() == 11 && heard.hills() == 4 && heard.jammed() == 0, "Heard 11, 4 lost to the hill: " + heard);
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absRx);
+                    List<Component> lines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), info);
+                    check(lineKeys(lines).contains("hills") && lines.stream().anyMatch(line -> line.getString().contains("4")), "Jade: " + lineKeys(lines));
+                    Player dev = namedPlayer(helper, rx.above(), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    var reading = com.reiko.signaltower.item.SignalMeterItem.read(level, dev, 4381);
+                    check(reading.hills() == 4 && com.reiko.signaltower.network.MeterReadingPayload.of(reading).hills() == 4, "The meter too: " + reading);
+                    // A repeater on top of the hill.
+                    place(helper, onHill, ModRegistry.RADIO_REPEATER.get(), 4381);
+                    helper.setBlock(onHill, helper.getBlockState(onHill).setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY,
+                            com.reiko.signaltower.radio.AntennaTier.NETHERITE));
+                })
+                .thenWaitUntil(() -> assertOutput(helper, rx, 15))
+                .thenExecute(() -> {
+                    check(network.hillLoss(level, absTx, helper.absolutePos(onHill)) == 0
+                            && network.hillLoss(level, helper.absolutePos(onHill), absRx) == 0, "Over the hill both ways");
+                    check(network.listen(level, 4381, absRx).hills() == 0, "Through the repeater, nothing lost");
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.46.0: radio jammer
+
+    /**
+     * The Radio Jammer, in the network: it takes its strength off what's heard on its frequency
+     * inside its reach (5 off 12 leaves 7; 15 silences it), not outside; a repeater inside it hears
+     * nothing to pass on; switched off, it's gone. Saved and loaded with the world.
+     */
+    @GameTest(template = PLATFORM)
+    public static void jammerInTheNetwork(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        BlockPos far = helper.absolutePos(BlockPos.ZERO).offset(0, 0, -30000);
+        network.updateTransmitter(far, 4392, 12, 200);
+        network.updateJammer(far.east(100), 4392, 5, 40, null);
+        var partly = network.listen(level, 4392, far.east(90));
+        check(partly.power() == 7 && partly.jammed() == 5, "5 off 12: " + partly);
+        check(network.listen(level, 4392, far.east(150)).power() == 12 && network.jamming(level, 4392, far.east(150)) == 0, "Outside its reach");
+        check(network.listen(level, 4393, far.east(90)).jammed() == 0, "Only its own frequency");
+        network.updateJammer(far.east(100), 4392, 15, 40, null);
+        var silenced = network.listen(level, 4392, far.east(90));
+        check(silenced.power() == 0 && silenced.jammed() == 15 && silenced.transmittersInReach() == 1, "15 silences it: " + silenced);
+        check(network.scanAt(level, far.east(90)).stream().anyMatch(heard -> heard.frequency() == 4392 && heard.power() == 0), "The scanner hears nothing either");
+        network.updateRepeater(far.east(110), 4392, 200);
+        check(network.repeaterPower(level, far.east(110)) == 0 && network.listen(level, 4392, far.east(300)).power() == 0,
+                "A repeater inside it has nothing to pass on");
+        CompoundTag saved = network.save(new CompoundTag(), level.registryAccess());
+        SignalNetwork loaded = SignalNetwork.load(saved, level.registryAccess()).attachTo(level);
+        check(network.jammerAt(far.east(100)).equals(loaded.jammerAt(far.east(100))) && loaded.listen(level, 4392, far.east(90)).power() == 0,
+                "Saved and loaded");
+        network.updateJammer(far.east(100), 4392, 0, 40, null);
+        check(network.listen(level, 4392, far.east(90)).power() == 12 && network.listen(level, 4392, far.east(300)).power() == 12,
+                "Off: heard again, and passed on");
+        network.removeJammer(far.east(100));
+        check(network.jammerAt(far.east(100)) == null, "Removed");
+        helper.succeed();
+    }
+
+    /**
+     * A placed Radio Jammer, powered by redstone, silences a receiver near it on its frequency
+     * (Jade says "Jammed", and the jammer what it jams), not one far away. On someone else's
+     * private frequency a stranger's jammer does nothing (and shows in the owner's audit); broken,
+     * it stops and keeps its frequency on the item.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void radioJammer(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos nearRx = new BlockPos(14, 1, 1);
+        BlockPos farRx = new BlockPos(110, 1, 1);
+        BlockPos jammer = new BlockPos(20, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4391);
+        helper.setBlock(tx, helper.getBlockState(tx).setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY,
+                com.reiko.signaltower.radio.AntennaTier.NETHERITE));
+        place(helper, nearRx, ModRegistry.RADIO_RECEIVER.get(), 4391);
+        place(helper, farRx, ModRegistry.RADIO_RECEIVER.get(), 4391);
+        place(helper, jammer, ModRegistry.RADIO_JAMMER.get(), 4391);
+        BlockPos absJammer = helper.absolutePos(jammer);
+        BlockPos absNear = helper.absolutePos(nearRx);
+        SignalNetwork network = SignalNetwork.get(level);
+        UUID stranger = UUID.randomUUID();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        check(com.reiko.signaltower.blockentity.RadioJammerBlockEntity.jamReach(level, absJammer, helper.getBlockState(jammer))
+                == (int) Math.round(RadioHelper.reachAt(level, absJammer) * 0.5), "Half a transmitter's reach");
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(tx.north(), Blocks.REDSTONE_BLOCK))
+                .thenWaitUntil(() -> {
+                    assertOutput(helper, nearRx, 15);
+                    assertOutput(helper, farRx, 15);
+                })
+                .thenExecute(() -> {
+                    check(!helper.getBlockState(jammer).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Not jamming yet");
+                    helper.setBlock(jammer.south(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, nearRx, 0))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    assertOutput(helper, farRx, 15);
+                    check(helper.getBlockState(jammer).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Lit while jamming");
+                    check(network.jamming(level, 4391, absNear) == 15 && network.listen(level, 4391, absNear).jammed() == 15, "Jammed at 15");
+                    List<String> rxLines = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(nearRx),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, absNear)));
+                    check(rxLines.contains("jammed"), "Jade on the receiver: " + rxLines);
+                    List<String> jammerLines = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(jammer),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, absJammer)));
+                    check(jammerLines.contains("jams") && jammerLines.contains("jamming") && jammerLines.contains("reach"), "Jade on the jammer: " + jammerLines);
+                    Player dev = namedPlayer(helper, nearRx.above(), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    var reading = com.reiko.signaltower.item.SignalMeterItem.read(level, dev, 4391);
+                    check(reading.strength() == 0 && reading.jammed() == 15
+                            && com.reiko.signaltower.network.MeterReadingPayload.of(reading).jammed() == 15, "The meter: " + reading);
+                    check(network.towerFrequencyAt(absJammer).orElse(-1) == 4391 && network.transmittersOn(level, 4391).size() == 1,
+                            "It sends nothing itself");
+                    // Someone else's private frequency: a stranger's jammer does nothing.
+                    claims.put(4391, UUID.randomUUID(), "Owner", java.util.Map.of());
+                    com.reiko.signaltower.blockentity.RadioJammerBlockEntity be = helper.getBlockEntity(jammer);
+                    be.setTunedBy(stranger);
+                })
+                .thenWaitUntil(() -> assertOutput(helper, nearRx, 15))
+                .thenExecute(() -> {
+                    try {
+                        check(network.isSilenced(level, absJammer) && com.reiko.signaltower.block.RadioBlock.silencedNotice(level, absJammer) != null,
+                                "Kept quiet, and says so");
+                        var rows = com.reiko.signaltower.radio.FrequencyAudit.audit(level.getServer(), 4391, null, 512);
+                        check(rows.stream().anyMatch(row -> row.kind() == com.reiko.signaltower.radio.FrequencyAudit.Kind.JAMMER
+                                && row.status() == com.reiko.signaltower.radio.FrequencyAudit.Status.SILENT), "In the owner's audit: " + rows);
+                    } finally {
+                        claims.remove(4391);
+                    }
+                })
+                .thenWaitUntil(() -> assertOutput(helper, nearRx, 0))
+                .thenExecute(() -> level.destroyBlock(absJammer, true))
+                .thenWaitUntil(() -> assertOutput(helper, nearRx, 15))
+                .thenWaitUntil(() -> check(network.jammerAt(absJammer) == null && helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_JAMMER_ITEM.get())
+                                && Integer.valueOf(4391).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Broken: gone, and dropped with its frequency"))
+                .thenSucceed();
+    }
 }

@@ -239,7 +239,9 @@ public final class SignalTower {
     /** Ends Remote Control pulses on time. */
     private static void onLevelTick(LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel serverLevel) {
-            SignalNetwork.get(serverLevel).tick(serverLevel.getGameTime(), serverLevel.getDayTime());
+            SignalNetwork network = SignalNetwork.get(serverLevel);
+            network.tick(serverLevel.getGameTime(), serverLevel.getDayTime());
+            network.watchWeather(serverLevel); // v0.46.0: rain and thunder shorten reach
         }
     }
 
@@ -262,6 +264,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
             event.accept(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
+            event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.AVIATION_BEACON_ITEM.get());
             event.accept(ModRegistry.RADIO_LAMP_ITEM.get());

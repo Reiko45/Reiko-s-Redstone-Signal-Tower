@@ -55,9 +55,14 @@ public class SignalMeterItem extends Item {
     /**
      * What a meter held by {@code player} reads on {@code frequency}: strength, towers in reach,
      * blocks to the edge (-1: out of every tower's reach), or {@code deaf} with nothing else if it's
-     * someone else's encrypted frequency.
+     * someone else's encrypted frequency. {@code hills} and {@code jammed} (v0.46.0) as in
+     * {@link SignalNetwork.Reception}.
      */
-    public record Reading(int frequency, int strength, int towers, int margin, boolean deaf) {}
+    public record Reading(int frequency, int strength, int towers, int margin, boolean deaf, int hills, int jammed) {
+        public Reading(int frequency, int strength, int towers, int margin, boolean deaf) {
+            this(frequency, strength, towers, margin, deaf, 0, 0);
+        }
+    }
 
     public static Reading read(ServerLevel level, Player player, int frequency) {
         UUID who = player.getUUID();
@@ -67,7 +72,8 @@ public class SignalMeterItem extends Item {
         BlockPos pos = player.blockPosition();
         SignalNetwork network = SignalNetwork.get(level);
         SignalNetwork.Reception reception = network.listen(level, frequency, pos, who);
-        return new Reading(frequency, reception.power(), reception.transmittersInReach(), network.edgeMargin(level, frequency, pos), false);
+        return new Reading(frequency, reception.power(), reception.transmittersInReach(), network.edgeMargin(level, frequency, pos), false,
+                reception.hills(), reception.jammed());
     }
 
     public static boolean isSilent(ItemStack stack) {

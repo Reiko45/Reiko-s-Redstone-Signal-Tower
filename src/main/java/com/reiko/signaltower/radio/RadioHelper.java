@@ -59,6 +59,14 @@ public final class RadioHelper {
     }
 
     /**
+     * {@link #towerReach} in the weather where it stands now (v0.46.0): what the network goes by.
+     * For status lines, Jade and the reach ring.
+     */
+    public static int towerReachNow(ServerLevel level, BlockPos pos, BlockState state) {
+        return SignalNetwork.get(level).reachNow(level, pos, towerReach(level, pos, state));
+    }
+
+    /**
      * The strongest redstone signal feeding a transmitter: from the blocks around the transmitter
      * itself, or around any mast in the unbroken column directly beneath it.
      */

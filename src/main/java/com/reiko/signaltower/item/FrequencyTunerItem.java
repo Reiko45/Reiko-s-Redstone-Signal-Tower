@@ -128,7 +128,8 @@ public class FrequencyTunerItem extends Item {
         if (sends < 0) {
             return null;
         }
-        return FrequencyClaims.refusal(level, sends, player == null ? null : player.getUUID(), "private_refused_block");
+        return FrequencyClaims.refusal(level, sends, player == null ? null : player.getUUID(),
+                radio instanceof com.reiko.signaltower.blockentity.RadioJammerBlockEntity ? "private_refused_jammer" : "private_refused_block");
     }
 
     /** The frequency {@code radio} would send on if tuned to {@code frequency} (a converter: its output), or -1 for a receiver. */

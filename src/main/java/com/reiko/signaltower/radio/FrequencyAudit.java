@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP, JAMMER;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -107,6 +107,10 @@ public final class FrequencyAudit {
                     : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? Kind.MOTION_SENSOR
                     : Kind.COMPACT_TRANSMITTER,
                     dimension, pos, tx.tunedBy(), network.isSilenced(level, pos) ? Status.SILENT : Status.WORKING, tx.power())));
+
+            // v0.46.0: Radio Jammers on it, with how strongly each jams.
+            network.jammersOn(level, frequency).forEach((pos, jammer) -> found.add(row(server, claim, Kind.JAMMER, dimension, pos,
+                    jammer.tunedBy(), network.isSilenced(level, pos) ? Status.SILENT : Status.WORKING, jammer.power())));
 
             network.relaysOn(level, frequency).forEach((pos, relay) -> {
                 boolean converter = level.isLoaded(pos)

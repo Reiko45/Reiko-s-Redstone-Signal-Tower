@@ -80,7 +80,7 @@ public class AntennaItem extends Item {
         if (refused != null) {
             return tell(player, refused);
         }
-        int before = RadioHelper.towerReach(level, pos, state);
+        int before = reachShown(level, pos, state);
         BlockState fitted = state.setValue(AntennaTier.PROPERTY, tier);
         level.setBlock(pos, fitted, Block.UPDATE_ALL);
         refresh(level, pos);
@@ -90,7 +90,7 @@ public class AntennaItem extends Item {
         }
         level.playSound(null, pos, sound(tier), SoundSource.BLOCKS, 1.0F, 1.0F);
         return tell(player, Component.translatable(KEY + "antenna_fitted", name, tier.label(), before,
-                RadioHelper.towerReach(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
+                reachShown(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
     }
 
     /**
@@ -108,7 +108,7 @@ public class AntennaItem extends Item {
         if (refused != null) {
             return tell(player, refused);
         }
-        int before = RadioHelper.towerReach(level, pos, state);
+        int before = reachShown(level, pos, state);
         BlockState bare = state.setValue(AntennaTier.PROPERTY, AntennaTier.NONE);
         level.setBlock(pos, bare, Block.UPDATE_ALL);
         refresh(level, pos);
@@ -117,7 +117,7 @@ public class AntennaItem extends Item {
         }
         level.playSound(null, pos, SoundEvents.ARMOR_EQUIP_GENERIC.value(), SoundSource.BLOCKS, 1.0F, 0.8F);
         return tell(player, Component.translatable(KEY + "antenna_taken_off", old.label(), before,
-                RadioHelper.towerReach(level, pos, bare)).withStyle(ChatFormatting.AQUA));
+                reachShown(level, pos, bare)).withStyle(ChatFormatting.AQUA));
     }
 
     /**
@@ -140,11 +140,22 @@ public class AntennaItem extends Item {
             return null;
         }
         int sends = radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter() ? relay.getOutputFrequency() : radio.getFrequency();
-        Component refused = FrequencyClaims.refusal(player.level(), sends, player.getUUID(), "private_refused_block");
+        Component refused = FrequencyClaims.refusal(player.level(), sends, player.getUUID(),
+                radio instanceof com.reiko.signaltower.blockentity.RadioJammerBlockEntity ? "private_refused_jammer" : "private_refused_block");
         if (refused != null) {
             IntruderAlerts.report(player.getServer(), sends, player, IntruderAlerts.Kind.TUNE, state.getBlock());
         }
         return refused;
+    }
+
+    /** The reach shown in the messages: a tower's (a jammer's jamming reach), in the weather where it stands now. */
+    private static int reachShown(Level level, BlockPos pos, BlockState state) {
+        if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+            return RadioHelper.towerReach(level, pos, state);
+        }
+        return state.getBlock() instanceof com.reiko.signaltower.block.RadioTransmitterBlock
+                ? RadioTransmitterBlockEntity.reachNow(serverLevel, pos, state)
+                : RadioHelper.towerReachNow(serverLevel, pos, state);
     }
 
     /** Tells the network about the tower's new reach. */

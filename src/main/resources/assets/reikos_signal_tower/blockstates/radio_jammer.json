@@ -1,0 +1,52 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "powered": "false"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/radio_jammer"
+      }
+    },
+    {
+      "when": {
+        "powered": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/radio_jammer_on"
+      }
+    },
+    {
+      "when": {
+        "antenna": "iron"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_iron"
+      }
+    },
+    {
+      "when": {
+        "antenna": "gold"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_gold"
+      }
+    },
+    {
+      "when": {
+        "antenna": "diamond"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_diamond"
+      }
+    },
+    {
+      "when": {
+        "antenna": "netherite"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_netherite"
+      }
+    }
+  ]
+}

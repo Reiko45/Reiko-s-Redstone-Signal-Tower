@@ -148,17 +148,29 @@ public final class SignalMeterHud {
                         : edge.copy()).withStyle(ChatFormatting.GRAY);
             }
         }
-        int width = Math.max(MIN_WIDTH, Math.max(font.width(detail), middle == null ? 0 : font.width(middle)) + 8);
+        // v0.46.0: what hills and a jammer take off, on a line of its own.
+        Component loss = null;
+        if (!current.deaf() && (current.hills() > 0 || current.jammed() > 0)) {
+            Component hills = current.hills() > 0 ? Component.translatable(KEY + "hills", current.hills()).withStyle(ChatFormatting.GOLD) : null;
+            Component jammed = current.jammed() > 0 ? Component.translatable(KEY + "jammed", current.jammed()).withStyle(ChatFormatting.LIGHT_PURPLE) : null;
+            loss = hills != null && jammed != null ? Component.translatable(KEY + "loss_both", hills, jammed) : hills != null ? hills : jammed;
+        }
+        int height = HEIGHT + (loss != null ? 10 : 0);
+        int width = Math.max(MIN_WIDTH, Math.max(Math.max(font.width(detail), loss == null ? 0 : font.width(loss)),
+                middle == null ? 0 : font.width(middle)) + 8);
+        if (!current.deaf() && current.strength() <= 0 && current.jammed() > 0) {
+            width = Math.max(width, 4 + 15 * 6 + 4 + font.width(Component.translatable(KEY + "jammed_short")) + 4);
+        }
         width = Math.max(MIN_WIDTH, Math.min(width, graphics.guiWidth() - 4));
         int centerX = graphics.guiWidth() / 2;
         // To the right of the hotbar; above it on the right if the window is too narrow.
         int x = centerX + 98;
-        int y = graphics.guiHeight() - HEIGHT - 2;
+        int y = graphics.guiHeight() - height - 2;
         if (x + width > graphics.guiWidth() - 2) {
             x = graphics.guiWidth() - width - 2;
-            y = graphics.guiHeight() - HEIGHT - 60;
+            y = graphics.guiHeight() - height - 60;
         }
-        graphics.fill(x, y, x + width, y + HEIGHT, 0xA0000000);
+        graphics.fill(x, y, x + width, y + height, 0xA0000000);
         graphics.fill(x, y, x + width, y + 1, 0x60FFFFFF);
         graphics.drawString(font, font.plainSubstrByWidth(label.getString(), width - 8), x + 4, y + 3, 0x55FFFF);
 
@@ -178,8 +190,12 @@ public final class SignalMeterHud {
         }
         Component strength = current.strength() > 0
                 ? Component.literal(Integer.toString(current.strength())).withStyle(ChatFormatting.GREEN)
+                : current.jammed() > 0 ? Component.translatable(KEY + "jammed_short").withStyle(ChatFormatting.LIGHT_PURPLE)
                 : Component.translatable(KEY + "off").withStyle(ChatFormatting.GRAY);
         graphics.drawString(font, strength, barX + 15 * 6 + 4, barY, 0xFFFFFF);
         graphics.drawString(font, detail, x + 4, y + 24, 0xFFFFFF);
+        if (loss != null) {
+            graphics.drawString(font, loss, x + 4, y + 34, 0xFFFFFF);
+        }
     }
 }

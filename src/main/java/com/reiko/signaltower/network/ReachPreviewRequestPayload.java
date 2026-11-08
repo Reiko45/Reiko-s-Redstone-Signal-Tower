@@ -69,6 +69,7 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
                 : block instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock ? ReachPreviewPayload.COMPACT_TRANSMITTER
                 : block instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? ReachPreviewPayload.TIMER_TRANSMITTER
                 : block instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? ReachPreviewPayload.SIGNAL_RECORDER
+                : block instanceof com.reiko.signaltower.block.RadioJammerBlock ? ReachPreviewPayload.JAMMER
                 : block instanceof RadioTransmitterBlock ? ReachPreviewPayload.TRANSMITTER
                 : block instanceof CodeKeypadBlock ? ReachPreviewPayload.KEYPAD
                 : -1;
@@ -79,8 +80,8 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
         int frequency = radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter()
                 ? relay.getOutputFrequency() : radio.getFrequency();
         int reach = block instanceof RadioTransmitterBlock
-                ? com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, pos, level.getBlockState(pos))
-                : RadioHelper.towerReach(level, pos, level.getBlockState(pos));
+                ? com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, pos, level.getBlockState(pos))
+                : RadioHelper.towerReachNow(level, pos, level.getBlockState(pos));
         return new ReachPreviewPayload(pos, reach, kind, frequency);
     }
 }

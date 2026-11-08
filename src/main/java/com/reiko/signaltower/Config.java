@@ -44,6 +44,29 @@ public final class Config {
             .comment("The same for a Netherite Antenna.")
             .defineInRange("netheriteAntennaReach", 4.0, 1.0, 100.0);
 
+    public static final ModConfigSpec.IntValue RAIN_REACH_LOSS = BUILDER
+            .comment("How much shorter, in percent, the reach of transmitters, repeaters, converters and jammers is while",
+                    "it rains or snows where they stand (towers in deserts, savannas and badlands, where it never rains,",
+                    "aren't affected). 0 means rain doesn't matter.")
+            .defineInRange("rainReachLoss", 15, 0, 90);
+
+    public static final ModConfigSpec.IntValue THUNDER_REACH_LOSS = BUILDER
+            .comment("The same during a thunderstorm.")
+            .defineInRange("thunderReachLoss", 30, 0, 90);
+
+    public static final ModConfigSpec.IntValue TERRAIN_BLOCKS_PER_STRENGTH = BUILDER
+            .comment("Hills and other ground between a tower and whatever hears it weaken the signal: every this many",
+                    "blocks of solid ground (or liquid) the straight line from the tower's top runs through take 1 off",
+                    "its strength (15 x this many block it completely). Leaves, caves and roofs above the line don't count;",
+                    "nor do the first and last 8 blocks, so the building around a receiver doesn't. Only loaded chunks",
+                    "count. 0 means terrain doesn't matter.")
+            .defineInRange("terrainBlocksPerStrength", 8, 0, 100_000);
+
+    public static final ModConfigSpec.IntValue JAMMER_REACH_PERCENT = BUILDER
+            .comment("How far a Radio Jammer reaches, in percent of what a transmitter at the same height",
+                    "(with the same antenna) would.")
+            .defineInRange("jammerReachPercent", 50, 1, 1000);
+
     public static final ModConfigSpec.BooleanValue TOWERS_RELAY_REMOTES = BUILDER
             .comment("If true, every Radio Transmitter and Radio Repeater within a Remote Control's reach relays",
                     "its presses: the signal goes out again from the tower with the tower's reach.",

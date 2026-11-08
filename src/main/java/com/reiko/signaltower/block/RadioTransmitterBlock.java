@@ -89,7 +89,7 @@ public class RadioTransmitterBlock extends RadioBlock {
                 FrequencyNames.label(level, frequency),
                 RadioHelper.readTransmitterInput(level, pos),
                 heightText,
-                RadioHelper.towerReach(level, pos, state));
+                RadioHelper.towerReachNow(level, pos, state));
     }
 
     // ---- Redstone ----

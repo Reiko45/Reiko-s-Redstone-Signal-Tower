@@ -26,8 +26,9 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
-| **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater or converter and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
+| **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
+| **Radio Jammer** | A tower top that drowns out one frequency around it while it gets redstone. Everything there that listens on that frequency hears that much less, and a full-strength signal silences it completely. It reaches half as far as a transmitter at the same height. On someone else's private frequency it does nothing, and the owner is told. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
@@ -475,7 +476,7 @@ An **Aviation Beacon** (since 0.44) is a warning light for towers. Put it on top
 
 ### Antennas
 
-**Antennas** (since 0.45) make a tower reach farther. Right-click a full-size Radio Transmitter, Radio Timer Transmitter, Radio Signal Recorder, Radio Repeater or Radio Converter with one:
+**Antennas** (since 0.45) make a tower reach farther. Right-click a full-size Radio Transmitter, Radio Timer Transmitter, Radio Signal Recorder, Radio Repeater, Radio Converter or (since 0.46) Radio Jammer with one:
 
 | Antenna | Reach | Made from |
 |---|---|---|
@@ -501,6 +502,29 @@ A **Radio Lamp** (since 0.45) is a lamp with a receiver built in. Tune it like a
 - Jade shows its light and color ("Light: 6", "Color: Red"). Breaking it keeps its frequency and color on the item, and the item shows its color.
 
 ![Transmitters with no antenna, then iron, gold, diamond and netherite; Dev fitting a Diamond Antenna to the beacon tower (reach 216 → 648 blocks, Jade and the reach ring agree); Alex refused on Dev's private repeater, then fitting a Gold Antenna to the recorder; colored lamps at full strength in front and at 6 behind, with Jade saying "Light: 6"; and Alex dyeing a white lamp purple](docs/images/antennas-and-radio-lamp.png)
+
+### Weather and terrain
+
+Since 0.46 the world gets in the way of signals:
+
+- **Rain and thunderstorms** shorten the reach of transmitters (plain, timer and recorder), repeaters, converters and jammers: by 15% while it rains or snows where the tower stands, by 30% in a thunderstorm. A tower in a desert, savanna or badlands (where it never rains), or in the Nether or the End, isn't affected. Compact transmitters, motion sensors, keypads and remotes don't mind the weather.
+- When the weather changes, everything on every frequency is worked out again at once: a receiver at the edge of a tower's reach can go dark when a storm rolls in, and come back when it clears. Jade shows the tower's reach in the weather now, with a line saying why ("Thunderstorm: reach -30%"), and the reach ring and the meter's distance to the edge move in too.
+- **Hills** between a tower and what hears it weaken the signal. The game follows a straight line from the top of the tower to the receiver (or the pager, meter or scanner in your hand), and every 8 blocks of solid ground or water that line runs through takes 1 off the strength, so 32 blocks of hill turn 15 into 11 and 120 blocks block it completely. Leaves, caves and roofs above the line don't count, and neither do the first and last 8 blocks (the tower's own base, or the walls round your receiver). A taller tower, or a repeater on top of the hill, gets the signal over it.
+- Only loaded chunks count for hills (the game can't look inside unloaded ones, so they count as clear). Remote presses don't mind hills.
+- Jade shows what hills take off a receiver's signal ("Hills in the way: -4"), and the Signal Meter adds a line ("Hills -4").
+- The numbers are in the server config: `rainReachLoss` and `thunderReachLoss` (percent; 0 = off) and `terrainBlocksPerStrength` (0 = hills don't matter).
+
+### Radio Jammers
+
+A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
+
+- **It drowns out its frequency** inside its reach: everything that listens on it there (receivers of every kind, lamps, speakers, status boards, repeaters and converters, pagers, meters, scanners) hears that much less. The strength of the redstone it gets is how strong it jams, so 15 silences the frequency and 5 takes 5 off a 12. A repeater inside it has nothing to pass on, so a jammer can cut a chain.
+- **Its reach** is half what a transmitter at the same height would have (with the same antenna), shown by the reach ring in magenta. Rain and hills weaken jamming the same way they weaken signals.
+- **On someone else's private frequency** only its owner and members can tune a jammer to it or place one that works. Anyone else is refused ("Can't do that: it would jam 2026 (Front Gate), which is private to Dev"), a jammer of theirs placed already tuned stays silent, and the owner gets an alert. Jammers show up in the frequency audit as "Radio Jammer".
+- Jade shows what it jams, how strongly ("Jamming: -15") and how far, and on a jammed receiver "Jammed: -15". The Signal Meter says "Jammed" instead of the strength. Its sides glow magenta and static crackles round its antenna while it jams.
+- The share of a transmitter's reach is `jammerReachPercent` in the server config (50 by default).
+
+![A receiver and a Radio Lamp behind a hill with a repeater on top, and Alex by a jammer; Jade on the receiver saying "Hills in the way: -4" (output 11, the meter "Hills -4"); the tower in a thunderstorm ("Reach: 62 blocks", "Thunderstorm: reach -30%"); Alex at the jammer ("Jamming: -15", its magenta reach ring) refused when tuning it to Dev's private frequency; and Dev's receiver "Jammed: -15", with the meter saying "Jammed" and Dev's radio alert](docs/images/weather-terrain-and-jammer.png)
 
 ### Code Keypad
 
@@ -545,11 +569,11 @@ A **Radio Motion Sensor** (since 0.39) is a button-sized eye that sticks to wall
 
 ### Reach preview ring
 
-Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size or compact), Repeater, Converter, Code Keypad or Radio Motion Sensor, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, green for a keypad, or purple for a motion sensor), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
+Hold a Frequency Tuner (either hand) and look at a Radio Transmitter (full-size or compact), Repeater, Converter, Radio Jammer, Code Keypad or Radio Motion Sensor, or at a mast under one, from up to 128 blocks away. A dotted ring appears on the ground where its reach ends, in the color of its light (red, amber, teal, magenta for a jammer, green for a keypad, or purple for a motion sensor), and two lines above your hotbar say what it is and where you stand: "Reach ring: Radio Transmitter on 2026 (Front Gate), 56 blocks" and "You're inside: 54 blocks to the edge" (or "You're 7 blocks outside").
 
 - The ring stays on that tower while you keep holding the tuner, so you can walk out to the edge to see where to put the next repeater or receiver. Look at another tower to move it; put the tuner away to clear it.
 - The dots follow the ground, and far ones are drawn bigger so the ring still shows from a hilltop. Only you see it, and only the part within your render distance.
-- The reach comes from the server, so it's always the real one (the dimension's sea level and the server config).
+- The reach comes from the server, so it's always the real one (the dimension's sea level, the server config and the weather).
 
 ### Reach
 
@@ -569,7 +593,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-An antenna multiplies a tower's reach (see Antennas). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
+An antenna multiplies a tower's reach (see Antennas), and rain shortens it (see Weather and terrain). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -612,6 +636,8 @@ I = Iron Ingot   R = Redstone Dust
 **Gold Antenna:** an Iron Antenna, 2 Gold Ingots and a Redstone Dust, in any arrangement. **Diamond Antenna:** a Gold Antenna and 2 Diamonds. **Netherite Antenna:** a Diamond Antenna and a Netherite Ingot.
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
+
+**Radio Jammer:** a Radio Transmitter, a Note Block and a Redstone Dust, in any arrangement in the crafting grid.
 
 **Aviation Beacon** (makes 2):
 
@@ -699,6 +725,9 @@ src/main/java/com/reiko/signaltower/
   radio/AntennaTier.java                 the antenna tiers (block state "antenna"), multipliers, item tooltips
   item/AntennaItem.java                  antenna items: fit, replace, take off (sneak + empty hand)
   block/RadioLampBlock.java              receiver that's a light: light level = strength, dye colors, no redstone
+  block/RadioJammerBlock.java            tower top that drowns out its frequency around it while powered
+  blockentity/RadioJammerBlockEntity.java  tells the network how strongly and how far it jams
+  radio/Weather.java                     clear, rain, thunder: how much reach each takes off (config)
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -944,9 +973,13 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 142. the aviation beacon: its clock (dusk to dawn, blink, flash, steady) and when it's lit; on top of a transmitter on masts, on a mast's side and on a stone wall it hangs (not in the air), the first two find the tower and the third none; set to "while its tower sends" it's on only while the transmitter broadcasts (Jade knows its tower, how far up, and whether it's on); the screen's packet sets it (round trip), from anyone within reach; and broken, or popped off when its mast goes, it drops with its settings;
 143. the signal recorder: with nothing to record from, or the same frequency both ways, it says so; Record waits for 4201 to turn on, then records two 10-tick pulses to the tick until Stop; Play sends them on 4202 once, with the same rhythm (the log names the recorder; Jade knows the tape); in Once mode a redstone pulse plays it once; in Loop mode it plays over and over while powered and stops when the power goes; the status, screen and settings packets round-trip (no status out of reach); a stranger can't change it on someone else's private frequency, nor anyone out of reach; it's saved, and drops with its recording;
 144. antennas: a Diamond Antenna fitted to a transmitter triples its reach (in the network too) and uses one up; fitting it again does nothing; a Netherite one replaces it (×4) and gives the diamond one back; taking it off (also by sneaking with an empty hand) gives it back and restores the reach; a Gold Antenna doubles a repeater's; only full-size tower tops take one; a stranger is refused on someone else's private frequency; Jade shows it; and the broken transmitter keeps its antenna on the item;
-145. the Radio Lamp: a transmitter fed through six blocks of dust sends 10 and the lamp gives off light 10, with no redstone out (a redstone lamp beside it stays dark); a dye recolors it (using one); its tint is darker off than on; Jade shows its light and color; dark when the signal goes; and broken, it keeps its color and frequency on the item.
+145. the Radio Lamp: a transmitter fed through six blocks of dust sends 10 and the lamp gives off light 10, with no redstone out (a redstone lamp beside it stays dark); a dye recolors it (using one); its tint is darker off than on; Jade shows its light and color; dark when the signal goes; and broken, it keeps its color and frequency on the item;
+146. weather: rain takes 15% off a tower's reach and a thunderstorm 30%, where it stands; it rains on plains but not in a desert or the Nether; a repeater's and a jammer's reach shrink too, a compact transmitter's doesn't; the meter's edge moves in; and a change of weather bumps the frequency;
+147. hills: 32 blocks of hill between a transmitter and a receiver take 4 off (the receiver outputs 11, Jade and the meter say "Hills"); a wall right by the receiver and the test's own ceiling don't count; and a repeater on top of the hill gets it over (15 again);
+148. jammers in the network: 5 off 12 leaves 7 and 15 silences it, inside its reach only and on its own frequency; the scanner hears nothing either; a repeater inside it has nothing to pass on; switched off it's heard (and passed on) again; saved and loaded with the world;
+149. the Radio Jammer: powered by redstone it silences a receiver near it and not one far away, at half a transmitter's reach; Jade says "Jammed" on the receiver and what it jams on the jammer; the meter says "Jammed"; it sends nothing itself; a stranger's jammer on someone else's private frequency is silent (and says so, and shows in the audit); and broken, it stops and keeps its frequency on the item.
 
-All 145 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 149 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

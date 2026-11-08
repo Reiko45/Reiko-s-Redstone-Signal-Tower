@@ -76,7 +76,7 @@ public class RadioRepeaterBlock extends RadioBlock {
                 ? Component.translatable(key + "repeater_repeating", power)
                 : Component.translatable(key + "repeater_quiet");
         return Component.translatable(key + "repeater_status", FrequencyNames.label(level, frequency), repeating, heightText,
-                RadioHelper.towerReach(level, pos, state));
+                RadioHelper.towerReachNow(level, pos, state));
     }
 
     // ---- Block entity ----

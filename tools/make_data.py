@@ -119,6 +119,7 @@ for lit in (False, True):
     write(models / f"radio_speaker{suffix}.json", receiver_model(lit, "radio_speaker_side"))
     write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
     write(models / f"radio_signal_recorder{suffix}.json", transmitter_model(lit, "radio_signal_recorder"))
+    write(models / f"radio_jammer{suffix}.json", transmitter_model(lit, "radio_jammer", "jammer_tip"))
 
 
 def compact_receiver_model(lit, name="compact_radio_receiver", particle="radio_receiver_side"):
@@ -306,7 +307,7 @@ write(models / "radio_mast.json", {
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_signal_recorder", "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
@@ -434,6 +435,7 @@ tower_states("radio_repeater", "lit")
 tower_states("radio_converter", "lit")
 tower_states("radio_signal_recorder", "powered")
 tower_states("radio_timer_transmitter", "powered")
+tower_states("radio_jammer", "powered")
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -630,6 +632,39 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.46.0: weather and terrain, and the Radio Jammer
+    f"block.{MOD}.radio_jammer": "Radio Jammer",
+    f"block.{MOD}.radio_jammer.tooltip": "A tower top that drowns out its frequency around it while redstone reaches it (or a mast under it): everything there hears that much less, and full strength (15) silences it. It reaches half as far as a transmitter at the same height; masts and antennas help.",
+    f"tooltip.{MOD}.jammer_jams": "Jams: %s",
+    f"message.{MOD}.private_refused_jammer": "Can't do that: it would jam %s, which is private to %s",
+    f"message.{MOD}.private_silenced_jammer": "Silent: %s is private to %s, so this won't jam",
+    f"message.{MOD}.jammer_status": "Radio Jammer | Jams %s | %s | Reach %s blocks",
+    f"message.{MOD}.jammer_jamming": "Jamming at %s",
+    f"message.{MOD}.jammer_off": "Off (no redstone)",
+    f"jade.{MOD}.jams": "Jams: %s",
+    f"jade.{MOD}.jamming": "Jamming: -%s",
+    f"jade.{MOD}.jamming_on": "Jamming",
+    f"jade.{MOD}.jammer_off": "Not jamming (no redstone)",
+    f"jade.{MOD}.jammed": "Jammed: -%s",
+    f"jade.{MOD}.hills": "Hills in the way: -%s",
+    f"jade.{MOD}.weather": "%s: reach -%s%%",
+    f"weather.{MOD}.clear": "Clear",
+    f"weather.{MOD}.rain": "Rain",
+    f"weather.{MOD}.thunder": "Thunderstorm",
+    f"hud.{MOD}.meter_hills": "Hills -%s",
+    f"hud.{MOD}.meter_jammed": "Jammed -%s",
+    f"hud.{MOD}.meter_loss_both": "%s, %s",
+    f"hud.{MOD}.meter_jammed_short": "Jammed",
+    f"screen.{MOD}.audit.kind_jammer": "Radio Jammer",
+    f"{MOD}.configuration.rainReachLoss": "Reach lost in rain or snow (%)",
+    f"{MOD}.configuration.thunderReachLoss": "Reach lost in a thunderstorm (%)",
+    f"{MOD}.configuration.terrainBlocksPerStrength": "Blocks of ground per 1 strength lost (0 = off)",
+    f"{MOD}.configuration.jammerReachPercent": "Jammer reach (% of a transmitter's)",
+    f"{MOD}.configuration.compactTransmitterReach": "Compact transmitter reach",
+    f"{MOD}.configuration.ironAntennaReach": "Iron Antenna reach (times)",
+    f"{MOD}.configuration.goldAntennaReach": "Gold Antenna reach (times)",
+    f"{MOD}.configuration.diamondAntennaReach": "Diamond Antenna reach (times)",
+    f"{MOD}.configuration.netheriteAntennaReach": "Netherite Antenna reach (times)",
     # v0.45.0: antennas and the Radio Lamp
     f"item.{MOD}.iron_antenna": "Iron Antenna",
     f"item.{MOD}.gold_antenna": "Gold Antenna",
@@ -1809,6 +1844,12 @@ recipes["radio_signal_recorder"] = ({
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:book"}],
     "result": {"count": 1, "id": f"{MOD}:radio_signal_recorder"},
 }, f"{MOD}:radio_transmitter")
+recipes["radio_jammer"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "minecraft:note_block"}, {"item": "minecraft:redstone"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_jammer"},
+}, f"{MOD}:radio_transmitter")
 recipes["aviation_beacon"] = ({
     "type": "minecraft:crafting_shaped",
     "category": "redstone",
@@ -1893,7 +1934,7 @@ for name, (recipe, trigger) in recipes.items():
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_signal_recorder", "aviation_beacon", "radio_lamp",
+             "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "aviation_beacon":
@@ -1916,7 +1957,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
-    if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_repeater", "radio_converter"):
+    if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter"):
         # v0.45.0: its antenna (only if it has one, so plain ones still stack with older items).
         entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:{name}", "properties": ["antenna"],
                                    "conditions": [{"condition": "minecraft:inverted", "term": {
@@ -1940,7 +1981,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
                f"{MOD}:radio_delay_receiver", f"{MOD}:radio_counter_receiver", f"{MOD}:radio_timer_transmitter",
-               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
+               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]
