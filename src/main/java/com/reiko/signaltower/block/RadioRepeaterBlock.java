@@ -41,7 +41,8 @@ public class RadioRepeaterBlock extends RadioBlock {
 
     public RadioRepeaterBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(LIT, false));
+        registerDefaultState(stateDefinition.any().setValue(LIT, false).setValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY,
+                com.reiko.signaltower.radio.AntennaTier.NONE));
     }
 
     @Override
@@ -51,7 +52,7 @@ public class RadioRepeaterBlock extends RadioBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(LIT);
+        builder.add(LIT, com.reiko.signaltower.radio.AntennaTier.PROPERTY);
     }
 
     @Override
@@ -75,7 +76,7 @@ public class RadioRepeaterBlock extends RadioBlock {
                 ? Component.translatable(key + "repeater_repeating", power)
                 : Component.translatable(key + "repeater_quiet");
         return Component.translatable(key + "repeater_status", FrequencyNames.label(level, frequency), repeating, heightText,
-                RadioHelper.reachAt(level, pos));
+                RadioHelper.towerReach(level, pos, state));
     }
 
     // ---- Block entity ----

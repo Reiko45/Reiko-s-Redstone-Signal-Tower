@@ -27,6 +27,23 @@ public final class Config {
             .comment("Reach, in blocks, of a Compact Radio Transmitter. It's the same at any height (still capped by maxReach).")
             .defineInRange("compactTransmitterReach", 16, 1, 1_000_000);
 
+    public static final ModConfigSpec.DoubleValue IRON_ANTENNA_REACH = BUILDER
+            .comment("How many times its normal reach a transmitter, repeater or converter with an Iron Antenna reaches",
+                    "(still capped by maxReach).")
+            .defineInRange("ironAntennaReach", 1.5, 1.0, 100.0);
+
+    public static final ModConfigSpec.DoubleValue GOLD_ANTENNA_REACH = BUILDER
+            .comment("The same for a Gold Antenna.")
+            .defineInRange("goldAntennaReach", 2.0, 1.0, 100.0);
+
+    public static final ModConfigSpec.DoubleValue DIAMOND_ANTENNA_REACH = BUILDER
+            .comment("The same for a Diamond Antenna.")
+            .defineInRange("diamondAntennaReach", 3.0, 1.0, 100.0);
+
+    public static final ModConfigSpec.DoubleValue NETHERITE_ANTENNA_REACH = BUILDER
+            .comment("The same for a Netherite Antenna.")
+            .defineInRange("netheriteAntennaReach", 4.0, 1.0, 100.0);
+
     public static final ModConfigSpec.BooleanValue TOWERS_RELAY_REMOTES = BUILDER
             .comment("If true, every Radio Transmitter and Radio Repeater within a Remote Control's reach relays",
                     "its presses: the signal goes out again from the tower with the tower's reach.",

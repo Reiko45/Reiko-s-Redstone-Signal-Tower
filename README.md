@@ -26,6 +26,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
+| **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater or converter and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
+| **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
 | **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
@@ -471,6 +473,35 @@ An **Aviation Beacon** (since 0.44) is a warning light for towers. Put it on top
 
 ![From 150 blocks at night only the tower's blinking beacons show; the same tower closer; a white beacon set to "while its tower sends" lit while the lever is on and dark after Alex switches it off (Jade says why); the beacon's screen; Jade on a recorder looping a rhythm onto a lamp; and the recorder's screen after recording five remote presses, then playing them](docs/images/aviation-beacon-and-signal-recorder.png)
 
+### Antennas
+
+**Antennas** (since 0.45) make a tower reach farther. Right-click a full-size Radio Transmitter, Radio Timer Transmitter, Radio Signal Recorder, Radio Repeater or Radio Converter with one:
+
+| Antenna | Reach | Made from |
+|---|---|---|
+| **Iron Antenna** | ×1.5 | 4 Iron Ingots and Redstone Dust |
+| **Gold Antenna** | ×2 | an Iron Antenna, 2 Gold Ingots and Redstone Dust |
+| **Diamond Antenna** | ×3 | a Gold Antenna and 2 Diamonds |
+| **Netherite Antenna** | ×4 | a Diamond Antenna and a Netherite Ingot |
+
+- The multiplier applies to the tower's whole reach (from its height), and the server config's `maxReach` still caps it. A transmitter 23 blocks above sea level reaches 216 blocks; with a Diamond Antenna, 648 ("Radio Transmitter: Diamond Antenna fitted, reach 216 → 648 blocks").
+- **Changing it:** fitting another one replaces it and gives the old one back. **Sneak + right-click** the tower with an empty hand to take it off (you get it back). In creative mode antennas aren't used up or given back.
+- **You can see it:** bands round the antenna rod and caps on the dipole's ends in the antenna's metal. Jade shows "Antenna: Diamond Antenna (×3 reach)" (also on a mast below), the reach ring and the readout show the new reach, and the remote, scanner, meter and every receiver go by it.
+- On someone else's private frequency only its owner and members can fit or take off an antenna (others get a red refusal and the owner an alert, as when tuning).
+- Breaking the tower keeps its antenna on the item ("Antenna: Diamond Antenna (×3 reach)" in its tooltip), and placing it puts it back. Compact transmitters and motion sensors don't take antennas.
+- The multipliers are in the server config: `ironAntennaReach`, `goldAntennaReach`, `diamondAntennaReach`, `netheriteAntennaReach`.
+
+### Radio Lamps
+
+A **Radio Lamp** (since 0.45) is a lamp with a receiver built in. Tune it like any receiver:
+
+- **Light:** it gives off as much light as the strength it hears on its frequency, so 15 is as bright as a glowstone and 6 a soft glow. A transmitter fed a weaker signal (through a line of redstone dust, or from a comparator) gives dimmer light.
+- **Color:** its glass glows in one of the 16 dye colors, darker while it's off and brighter the stronger the signal. Right-click it with a dye to change the color (one dye, none in creative). New lamps are white.
+- **Only a light:** it outputs no redstone, so it doesn't switch on what's next to it. It counts as a receiver ("Heard by", the remote's light, the locator, the audit as "Radio Lamp"), and on someone else's encrypted frequency it stays dark.
+- Jade shows its light and color ("Light: 6", "Color: Red"). Breaking it keeps its frequency and color on the item, and the item shows its color.
+
+![Transmitters with no antenna, then iron, gold, diamond and netherite; Dev fitting a Diamond Antenna to the beacon tower (reach 216 → 648 blocks, Jade and the reach ring agree); Alex refused on Dev's private repeater, then fitting a Gold Antenna to the recorder; colored lamps at full strength in front and at 6 behind, with Jade saying "Light: 6"; and Alex dyeing a white lamp purple](docs/images/antennas-and-radio-lamp.png)
+
 ### Code Keypad
 
 A **Code Keypad** is a thin panel you put on a wall, floor or ceiling. Type its code and it sends a pulse on its frequency, from where it is, like a remote pressed there (towers in its reach relay it). For as long as the pulse lasts, its display lights green and, like a button, it powers the block it's on, so an iron door next to that block opens without any radio at all.
@@ -538,7 +569,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
+An antenna multiplies a tower's reach (see Antennas). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -565,6 +596,20 @@ I = Iron Ingot      B = Iron Bars     G = Glass Pane       R = Redstone Dust
 **Radio Speaker:** a Radio Receiver and a Note Block, in any arrangement in the crafting grid. Put a speaker in the grid on its own to get the Radio Receiver back.
 
 **Radio Status Board:** a Radio Receiver, a Redstone Lamp and a Glass Pane, in any arrangement in the crafting grid.
+
+**Radio Lamp:** a Radio Receiver and a Redstone Lamp, in any arrangement in the crafting grid.
+
+**Iron Antenna:**
+
+```
+     .  I  .
+     I  I  I
+     .  R  .
+
+I = Iron Ingot   R = Redstone Dust
+```
+
+**Gold Antenna:** an Iron Antenna, 2 Gold Ingots and a Redstone Dust, in any arrangement. **Diamond Antenna:** a Gold Antenna and 2 Diamonds. **Netherite Antenna:** a Diamond Antenna and a Netherite Ingot.
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
@@ -651,6 +696,9 @@ src/main/java/com/reiko/signaltower/
   blockentity/TimerTransmitterBlockEntity.java  the timer's clock: interval or daily, pause, labels
   client/TimerScreen.java                the timer transmitter's screen
   network/OpenTimerScreenPayload.java, ConfigureTimerPayload.java  timer screen <-> server
+  radio/AntennaTier.java                 the antenna tiers (block state "antenna"), multipliers, item tooltips
+  item/AntennaItem.java                  antenna items: fit, replace, take off (sneak + empty hand)
+  block/RadioLampBlock.java              receiver that's a light: light level = strength, dye colors, no redstone
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -894,9 +942,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 140. the speaker: set by Dev's packet to a bell played once (out of reach does nothing), a short pulse plays one note and 50 ticks on still one; one placed while its frequency is on stays quiet but outputs 15; set to the doorbell repeating, 45 ticks on play three rings of two notes; note labels (F♯3, F♯4, C5, F♯5) and pitches are a note block's; Jade, the screen packet (round trip) and saving keep its settings, and it drops with them;
 141. the status board: hung on a wall and set by Dev's packet to 4151, 4152, an empty row and 4153 (out of reach does nothing), its rows follow their transmitters on and off, the update tag carries the rows and strengths (not who set it) to clients, Jade lists the rows, a row on someone else's encrypted frequency is deaf (Jade and the screen say so), the screen packet round-trips, it's saved, and with its wall gone it pops off with its rows on the item;
 142. the aviation beacon: its clock (dusk to dawn, blink, flash, steady) and when it's lit; on top of a transmitter on masts, on a mast's side and on a stone wall it hangs (not in the air), the first two find the tower and the third none; set to "while its tower sends" it's on only while the transmitter broadcasts (Jade knows its tower, how far up, and whether it's on); the screen's packet sets it (round trip), from anyone within reach; and broken, or popped off when its mast goes, it drops with its settings;
-143. the signal recorder: with nothing to record from, or the same frequency both ways, it says so; Record waits for 4201 to turn on, then records two 10-tick pulses to the tick until Stop; Play sends them on 4202 once, with the same rhythm (the log names the recorder; Jade knows the tape); in Once mode a redstone pulse plays it once; in Loop mode it plays over and over while powered and stops when the power goes; the status, screen and settings packets round-trip (no status out of reach); a stranger can't change it on someone else's private frequency, nor anyone out of reach; it's saved, and drops with its recording.
+143. the signal recorder: with nothing to record from, or the same frequency both ways, it says so; Record waits for 4201 to turn on, then records two 10-tick pulses to the tick until Stop; Play sends them on 4202 once, with the same rhythm (the log names the recorder; Jade knows the tape); in Once mode a redstone pulse plays it once; in Loop mode it plays over and over while powered and stops when the power goes; the status, screen and settings packets round-trip (no status out of reach); a stranger can't change it on someone else's private frequency, nor anyone out of reach; it's saved, and drops with its recording;
+144. antennas: a Diamond Antenna fitted to a transmitter triples its reach (in the network too) and uses one up; fitting it again does nothing; a Netherite one replaces it (×4) and gives the diamond one back; taking it off (also by sneaking with an empty hand) gives it back and restores the reach; a Gold Antenna doubles a repeater's; only full-size tower tops take one; a stranger is refused on someone else's private frequency; Jade shows it; and the broken transmitter keeps its antenna on the item;
+145. the Radio Lamp: a transmitter fed through six blocks of dust sends 10 and the lamp gives off light 10, with no redstone out (a redstone lamp beside it stays dark); a dye recolors it (using one); its tint is darker off than on; Jade shows its light and color; dark when the signal goes; and broken, it keeps its color and frequency on the item.
 
-All 143 also pass with `-PnoJade`, so the mod runs the same without Jade.
+All 145 also pass with `-PnoJade`, so the mod runs the same without Jade.
 
 ## License
 

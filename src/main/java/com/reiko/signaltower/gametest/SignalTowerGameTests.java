@@ -6519,4 +6519,161 @@ public final class SignalTowerGameTests {
                                 && Integer.valueOf(4202).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its recording"))
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.45.0: antennas
+
+    /**
+     * Antennas: a Diamond Antenna fitted to a transmitter triples its reach (in the network too) and
+     * uses up one antenna; fitting it again does nothing; a Netherite one replaces it (×4) and gives
+     * the diamond one back; taking it off (also by sneaking with an empty hand) gives it back and
+     * restores the reach. A Gold Antenna doubles a repeater's. Only full-size tower tops take one;
+     * on someone else's private frequency a stranger is refused; Jade shows it; and broken, the
+     * transmitter keeps its antenna on the item.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void antennaTiers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos rep = new BlockPos(6, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4361);
+        place(helper, rep, ModRegistry.RADIO_REPEATER.get(), 4362);
+        BlockPos absTx = helper.absolutePos(tx);
+        BlockPos absRep = helper.absolutePos(rep);
+        SignalNetwork network = SignalNetwork.get(level);
+        Player dev = namedPlayer(helper, new BlockPos(4, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var diamond = com.reiko.signaltower.radio.AntennaTier.DIAMOND;
+        var none = com.reiko.signaltower.radio.AntennaTier.NONE;
+
+        check(com.reiko.signaltower.radio.AntennaTier.IRON.multiplierText().equals("×1.5") && diamond.multiplierText().equals("×3")
+                && com.reiko.signaltower.radio.AntennaTier.NETHERITE.multiplier() == 4.0, "Multipliers");
+        check(com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.RADIO_TIMER_TRANSMITTER.get().defaultBlockState())
+                && com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.RADIO_SIGNAL_RECORDER.get().defaultBlockState())
+                && com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.RADIO_CONVERTER.get().defaultBlockState())
+                && !com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.COMPACT_RADIO_TRANSMITTER.get().defaultBlockState())
+                && !com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.RADIO_MOTION_SENSOR.get().defaultBlockState())
+                && !com.reiko.signaltower.radio.AntennaTier.fits(ModRegistry.RADIO_RECEIVER.get().defaultBlockState()), "Only tower tops take one");
+
+        helper.startSequence()
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    int basic = RadioHelper.reachAt(level, absTx);
+                    check(network.transmittersOn(level, 4361).get(absTx).reach() == basic, "No antenna: its usual reach " + basic);
+                    ItemStack diamonds = new ItemStack(ModRegistry.DIAMOND_ANTENNA.get(), 2);
+                    Component fitted = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, diamond, diamonds);
+                    check(fitted != null && keyOf(fitted).endsWith("antenna_fitted") && diamonds.getCount() == 1
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == diamond, "Fitted: " + fitted);
+                    int tripled = (int) Math.round(basic * 3.0);
+                    check(network.transmittersOn(level, 4361).get(absTx).reach() == tripled
+                            && com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, absTx, helper.getBlockState(tx)) == tripled,
+                            "Three times the reach: " + network.transmittersOn(level, 4361).get(absTx).reach());
+                    Component again = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, diamond, diamonds);
+                    check(again != null && keyOf(again).endsWith("antenna_already") && diamonds.getCount() == 1, "Already has one");
+                    ItemStack netherite = new ItemStack(ModRegistry.NETHERITE_ANTENNA.get());
+                    com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, com.reiko.signaltower.radio.AntennaTier.NETHERITE, netherite);
+                    check(netherite.isEmpty() && dev.getInventory().countItem(ModRegistry.DIAMOND_ANTENNA.get()) == 1
+                            && network.transmittersOn(level, 4361).get(absTx).reach() == (int) Math.round(basic * 4.0), "Netherite replaces it, diamond back");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("antenna"), "Jade shows it");
+                    Component off = com.reiko.signaltower.item.AntennaItem.takeOff(dev, absTx);
+                    check(off != null && keyOf(off).endsWith("antenna_taken_off") && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == none
+                            && dev.getInventory().countItem(ModRegistry.NETHERITE_ANTENNA.get()) == 1
+                            && network.transmittersOn(level, 4361).get(absTx).reach() == basic, "Taken off: " + off);
+                    check(com.reiko.signaltower.item.AntennaItem.takeOff(dev, absTx) == null, "Nothing to take off");
+
+                    int repBasic = RadioHelper.reachAt(level, absRep);
+                    com.reiko.signaltower.item.AntennaItem.fit(dev, absRep, com.reiko.signaltower.radio.AntennaTier.GOLD, new ItemStack(ModRegistry.GOLD_ANTENNA.get()));
+                    check(network.relaysOn(level, 4362).get(absRep).reach() == (int) Math.round(repBasic * 2.0), "A gold one doubles a repeater's reach");
+
+                    com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, com.reiko.signaltower.radio.AntennaTier.IRON, new ItemStack(ModRegistry.IRON_ANTENNA.get()));
+                    dev.setShiftKeyDown(true);
+                    check(com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(helper.getBlockState(tx), level, absTx, dev)
+                            && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == none
+                            && dev.getInventory().countItem(ModRegistry.IRON_ANTENNA.get()) == 1, "Sneak + empty hand takes it off");
+                    check(!com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(helper.getBlockState(tx), level, absTx, dev), "Without one, a sneak-click is a normal click");
+                    dev.setShiftKeyDown(false);
+
+                    var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+                    claims.put(4361, UUID.randomUUID(), "Owner", java.util.Map.of());
+                    try {
+                        ItemStack iron = new ItemStack(ModRegistry.IRON_ANTENNA.get());
+                        Component refused = com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, com.reiko.signaltower.radio.AntennaTier.IRON, iron);
+                        check(refused != null && keyOf(refused).endsWith("private_refused_block") && iron.getCount() == 1
+                                && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == none, "A stranger can't on someone else's private frequency");
+                    } finally {
+                        claims.remove(4361);
+                    }
+                    com.reiko.signaltower.item.AntennaItem.fit(dev, absTx, diamond, new ItemStack(ModRegistry.DIAMOND_ANTENNA.get()));
+                    level.destroyBlock(absTx, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_TRANSMITTER_ITEM.get())
+                                && com.reiko.signaltower.radio.AntennaTier.of(stack) == diamond
+                                && Integer.valueOf(4361).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its antenna"))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.45.0: radio lamp
+
+    /**
+     * The Radio Lamp: a transmitter fed through six blocks of dust sends 10, and the lamp gives off
+     * light 10 (and outputs no redstone: a redstone lamp beside it stays dark); off when the signal
+     * goes. A dye recolors it (using one dye); its tint is darker off than on; Jade shows its light
+     * and color; broken, it keeps its color and frequency on the item.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radioLamp(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos source = new BlockPos(0, 1, 1);
+        BlockPos tx = new BlockPos(7, 1, 1);
+        BlockPos lamp = new BlockPos(10, 1, 2);
+        BlockPos plainLamp = new BlockPos(11, 1, 2);
+        for (int x = 1; x <= 6; x++) {
+            helper.setBlock(new BlockPos(x, 0, 1), Blocks.STONE);
+        }
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4351);
+        place(helper, lamp, ModRegistry.RADIO_LAMP.get(), 4351);
+        helper.setBlock(new BlockPos(11, 0, 2), Blocks.STONE);
+        helper.setBlock(plainLamp, Blocks.REDSTONE_LAMP);
+        BlockPos absLamp = helper.absolutePos(lamp);
+        Player dev = namedPlayer(helper, new BlockPos(10, 1, 1), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+
+        check(com.reiko.signaltower.block.RadioLampBlock.tint(DyeColor.RED, 0) != com.reiko.signaltower.block.RadioLampBlock.tint(DyeColor.RED, 15)
+                && (com.reiko.signaltower.block.RadioLampBlock.tint(DyeColor.RED, 0) >> 16 & 255)
+                    < (com.reiko.signaltower.block.RadioLampBlock.tint(DyeColor.RED, 15) >> 16 & 255), "Darker off than on");
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    for (int x = 1; x <= 6; x++) {
+                        helper.setBlock(new BlockPos(x, 1, 1), Blocks.REDSTONE_WIRE);
+                    }
+                    helper.setBlock(source, Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(lamp).getValue(RadioReceiverBlock.POWER) > 0, "It lights"))
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    BlockState state = helper.getBlockState(lamp);
+                    int sent = com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, helper.absolutePos(tx), helper.getBlockState(tx));
+                    check(sent == 10 && state.getValue(RadioReceiverBlock.POWER) == 10 && state.getLightEmission() == 10,
+                            "As bright as it hears: sent " + sent + ", light " + state.getLightEmission());
+                    check(!helper.getBlockState(plainLamp).getValue(RedstoneLampBlock.LIT), "No redstone out");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absLamp);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(state, info));
+                    check(keys.contains("lamp_light") && keys.contains("lamp_color"), "Jade: " + keys);
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.RED_DYE, 2));
+                    state.useItemOn(dev.getMainHandItem(), level, dev, InteractionHand.MAIN_HAND,
+                            new BlockHitResult(Vec3.atCenterOf(absLamp), Direction.UP, absLamp, false));
+                    check(helper.getBlockState(lamp).getValue(com.reiko.signaltower.block.RadioLampBlock.COLOR) == DyeColor.RED
+                            && dev.getMainHandItem().getCount() == 1, "Dyed red with one dye");
+                    helper.setBlock(source, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(lamp).getValue(RadioReceiverBlock.POWER) == 0
+                        && helper.getBlockState(lamp).getLightEmission() == 0, "Dark when the signal goes"))
+                .thenExecute(() -> level.destroyBlock(absLamp, true))
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_LAMP_ITEM.get())
+                                && com.reiko.signaltower.block.RadioLampBlock.colorOf(stack) == DyeColor.RED
+                                && Integer.valueOf(4351).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped red, with its frequency: "
+                        + helper.getEntities(EntityType.ITEM).stream().map(e -> e.getItem() + " " + e.getItem().getComponentsPatch()).toList()))
+                .thenSucceed();
+    }
 }

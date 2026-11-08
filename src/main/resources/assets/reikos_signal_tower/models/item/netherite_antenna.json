@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "reikos_signal_tower:item/netherite_antenna"
+  }
+}

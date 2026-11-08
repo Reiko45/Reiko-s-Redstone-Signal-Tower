@@ -58,6 +58,9 @@ public class RadioSignalRecorderBlock extends RadioTransmitterBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
+        if (com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(state, level, pos, player)) {
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof SignalRecorderBlockEntity recorder) {
             PacketDistributor.sendToPlayer(serverPlayer, OpenRecorderScreenPayload.of(serverLevel, recorder));
@@ -93,6 +96,7 @@ public class RadioSignalRecorderBlock extends RadioTransmitterBlock {
             tooltip.add(Component.translatable(prefix + "recorder_tape", SignalRecorderBlockEntity.tapeText(tape.length(), tape.changes().size()),
                     SignalRecorderBlockEntity.modeText(tape.loop())).withStyle(ChatFormatting.YELLOW));
         }
+        com.reiko.signaltower.radio.AntennaTier.addTooltipLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "tune_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 

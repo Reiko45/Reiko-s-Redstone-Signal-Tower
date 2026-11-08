@@ -19,6 +19,25 @@
                 "reikos_signal_tower:timer_pulse",
                 "reikos_signal_tower:timer_hours"
               ]
+            },
+            {
+              "function": "minecraft:copy_state",
+              "block": "reikos_signal_tower:radio_timer_transmitter",
+              "properties": [
+                "antenna"
+              ],
+              "conditions": [
+                {
+                  "condition": "minecraft:inverted",
+                  "term": {
+                    "condition": "minecraft:block_state_property",
+                    "block": "reikos_signal_tower:radio_timer_transmitter",
+                    "properties": {
+                      "antenna": "none"
+                    }
+                  }
+                }
+              ]
             }
           ]
         }

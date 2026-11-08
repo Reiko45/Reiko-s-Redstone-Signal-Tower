@@ -17,6 +17,25 @@
                 "reikos_signal_tower:output_frequency",
                 "reikos_signal_tower:converter_gate"
               ]
+            },
+            {
+              "function": "minecraft:copy_state",
+              "block": "reikos_signal_tower:radio_converter",
+              "properties": [
+                "antenna"
+              ],
+              "conditions": [
+                {
+                  "condition": "minecraft:inverted",
+                  "term": {
+                    "condition": "minecraft:block_state_property",
+                    "block": "reikos_signal_tower:radio_converter",
+                    "properties": {
+                      "antenna": "none"
+                    }
+                  }
+                }
+              ]
             }
           ]
         }

@@ -289,6 +289,14 @@ public final class ModRegistry {
                     .noOcclusion()
                     .lightLevel(state -> 3)));
 
+    /** A lamp with a receiver built in (v0.45.0): light level = the strength it hears, in a dye color. */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioLampBlock> RADIO_LAMP = BLOCKS.register("radio_lamp",
+            () -> new com.reiko.signaltower.block.RadioLampBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(1.5F, 6.0F)
+                    .sound(SoundType.GLASS)
+                    .lightLevel(com.reiko.signaltower.block.RadioLampBlock::lightOf)));
+
     /** A transmitter that records a frequency and plays it back (v0.44.0). */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioSignalRecorderBlock> RADIO_SIGNAL_RECORDER = BLOCKS.register("radio_signal_recorder",
             () -> new com.reiko.signaltower.block.RadioSignalRecorderBlock(BlockBehaviour.Properties.of()
@@ -429,6 +437,18 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_signal_recorder", RADIO_SIGNAL_RECORDER);
     public static final DeferredItem<BlockItem> AVIATION_BEACON_ITEM =
             ITEMS.registerSimpleBlockItem("aviation_beacon", AVIATION_BEACON);
+    public static final DeferredItem<BlockItem> RADIO_LAMP_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_lamp", RADIO_LAMP);
+    /** Antenna upgrades for tower tops (v0.45.0). */
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> IRON_ANTENNA = ITEMS.register("iron_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.IRON, new Item.Properties()));
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> GOLD_ANTENNA = ITEMS.register("gold_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.GOLD, new Item.Properties()));
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> DIAMOND_ANTENNA = ITEMS.register("diamond_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.DIAMOND, new Item.Properties()));
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> NETHERITE_ANTENNA = ITEMS.register("netherite_antenna",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.NETHERITE,
+                    new Item.Properties().fireResistant()));
     public static final DeferredItem<BlockItem> RADIO_REPEATER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_repeater", RADIO_REPEATER);
     public static final DeferredItem<BlockItem> RADIO_CONVERTER_ITEM =
@@ -469,7 +489,7 @@ public final class ModRegistry {
                     () -> BlockEntityType.Builder.of(RadioReceiverBlockEntity::new,
                             RADIO_RECEIVER.get(), COMPACT_RADIO_RECEIVER.get(), RADIO_TOGGLE_RECEIVER.get(),
                             RADIO_INVERTED_RECEIVER.get(), RADIO_LOGIC_RECEIVER.get(), RADIO_DELAY_RECEIVER.get(),
-                            RADIO_COUNTER_RECEIVER.get(), RADIO_SPEAKER.get()).build(null));
+                            RADIO_COUNTER_RECEIVER.get(), RADIO_SPEAKER.get(), RADIO_LAMP.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRepeaterBlockEntity>> RADIO_REPEATER_BE =
             BLOCK_ENTITIES.register("radio_repeater",

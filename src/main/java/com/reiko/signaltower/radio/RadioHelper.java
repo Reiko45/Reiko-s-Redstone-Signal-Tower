@@ -8,6 +8,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 /** Altitude, reach and mast-column helpers. */
 public final class RadioHelper {
@@ -35,13 +36,26 @@ public final class RadioHelper {
 
     /** How far a transmitter at {@code pos} reaches, measured horizontally. */
     public static int reachAt(Level level, BlockPos pos) {
+        return reachAt(level, pos, 1.0);
+    }
+
+    /** {@link #reachAt(Level, BlockPos)} times {@code multiplier} (before the cap). */
+    public static int reachAt(Level level, BlockPos pos, double multiplier) {
         long height = Math.max(0, heightAboveSeaLevel(level, pos));
-        long reach = Config.BASE_REACH.get() + height * Config.REACH_PER_BLOCK.get();
+        double reach = (Config.BASE_REACH.get() + height * (double) Config.REACH_PER_BLOCK.get()) * multiplier;
         int max = Config.MAX_REACH.get();
         if (max > 0) {
             reach = Math.min(reach, max);
         }
-        return (int) Math.min(reach, Integer.MAX_VALUE);
+        return (int) Math.min(Math.round(reach), Integer.MAX_VALUE);
+    }
+
+    /**
+     * How far a tower top (transmitter, repeater, converter) in {@code state} at {@code pos} reaches:
+     * by its height, times its antenna's multiplier (v0.45.0), capped by maxReach.
+     */
+    public static int towerReach(Level level, BlockPos pos, BlockState state) {
+        return reachAt(level, pos, AntennaTier.of(state).multiplier());
     }
 
     /**

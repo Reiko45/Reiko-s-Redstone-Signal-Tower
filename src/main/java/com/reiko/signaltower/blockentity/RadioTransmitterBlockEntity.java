@@ -86,7 +86,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             int max = Config.MAX_REACH.get();
             return max > 0 ? Math.min(reach, max) : reach;
         }
-        return RadioHelper.reachAt(level, pos);
+        return RadioHelper.towerReach(level, pos, state);
     }
 
     @Override

@@ -80,7 +80,7 @@ public record ReachPreviewRequestPayload(BlockPos pos) implements CustomPacketPa
                 ? relay.getOutputFrequency() : radio.getFrequency();
         int reach = block instanceof RadioTransmitterBlock
                 ? com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, pos, level.getBlockState(pos))
-                : RadioHelper.reachAt(level, pos);
+                : RadioHelper.towerReach(level, pos, level.getBlockState(pos));
         return new ReachPreviewPayload(pos, reach, kind, frequency);
     }
 }

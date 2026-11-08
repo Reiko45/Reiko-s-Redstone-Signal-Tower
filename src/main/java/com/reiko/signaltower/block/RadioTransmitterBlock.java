@@ -3,6 +3,7 @@ package com.reiko.signaltower.block;
 import com.mojang.serialization.MapCodec;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity;
+import com.reiko.signaltower.radio.AntennaTier;
 import com.reiko.signaltower.radio.FrequencyNames;
 import com.reiko.signaltower.radio.RadioHelper;
 import com.reiko.signaltower.radio.SignalNetwork;
@@ -38,7 +39,9 @@ public class RadioTransmitterBlock extends RadioBlock {
 
     public RadioTransmitterBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(POWERED, false));
+        BlockState initial = stateDefinition.any().setValue(POWERED, false);
+        // A full-size one has an antenna slot (v0.45.0); the compact ones define their own states without it.
+        registerDefaultState(initial.hasProperty(AntennaTier.PROPERTY) ? initial.setValue(AntennaTier.PROPERTY, AntennaTier.NONE) : initial);
     }
 
     @Override
@@ -48,7 +51,7 @@ public class RadioTransmitterBlock extends RadioBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(POWERED);
+        builder.add(POWERED, AntennaTier.PROPERTY);
     }
 
     @Override
@@ -86,7 +89,7 @@ public class RadioTransmitterBlock extends RadioBlock {
                 FrequencyNames.label(level, frequency),
                 RadioHelper.readTransmitterInput(level, pos),
                 heightText,
-                RadioHelper.reachAt(level, pos));
+                RadioHelper.towerReach(level, pos, state));
     }
 
     // ---- Redstone ----

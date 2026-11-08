@@ -60,6 +60,9 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                BlockHitResult hitResult) {
+        if (com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(state, level, pos, player)) {
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof RadioRepeaterBlockEntity converter) {
             SignalNetwork network = SignalNetwork.get(serverLevel);
@@ -67,7 +70,7 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                     | (network.isDeaf(serverLevel, pos) ? OpenConverterScreenPayload.DEAF : 0);
             PacketDistributor.sendToPlayer(serverPlayer, new OpenConverterScreenPayload(pos, converter.getFrequency(),
                     converter.getOutputFrequency(), network.repeaterPower(serverLevel, pos),
-                    RadioHelper.reachAt(serverLevel, pos), quiet, converter.getGate(), converter.getThreshold(),
+                    RadioHelper.towerReach(serverLevel, pos, state), quiet, converter.getGate(), converter.getThreshold(),
                     converter.gateHeard(serverLevel)));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
@@ -87,7 +90,7 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
                 ? Component.translatable(key + "converter_converting", power)
                 : Component.translatable(key + "converter_quiet");
         return Component.translatable(key + "converter_status", FrequencyNames.label(level, listen), FrequencyNames.label(level, send),
-                converting, RadioHelper.reachAt(level, pos));
+                converting, RadioHelper.towerReach(level, pos, state));
     }
 
     @Override
@@ -109,6 +112,7 @@ public class RadioConverterBlock extends RadioRepeaterBlock {
             tooltip.add(Component.translatable(prefix + "converter_gate",
                     com.reiko.signaltower.network.ConfigureConverterPayload.gateText(gate / 16, gate % 16)).withStyle(ChatFormatting.YELLOW));
         }
+        com.reiko.signaltower.radio.AntennaTier.addTooltipLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "converter_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

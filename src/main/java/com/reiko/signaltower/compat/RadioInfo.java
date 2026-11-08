@@ -152,6 +152,10 @@ public final class RadioInfo {
                         : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter"
                         : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
+                com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(level.getBlockState(cursor));
+                if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
+                    tag.putString("top_antenna", antenna.getSerializedName());
+                }
                 tag.putInt("frequency", radio.getFrequency());
                 if (top instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
                     tag.putInt("output", converter.getOutputFrequency());
@@ -193,7 +197,7 @@ public final class RadioInfo {
             }
         } else if (block instanceof RadioRepeaterBlock) {
             tag.putInt("power", SignalNetwork.get(level).repeaterPower(level, pos));
-            tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            tag.putInt("reach", RadioHelper.towerReach(level, pos, state));
             if (block instanceof RadioConverterBlock && radio instanceof RadioRepeaterBlockEntity converter) {
                 tag.putInt("output", converter.getOutputFrequency());
                 if (converter.getGate() != 0) {
@@ -256,6 +260,11 @@ public final class RadioInfo {
      */
     public static List<Component> lines(BlockState state, @Nullable CompoundTag data) {
         List<Component> lines = blockLines(state, data);
+        com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(state);
+        if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
+            // v0.45.0: its antenna, and how much farther that makes it reach.
+            lines.add(Component.translatable(LANG + "antenna", antenna.label(), antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
+        }
         boolean deaf = data != null && data.contains("deaf_to");
         boolean receiver = state.getBlock() instanceof RadioReceiverBlock;
         // A deaf receiver's own frequency is the one it can't hear: one line says both.
@@ -293,6 +302,12 @@ public final class RadioInfo {
             }
             Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
+            if (data.contains("top_antenna")) {
+                lines.add(Component.translatable(LANG + "antenna",
+                        Component.translatable("item." + SignalTower.MOD_ID + "." + data.getString("top_antenna") + "_antenna"),
+                        com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT)).multiplierText())
+                        .withStyle(ChatFormatting.GOLD));
+            }
             if (data.contains("output")) {
                 lines.add(Component.translatable(LANG + "listens", number(data, "frequency", "name")));
                 addNoteLine(lines, data, "note");
@@ -492,6 +507,17 @@ public final class RadioInfo {
                     lines.add(Component.translatable(LANG + (change > 0 ? "delay_turns_on" : "delay_turns_off"),
                             RadioReceiverBlockEntity.countdownLabel(Math.abs(change))).withStyle(ChatFormatting.YELLOW));
                 }
+                lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
+            }
+        } else if (block instanceof com.reiko.signaltower.block.RadioLampBlock) {
+            // v0.45.0: its light (the strength it hears) and color, from the block state.
+            int light = state.getValue(RadioReceiverBlock.POWER);
+            lines.add(light > 0 ? Component.translatable(LANG + "lamp_light", value(light))
+                    : Component.translatable(LANG + "lamp_dark").withStyle(ChatFormatting.GRAY));
+            lines.add(Component.translatable(LANG + "lamp_color",
+                    com.reiko.signaltower.block.RadioLampBlock.colorLabel(state.getValue(com.reiko.signaltower.block.RadioLampBlock.COLOR)))
+                    .withStyle(ChatFormatting.YELLOW));
+            if (hasData) {
                 lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
         } else if (block instanceof com.reiko.signaltower.block.RadioSpeakerBlock) {

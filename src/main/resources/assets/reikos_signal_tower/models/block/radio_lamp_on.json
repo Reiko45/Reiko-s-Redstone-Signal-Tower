@@ -1,0 +1,92 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "reikos_signal_tower:block/radio_lamp_frame",
+    "frame": "reikos_signal_tower:block/radio_lamp_frame",
+    "glass": "reikos_signal_tower:block/radio_lamp_glass"
+  },
+  "elements": [
+    {
+      "from": [
+        0.6,
+        0.6,
+        0.6
+      ],
+      "to": [
+        15.4,
+        15.4,
+        15.4
+      ],
+      "faces": {
+        "north": {
+          "texture": "#glass",
+          "tintindex": 0
+        },
+        "south": {
+          "texture": "#glass",
+          "tintindex": 0
+        },
+        "east": {
+          "texture": "#glass",
+          "tintindex": 0
+        },
+        "west": {
+          "texture": "#glass",
+          "tintindex": 0
+        },
+        "up": {
+          "texture": "#glass",
+          "tintindex": 0
+        },
+        "down": {
+          "texture": "#glass",
+          "tintindex": 0
+        }
+      },
+      "neoforge_data": {
+        "block_light": 15,
+        "sky_light": 15
+      },
+      "shade": false
+    },
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#frame",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#frame",
+          "cullface": "south"
+        },
+        "east": {
+          "texture": "#frame",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#frame",
+          "cullface": "west"
+        },
+        "up": {
+          "texture": "#frame",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#frame",
+          "cullface": "down"
+        }
+      }
+    }
+  ]
+}

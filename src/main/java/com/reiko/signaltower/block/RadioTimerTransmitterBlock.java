@@ -57,6 +57,9 @@ public class RadioTimerTransmitterBlock extends RadioTransmitterBlock {
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
+        if (com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(state, level, pos, player)) {
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof TimerTransmitterBlockEntity timer) {
             PacketDistributor.sendToPlayer(serverPlayer, OpenTimerScreenPayload.of(serverLevel, timer));
@@ -92,6 +95,7 @@ public class RadioTimerTransmitterBlock extends RadioTransmitterBlock {
                     interval == null ? TimerTransmitterBlockEntity.DEFAULT_INTERVAL : interval,
                     pulse == null ? TimerTransmitterBlockEntity.DEFAULT_PULSE : pulse, packed / 24, packed % 24)).withStyle(ChatFormatting.YELLOW));
         }
+        com.reiko.signaltower.radio.AntennaTier.addTooltipLine(stack, tooltip);
         tooltip.add(Component.translatable(prefix + "tune_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 

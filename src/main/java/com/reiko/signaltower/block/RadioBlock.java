@@ -64,6 +64,9 @@ public abstract class RadioBlock extends BaseEntityBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
                                                BlockHitResult hitResult) {
+        if (com.reiko.signaltower.item.AntennaItem.takeOffBySneaking(state, level, pos, player)) {
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level instanceof ServerLevel serverLevel) {
             Component quiet = quietNotice(serverLevel, pos);
             player.displayClientMessage(quiet != null ? quiet : describe(serverLevel, pos, state), true);
@@ -146,6 +149,7 @@ public abstract class RadioBlock extends BaseEntityBlock {
                     .withStyle(ChatFormatting.AQUA));
             FrequencyNotes.addTooltipLine(frequency, tooltip);
         }
+        com.reiko.signaltower.radio.AntennaTier.addTooltipLine(stack, tooltip);
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".tune_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

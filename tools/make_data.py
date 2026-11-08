@@ -40,6 +40,10 @@ def casing_faces():
     return faces
 
 
+def casing_faces_with(texture):
+    return {f: {"texture": texture, "cullface": f} for f in SIDES + ["up", "down"]}
+
+
 def box(frm, to, texture, uv_sides, uv_ends, glow=False):
     faces = {f: {"texture": texture, "uv": uv_sides} for f in SIDES}
     faces["up"] = {"texture": texture, "uv": uv_ends}
@@ -305,6 +309,9 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_signal_recorder", "radio_repeater", "radio_converter", "radio_mast"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
+write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
+for tier in ("iron", "gold", "diamond", "netherite"):
+    write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
 write(items / "radio_motion_sensor.json", {"parent": f"{MOD}:block/radio_motion_sensor_inventory"})
@@ -386,18 +393,47 @@ write(items / "frequency_tuner.json", {
 # ---------------------------------------------------------------- blockstates
 
 states = ASSETS / "blockstates"
-write(states / "radio_transmitter.json", {"variants": {
-    "powered=false": {"model": f"{MOD}:block/radio_transmitter"},
-    "powered=true": {"model": f"{MOD}:block/radio_transmitter_on"},
-}})
-write(states / "radio_repeater.json", {"variants": {
-    "lit=false": {"model": f"{MOD}:block/radio_repeater"},
-    "lit=true": {"model": f"{MOD}:block/radio_repeater_on"},
-}})
-write(states / "radio_converter.json", {"variants": {
-    "lit=false": {"model": f"{MOD}:block/radio_converter"},
-    "lit=true": {"model": f"{MOD}:block/radio_converter_on"},
-}})
+# v0.45.0: tower tops (multipart): the block lit or not, plus its antenna's fittings if it has one.
+ANTENNAS = ("iron", "gold", "diamond", "netherite")
+ANTENNA_TEXTURE = {"iron": "minecraft:block/iron_block", "gold": "minecraft:block/gold_block",
+                   "diamond": "minecraft:block/diamond_block", "netherite": "minecraft:block/netherite_block"}
+
+
+def antenna_model(tier):
+    """Bands round the antenna rod and caps on the dipole's ends, in the tier's metal (just over the
+    rod and arms, so nothing z-fights)."""
+    t = "#metal"
+    return {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": ANTENNA_TEXTURE[tier], "metal": ANTENNA_TEXTURE[tier]},
+        "elements": [
+            box([6.5, 16, 6.5], [9.5, 17.5, 9.5], t, [6, 6, 9, 7.5], [6.5, 6.5, 9.5, 9.5]),
+            box([6.6, 24, 6.6], [9.4, 25.2, 9.4], t, [6, 6, 9, 7.2], [6.6, 6.6, 9.4, 9.4]),
+            box([6.6, 26.6, 6.6], [9.4, 27.8, 9.4], t, [6, 6, 9, 7.2], [6.6, 6.6, 9.4, 9.4]),
+            box([2.4, 21.6, 7.1], [3.6, 23.4, 8.9], t, [0, 0, 1.2, 1.8], [0, 0, 1.2, 1.8]),
+            box([12.4, 21.6, 7.1], [13.6, 23.4, 8.9], t, [0, 0, 1.2, 1.8], [0, 0, 1.2, 1.8]),
+            box([7.1, 18.6, 2.4], [8.9, 20.4, 3.6], t, [0, 0, 1.8, 1.8], [0, 0, 1.8, 1.2]),
+            box([7.1, 18.6, 12.4], [8.9, 20.4, 13.6], t, [0, 0, 1.8, 1.8], [0, 0, 1.8, 1.2]),
+        ],
+    }
+
+
+for tier in ANTENNAS:
+    write(models / f"antenna_{tier}.json", antenna_model(tier))
+
+
+def tower_states(name, lit_property):
+    parts = [{"when": {lit_property: "false"}, "apply": {"model": f"{MOD}:block/{name}"}},
+             {"when": {lit_property: "true"}, "apply": {"model": f"{MOD}:block/{name}_on"}}]
+    parts += [{"when": {"antenna": tier}, "apply": {"model": f"{MOD}:block/antenna_{tier}"}} for tier in ANTENNAS]
+    write(states / f"{name}.json", {"multipart": parts})
+
+
+tower_states("radio_transmitter", "powered")
+tower_states("radio_repeater", "lit")
+tower_states("radio_converter", "lit")
+tower_states("radio_signal_recorder", "powered")
+tower_states("radio_timer_transmitter", "powered")
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
@@ -436,13 +472,30 @@ write(states / "radio_speaker.json", {"variants": {
 write(states / "radio_counter_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_counter_receiver" + ("_on" if p > 0 else "")} for p in range(16)
 }})
-write(states / "radio_signal_recorder.json", {"variants": {
-    "powered=false": {"model": f"{MOD}:block/radio_signal_recorder"},
-    "powered=true": {"model": f"{MOD}:block/radio_signal_recorder_on"},
-}})
-write(states / "radio_timer_transmitter.json", {"variants": {
-    "powered=false": {"model": f"{MOD}:block/radio_timer_transmitter"},
-    "powered=true": {"model": f"{MOD}:block/radio_timer_transmitter_on"},
+# v0.45.0: the Radio Lamp. A steel frame with a window, round a glass core tinted by the client (its
+# dye color, brighter the stronger the signal); lit, the core is drawn full bright.
+def lamp_model(lit):
+    core = {"from": [0.6, 0.6, 0.6], "to": [15.4, 15.4, 15.4],
+            "faces": {f: {"texture": "#glass", "tintindex": 0} for f in SIDES + ["up", "down"]}}
+    if lit:
+        core["neoforge_data"] = GLOW
+        core["shade"] = False
+    return {
+        "parent": "minecraft:block/block",
+        "render_type": "minecraft:cutout",
+        "textures": {"particle": tex("radio_lamp_frame"), "frame": tex("radio_lamp_frame"),
+                     "glass": tex("radio_lamp_glass")},
+        "elements": [
+            core,
+            {"from": [0, 0, 0], "to": [16, 16, 16], "faces": casing_faces_with("#frame")},
+        ],
+    }
+
+
+write(models / "radio_lamp.json", lamp_model(False))
+write(models / "radio_lamp_on.json", lamp_model(True))
+write(states / "radio_lamp.json", {"variants": {
+    f"power={p}": {"model": f"{MOD}:block/radio_lamp" + ("_on" if p > 0 else "")} for p in range(16)
 }})
 write(states / "radio_delay_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_delay_receiver" + ("_on" if p > 0 else "")} for p in range(16)
@@ -577,6 +630,27 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.radio_inverted_receiver": "Radio Inverted Receiver",
     # v0.40.0: Radio Logic Receiver and Signal Meter
     f"block.{MOD}.radio_logic_receiver": "Radio Logic Receiver",
+    # v0.45.0: antennas and the Radio Lamp
+    f"item.{MOD}.iron_antenna": "Iron Antenna",
+    f"item.{MOD}.gold_antenna": "Gold Antenna",
+    f"item.{MOD}.diamond_antenna": "Diamond Antenna",
+    f"item.{MOD}.netherite_antenna": "Netherite Antenna",
+    f"item.{MOD}.none_antenna": "No Antenna",
+    f"tooltip.{MOD}.antenna_item": "Fit it to a transmitter, repeater or converter for %s its reach.",
+    f"tooltip.{MOD}.antenna_hint": "Right-click a tower top with it; sneak + right-click the tower with an empty hand to take it off.",
+    f"tooltip.{MOD}.antenna": "Antenna: %s (%s reach)",
+    f"message.{MOD}.antenna_fitted": "%s: %s fitted, reach %s → %s blocks",
+    f"message.{MOD}.antenna_already": "This %s already has a %s",
+    f"message.{MOD}.antenna_taken_off": "%s taken off: reach %s → %s blocks",
+    f"jade.{MOD}.antenna": "Antenna: %s (%s reach)",
+    f"block.{MOD}.radio_lamp": "Radio Lamp",
+    f"block.{MOD}.radio_lamp.tooltip": "A lamp with a receiver built in: it gives off as much light as the strength it hears (dim to bright), in its dye color. Right-click it with a dye to change the color. It's only a light: no redstone comes out.",
+    f"tooltip.{MOD}.lamp_color": "Color: %s",
+    f"message.{MOD}.lamp_status": "Radio Lamp | Frequency %s | %s | Light %s",
+    f"jade.{MOD}.lamp_light": "Light: %s",
+    f"jade.{MOD}.lamp_dark": "Dark",
+    f"jade.{MOD}.lamp_color": "Color: %s",
+    f"screen.{MOD}.audit.kind_lamp": "Radio Lamp",
     # v0.44.0: Aviation Beacon and Radio Signal Recorder
     f"block.{MOD}.aviation_beacon": "Aviation Beacon",
     f"block.{MOD}.aviation_beacon.tooltip": "A warning light for the top or side of a tower (or any block). It blinks red at night, can be seen from far away, and can blink only while its tower is broadcasting. All beacons blink together. Right-click it with an empty hand to set it.",
@@ -1697,6 +1771,38 @@ recipes["radio_timer_transmitter"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_timer_transmitter"},
 }, f"{MOD}:radio_transmitter")
 recipes["radio_transmitter_from_timer"] = (shapeless("radio_timer_transmitter", "radio_transmitter"), f"{MOD}:radio_timer_transmitter")
+recipes["iron_antenna"] = ({
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": [" I ", "III", " R "],
+    "key": {"I": {"item": "minecraft:iron_ingot"}, "R": {"item": "minecraft:redstone"}},
+    "result": {"count": 1, "id": f"{MOD}:iron_antenna"},
+}, "minecraft:iron_ingot")
+recipes["gold_antenna"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:iron_antenna"}, {"item": "minecraft:gold_ingot"}, {"item": "minecraft:gold_ingot"},
+                    {"item": "minecraft:redstone"}],
+    "result": {"count": 1, "id": f"{MOD}:gold_antenna"},
+}, f"{MOD}:iron_antenna")
+recipes["diamond_antenna"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:gold_antenna"}, {"item": "minecraft:diamond"}, {"item": "minecraft:diamond"}],
+    "result": {"count": 1, "id": f"{MOD}:diamond_antenna"},
+}, f"{MOD}:gold_antenna")
+recipes["netherite_antenna"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:diamond_antenna"}, {"item": "minecraft:netherite_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:netherite_antenna"},
+}, f"{MOD}:diamond_antenna")
+recipes["radio_lamp"] = ({
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:redstone_lamp"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_lamp"},
+}, f"{MOD}:radio_receiver")
 recipes["radio_signal_recorder"] = ({
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -1787,7 +1893,7 @@ for name, (recipe, trigger) in recipes.items():
 
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_signal_recorder", "aviation_beacon",
+             "radio_signal_recorder", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "aviation_beacon":
@@ -1810,6 +1916,14 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
+    if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_repeater", "radio_converter"):
+        # v0.45.0: its antenna (only if it has one, so plain ones still stack with older items).
+        entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:{name}", "properties": ["antenna"],
+                                   "conditions": [{"condition": "minecraft:inverted", "term": {
+                                       "condition": "minecraft:block_state_property", "block": f"{MOD}:{name}",
+                                       "properties": {"antenna": "none"}}}]})
+    if name == "radio_lamp":
+        entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:radio_lamp", "properties": ["color"]})
     write(DATA / "loot_table" / "blocks" / f"{name}.json", {
         "type": "minecraft:block",
         "pools": [{
@@ -1826,7 +1940,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
 write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json", {
     "values": [f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:radio_toggle_receiver", f"{MOD}:radio_inverted_receiver", f"{MOD}:radio_logic_receiver",
                f"{MOD}:radio_delay_receiver", f"{MOD}:radio_counter_receiver", f"{MOD}:radio_timer_transmitter",
-               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:aviation_beacon",
+               f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast"]

@@ -338,6 +338,65 @@ def beacon_glow():
     return img
 
 
+def lamp_frame():
+    """The Radio Lamp's steel frame (v0.45.0): a border and a cross, with clear windows the
+    glass shows through."""
+    img = casing(20, rivets=False)
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            border = x < 2 or x > 13 or y < 2 or y > 13
+            cross = x in (7, 8) or y in (7, 8)
+            if not border and not cross:
+                px[x, y] = CLEAR
+            elif not border and cross:
+                px[x, y] = M if (x + y) % 3 else D
+    for (x, y) in [(2, 2), (13, 2), (2, 13), (13, 13)]:
+        px[x, y] = O
+    return img
+
+
+def lamp_glass():
+    """The Radio Lamp's glass (v0.45.0): light grey with a soft bright middle, tinted by the
+    client to the lamp's color."""
+    import math
+    img = blank((200, 200, 200, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            d = math.hypot(x - 7.5, y - 7.5) / 10.6
+            v = int(255 - 70 * d)
+            if (x * 7 + y * 3) % 11 == 0:
+                v -= 18
+            px[x, y] = (v, v, v, 255)
+    return img
+
+
+def antenna_item(tier):
+    """An antenna upgrade (v0.45.0): a rod with a dipole crossbar and a red tip, in the tier's metal."""
+    metal = {"iron": [(110, 110, 110, 255), (200, 200, 200, 255), (240, 240, 240, 255)],
+             "gold": [(150, 100, 10, 255), (240, 190, 40, 255), (255, 240, 140, 255)],
+             "diamond": [(20, 120, 120, 255), (80, 220, 210, 255), (200, 255, 250, 255)],
+             "netherite": [(40, 30, 32, 255), (90, 76, 78, 255), (140, 124, 126, 255)]}[tier]
+    img = blank()
+    px = img.load()
+    for y in range(4, 15):           # the rod
+        px[7, y] = metal[1]
+        px[8, y] = metal[0]
+    for x in range(3, 13):           # the dipole
+        px[x, 8] = metal[1]
+        px[x, 9] = metal[0]
+    for x in (3, 12):
+        px[x, 7] = metal[2]
+    for (x, y) in [(6, 14), (7, 14), (8, 14), (9, 14), (6, 15), (9, 15)]:   # the foot
+        px[x, y] = metal[0]
+    for (x, y) in [(7, 2), (8, 2), (7, 3), (8, 3)]:   # the red tip
+        px[x, y] = ON[1]
+    px[7, 2] = ON[2]
+    px[7, 5] = metal[2]
+    return img
+
+
 def board_front():
     """The status board's face (v0.43.0): a dark screen in a steel frame (the rows are drawn on it)."""
     img = casing(16, rivets=False)
@@ -911,6 +970,8 @@ blocks = {
     "radio_signal_recorder_side_on": recorder_side(True),
     "radio_signal_recorder_top": top(False, receiver=False),
     "radio_signal_recorder_top_on": top(True, receiver=False),
+    "radio_lamp_frame": lamp_frame(),
+    "radio_lamp_glass": lamp_glass(),
     "aviation_beacon_red": beacon_dome("red"),
     "aviation_beacon_white": beacon_dome("white"),
     "aviation_beacon_base": beacon_base(),
@@ -950,7 +1011,8 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
          **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
-         "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)}}
+         "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
+         **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")}}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

@@ -16,6 +16,25 @@
                 "reikos_signal_tower:frequency",
                 "reikos_signal_tower:recorder_tape"
               ]
+            },
+            {
+              "function": "minecraft:copy_state",
+              "block": "reikos_signal_tower:radio_signal_recorder",
+              "properties": [
+                "antenna"
+              ],
+              "conditions": [
+                {
+                  "condition": "minecraft:inverted",
+                  "term": {
+                    "condition": "minecraft:block_state_property",
+                    "block": "reikos_signal_tower:radio_signal_recorder",
+                    "properties": {
+                      "antenna": "none"
+                    }
+                  }
+                }
+              ]
             }
           ]
         }

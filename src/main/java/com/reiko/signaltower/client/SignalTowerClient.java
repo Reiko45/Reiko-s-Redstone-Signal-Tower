@@ -123,12 +123,21 @@ public final class SignalTowerClient {
     /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */
     private static void registerItemColors(RegisterColorHandlersEvent.Item event) {
         event.register(MultiRemoteItem::tintColor, ModRegistry.MULTI_REMOTE.get());
+        // v0.45.0: the Radio Lamp item in its color (as if lit).
+        event.register((stack, tintIndex) -> tintIndex == 0
+                ? com.reiko.signaltower.block.RadioLampBlock.tint(com.reiko.signaltower.block.RadioLampBlock.colorOf(stack), 15) : -1,
+                ModRegistry.RADIO_LAMP_ITEM.get());
     }
 
     private static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
         event.register((state, level, pos, tintIndex) ->
                         tintIndex == 0 ? RedStoneWireBlock.getColorForPower(state.getValue(WallRedstoneBlock.POWER)) : -1,
                 ModRegistry.WALL_REDSTONE.get());
+        // v0.45.0: the Radio Lamp's glass, in its color and as bright as what it hears.
+        event.register((state, level, pos, tintIndex) -> tintIndex == 0
+                ? com.reiko.signaltower.block.RadioLampBlock.tint(state.getValue(com.reiko.signaltower.block.RadioLampBlock.COLOR),
+                        state.getValue(com.reiko.signaltower.block.RadioLampBlock.POWER)) : -1,
+                ModRegistry.RADIO_LAMP.get());
     }
 
     /** Leaving a world or server: forget its frequency names (the next one sends its own). */

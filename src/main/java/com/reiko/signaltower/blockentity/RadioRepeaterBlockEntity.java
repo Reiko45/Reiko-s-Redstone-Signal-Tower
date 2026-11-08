@@ -115,7 +115,7 @@ public class RadioRepeaterBlockEntity extends RadioBlockEntity {
             return;
         }
         SignalNetwork network = SignalNetwork.get(serverLevel);
-        network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.reachAt(serverLevel, worldPosition),
+        network.updateRepeater(worldPosition, getFrequency(), getSendFrequency(), RadioHelper.towerReach(serverLevel, worldPosition, serverLevel.getBlockState(worldPosition)),
                 getTunedBy(), getGate(), threshold);
         seenRevision = network.revision(getSendFrequency());
         updateLight(serverLevel, network);

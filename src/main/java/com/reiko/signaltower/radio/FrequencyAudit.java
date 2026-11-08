@@ -38,7 +38,7 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -140,6 +140,7 @@ public final class FrequencyAudit {
                         : block instanceof com.reiko.signaltower.block.RadioDelayReceiverBlock ? Kind.DELAY_RECEIVER
                         : block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock ? Kind.COUNTER_RECEIVER
                         : block instanceof com.reiko.signaltower.block.RadioSpeakerBlock ? Kind.SPEAKER
+                        : block instanceof com.reiko.signaltower.block.RadioLampBlock ? Kind.LAMP
                         : block instanceof CompactRadioReceiverBlock ? Kind.COMPACT_RECEIVER : Kind.RECEIVER;
                 Status status = FrequencyClaims.mayHear(level, frequency, tunedBy) ? Status.WORKING : Status.DEAF;
                 found.add(row(server, claim, kind, dimension, receiver.pos(), tunedBy, status,
