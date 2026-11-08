@@ -74,7 +74,8 @@ public final class PowerCost {
         for (int i = 0; i < COLUMN_LIMIT; i++) {
             for (Direction side : Direction.values()) {
                 BlockPos next = cursor.relative(side);
-                if (level.getBlockEntity(next) instanceof RadioBatteryBlockEntity) {
+                // Never load a chunk to look (a tower at a chunk's edge, its neighbour not loaded).
+                if (level.isLoaded(next) && level.getBlockEntity(next) instanceof RadioBatteryBlockEntity) {
                     found.add(next);
                 }
             }
