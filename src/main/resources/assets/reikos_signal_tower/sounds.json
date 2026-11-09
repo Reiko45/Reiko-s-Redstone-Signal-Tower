@@ -1,0 +1,56 @@
+{
+  "tuner.tune": {
+    "subtitle": "subtitles.reikos_signal_tower.tuner.tune",
+    "sounds": [
+      "reikos_signal_tower:tuner_tune"
+    ]
+  },
+  "tuner.step": {
+    "subtitle": "subtitles.reikos_signal_tower.tuner.step",
+    "sounds": [
+      "reikos_signal_tower:tuner_step"
+    ]
+  },
+  "telegraph.key": {
+    "subtitle": "subtitles.reikos_signal_tower.telegraph.key",
+    "sounds": [
+      "reikos_signal_tower:telegraph_key"
+    ]
+  },
+  "telegraph.sounder": {
+    "subtitle": "subtitles.reikos_signal_tower.telegraph.sounder",
+    "sounds": [
+      "reikos_signal_tower:telegraph_sounder"
+    ]
+  },
+  "pager.beep": {
+    "subtitle": "subtitles.reikos_signal_tower.pager.beep",
+    "sounds": [
+      "reikos_signal_tower:pager_beep"
+    ]
+  },
+  "meter.tick": {
+    "subtitle": "subtitles.reikos_signal_tower.meter.tick",
+    "sounds": [
+      "reikos_signal_tower:meter_tick"
+    ]
+  },
+  "tower.on": {
+    "subtitle": "subtitles.reikos_signal_tower.tower.on",
+    "sounds": [
+      "reikos_signal_tower:tower_on"
+    ]
+  },
+  "tower.off": {
+    "subtitle": "subtitles.reikos_signal_tower.tower.off",
+    "sounds": [
+      "reikos_signal_tower:tower_off"
+    ]
+  },
+  "station.siren": {
+    "subtitle": "subtitles.reikos_signal_tower.station.siren",
+    "sounds": [
+      "reikos_signal_tower:station_siren"
+    ]
+  }
+}

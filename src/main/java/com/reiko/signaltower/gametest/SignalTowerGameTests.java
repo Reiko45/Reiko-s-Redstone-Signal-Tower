@@ -9803,4 +9803,193 @@ public final class SignalTowerGameTests {
                 .thenExecute(() -> level.getPoiManager().release(home[0]))
                 .thenSucceed();
     }
+
+    // ---- v0.59.0: the mod's own sounds, and the radio in turtles and pocket computers ----
+
+    /** Reads a resource of the mod from the classpath (null if it isn't there). */
+    private static byte[] modResource(String path) {
+        try (var in = SignalTowerGameTests.class.getResourceAsStream("/" + path)) {
+            return in == null ? null : in.readAllBytes();
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The mod's own sounds: all nine are registered; sounds.json lists each with a subtitle that
+     * en_us.json has, and each one's file is there, an Ogg Vorbis file, mono (so it's heard from
+     * where it's played) at 44.1 kHz. The Speaker's three new sounds are the mod's, the Radio
+     * Operator works its telegraph's key. A new Radio Transmitter coming on the air plays its "on"
+     * sound; going off (2 seconds later), its "off" sound; again at once, nothing (too soon); a
+     * compact one makes none.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radioSounds(GameTestHelper helper) {
+        com.google.gson.JsonObject lang = modLang();
+        com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
+                modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 9 && sounds.size() == 9, "Nine sounds: " + sounds.keySet());
+        for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
+            String event = holder.getId().getPath();
+            check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
+            var entry = sounds.getAsJsonObject(event);
+            check(entry != null && lang.has(entry.get("subtitle").getAsString()), "Listed, with a subtitle: " + event);
+            for (var file : entry.getAsJsonArray("sounds")) {
+                String name = file.getAsString().substring("reikos_signal_tower:".length());
+                byte[] ogg = modResource("assets/reikos_signal_tower/sounds/" + name + ".ogg");
+                check(ogg != null && ogg.length > 100 && new String(ogg, 0, 4, java.nio.charset.StandardCharsets.US_ASCII).equals("OggS"), "Its file: " + name);
+                int packet = 27 + (ogg[26] & 0xFF); // the first page's header, then its segment table
+                check(new String(ogg, packet + 1, 6, java.nio.charset.StandardCharsets.US_ASCII).equals("vorbis"), "Vorbis: " + name);
+                int channels = ogg[packet + 11] & 0xFF;
+                int rate = (ogg[packet + 12] & 0xFF) | (ogg[packet + 13] & 0xFF) << 8 | (ogg[packet + 14] & 0xFF) << 16;
+                check(channels == 1 && rate == 44100, name + ": " + channels + " channels, " + rate + " Hz");
+            }
+        }
+        check(com.reiko.signaltower.radio.SpeakerSound.SIREN.sound() == com.reiko.signaltower.registry.ModSounds.STATION_SIREN.get()
+                && com.reiko.signaltower.radio.SpeakerSound.PAGER.sound() == com.reiko.signaltower.registry.ModSounds.PAGER_BEEP.get()
+                && com.reiko.signaltower.radio.SpeakerSound.STATIC.sound() == com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), "The Speaker's new sounds");
+        for (var sound : List.of(com.reiko.signaltower.radio.SpeakerSound.PAGER, com.reiko.signaltower.radio.SpeakerSound.STATIC, com.reiko.signaltower.radio.SpeakerSound.SIREN)) {
+            check(lang.has(((net.minecraft.network.chat.contents.TranslatableContents) sound.label().getContents()).getKey()), "Its name: " + sound);
+        }
+        check(com.reiko.signaltower.world.ModVillagers.RADIO_OPERATOR.get().workSound() == com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(),
+                "A Radio Operator works its key");
+
+        BlockPos tx = new BlockPos(2, 1, 2);
+        BlockPos compact = new BlockPos(8, 1, 2);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4623);
+        helper.setBlock(compact.below(), Blocks.STONE);
+        helper.setBlock(compact, ModRegistry.COMPACT_RADIO_TRANSMITTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock.FACE, net.minecraft.world.level.block.state.properties.AttachFace.FLOOR));
+        setFrequency(helper, compact, 4623);
+        com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity tower = helper.getBlockEntity(tx);
+        com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity small = helper.getBlockEntity(compact);
+        var powered = com.reiko.signaltower.block.RadioTransmitterBlock.POWERED;
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(tower.lastAirSoundForTests() == null, "No sound before it sends");
+                    helper.setBlock(tx.east(), Blocks.REDSTONE_BLOCK);
+                    helper.setBlock(compact.east(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(tx).getValue(powered) && helper.getBlockState(compact).getValue(powered), "On the air"))
+                .thenExecute(() -> check(Boolean.TRUE.equals(tower.lastAirSoundForTests()) && small.lastAirSoundForTests() == null,
+                        "The tower's \"on\" sound; none for the compact one"))
+                .thenIdle(com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.AIR_SOUND_GAP_TICKS + 2)
+                .thenExecute(() -> helper.setBlock(tx.east(), Blocks.AIR))
+                .thenWaitUntil(() -> check(!helper.getBlockState(tx).getValue(powered), "Off the air"))
+                .thenExecute(() -> {
+                    check(Boolean.FALSE.equals(tower.lastAirSoundForTests()), "Its \"off\" sound");
+                    helper.setBlock(tx.east(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(tx).getValue(powered), "Back on"))
+                .thenExecute(() -> check(Boolean.FALSE.equals(tower.lastAirSoundForTests()), "Too soon for another sound"))
+                .thenSucceed();
+    }
+
+    /** A turtle or pocket computer's radio, for the tests: it can be moved, and keeps the messages it gets. */
+    private static final class TestDevice implements com.reiko.signaltower.compat.MobileRadio.Device {
+        private final ServerLevel level;
+        private BlockPos pos;
+        private final int frequency;
+        private final UUID owner = UUID.randomUUID();
+        private final List<String> got = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        TestDevice(ServerLevel level, BlockPos pos, int frequency) {
+            this.level = level;
+            this.pos = pos;
+            this.frequency = frequency;
+        }
+
+        public ServerLevel level() { return level; }
+        public BlockPos position() { return pos; }
+        public int frequency() { return frequency; }
+        public UUID owner() { return owner; }
+        public void message(int f, String text, String from) { got.add(f + " " + text + "|" + from); }
+    }
+
+    /**
+     * A radio that moves (CC: Tweaked's turtle and pocket peripheral only calls these): it hears a
+     * tower where it is, and scans; its pulse turns a receiver in reach on for the pulse and off
+     * again, heard by one; it sends a telegraph message ("Turtle 3") that a telegraph on its frequency
+     * reads (it doesn't get its own); a telegraph's message reaches it while it's in reach, not once
+     * it's moved far away; on someone else's private frequency its pulse and messages are refused.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void mobileRadio(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(8, 1, 1);
+        BlockPos tg = new BlockPos(11, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4624);
+        helper.setBlock(tx.east(), Blocks.REDSTONE_BLOCK);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4625);
+        place(helper, tg, ModRegistry.RADIO_TELEGRAPH.get(), 4625);
+        TestDevice turtle = new TestDevice(level, helper.absolutePos(new BlockPos(5, 1, 5)), 4625);
+        com.reiko.signaltower.compat.MobileRadio.add(turtle);
+        claims.put(4626, UUID.randomUUID(), "Owner", java.util.Map.of());
+        int[] heardBy = new int[1];
+        helper.startSequence()
+                .thenIdle(2) // the receiver checks in with the network on its first tick
+                .thenWaitUntil(() -> check(com.reiko.signaltower.compat.MobileRadio.heard(level, turtle.position(), 4624, turtle.owner) == 15,
+                        "It hears the tower where it is"))
+                .thenExecute(() -> {
+                    var scan = com.reiko.signaltower.compat.MobileRadio.scan(level, turtle.position(), turtle.owner);
+                    check(scan.stream().anyMatch(row -> Integer.valueOf(4624).equals(row.get("frequency"))), "Scanned: " + scan);
+                    check(com.reiko.signaltower.compat.MobileRadio.reach(level, turtle.position()) > 0, "Its reach");
+                    var pulse = com.reiko.signaltower.compat.MobileRadio.pulse(level, turtle.position(), 4625, turtle.owner, "Turtle 3", 10);
+                    check(pulse.sent(), "Pulsed: " + pulse);
+                    heardBy[0] = pulse.heardBy();
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "The receiver hears the pulse"))
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "and it ends"))
+                .thenExecute(() -> {
+                    check(heardBy[0] == 1, "Heard by 1: " + heardBy[0]);
+                    check(com.reiko.signaltower.compat.MobileRadio.send(level, turtle.position(), 4625, turtle.owner, "Turtle 3", "Hello from a turtle") == null,
+                            "Message sent");
+                    check(helper.getBlockState(tg).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED), "The telegraph reads it");
+                    var messages = com.reiko.signaltower.compat.MobileRadio.messages(level, turtle.position(), 4625, turtle.owner);
+                    check(!messages.isEmpty() && "Hello from a turtle".equals(messages.get(messages.size() - 1).get("text"))
+                            && "Turtle 3".equals(messages.get(messages.size() - 1).get("from")), "Listed: " + messages);
+                    check(turtle.got.isEmpty(), "Not its own: " + turtle.got);
+                    check(com.reiko.signaltower.compat.MobileRadio.send(level, turtle.position(), 4625, turtle.owner, "Turtle 3", "  ") != null, "Empty: refused");
+                    check(!com.reiko.signaltower.compat.MobileRadio.pulse(level, turtle.position(), 4626, turtle.owner, "Turtle 3", 10).sent()
+                            && com.reiko.signaltower.compat.MobileRadio.send(level, turtle.position(), 4626, turtle.owner, "Turtle 3", "hi") != null,
+                            "Not on someone else's private frequency");
+                })
+                .thenIdle(com.reiko.signaltower.radio.Telegraph.COOLDOWN_TICKS)
+                .thenExecute(() -> {
+                    var sent = com.reiko.signaltower.radio.Telegraph.sendAs(level, helper.absolutePos(tg), null, "Computer 9", "Turtle, come home");
+                    check(sent != null && sent.sent(), "The telegraph sends");
+                    check(turtle.got.contains("4625 Turtle, come home|Computer 9"), "It reaches the turtle: " + turtle.got);
+                    turtle.pos = turtle.pos.offset(5000, 0, 0);
+                })
+                .thenIdle(com.reiko.signaltower.radio.Telegraph.COOLDOWN_TICKS)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.radio.Telegraph.sendAs(level, helper.absolutePos(tg), null, "Computer 9", "Are you there?");
+                    check(turtle.got.size() == 1, "Not once it's far away: " + turtle.got);
+                    com.reiko.signaltower.compat.MobileRadio.remove(turtle);
+                    check(!com.reiko.signaltower.compat.MobileRadio.listed(turtle), "Gone");
+                    claims.remove(4626);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * With CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are there from
+     * their data files, take any Radio Pager and keep its frequency (giving it back on the pager),
+     * are called "Radio", and make a "radio" peripheral whose frequency is the upgrade's (and can
+     * be set). Without it, there's nothing to check.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void radioUpgrades(GameTestHelper helper) {
+        if (!net.neoforged.fml.ModList.get().isLoaded(com.reiko.signaltower.compat.cct.CctCompat.MOD_ID)) {
+            helper.succeed();
+            return;
+        }
+        List<String> problems = com.reiko.signaltower.compat.cct.CctCompat.checkRadioUpgrades(helper.getLevel(), helper.absolutePos(new BlockPos(1, 1, 1)));
+        check(problems.isEmpty(), "Radio upgrades: " + problems);
+        SignalTower.LOGGER.info("radioUpgrades: CC: Tweaked has the Radio Turtle and Radio Pocket Computer");
+        helper.succeed();
+    }
 }

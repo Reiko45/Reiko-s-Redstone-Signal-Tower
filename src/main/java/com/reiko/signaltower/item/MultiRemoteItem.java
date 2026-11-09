@@ -106,7 +106,7 @@ public class MultiRemoteItem extends Item {
                 setButtons(stack, buttons.withButton(buttons.selected(), old.withFrequency(radio.getFrequency())));
                 player.displayClientMessage(Component.translatable(KEY + "frequency_copied_button",
                         FrequencyNames.label(level, radio.getFrequency()), old.label(buttons.selected())), true);
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
+                level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.PLAYERS, 0.6F, 1.0F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

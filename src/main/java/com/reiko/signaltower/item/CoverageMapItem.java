@@ -148,7 +148,7 @@ public class CoverageMapItem extends MapItem {
                     NEXT_ROW.put(id, 0); // repaint for the new frequency
                 }
                 player.displayClientMessage(Component.translatable(KEY + "coverage_copied", FrequencyNames.label(level, frequency)), true);
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
+                level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.PLAYERS, 0.6F, 1.0F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

@@ -90,7 +90,7 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
         long now = level.getGameTime();
         if (be.clicks > 0 && now % CLICK_GAP_TICKS == 0) {
             be.clicks--;
-            level.playSound(null, pos, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS, 0.6F, be.clicks == 0 ? 1.2F : 1.8F);
+            level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_SOUNDER.get(), SoundSource.BLOCKS, 0.6F, be.clicks == 0 ? 0.9F : 1.05F);
         }
         if (state.getValue(RadioTelegraphBlock.POWERED) && now >= be.poweredUntil) {
             level.setBlock(pos, state.setValue(RadioTelegraphBlock.POWERED, false), Block.UPDATE_ALL);

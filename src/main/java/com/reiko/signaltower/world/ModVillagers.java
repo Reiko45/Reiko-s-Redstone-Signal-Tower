@@ -39,7 +39,7 @@ public final class ModVillagers {
 
     public static final DeferredHolder<VillagerProfession, VillagerProfession> RADIO_OPERATOR = PROFESSIONS.register("radio_operator",
             () -> new VillagerProfession("radio_operator", holder -> holder.is(RADIO_OPERATOR_POI_KEY), holder -> holder.is(RADIO_OPERATOR_POI_KEY),
-                    ImmutableSet.of(), ImmutableSet.of(), SoundEvents.NOTE_BLOCK_HAT.value()));
+                    ImmutableSet.of(), ImmutableSet.of(), com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get())); // v0.59.0: works its telegraph's key
 
     private ModVillagers() {
     }

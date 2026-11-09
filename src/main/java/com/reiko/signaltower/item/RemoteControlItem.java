@@ -87,7 +87,7 @@ public class RemoteControlItem extends Item {
                 FrequencyTunerItem.setFrequency(context.getItemInHand(), radio.getFrequency());
                 player.displayClientMessage(Component.translatable(
                         "message." + SignalTower.MOD_ID + ".frequency_copied_remote", radio.getFrequency()), true);
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
+                level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.PLAYERS, 0.6F, 1.0F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }

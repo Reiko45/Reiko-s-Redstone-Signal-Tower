@@ -147,6 +147,11 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             setChanged();
             refresh(); // on the air at 15 before the message goes out
             announceRaid(level, com.reiko.signaltower.radio.RaidAlerts.startText());
+            if (!SignalNetwork.get(level).isDown(worldPosition)) {
+                // v0.59.0: and its siren, heard 48 blocks round
+                level.playSound(null, worldPosition, com.reiko.signaltower.registry.ModSounds.STATION_SIREN.get(),
+                        net.minecraft.sounds.SoundSource.BLOCKS, 3.0F, 1.0F);
+            }
             return;
         }
         raidWaves = now.waves();
@@ -283,6 +288,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         villageStation = tag.getBoolean("village_station");
         foundSign = tag.contains("found_sign") ? BlockPos.of(tag.getLong("found_sign")) : null;
         raidId = tag.contains("raid_id") ? tag.getInt("raid_id") : -1;
+        loaded = true; // v0.59.0: its first refresh after loading makes no on/off sound
         raidWave = tag.getInt("raid_wave");
         raidWaves = tag.getInt("raid_waves");
     }
@@ -315,8 +321,45 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         boolean powered = power > 0 && !SignalNetwork.get(serverLevel).isDown(worldPosition);
         if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
             serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
+            airSound(serverLevel, state, powered);
         }
+        airSeen = true;
         advancements(serverLevel, state, powered, reach);
+    }
+
+    // ---- v0.59.0: the sound of a tower going on and off the air ----
+
+    /** At least this long between two of its on/off sounds (a tower on a fast clock stays bearable). */
+    public static final int AIR_SOUND_GAP_TICKS = 40;
+    private long lastAirSound = Long.MIN_VALUE;
+    /** Whether it has been refreshed since it was made or loaded; and whether it was loaded (or placed from a template). */
+    private boolean airSeen;
+    private boolean loaded;
+    /** For the tests: the last on/off sound it played (true on, false off), or null. */
+    private @Nullable Boolean lastAirSoundOn;
+
+    /**
+     * A full-size Radio Transmitter coming on or going off the air: a relay clunk and a carrier
+     * whining up, or sinking into static. Not the first time a loaded (or generated) tower is
+     * looked at, not for the compact or special transmitters, and not more often than every 2 seconds.
+     */
+    private void airSound(ServerLevel level, BlockState state, boolean on) {
+        if (!state.is(ModRegistry.RADIO_TRANSMITTER.get()) || !airSeen && (loaded || foundTower)) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (lastAirSound != Long.MIN_VALUE && now - lastAirSound < AIR_SOUND_GAP_TICKS) {
+            return;
+        }
+        lastAirSound = now;
+        lastAirSoundOn = on;
+        level.playSound(null, worldPosition, on ? com.reiko.signaltower.registry.ModSounds.TOWER_ON.get()
+                : com.reiko.signaltower.registry.ModSounds.TOWER_OFF.get(), net.minecraft.sounds.SoundSource.BLOCKS, 0.7F, 1.0F);
+    }
+
+    /** For the tests: the last on/off sound it played (true on, false off), or null if none. */
+    public @Nullable Boolean lastAirSoundForTests() {
+        return lastAirSoundOn;
     }
 
     /** v0.56.0: First Broadcast and Over the Horizon for its tuner; Finders Keepers for an old tower brought back. */

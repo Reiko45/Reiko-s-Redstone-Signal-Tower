@@ -45,7 +45,7 @@ public record ScrollFrequencyPayload(boolean offhand, boolean up, boolean favori
         Component message = RadioFavorites.scroll(player.level(), stack, payload.up(), payload.favorites());
         player.displayClientMessage(message, true);
         if (player instanceof ServerPlayer serverPlayer) {
-            serverPlayer.playNotifySound(SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.PLAYERS, 0.35F, payload.up() ? 1.9F : 1.6F);
+            serverPlayer.playNotifySound(com.reiko.signaltower.registry.ModSounds.TUNER_STEP.get(), SoundSource.PLAYERS, 0.5F, payload.up() ? 1.1F : 0.95F);
         }
     }
 }

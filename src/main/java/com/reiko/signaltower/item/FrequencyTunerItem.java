@@ -73,7 +73,7 @@ public class FrequencyTunerItem extends Item {
             if (player != null && player.isSecondaryUseActive()) {
                 setFrequency(stack, radio.getFrequency());
                 message = Component.translatable("message." + SignalTower.MOD_ID + ".frequency_copied", FrequencyNames.label(level, radio.getFrequency()));
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
+                level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.PLAYERS, 0.6F, 1.0F);
             } else {
                 int frequency = getFrequency(stack);
                 Component refused = refusal(level, radio, frequency, player);
@@ -107,7 +107,7 @@ public class FrequencyTunerItem extends Item {
                         IntruderAlerts.report(level.getServer(), radio.getFrequency(), player, IntruderAlerts.Kind.DEAF,
                                 level.getBlockState(pos).getBlock());
                     }
-                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.6F);
+                    level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.BLOCKS, 0.7F, 1.15F);
                 }
             }
             if (player != null) {

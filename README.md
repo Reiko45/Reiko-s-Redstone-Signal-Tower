@@ -20,7 +20,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
 | **Radio Counter Receiver** | Counts how many times its frequency turns on, and turns on once the count reaches a set number (1 to 64): for a 1-second pulse, or until a second **reset frequency** turns on. It can forget the count after a pause, so three quick presses work and three slow ones don't (a secret knock). |
-| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass or beep, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver. |
+| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass, beep, pager, static or siren, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver. |
 | **Radio Status Board** | A panel for a wall that shows up to four frequencies at a glance: each one's name, a light and the strength heard there, glowing so it reads at night. A control-room display for your base. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
@@ -440,7 +440,7 @@ A **Radio Counter Receiver** (since 0.42) counts how many times its frequency tu
 
 A **Radio Speaker** (since 0.43) is a receiver (it outputs what it hears, like a Radio Receiver) that also plays a sound when its frequency turns on. Right-click it with an empty hand to open its screen:
 
-- **Sound:** Bell, Chime, Ding, Doorbell (two notes, "ding-dong"), Pling, Bass or Beep. They're the game's own sounds, so they show in subtitles ("Bell rings", "Note Block plays") and follow the Blocks volume slider.
+- **Sound:** Bell, Chime, Ding, Doorbell (two notes, "ding-dong"), Pling, Bass or Beep, which are the game's own note block sounds ("Bell rings", "Note Block plays" in subtitles), or, since 0.59, Pager, Static or Siren, the mod's own ("Pager beeps", "Radio tunes in", "Raid siren wails"). All follow the Blocks volume slider.
 - **Pitch:** any of a note block's 25 notes, F♯3 to F♯5 (F♯4 is the sound's own pitch).
 - **Volume:** quiet or normal (heard within 16 blocks) or loud (within 48).
 - **Plays:** **Once when it turns on** (the default), or **Every second while on**, for an alarm that rings until the signal stops.
@@ -761,6 +761,26 @@ Put a ring round the mast **one below the top**. Standing on that, your head cle
 
 ![An old radio tower found in an old-growth taiga, a stone-and-spruce hut beside a mast 10 tall with a platform near the top, a beacon and guy wires, and Alex's scanner arrow "Frequency 681675: 25 blocks"; Dev climbing the mast by walking into it, past the guy wires, with the battery and solar panel at its foot; Dev standing on the platform under the top, Jade on the transmitter "Frequency: 681675", "Sending: 15", "Reach: 152 blocks", "An old radio tower, found in the world", "Braced by 3 guy wires", "Battery: 70%"; the hut's door with its sign "Radio Station, Frequency 681675", the chest inside and the redstone torch at the mast's foot; Alex's Signal Scanner 89 blocks away "681,675 ON 15 Transmitter, 89 blocks north-west"; and Dev standing on a second ring of platforms he put in halfway up the mast by hand while climbing](docs/images/old-radio-towers-and-climbing.png)
 
+### Sounds
+
+Since 0.59 the mod has its own sounds, each with a subtitle:
+
+| Sound | Subtitle | When |
+|---|---|---|
+| Static and a whistle | "Radio tunes in" | A tuner tunes a block, or a tuner, remote, pager, meter or map copies a frequency |
+| A dial click | "Tuning dial clicks" | Sneak + scroll changes a handheld's frequency |
+| A key tapping | "Telegraph key taps" | A player or computer sends a telegraph message, and a Radio Operator at work |
+| A sounder's clack | "Telegraph clacks" | A telegraph gets a message |
+| A beep | "Pager beeps" | A pager goes off (three beeps when its frequency turns on) |
+| A tick | "Signal Meter ticks" | The Signal Meter's Geiger-counter tick |
+| A relay's clunk and a rising hum | "Tower goes on the air" | A Radio Transmitter starts sending |
+| A falling hum, static and a clunk | "Tower goes off the air" | It stops |
+| A two-tone siren | "Raid siren wails" | A village station when a raid starts, heard 48 blocks away |
+
+- **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
+- **A Radio Speaker** can play three of them too: Pager, Static (the tuning sound) and Siren.
+- They're made by `tools/make_sounds.py` (synthesized from sine waves and noise, no recordings), and follow the Players or Blocks volume slider like the game's own.
+
 ### Advancements
 
 Since 0.56 the mod has its own tab of advancements:
@@ -809,7 +829,8 @@ Since 0.58 a village radio station warns of a raid. While a raid is on within 96
 
 - **sends 15**, even if its torch is gone;
 - **telegraphs on its frequency**, as "Village Radio": "RAID! Pillagers are coming to the village" when the raid starts (before the first wave arrives), "Raid: wave 2 of 3" as each wave comes, and "The raid is over: the village held" (or "the village fell") at the end. If a raid just stops, for example when everyone leaves, it says "The raid has ended". Pagers, telegraphs and Status Boards on its frequency within its reach (512 blocks for a station 60 blocks above sea level) get the messages, so you hear about a raid from far away, and a telegraph gives a redstone pulse with each one;
-- shows it in **Jade**: "Raid! Wave 1 of 3".
+- shows it in **Jade**: "Raid! Wave 1 of 3";
+- since 0.59, **sounds a siren** when the raid starts ("Raid siren wails"), heard 48 blocks away.
 
 `raidAlerts` in the server config turns it off. A raid has 3 waves on Easy, 5 on Normal and 7 on Hard, and one more when the bad omen was strong.
 
@@ -851,7 +872,36 @@ while true do
 end
 ```
 
+#### Radio Turtle and Radio Pocket Computer
+
+Since 0.59 a **Radio Pager** is also an upgrade, like a modem: craft it beside a turtle for a **Radio Turtle**, or above a pocket computer for a **Radio Pocket Computer**. It keeps the pager's frequency, and gives the pager back (still tuned) when you take it off. Its peripheral, `radio`, goes wherever the turtle or the player goes:
+
+| Function | What it does |
+|---|---|
+| `getFrequency()`, `setFrequency(frequency)`, `getFrequencyName()` | Its frequency (any, from 1 to 999,999,999) |
+| `getSignal()`, `listen(frequency)` | The strength heard where it is, on its frequency or any other |
+| `scan()` | Everything that could be heard there: frequency, strength and name |
+| `getReach()` | How far it sends from here: like a Remote Control, farther the higher it is |
+| `pulse([seconds])` | A full-strength pulse on its frequency, like a remote (0.5 seconds, or 0.1 to 10): true and how many receivers and pagers heard it, or false and why not |
+| `send(text)` | Telegraphs a message (one every 2 seconds), signed "Turtle 2" or "Pocket Computer 1": true, or false and why not |
+| `getMessages()` | The messages on its frequency that reached where it is (text, from, secondsAgo) |
+
+- **Events:** `radio_signal` (side, frequency, strength) when what it hears changes, and `radio_message` (side, frequency, text, from) when a message on its frequency reaches it, but not its own.
+- **A pocket computer's light** glows green while it hears its frequency.
+- **The same rules as a player:** the turtle's owner (whoever placed it) or the pocket computer's holder counts for private and encrypted frequencies.
+
+A turtle that climbs until it can reach a tower 600 blocks away, then calls for help:
+
+```lua
+local radio = peripheral.find("radio")
+radio.setFrequency(4600)
+while radio.getReach() < 600 and turtle.up() do end
+radio.send("Help! Up here with " .. radio.getReach() .. " blocks of reach")
+```
+
 ![Jade on a plains village's station during a raid: "Sending: 15", "Reach: 512 blocks", "A village's radio station", "Raid! Wave 1 of 3", under the raid bar, with a pillager and an iron golem below; a base 160 blocks away: an Advanced Computer between a Radio Telegraph and a Radio Transmitter, a receiver on top, and a Radio Lamp the computer has lit red; the computer's monitor program listing the raid from "RAID!" through waves 1 to 3 to "the village held", its alarm "sending" and then "quiet"; Alex's chat with the pager's messages from Village Radio; the Lua prompt reading the receiver, scanning 9 frequencies, the alarm "sending" 9, and sending a telegraph message as "Computer 0"; and Jade on the alarm transmitter: "Sending: 9", "A computer sends: 9"](docs/images/cc-tweaked-and-raid-alerts.png)
+
+![Alex tuning a transmitter with the tuner and a pager on its frequency, with the subtitles "Tuning dial clicks", "Radio tunes in", "Pager beeps" and "Tower goes on the air"; Dev at a plains village station as a raid starts, Jade "Raid! The pillagers are on their way" and the subtitle "Raid siren wails"; a crafting table with a Radio Pager above an Advanced Pocket Computer making an "Advanced Radio Pocket Computer"; its Lua prompt: getSignal() 15, getReach() 584, scan() 9 frequencies, send(...) true and pulse(1) true, heard by 2, with Alex's pager showing "message on 367132 from Pocket Computer 1" and the subtitles "Telegraph clacks" and "Pager beeps"; an Advanced Radio Turtle with the pager on its side; and the turtle's Lua prompt: getReach() 576, then 624 after climbing 6 blocks, and send("Turtle 2 is up") true, which Alex's pager gets](docs/images/sounds-and-radio-upgrades.png)
 
 ### Radio Jammers
 
@@ -1110,6 +1160,8 @@ To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod)
 
 To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, and `-PwithCct` for CC: Tweaked. Otherwise they're only compiled against.
 
+The sounds' `.ogg` files are checked in. To change one, edit `tools/make_sounds.py` and run `python3 tools/make_sounds.py` (it needs numpy and ffmpeg).
+
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
 **IntelliJ IDEA:** File → Open → pick this folder's `build.gradle` → Open as Project. Wait for the Gradle sync to finish, then use the generated run configurations (Client, Server, GameTestServer).
@@ -1123,6 +1175,7 @@ src/main/java/com/reiko/signaltower/
   SignalTower.java                       mod entry point: registration, creative tabs, packets
   Config.java                            server config (reach settings, tower relay switch, private frequency limit)
   registry/ModRegistry.java              blocks, items, block entities, the frequency data component
+  registry/ModSounds.java                the mod's sound events
   block/RadioBlock.java                  shared transmitter/receiver code: status readout, tooltips
   block/RadioTransmitterBlock.java       reads input, broadcasts
   block/RadioReceiverBlock.java          redstone output
@@ -1253,6 +1306,8 @@ src/main/java/com/reiko/signaltower/
   compat/emi/SignalTowerEmiPlugin.java, RadioOperatorEmiRecipe.java  the EMI plugin and its trades page (only loaded by EMI)
   compat/RadioComputer.java              what a computer can do with a radio block, and its events (works without CC: Tweaked)
   compat/cct/CctCompat.java, RadioPeripheral.java and the three *Peripheral.java  the CC: Tweaked peripherals (only loaded with it)
+  compat/MobileRadio.java                a radio carried by a turtle or pocket computer: what it hears, pulses and messages (works without CC: Tweaked)
+  compat/cct/RadioUpgrades.java, MobileRadioPeripheral.java, CctClient.java  the Radio Turtle and Radio Pocket Computer upgrades, their "radio" peripheral and the turtle's model
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/DirectoryScreen.java            the frequency directory
   network/DirectoryRequestPayload.java, DirectoryResultPayload.java  the directory asking the server what's on
@@ -1275,17 +1330,19 @@ src/main/java/com/reiko/signaltower/
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
-  assets/reikos_signal_tower/            blockstates, models, textures (the Radio Operator's under textures/entity), en_us.json
+  assets/reikos_signal_tower/            blockstates, models, textures (the Radio Operator's under textures/entity), en_us.json, sounds.json and sounds/*.ogg
   data/reikos_signal_tower/              recipes, loot tables, advancements, recipe-book unlocks, worldgen, village radio shacks (structure/village), test structures
   data/minecraft/tags/point_of_interest_type/acquirable_job_site.json  lets a villager with no job take a Radio Telegraph
+  data/reikos_signal_tower/computercraft/  the radio turtle and pocket upgrades (read by CC: Tweaked)
 tools/
   make_textures.py                       draws all textures (needs Pillow)
   make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen, the village shacks' templates
+  make_sounds.py                         synthesizes the sounds and writes sounds.json (needs numpy and ffmpeg)
 docs/
   DESIGN.md                              how it works under the hood, ideas for later
 ```
 
-The `tools/` scripts are how the textures and JSON files were generated. You can keep using them, or paint and edit the files directly. Re-running a script overwrites what it writes.
+The `tools/` scripts are how the textures, sounds and JSON files were generated. You can keep using them, or paint and edit the files directly. Re-running a script overwrites what it writes.
 
 ## Automated tests
 
@@ -1478,9 +1535,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 181. computers (without CC: Tweaked's classes): a transmitter sends what a computer sets, and stops when the last computer goes; a receiver's computers get `radio_signal` as what it hears changes, and it can listen on any frequency and scan; a transmitter can't be tuned onto someone else's private frequency or out of range (a receiver can listen to it); a telegraph sends as "Computer 7", the other one's computers get `radio_message`, and its messages are listed; too fast and empty are refused; Jade shows what the computer sends;
 182. with CC: Tweaked loaded: transmitters, receivers (plain, toggle, lamp) and telegraphs are its peripherals, and a mast isn't (without it there's nothing to check);
 183. raid alerts step by step: a raid puts a station whose torch is gone on the air at 15, and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each wave once; a won raid "the village held", and it goes quiet; a raid that goes away "The raid has ended"; one already over when it's first seen, nothing; a lost one "the village fell"; Jade shows the raid, and it's saved;
-184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended".
+184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended";
+185. sounds: all nine are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static and Siren are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
+186. a radio on the move (without CC: Tweaked's classes): it hears a tower where it is and scans it; its pulse reaches a receiver (heard by 1) and ends; its message, signed "Turtle 3", reaches a telegraph and is listed, but not back to itself; empty is refused, and so is someone else's private frequency; a telegraph's message reaches it, but not once it has moved 5,000 blocks away;
+187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check).
 
-All 184 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where test 182 checks the peripherals.
+All 187 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
 
 ## License
 

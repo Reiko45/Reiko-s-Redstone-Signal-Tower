@@ -906,6 +906,10 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.raid_ended": "The raid has ended",
     f"computer.{MOD}.sender": "Computer %s",
     f"computer.{MOD}.frequency_range": "Frequency must be %s to %s",
+    # v0.59.0: the radio upgrade for turtles and pocket computers
+    f"upgrade.{MOD}.radio.adjective": "Radio",
+    f"computer.{MOD}.turtle": "Turtle %s",
+    f"computer.{MOD}.pocket": "Pocket Computer %s",
     f"sign.{MOD}.radio_tower.station": "Radio Station",
     f"sign.{MOD}.radio_tower.frequency": "Frequency",
     # v0.56.0: advancements and the Radio Operator
@@ -1327,6 +1331,19 @@ write(ASSETS / "lang" / "en_us.json", {
     f"message.{MOD}.speaker_sound_pling": "Pling",
     f"message.{MOD}.speaker_sound_bass": "Bass",
     f"message.{MOD}.speaker_sound_beep": "Beep",
+    f"message.{MOD}.speaker_sound_pager": "Pager",
+    f"message.{MOD}.speaker_sound_static": "Static",
+    f"message.{MOD}.speaker_sound_siren": "Siren",
+    # v0.59.0: the mod's own sounds (tools/make_sounds.py)
+    f"subtitles.{MOD}.tuner.tune": "Radio tunes in",
+    f"subtitles.{MOD}.tuner.step": "Tuning dial clicks",
+    f"subtitles.{MOD}.telegraph.key": "Telegraph key taps",
+    f"subtitles.{MOD}.telegraph.sounder": "Telegraph clacks",
+    f"subtitles.{MOD}.pager.beep": "Pager beeps",
+    f"subtitles.{MOD}.meter.tick": "Signal Meter ticks",
+    f"subtitles.{MOD}.tower.on": "Tower goes on the air",
+    f"subtitles.{MOD}.tower.off": "Tower goes off the air",
+    f"subtitles.{MOD}.station.siren": "Raid siren wails",
     f"message.{MOD}.speaker_volume_quiet": "quiet",
     f"message.{MOD}.speaker_volume_normal": "normal",
     f"message.{MOD}.speaker_volume_loud": "loud",
@@ -2984,5 +3001,10 @@ def radio_shack(kind):
 
 for _kind in SHACK_STYLES:
     radio_shack(_kind)
+
+# v0.59.0: the CC: Tweaked radio upgrade (a Radio Pager in a turtle or pocket computer). Only read
+# when CC: Tweaked is installed; its type is registered by compat/cct/RadioUpgrades.
+for _kind in ("turtle_upgrade", "pocket_upgrade"):
+    write(RES / "data" / MOD / "computercraft" / _kind / "radio.json", {"type": f"{MOD}:radio", "item": f"{MOD}:pager"})
 
 print("data written to", RES)

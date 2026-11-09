@@ -8,8 +8,8 @@ import net.minecraft.sounds.SoundEvents;
 import java.util.function.Supplier;
 
 /**
- * The sounds a Radio Speaker can play (v0.43.0), all vanilla so they have subtitles and follow the
- * Blocks volume slider. The doorbell plays two notes ("ding-dong"), a major third apart. Saved by
+ * The sounds a Radio Speaker can play (v0.43.0): vanilla ones, and since v0.59.0 three of the
+ * mod's own (pager, static, siren); all have subtitles and follow the Blocks volume slider. The doorbell plays two notes ("ding-dong"), a major third apart. Saved by
  * {@link #ordinal()}, so new ones go at the end.
  */
 public enum SpeakerSound {
@@ -19,7 +19,11 @@ public enum SpeakerSound {
     DOORBELL("doorbell", () -> SoundEvents.NOTE_BLOCK_BELL.value()),
     PLING("pling", () -> SoundEvents.NOTE_BLOCK_PLING.value()),
     BASS("bass", () -> SoundEvents.NOTE_BLOCK_BASS.value()),
-    BEEP("beep", () -> SoundEvents.NOTE_BLOCK_BIT.value());
+    BEEP("beep", () -> SoundEvents.NOTE_BLOCK_BIT.value()),
+    // v0.59.0: some of the mod's own
+    PAGER("pager", () -> com.reiko.signaltower.registry.ModSounds.PAGER_BEEP.get()),
+    STATIC("static", () -> com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get()),
+    SIREN("siren", () -> com.reiko.signaltower.registry.ModSounds.STATION_SIREN.get());
 
     /** The note names from F♯ up, like a note block's. */
     private static final String[] NOTES = {"F♯", "G", "G♯", "A", "A♯", "B", "C", "C♯", "D", "D♯", "E", "F"};

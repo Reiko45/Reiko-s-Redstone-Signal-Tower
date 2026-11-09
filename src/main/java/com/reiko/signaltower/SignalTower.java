@@ -66,6 +66,7 @@ public final class SignalTower {
 
     public SignalTower(IEventBus modEventBus, ModContainer modContainer) {
         ModRegistry.register(modEventBus);
+        com.reiko.signaltower.registry.ModSounds.register(modEventBus); // v0.59.0
         com.reiko.signaltower.world.ModWorldgen.register(modEventBus); // v0.55.0
         com.reiko.signaltower.advancement.TowerAdvancements.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.ModVillagers.register(modEventBus); // v0.56.0

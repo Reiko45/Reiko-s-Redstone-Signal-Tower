@@ -121,7 +121,7 @@ public final class Telegraph {
         List<SignalNetwork.Coverage> coverage = network.withRepeaters(level, frequency, own);
         SignalNetwork.Message message = network.recordMessage(frequency, coverage, pos, who, name, text);
         telegraph.markSent(now);
-        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS, 0.7F, 1.6F);
+        level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(), SoundSource.BLOCKS, 0.7F, 1.0F);
         int[] read = deliver(level, pos, frequency, coverage, message);
         int pagers = read[0];
         int telegraphs = read[1];
@@ -148,6 +148,7 @@ public final class Telegraph {
                 telegraphs++;
             }
         }
+        com.reiko.signaltower.compat.MobileRadio.deliver(level, frequency, coverage, message); // v0.59.0: radio turtles and pocket computers
         return new int[]{pagers, telegraphs};
     }
 

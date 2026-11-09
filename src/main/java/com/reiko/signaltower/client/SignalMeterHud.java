@@ -111,7 +111,7 @@ public final class SignalMeterHud {
         if (--tickCountdown <= 0) {
             tickCountdown = Math.max(2, 21 - current.strength() * 19 / 15);
             float pitch = 0.7F + current.strength() * 0.06F;
-            minecraft.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.NOTE_BLOCK_HAT.value(), pitch, 0.35F));
+            minecraft.getSoundManager().play(SimpleSoundInstance.forUI(com.reiko.signaltower.registry.ModSounds.METER_TICK.get(), pitch, 0.4F));
         }
     }
 

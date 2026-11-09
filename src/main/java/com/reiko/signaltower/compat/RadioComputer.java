@@ -202,11 +202,13 @@ public final class RadioComputer {
 
     /** Everything it could hear where it stands (as a Signal Scanner would): frequency, strength and name, strongest first. */
     public static List<Map<String, Object>> scan(RadioBlockEntity be) {
+        return be.getLevel() instanceof ServerLevel level ? scanAt(level, be.getBlockPos(), be.getTunedBy()) : new ArrayList<>();
+    }
+
+    /** Everything that could be heard at {@code pos} by {@code listener}: frequency, strength and name, strongest first. */
+    public static List<Map<String, Object>> scanAt(ServerLevel level, BlockPos pos, @Nullable java.util.UUID listener) {
         List<Map<String, Object>> list = new ArrayList<>();
-        if (!(be.getLevel() instanceof ServerLevel level)) {
-            return list;
-        }
-        for (SignalNetwork.HeardFrequency heard : SignalNetwork.get(level).scanAt(level, be.getBlockPos(), be.getTunedBy())) {
+        for (SignalNetwork.HeardFrequency heard : SignalNetwork.get(level).scanAt(level, pos, listener)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("frequency", heard.frequency());
             row.put("strength", heard.power());
@@ -239,13 +241,15 @@ public final class RadioComputer {
      * On someone else's encrypted frequency the text is left out.
      */
     public static List<Map<String, Object>> messages(TelegraphBlockEntity telegraph) {
+        return telegraph.getLevel() instanceof ServerLevel level
+                ? messagesAt(level, telegraph.getBlockPos(), telegraph.getFrequency(), telegraph.getTunedBy()) : new ArrayList<>();
+    }
+
+    /** The messages on {@code frequency} that could be read at {@code pos}, as {@code listener} reads them, oldest first. */
+    public static List<Map<String, Object>> messagesAt(ServerLevel level, BlockPos pos, int frequency, @Nullable java.util.UUID listener) {
         List<Map<String, Object>> list = new ArrayList<>();
-        if (!(telegraph.getLevel() instanceof ServerLevel level)) {
-            return list;
-        }
-        int frequency = telegraph.getFrequency();
-        boolean deaf = !FrequencyClaims.mayHear(level, frequency, telegraph.getTunedBy());
-        for (SignalNetwork.Message message : SignalNetwork.get(level).messagesAt(frequency, telegraph.getBlockPos())) {
+        boolean deaf = !FrequencyClaims.mayHear(level, frequency, listener);
+        for (SignalNetwork.Message message : SignalNetwork.get(level).messagesAt(frequency, pos)) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("text", deaf ? "" : message.text());
             row.put("from", message.name());

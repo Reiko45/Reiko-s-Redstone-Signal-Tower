@@ -291,7 +291,7 @@ public class PagerItem extends Item {
     /** One beep, heard only by the pager's owner. */
     private static void beep(Entity holder) {
         if (holder instanceof ServerPlayer player) {
-            player.playNotifySound(SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.PLAYERS, 0.8F, 1.8F);
+            player.playNotifySound(com.reiko.signaltower.registry.ModSounds.PAGER_BEEP.get(), SoundSource.PLAYERS, 0.7F, 1.0F);
         }
     }
 
@@ -333,7 +333,7 @@ public class PagerItem extends Item {
             if (!level.isClientSide) {
                 setFrequency(context.getItemInHand(), radio.getFrequency());
                 player.displayClientMessage(Component.translatable(KEY + "frequency_copied_pager", FrequencyNames.label(level, radio.getFrequency())), true);
-                level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.8F);
+                level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get(), SoundSource.PLAYERS, 0.6F, 1.0F);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
