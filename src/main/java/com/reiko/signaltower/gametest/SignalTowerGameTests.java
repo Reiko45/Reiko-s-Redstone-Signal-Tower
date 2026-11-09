@@ -9345,4 +9345,188 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.57.0: JEI / EMI, village radio shacks
+
+    private static com.google.gson.JsonObject modLang() {
+        try (var in = SignalTower.class.getResourceAsStream("/assets/" + SignalTower.MOD_ID + "/lang/en_us.json")) {
+            check(in != null, "en_us.json on the classpath");
+            return com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        } catch (java.io.IOException e) {
+            throw new net.minecraft.gametest.framework.GameTestAssertException("Couldn't read en_us.json: " + e);
+        }
+    }
+
+    /**
+     * What JEI and EMI show: every one of the mod's items (all 46) has an information page, with its
+     * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
+     * as many at each level as the villager has, with the same results.
+     */
+    @GameTest(template = PLATFORM)
+    public static void recipeViewerInfo(GameTestHelper helper) {
+        var lang = modLang();
+        var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
+        check(items.size() == 46, "All the mod's items: " + items.size());
+        for (var item : items) {
+            String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
+            check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
+        }
+        check(lang.has(com.reiko.signaltower.compat.RecipeViewerInfo.TRADES_TITLE_KEY), "The trades page's title");
+        var trades = com.reiko.signaltower.compat.RecipeViewerInfo.trades();
+        check(trades.size() == 17, "17 trades: " + trades.size());
+        var villager = net.minecraft.world.entity.npc.VillagerTrades.TRADES.get(com.reiko.signaltower.world.ModVillagers.RADIO_OPERATOR.get());
+        var trader = helper.spawn(EntityType.VILLAGER, new BlockPos(2, 1, 1));
+        trader.setNoAi(true);
+        for (int level = 1; level <= 5; level++) {
+            int at = level;
+            var listed = trades.stream().filter(t -> t.level() == at).toList();
+            var listings = villager.get(level);
+            check(listings.length == listed.size(), "Level " + level + ": " + listings.length + " trades, " + listed.size() + " shown");
+            for (int i = 0; i < listings.length; i++) {
+                var offer = listings[i].getOffer(trader, helper.getLevel().getRandom());
+                var shown = listed.get(i);
+                check(ItemStack.isSameItemSameComponents(offer.getResult(), shown.result()) && offer.getResult().getCount() == shown.result().getCount()
+                        && offer.getCostA().is(shown.costA().getItem()) && offer.getCostA().getCount() == shown.costA().getCount()
+                        && (shown.costB().isEmpty() ? offer.getCostB().isEmpty() : offer.getCostB().is(shown.costB().getItem())),
+                        "Shown as traded: " + shown);
+            }
+        }
+        trader.discard();
+        helper.succeed();
+    }
+
+    /**
+     * The five village types' house pools each hold the radio shack 3 times (the config's weight), and
+     * adding again changes nothing. Each template loads: 8 x 7 x 7, a Radio Telegraph, a bed, 4 masts,
+     * a transmitter marked as a village station, a charged battery, a "Radio Station" sign, a jigsaw
+     * meeting the type's streets and one bringing a villager from its villagers pool (which exist).
+     */
+    @GameTest(template = PLATFORM)
+    public static void villageShackPools(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var access = level.registryAccess();
+        var pools = access.registryOrThrow(net.minecraft.core.registries.Registries.TEMPLATE_POOL);
+        int weight = com.reiko.signaltower.Config.VILLAGE_RADIO_SHACKS.get();
+        check(weight == 3, "Weight 3 by default: " + weight);
+        check(com.reiko.signaltower.world.VillageRadioShacks.addToVillages(access, weight) == 0, "Adding again changes nothing");
+        for (String type : com.reiko.signaltower.world.VillageRadioShacks.TYPES) {
+            var pool = pools.get(com.reiko.signaltower.world.VillageRadioShacks.housesPool(type));
+            check(pool != null, "The " + type + " houses pool");
+            check(com.reiko.signaltower.world.VillageRadioShacks.count(pool, type) == weight, type + ": the shack " + weight + " times");
+            check(pools.containsKey(net.minecraft.resources.ResourceLocation.withDefaultNamespace("village/" + type + "/streets"))
+                    && pools.containsKey(net.minecraft.resources.ResourceLocation.withDefaultNamespace("village/" + type + "/villagers")), type + "'s streets and villagers");
+            var template = level.getStructureManager().get(com.reiko.signaltower.world.VillageRadioShacks.template(type));
+            check(template.isPresent(), type + "'s template");
+            var size = template.get().getSize();
+            check(size.getX() == 8 && size.getY() == 7 && size.getZ() == 7, type + " is 8 x 7 x 7: " + size);
+            var settings = new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings();
+            java.util.Map<Block, Integer> counts = new java.util.HashMap<>();
+            boolean station = false, street = false, villagerJigsaw = false, signed = false;
+            var all = new java.util.ArrayList<net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo>();
+            for (Block block : new Block[]{ModRegistry.RADIO_TELEGRAPH.get(), ModRegistry.RADIO_MAST.get(), ModRegistry.RADIO_TRANSMITTER.get(),
+                    ModRegistry.RADIO_BATTERY.get(), Blocks.JIGSAW}) {
+                var found = template.get().filterBlocks(BlockPos.ZERO, settings, block, false);
+                counts.put(block, found.size());
+                all.addAll(found);
+            }
+            for (var info : all) {
+                if (info.state().is(ModRegistry.RADIO_TRANSMITTER.get())) {
+                    station = info.nbt() != null && info.nbt().getBoolean("village_station") && info.nbt().getBoolean("found_tower");
+                } else if (info.state().is(ModRegistry.RADIO_BATTERY.get())) {
+                    check(info.nbt() != null && info.nbt().getInt("charge") == 80000, type + ": a charged battery");
+                } else if (info.state().is(Blocks.JIGSAW) && info.nbt() != null) {
+                    String target = info.nbt().getString("pool");
+                    street |= info.nbt().getString("name").equals("minecraft:building_entrance") && target.equals("minecraft:village/" + type + "/streets");
+                    villagerJigsaw |= info.nbt().getString("name").equals("minecraft:bottom") && target.equals("minecraft:village/" + type + "/villagers");
+                }
+            }
+            check(counts.get(ModRegistry.RADIO_TELEGRAPH.get()) == 1 && counts.get(ModRegistry.RADIO_MAST.get()) == 4
+                    && counts.get(ModRegistry.RADIO_TRANSMITTER.get()) == 1 && counts.get(ModRegistry.RADIO_BATTERY.get()) == 1
+                    && counts.get(Blocks.JIGSAW) == 2, type + ": telegraph, 4 masts, transmitter, battery, 2 jigsaws: " + counts);
+            check(station, type + ": the transmitter is a village station");
+            check(street && villagerJigsaw, type + ": meets the street, brings a villager");
+            for (Block sign : new Block[]{Blocks.OAK_WALL_SIGN, Blocks.JUNGLE_WALL_SIGN, Blocks.ACACIA_WALL_SIGN, Blocks.SPRUCE_WALL_SIGN}) {
+                for (var info : template.get().filterBlocks(BlockPos.ZERO, settings, sign, false)) {
+                    signed |= info.nbt() != null && info.nbt().getCompound("front_text").getList("messages", 8).getString(0)
+                            .contains(com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.STATION_SIGN_KEY);
+                }
+            }
+            check(signed, type + ": a Radio Station sign");
+            boolean bed = false;
+            for (Block b : new Block[]{Blocks.WHITE_BED, Blocks.CYAN_BED, Blocks.ORANGE_BED, Blocks.LIGHT_BLUE_BED, Blocks.BROWN_BED}) {
+                bed |= template.get().filterBlocks(BlockPos.ZERO, settings, b, false).size() == 2;
+            }
+            check(bed, type + ": a bed");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Two plains radio shacks placed side by side (one turned): within a second each transmitter has
+     * picked its own frequency (100,000 to 999,999, not the template's 1, not each other's), found its
+     * sign and written the frequency on it, and is on the air (lit, by its torch). Jade calls it a
+     * village's radio station, not an old tower. Its torch taken away and put back, it fires no
+     * Finders Keepers (that's for old towers).
+     */
+    @GameTest(template = TOWER_SITE, timeoutTicks = 200)
+    public static void villageRadioShack(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var fired = com.reiko.signaltower.advancement.TowerAdvancements.recordForTests();
+        var template = level.getStructureManager().get(com.reiko.signaltower.world.VillageRadioShacks.template("plains")).orElseThrow();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+        BlockPos[] origins = {new BlockPos(0, 1, 0), new BlockPos(15, 1, 8)};
+        net.minecraft.world.level.block.Rotation[] turns = {net.minecraft.world.level.block.Rotation.NONE, net.minecraft.world.level.block.Rotation.CLOCKWISE_90};
+        BlockPos[] tops = new BlockPos[2];
+        for (int i = 0; i < 2; i++) {
+            var settings = new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings().setRotation(turns[i])
+                    .addProcessor(net.minecraft.world.level.levelgen.structure.templatesystem.JigsawReplacementProcessor.INSTANCE)
+                    .addProcessor(net.minecraft.world.level.levelgen.structure.templatesystem.BlockIgnoreProcessor.STRUCTURE_AND_AIR);
+            BlockPos origin = helper.absolutePos(origins[i]);
+            template.placeInWorld(level, origin, origin, settings, level.getRandom(), Block.UPDATE_ALL);
+            tops[i] = net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.calculateRelativePosition(settings, new BlockPos(6, 5, 3)).offset(origin);
+            check(level.getBlockState(tops[i]).is(ModRegistry.RADIO_TRANSMITTER.get()), "Transmitter " + i + " at " + tops[i]);
+        }
+        var first = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(tops[0]);
+        var second = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(tops[1]);
+        BlockPos torch = tops[0].below(4).north();
+        helper.startSequence()
+                .thenWaitUntil(() -> check(level.getBlockState(tops[0]).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED)
+                        && level.getBlockState(tops[1]).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Both on the air"))
+                .thenExecute(() -> {
+                    for (var station : new com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity[]{first, second}) {
+                        int f = station.getFrequency();
+                        check(station.isVillageStation() && station.isFoundTower(), "A village station");
+                        check(f >= 100_000 && f < 1_000_000, "Its own frequency: " + f);
+                        CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, station.getBlockPos());
+                        check(info.getBoolean("village_station") && !info.getBoolean("found_tower"), "Jade: a village's radio station");
+                    }
+                    check(first.getFrequency() != second.getFrequency(), "Not the same: " + first.getFrequency());
+                    for (int i = 0; i < 2; i++) {
+                        int f = ((com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(tops[i])).getFrequency();
+                        boolean written = false;
+                        for (BlockPos pos : BlockPos.betweenClosed(tops[i].offset(-8, -6, -8), tops[i].offset(8, 0, 8))) {
+                            if (level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+                                written |= sign.getFrontText().getMessage(2, false).getString().equals(Integer.toString(f));
+                            }
+                        }
+                        check(written, "Shack " + i + "'s sign says " + f);
+                    }
+                    check(level.getBlockState(torch).is(Blocks.REDSTONE_TORCH), "Its torch at " + torch);
+                    level.setBlock(torch, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                })
+                .thenWaitUntil(() -> check(!level.getBlockState(tops[0]).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Off the air"))
+                .thenExecute(() -> {
+                    check(!first.isFoundQuiet(), "Not an old tower gone quiet");
+                    level.setBlock(torch, Blocks.REDSTONE_TORCH.defaultBlockState(), Block.UPDATE_ALL);
+                })
+                .thenWaitUntil(() -> check(level.getBlockState(tops[0]).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Back on"))
+                .thenIdle(5)
+                .thenExecute(() -> check(fired.stream().noneMatch(f -> f.pos().equals(tops[0])
+                        && f.event().equals(com.reiko.signaltower.advancement.TowerAdvancements.FOUND_TOWER_REVIVED)), "No Finders Keepers"))
+                .thenSucceed();
+    }
 }

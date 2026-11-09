@@ -406,7 +406,8 @@ public final class RadioInfo {
             tag.putBoolean("braces_tall", assessment.tall());
         }
         if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity found && found.isFoundTower()) {
-            tag.putBoolean("found_tower", true); // v0.55.0: an old tower generated in the world
+            // v0.55.0: an old tower generated in the world; v0.57.0: or a village's radio shack
+            tag.putBoolean(found.isVillageStation() ? "village_station" : "found_tower", true);
         }
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
@@ -507,6 +508,9 @@ public final class RadioInfo {
         }
         if (data != null && data.getBoolean("found_tower")) {
             lines.add(Component.translatable(LANG + "found_tower").withStyle(ChatFormatting.DARK_GREEN));
+        }
+        if (data != null && data.getBoolean("village_station")) {
+            lines.add(Component.translatable(LANG + "village_station").withStyle(ChatFormatting.DARK_GREEN));
         }
         if (data != null && data.contains("storm_damaged")) {
             // v0.54.0

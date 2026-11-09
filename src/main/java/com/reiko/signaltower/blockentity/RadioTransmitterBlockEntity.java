@@ -64,10 +64,18 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     private @Nullable BlockPos foundSign;
     /** v0.56.0: an old tower that has gone quiet (not lightning): sending again earns Finders Keepers. */
     private boolean foundQuiet;
+    /** v0.57.0: a village radio shack's tower (built from a template, so it picks its own frequency). */
+    private boolean villageStation;
+    public static final String STATION_SIGN_KEY = "sign.reikos_signal_tower.radio_tower.station";
 
-    /** True for the transmitter of an old radio tower generated in the world. */
+    /** True for the transmitter of an old radio tower generated in the world (or a village's). */
     public boolean isFoundTower() {
         return foundTower;
+    }
+
+    /** v0.57.0: true for the transmitter of a village radio shack. */
+    public boolean isVillageStation() {
+        return villageStation;
     }
 
     /**
@@ -92,7 +100,11 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         }
         foundChecked = true;
         setChanged();
-        if (!frequencyTaken(level, getFrequency())) {
+        if (villageStation && foundSign == null) {
+            foundSign = findStationSign(level); // v0.57.0: the template can't know where it'll be
+        }
+        // v0.57.0: every village station comes from the same template, so each picks its own frequency.
+        if (!villageStation && !frequencyTaken(level, getFrequency())) {
             return;
         }
         for (int i = 0; i < 64; i++) {
@@ -105,6 +117,18 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
                 return;
             }
         }
+    }
+
+    /** v0.57.0: the "Radio Station" sign near a village station (within 8 blocks), if there is one. */
+    private @Nullable BlockPos findStationSign(ServerLevel level) {
+        for (BlockPos pos : BlockPos.betweenClosed(worldPosition.offset(-8, -8, -8), worldPosition.offset(8, 2, 8))) {
+            if (level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign
+                    && sign.getFrontText().getMessage(0, false).getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents text
+                    && STATION_SIGN_KEY.equals(text.getKey())) {
+                return pos.immutable();
+            }
+        }
+        return null;
     }
 
     /** True if {@code frequency} is someone's private frequency, or has a name. */
@@ -123,6 +147,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             tag.putBoolean("found_tower", true);
             tag.putBoolean("found_checked", foundChecked);
             tag.putBoolean("found_quiet", foundQuiet);
+            if (villageStation) {
+                tag.putBoolean("village_station", true);
+            }
             if (foundSign != null) {
                 tag.putLong("found_sign", foundSign.asLong());
             }
@@ -138,6 +165,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         foundTower = tag.getBoolean("found_tower");
         foundChecked = tag.getBoolean("found_checked");
         foundQuiet = tag.getBoolean("found_quiet");
+        villageStation = tag.getBoolean("village_station");
         foundSign = tag.contains("found_sign") ? BlockPos.of(tag.getLong("found_sign")) : null;
     }
 
@@ -145,6 +173,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     public void refresh() {
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
+        }
+        if (foundTower && !foundChecked) {
+            checkFound(serverLevel); // v0.57.0: before it first sends (a placed template can be refreshed before it ticks)
         }
         com.reiko.signaltower.block.DishRotatorBlock.turnDish(serverLevel, worldPosition); // v0.52.0
         BlockState state = serverLevel.getBlockState(worldPosition);
@@ -178,14 +209,14 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         if (sending) {
             com.reiko.signaltower.advancement.TowerAdvancements.fire(level, worldPosition,
                     com.reiko.signaltower.advancement.TowerAdvancements.ON_AIR, reach, getTunedBy(), 0);
-            if (foundTower && foundQuiet) {
+            if (foundTower && foundQuiet && !villageStation) {
                 foundQuiet = false;
                 setChanged();
                 com.reiko.signaltower.advancement.TowerAdvancements.fire(level, worldPosition,
                         com.reiko.signaltower.advancement.TowerAdvancements.FOUND_TOWER_REVIVED, reach, getTunedBy(),
                         com.reiko.signaltower.advancement.TowerAdvancements.REVIVED_RADIUS);
             }
-        } else if (foundTower && !foundQuiet && !SignalNetwork.get(level).isKnockedOut(worldPosition)) {
+        } else if (foundTower && !villageStation && !foundQuiet && !SignalNetwork.get(level).isKnockedOut(worldPosition)) {
             foundQuiet = true;
             setChanged();
         }

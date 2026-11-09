@@ -43,6 +43,17 @@ dependencies {
     if (project.hasProperty('withWeather')) {
         localRuntime files(project.property('withWeather'))
     }
+    // JEI and EMI (v0.57.0) are optional recipe viewers: compat/jei and compat/emi are compiled against
+    // them and only loaded by them. Add one to a dev run with -PwithJei or -PwithEmi. (jei_version is a Modrinth
+    // version id: JEI's version number alone picks its Forge jar.)
+    compileOnly "maven.modrinth:jei:${jei_version}"
+    compileOnly "maven.modrinth:emi:${emi_version}"
+    if (project.hasProperty('withJei')) {
+        localRuntime "maven.modrinth:jei:${jei_version}"
+    }
+    if (project.hasProperty('withEmi')) {
+        localRuntime "maven.modrinth:emi:${emi_version}"
+    }
 }
 
 base {

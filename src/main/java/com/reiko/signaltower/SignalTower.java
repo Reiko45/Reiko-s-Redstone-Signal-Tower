@@ -69,6 +69,7 @@ public final class SignalTower {
         com.reiko.signaltower.world.ModWorldgen.register(modEventBus); // v0.55.0
         com.reiko.signaltower.advancement.TowerAdvancements.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.ModVillagers.register(modEventBus); // v0.56.0
+        com.reiko.signaltower.world.VillageRadioShacks.register(); // v0.57.0
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
         modEventBus.addListener(SignalTower::registerCapabilities);

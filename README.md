@@ -31,7 +31,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
-| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. |
+| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
@@ -794,6 +794,21 @@ Zombie villagers who were Radio Operators keep the look.
 
 ![Dev's transmitter at Y 130 with a charged battery, Jade "Sending: 15", "Reach: 568 blocks", and the toasts "Challenge Complete! Over the Horizon" and "Advancement Made! First Broadcast"; Dev on the platform of an old radio tower in a snowy taiga as a derecho comes over, the beacon lit, the toast "Challenge Complete! Weathered the Storm" and in chat "Head for Heights" and "Lost Signal"; from the old tower's hut doorway, Dev flipping the lever (on) at the mast's foot and the toast "Goal Reached! Finders Keepers"; a Radio Operator in headphones and an olive vest standing behind his Radio Telegraph in a fenced yard, Jade "Radio Operator - Novice"; Dev's trade screen "Radio Operator - Novice" with 8 copper for an emerald and an emerald for 4 masts, and the toast "Advancement Made! Call Sign"; and the mod's advancement tab with all eight done](docs/images/advancements-and-radio-operators.png)
 
+### Village radio shacks
+
+Since 0.57 villages sometimes have a **radio shack**: a one-room hut in the village's own style (plains, desert, savanna, snowy or taiga) with a Radio Telegraph, a bed and a lantern inside, and in its yard a short mast with a transmitter on top, a charged battery with a solar panel, a redstone torch and an aviation beacon.
+
+- **The village gets a Radio Operator.** A villager with no job takes the telegraph as their workstation, the same as with one you put down yourself.
+- **The station is on the air.** The first time it loads it picks a free frequency between 100,000 and 999,999 (never anyone's private or named one) and writes it on the sign by the door: "Radio Station, Frequency 473679". A Signal Scanner picks it up from as far as it reaches. **Jade** on its top says "A village's radio station".
+- **It's public and untuned**, like the old towers in the wild: listen in, re-tune it, take it apart or build on it. It isn't an old tower, though, so it doesn't count for Lost Signal or Finders Keepers.
+- **How many:** `villageRadioShacks` in the server config is the shack's weight among a village's houses (3 by default, so a plains village picks it for about one house in 30). 0 stops new ones. It's read when the world starts, and villages already made keep what they have.
+
+### JEI and EMI
+
+Since 0.57, with [JEI](https://modrinth.com/mod/jei) or [EMI](https://modrinth.com/mod/emi) installed, every block and item of the mod has an **information page** (JEI's Information tab, EMI's Info) saying what it does and how to use it. There's also a **Radio Operator Trades** page, with the Radio Telegraph as its workstation, listing all 17 trades and the level each one comes at. Look up the uses of a telegraph, or of an item you'd buy or sell, to find it. Neither mod is needed.
+
+![A plains village's radio shack, an oak hut with its mast, transmitter and beacon behind it; a snowy village from above with two radio shacks, a villager by one's mast; Jade on a snowy shack's transmitter "Frequency: 473679", "Sending: 15", "Reach: 136 blocks", "A village's radio station", "Battery: 80%"; JEI's Radio Operator Trades page 2 of 3, Apprentice to Expert; JEI's Information page for the Radio Telegraph; and EMI's Radio Operator Trades page 3 of 4, Journeyman and Expert](docs/images/jei-emi-and-village-radio-shacks.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -1049,6 +1064,8 @@ The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optio
 
 To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod), build that mod's jar (`./gradlew jar` in its folder) and pass its path: `./gradlew runClient -PwithWeather=/path/to/reikos_weather-1.7.0.jar`. Nothing is compiled against it.
 
+To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run. Otherwise they're only compiled against.
+
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
 **IntelliJ IDEA:** File → Open → pick this folder's `build.gradle` → Open as Project. Wait for the Gradle sync to finish, then use the generated run configurations (Client, Server, GameTestServer).
@@ -1114,6 +1131,7 @@ src/main/java/com/reiko/signaltower/
   advancement/TowerTrigger.java          the advancement trigger for tower events (on the air, an old tower brought back, a storm stood through)
   advancement/TowerAdvancements.java     registers it, and fires its events for a tower's tuner and the players near it
   world/ModVillagers.java                the Radio Operator: its workstation (the Radio Telegraph), the profession and its trades
+  world/VillageRadioShacks.java          adds the radio shack to the five villages' house pools, villageRadioShacks times each
   block/TowerPlatformBlock.java          the Tower Platform: rails, a deck solid only from above, rings round a mast
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
@@ -1185,6 +1203,9 @@ src/main/java/com/reiko/signaltower/
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/ReikosWeatherCompat.java        reads Reiko's Weather by reflection (local weather, storm cells, season, temperature)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
+  compat/RecipeViewerInfo.java           what JEI and EMI show: every item's info text and the Radio Operator's trades (works without either)
+  compat/jei/SignalTowerJeiPlugin.java, RadioOperatorCategory.java  the JEI plugin and its trades page (only loaded by JEI)
+  compat/emi/SignalTowerEmiPlugin.java, RadioOperatorEmiRecipe.java  the EMI plugin and its trades page (only loaded by EMI)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/DirectoryScreen.java            the frequency directory
   network/DirectoryRequestPayload.java, DirectoryResultPayload.java  the directory asking the server what's on
@@ -1208,11 +1229,11 @@ src/main/java/com/reiko/signaltower/
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
   assets/reikos_signal_tower/            blockstates, models, textures (the Radio Operator's under textures/entity), en_us.json
-  data/reikos_signal_tower/              recipes, loot tables, advancements, recipe-book unlocks, worldgen, test structures
+  data/reikos_signal_tower/              recipes, loot tables, advancements, recipe-book unlocks, worldgen, village radio shacks (structure/village), test structures
   data/minecraft/tags/point_of_interest_type/acquirable_job_site.json  lets a villager with no job take a Radio Telegraph
 tools/
   make_textures.py                       draws all textures (needs Pillow)
-  make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen
+  make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen, the village shacks' templates
 docs/
   DESIGN.md                              how it works under the hood, ideas for later
 ```
@@ -1403,9 +1424,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 174. Tower Platforms: right-clicking a mast with 8 puts in all 8 round it, the stack used up, a rail on the outside only and none against a wall; the deck holds you from above, lets you through from below, and lets you down beside the mast when you sneak; a corner taken away puts rails on the two beside it; with 3 in hand only 3 go in; the gap filled with one; with no room none, and the click goes on to place one normally.
 175. the advancement tree: all seven loaded, each under its parent (root; First Broadcast; Over the Horizon a challenge and Head for Heights under it; Lost Signal; Finders Keepers a goal under it; Call Sign), with Weathered the Storm (under Head for Heights) only with Reiko's Weather; the tower trigger registered; Over the Horizon matches "on_air" at 500 and 4,000 but not 499 or another event; First Broadcast any "on_air"; Finders Keepers "found_tower_revived"; Head for Heights matches a player on a Tower Platform, not one beside it; Lost Signal one inside an old tower's piece (put in the chunk for the test), not one outside it;
 176. the tower events: an old tower off the air (4616) is quiet and fires nothing; a plain transmitter off the air (4617) and a powered jammer (4618) fire nothing; the old tower's lever on fires "found_tower_revived" once, for everyone within 24 blocks, and it's no longer quiet (saved); the plain one powered fires "on_air" for its tuner with its reach, and never "found_tower_revived"; the lever off, quiet again; on again, it fires again; the jammer never;
-177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site.
+177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site;
+178. JEI and EMI: all 46 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
+179. village radio shacks: at the default weight of 3, each of the five villages' house pools (plains, desert, savanna, snowy, taiga) holds the shack 3 times, and adding it again changes nothing; each shack is 8 by 7 by 7, with a telegraph, a 2-block bed, 4 masts, a transmitter marked as a village station, a battery charged to 80,000, a "Radio Station" sign, and its two jigsaws (onto the street, and for its villager);
+180. two plains shacks placed as a village would (one turned a quarter): both go on the air, each on its own free frequency between 100,000 and 999,999 written on its sign; Jade calls each a village's radio station; taking its torch away and putting it back doesn't count as an old tower going quiet and coming back (no Finders Keepers).
 
-All 177 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it.
+All 180 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it.
 
 ## License
 

@@ -188,6 +188,12 @@ public final class Config {
             .comment("Masts can be climbed like ladders: walk into one to go up, let go to slide down, sneak to hold still (v0.55.0).")
             .define("climbableMasts", true);
 
+    public static final ModConfigSpec.IntValue VILLAGE_RADIO_SHACKS = BUILDER
+            .comment("How often a village (plains, desert, savanna, snowy, taiga) builds a radio shack: a Radio Telegraph",
+                    "and a short tower on the air on its own frequency (v0.57.0). Its weight among the village's houses",
+                    "(a library is 5, a cartographer 1); 0 for none. Read when the world starts; only new villages get them.")
+            .defineInRange("villageRadioShacks", 3, 0, 50);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

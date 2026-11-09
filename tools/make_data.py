@@ -893,6 +893,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.tower_platform.tooltip": "Right-click a mast with these and they go in all round it at that height, with rails. You come up through it climbing the mast; sneak beside the mast to go back down.",
     f"tooltip.{MOD}.mast_climb": "Walk into a mast to climb it; let go to slide down, sneak to hold still.",
     f"jade.{MOD}.found_tower": "An old radio tower, found in the world",
+    f"jade.{MOD}.village_station": "A village's radio station",
     f"sign.{MOD}.radio_tower.station": "Radio Station",
     f"sign.{MOD}.radio_tower.frequency": "Frequency",
     # v0.56.0: advancements and the Radio Operator
@@ -913,6 +914,8 @@ write(ASSETS / "lang" / "en_us.json", {
     f"advancements.{MOD}.call_sign.title": "Call Sign",
     f"advancements.{MOD}.call_sign.description": "Trade with a Radio Operator",
     f"entity.minecraft.villager.{MOD}.radio_operator": "Radio Operator",
+    # v0.57.0: JEI and EMI
+    f"recipe_viewer.{MOD}.radio_operator_trades": "Radio Operator Trades",
     f"tooltip.{MOD}.bundle_frequencies": "Frequency %1$s (uses %2$s)",
     f"message.{MOD}.cable_status": "Bundled Cable | %1$s cables, %2$s devices | %3$s",
     f"message.{MOD}.tap_in": "Cable Tap: %1$s, in (puts %2$s onto it)",
@@ -2658,6 +2661,64 @@ write(DATA / "loot_table" / "chests" / "radio_tower.json", {
     "random_sequence": f"{MOD}:chests/radio_tower",
 })
 
+# ---------------------------------------------------------------- v0.57.0: JEI / EMI information pages
+
+ANTENNA_INFO = ("Right-click the top of a full-size tower (a transmitter, repeater, converter or jammer) with it to fit it: "
+                "reach x{}. Fitting another gives this one back; sneak and right-click with an empty hand to take it off.")
+INFO = {
+    "radio_transmitter": "Sends the redstone signal it gets (0-15) on its frequency. Stand it on Radio Masts: it reaches 32 blocks, plus 8 for every block its top is above sea level. Give it redstone beside the top or beside any mast under it. With power cost on (the default) it also needs a charged Radio Battery beside the top or a mast. Tune it with a Frequency Tuner.",
+    "radio_receiver": "Gives out the strongest signal it hears on its frequency, from any transmitter whose reach covers it (higher up, it hears farther). Tune it with a Frequency Tuner.",
+    "radio_toggle_receiver": "Turns on, or off again, each time its frequency turns on: a wireless T flip-flop.",
+    "radio_inverted_receiver": "Gives out 15 while its frequency is silent, and 0 while it hears it.",
+    "radio_logic_receiver": "Listens on two frequencies and puts them together: AND (both on), OR (either) or XOR (just one). Right-click it to set them.",
+    "radio_delay_receiver": "A receiver that holds every change back, by up to 60 seconds, and can keep its output on for a while after.",
+    "radio_speaker": "A receiver that plays a sound (a bell, a chime, a doorbell and more) each time its frequency turns on.",
+    "radio_status_board": "A panel for walls that shows up to four frequencies: their names, strengths and the last telegraph message.",
+    "radio_counter_receiver": "Counts the times its frequency turns on; at the number you set it gives a pulse, or stays on until its reset frequency turns on.",
+    "radio_timer_transmitter": "Sends 15 on a timer: a short pulse every so often, or every day between two hours. Redstone pauses it.",
+    "guy_anchor": "Put three on the ground 2 to 12 blocks from the foot of a tall tower (4 masts or more) to brace it with guy wires: then storms (with Reiko's Weather) can't blow it down.",
+    "tower_platform": "Right-click a mast with Tower Platforms to put 8 round it, with rails on the outside. You can stand on them; sneak by the mast to drop through.",
+    "bundled_cable": "Carries 16 colored channels at once, with no loss. Cable Taps put signals on and take them off; the Bundled Radio Transmitter and Receiver send all 16 by radio.",
+    "cable_tap": "Puts a redstone signal onto its color's channel of the Bundled Cable it faces, or gives that channel out. Right-click with an empty hand to switch between in and out, with a dye to change its color.",
+    "bundled_transmitter": "A tower top that sends the 16 channels of the Bundled Cable touching it: color c on its frequency + c.",
+    "bundled_receiver": "Listens on its frequency and the 15 after it, and puts what it hears onto the Bundled Cable touching it, one channel each.",
+    "radio_weather_station": "A transmitter that sends a reading where it stands instead of redstone: the weather, the time of day or the moon (and more with Reiko's Weather). It can also tell pagers when the weather changes.",
+    "radio_signal_recorder": "Records up to 30 seconds of a frequency, then plays it back on its own frequency: once for each redstone pulse, or over and over while powered.",
+    "radio_jammer": "Stand it on masts like a transmitter: anything in its reach hears its frequency weaker by the redstone strength it gets (15 silences it).",
+    "aviation_beacon": "A red or white warning light for the top or side of a tower: on at night, always, or while its tower sends; blinking, flashing or steady. Right-click it to set it.",
+    "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",
+    "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
+    "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
+    "ender_antenna": "Fit it on a transmitter's tower: the tower also sends into another dimension, from the matching place (the Nether from the Overworld, or the Overworld from the others). It doubles the power the tower uses.",
+    "radio_battery": "Powers a tower when power cost is on: put it beside the tower's top or one of its masts. Charge it with redstone (dust or blocks), with Forge Energy, or with a Solar Panel on top.",
+    "coverage_map": "A map tuned to a frequency: it shows where that frequency can be heard, from strong to weak, with its towers marked.",
+    "radio_lamp": "A receiver whose light shows how strong a signal it hears. Comes in all 16 dye colors.",
+    "iron_antenna": ANTENNA_INFO.format("1.5"),
+    "gold_antenna": ANTENNA_INFO.format("2"),
+    "diamond_antenna": ANTENNA_INFO.format("3"),
+    "netherite_antenna": ANTENNA_INFO.format("4"),
+    "dish_antenna": "Fit it on a tower top and it faces the way you look: reach x3 in a narrow beam that way (15 degrees either side), and plain reach everywhere else.",
+    "radio_repeater": "Stand it on masts: it hears its frequency where it stands and sends it again with its own reach, to carry a signal farther.",
+    "radio_converter": "A repeater that listens on one frequency and sends on another. Its gate can make it a wireless comparator or NOT gate. Right-click it to set it.",
+    "compact_radio_receiver": "A receiver the size of a button, for walls, floors and ceilings. It strongly powers the block it's on.",
+    "compact_radio_transmitter": "A transmitter the size of a button: it sends the signal around it over a fixed 16 blocks, at any height, with no masts or battery.",
+    "radio_motion_sensor": "An eye the size of a button: it sends 15 over 16 blocks while it sees a player in range.",
+    "code_keypad": "The right code pulses its frequency and powers the block it's on; three wrong codes lock it for 30 seconds and tell its owner. Its owner sets the code, and can hand out guest codes.",
+    "radio_mast": "A lattice section for towers: stack masts under a transmitter (or repeater or jammer) to raise it, and redstone beside any of them reaches the top. Right-click a tower with a mast to add one under the top. Walk into a mast to climb it.",
+    "wall_redstone": "Redstone dust for the sides of blocks and for ceilings: it runs up, down and sideways, and powers the block it's on.",
+    "frequency_tuner": "Right-click the air to choose a frequency (1 to 999,999,999), name it or make it private. Right-click a radio block to tune it; sneak and right-click to copy its frequency. Sneak and scroll to step the frequency.",
+    "remote_control": "A transmitter in your hand: right-click to send a pulse or a toggle on its frequency, as far as a transmitter at your height would reach (towers in reach pass it on). Sneak and right-click the air to set it.",
+    "multi_remote": "A remote with 4 buttons, each with its own name, color, frequency and mode. Sneak and scroll to pick a button; sneak and right-click the air to set them.",
+    "pager": "Keep it anywhere in your inventory: it beeps and tells you when its frequency turns on where you are, and shows telegraph messages. Sneak and right-click the air to set its frequency.",
+    "signal_meter": "Hold it to see how strong its frequency is where you stand, how many towers reach you, and how far it is to the edge.",
+    "signal_scanner": "Lists everything a receiver where you stand would hear: each frequency, its strength, and the strongest sender with its distance and direction. Click a tower in the list for an arrow to it.",
+}
+_lang_path = ASSETS / "lang" / "en_us.json"
+_lang = json.loads(_lang_path.read_text(encoding="utf-8"))
+for item, text in INFO.items():
+    _lang[f"info.{MOD}.{item}"] = text
+write(_lang_path, _lang)
+
 # ---------------------------------------------------------------- v0.56.0: advancements
 
 def advancement(name, parent, icon, criteria, frame="task", hidden=False, xp=0, background=None, toast=True, conditions=None):
@@ -2762,5 +2823,154 @@ site = (
     + tag(9, "entities", compound_list([]))
 )
 (DATA / "structure" / "tower_site.nbt").write_bytes(gzip.compress(bytes([10]) + nbt_string("") + site + b"\x00", mtime=0))
+
+# ---------------------------------------------------------------- v0.57.0: village radio shacks
+
+class B:
+    """An NBT byte (a bool in the game)."""
+    def __init__(self, v):
+        self.v = v
+
+
+def nbt_payload(value):
+    """(type id, payload bytes) for a Python value: dict, str, int, B, list."""
+    if isinstance(value, B):
+        return 1, struct.pack(">b", int(value.v))
+    if isinstance(value, bool):
+        return 1, struct.pack(">b", int(value))
+    if isinstance(value, int):
+        return 3, struct.pack(">i", value)
+    if isinstance(value, str):
+        return 8, nbt_string(value)
+    if isinstance(value, dict):
+        out = b""
+        for k, v in value.items():
+            t, pl = nbt_payload(v)
+            out += bytes([t]) + nbt_string(k) + pl
+        return 10, out + b"\x00"
+    if isinstance(value, list):
+        if not value:
+            return 9, bytes([0]) + struct.pack(">i", 0)
+        items = [nbt_payload(v) for v in value]
+        return 9, bytes([items[0][0]]) + struct.pack(">i", len(items)) + b"".join(pl for _, pl in items)
+    raise TypeError(value)
+
+
+def write_structure(path, size, blocks, entities=()):
+    """blocks: (x, y, z, block name, {property: value}, block entity nbt or None)."""
+    palette, index = [], {}
+    rows = []
+    for x, y, z, name, props, nbt in blocks:
+        key = (name, tuple(sorted(props.items())))
+        if key not in index:
+            index[key] = len(palette)
+            state = {"Name": name}
+            if props:
+                state["Properties"] = dict(props)
+            palette.append(state)
+        row = {"pos": [x, y, z], "state": index[key]}
+        if nbt is not None:
+            row["nbt"] = nbt
+        rows.append(row)
+    root = {"DataVersion": 3955, "size": list(size), "palette": palette, "blocks": rows, "entities": list(entities)}
+    _, payload = nbt_payload(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(gzip.compress(bytes([10]) + nbt_string("") + payload, mtime=0))
+
+
+def jigsaw(name, target, pool, final_state, joint):
+    return {"id": "minecraft:jigsaw", "name": name, "target": target, "pool": pool, "final_state": final_state,
+            "joint": joint, "selection_priority": 0, "placement_priority": 0}
+
+
+def sign_text(lines):
+    return {"messages": [json.dumps(line) for line in lines], "color": "black", "has_glowing_text": B(False)}
+
+
+SHACK_STYLES = {
+    # foundation, floor, walls, corners, roof (slab or block), door, bed, wall sign
+    "plains": ("minecraft:cobblestone", "minecraft:oak_planks", "minecraft:oak_planks", "minecraft:oak_log",
+               "minecraft:oak_slab", "minecraft:oak_door", "minecraft:white_bed", "minecraft:oak_wall_sign"),
+    "desert": ("minecraft:sandstone", "minecraft:smooth_sandstone", "minecraft:smooth_sandstone", "minecraft:cut_sandstone",
+               "minecraft:smooth_sandstone_slab", "minecraft:jungle_door", "minecraft:cyan_bed", "minecraft:jungle_wall_sign"),
+    "savanna": ("minecraft:cobblestone", "minecraft:acacia_planks", "minecraft:acacia_planks", "minecraft:acacia_log",
+                "minecraft:acacia_slab", "minecraft:acacia_door", "minecraft:orange_bed", "minecraft:acacia_wall_sign"),
+    "snowy": ("minecraft:stone_bricks", "minecraft:spruce_planks", "minecraft:spruce_planks", "minecraft:stripped_spruce_log",
+              "minecraft:spruce_planks", "minecraft:spruce_door", "minecraft:light_blue_bed", "minecraft:spruce_wall_sign"),
+    "taiga": ("minecraft:cobblestone", "minecraft:spruce_planks", "minecraft:spruce_planks", "minecraft:spruce_log",
+              "minecraft:spruce_slab", "minecraft:spruce_door", "minecraft:brown_bed", "minecraft:spruce_wall_sign"),
+}
+
+
+def radio_shack(kind):
+    """A 5x5 shack (x 1..5, z 1..5) with its door on the west (street) side at z 3, and a 4-mast tower in
+    the yard behind it (x 6..7). y 0 is the ground; the street's jigsaw meets ours at (0, 1, 3)."""
+    foundation, floor, wall, corner, roof, door, bed, wall_sign = SHACK_STYLES[kind]
+    blocks = []
+
+    def put(x, y, z, name, props=None, nbt=None):
+        blocks.append((x, y, z, name, props or {}, nbt))
+
+    for x in range(1, 6):
+        for z in range(1, 6):
+            edge = x in (1, 5) or z in (1, 5)
+            if (x, z) == (3, 3):
+                # a villager comes to live here (the jigsaw turns into floor)
+                put(x, 0, z, "minecraft:jigsaw", {"orientation": "up_north"},
+                    jigsaw("minecraft:bottom", "minecraft:bottom", f"minecraft:village/{kind}/villagers", floor, "rollable"))
+            else:
+                put(x, 0, z, foundation if edge else floor)
+            if not edge:
+                continue
+            for y in range(1, 4):
+                if x in (1, 5) and z in (1, 5):
+                    put(x, y, z, corner, {"axis": "y"} if corner.endswith("_log") else {})
+                elif (x, z) == (1, 3) and y < 3:
+                    continue  # the door
+                elif (x, z) in ((3, 1), (3, 5)) and y == 2:
+                    put(x, y, z, "minecraft:glass_pane", {"east": "true", "west": "true", "north": "false", "south": "false", "waterlogged": "false"})
+                else:
+                    put(x, y, z, wall)
+    for x in range(1, 6):
+        for z in range(0, 7):
+            if roof.endswith("_slab"):
+                put(x, 4, z, roof, {"type": "bottom", "waterlogged": "false"})
+            else:
+                put(x, 4, z, roof)
+                if z in range(1, 6):
+                    put(x, 5, z, "minecraft:snow", {"layers": "1"})
+    put(1, 1, 3, door, {"facing": "east", "half": "lower", "hinge": "right", "open": "false", "powered": "false"})
+    put(1, 2, 3, door, {"facing": "east", "half": "upper", "hinge": "right", "open": "false", "powered": "false"})
+    # The street meets the shack here.
+    put(0, 1, 3, "minecraft:jigsaw", {"orientation": "west_up"},
+        jigsaw("minecraft:building_entrance", "minecraft:building_entrance", f"minecraft:village/{kind}/streets", "minecraft:structure_void", "aligned"))
+    # Inside: the operator's telegraph, a bed and a lantern.
+    put(4, 1, 2, f"{MOD}:radio_telegraph", {"facing": "west"})
+    put(3, 1, 4, bed, {"facing": "east", "part": "foot", "occupied": "false"})
+    put(4, 1, 4, bed, {"facing": "east", "part": "head", "occupied": "false"})
+    put(3, 3, 3, "minecraft:lantern", {"hanging": "true", "waterlogged": "false"})
+    # The sign by the door; the transmitter writes its frequency on line 3.
+    put(0, 2, 2, wall_sign, {"facing": "west", "waterlogged": "false"}, {
+        "id": "minecraft:sign", "is_waxed": B(True),
+        "front_text": sign_text([{"translate": f"sign.{MOD}.radio_tower.station"}, {"translate": f"sign.{MOD}.radio_tower.frequency"}, "", ""]),
+        "back_text": sign_text(["", "", "", ""])})
+    # The yard: a pad, 4 masts with the transmitter and a beacon on top, a battery with a solar panel,
+    # and a redstone torch keeping it on the air.
+    for x in (6, 7):
+        for z in (2, 3, 4):
+            put(x, 0, z, foundation)
+    for y in range(1, 5):
+        put(6, y, 3, f"{MOD}:radio_mast")
+    put(6, 5, 3, f"{MOD}:radio_transmitter", {}, {
+        "id": f"{MOD}:radio_transmitter", "frequency": 1, "found_tower": B(True), "village_station": B(True)})
+    put(6, 6, 3, f"{MOD}:aviation_beacon", {"face": "floor", "facing": "north"})
+    put(7, 1, 3, f"{MOD}:radio_battery", {"charge": "4"}, {"id": f"{MOD}:radio_battery", "charge": 80000})
+    put(7, 2, 3, f"{MOD}:solar_panel")
+    put(6, 1, 2, "minecraft:redstone_torch", {"lit": "true"})
+    write_structure(DATA / "structure" / "village" / kind / "radio_shack.nbt", (8, 7, 7), blocks)
+
+
+for _kind in SHACK_STYLES:
+    radio_shack(_kind)
 
 print("data written to", RES)

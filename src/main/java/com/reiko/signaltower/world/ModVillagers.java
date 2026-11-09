@@ -54,31 +54,61 @@ public final class ModVillagers {
         return new ItemStack(item, count);
     }
 
+    /**
+     * One of the Radio Operator's trades: at {@code level} (1 Novice ... 5 Master) they take
+     * {@code costA} (and {@code costB}, if not empty) for {@code result}. v0.57.0: also what JEI and
+     * EMI show.
+     */
+    public record Trade(int level, ItemStack costA, ItemStack costB, ItemStack result, int maxUses, int xp) {
+        public static final float PRICE_MULTIPLIER = 0.05F;
+
+        static Trade buy(int level, ItemLike item, int count, int maxUses, int xp) {
+            return new Trade(level, stack(item, count), ItemStack.EMPTY, stack(Items.EMERALD, 1), maxUses, xp);
+        }
+
+        static Trade sell(int level, int emeralds, ItemLike item, int count, int maxUses, int xp) {
+            return new Trade(level, stack(Items.EMERALD, emeralds), ItemStack.EMPTY, stack(item, count), maxUses, xp);
+        }
+
+        public VillagerTrades.ItemListing listing() {
+            return costB.isEmpty()
+                    ? new BasicItemListing(costA.copy(), result.copy(), maxUses, xp, PRICE_MULTIPLIER)
+                    : new BasicItemListing(costA.copy(), costB.copy(), result.copy(), maxUses, xp, PRICE_MULTIPLIER);
+        }
+    }
+
+    /** Everything a Radio Operator trades, Novice first. */
+    public static List<Trade> trades() {
+        return List.of(
+                // Novice: they buy redstone and copper, and sell masts and a tuner.
+                Trade.buy(1, Items.REDSTONE, 12, 16, 2),
+                Trade.buy(1, Items.COPPER_INGOT, 8, 16, 2),
+                Trade.sell(1, 1, ModRegistry.RADIO_MAST_ITEM.get(), 4, 16, 1),
+                Trade.sell(1, 3, ModRegistry.FREQUENCY_TUNER.get(), 1, 12, 1),
+                // Apprentice: receivers, transmitters and guy wire anchors.
+                Trade.buy(2, Items.IRON_INGOT, 4, 12, 10),
+                Trade.sell(2, 4, ModRegistry.RADIO_RECEIVER_ITEM.get(), 1, 12, 5),
+                Trade.sell(2, 5, ModRegistry.RADIO_TRANSMITTER_ITEM.get(), 1, 12, 5),
+                Trade.sell(2, 3, ModRegistry.GUY_ANCHOR_ITEM.get(), 3, 12, 5),
+                // Journeyman: an iron antenna, platforms, a battery and a scanner.
+                Trade.sell(3, 6, ModRegistry.IRON_ANTENNA.get(), 1, 8, 10),
+                Trade.sell(3, 3, ModRegistry.TOWER_PLATFORM_ITEM.get(), 8, 12, 10),
+                Trade.sell(3, 8, ModRegistry.RADIO_BATTERY_ITEM.get(), 1, 8, 10),
+                Trade.sell(3, 7, ModRegistry.SIGNAL_SCANNER.get(), 1, 6, 10),
+                // Expert: a gold antenna, a solar panel and a pager.
+                Trade.sell(4, 14, ModRegistry.GOLD_ANTENNA.get(), 1, 6, 15),
+                Trade.sell(4, 10, ModRegistry.SOLAR_PANEL_ITEM.get(), 1, 8, 15),
+                Trade.sell(4, 8, ModRegistry.PAGER.get(), 1, 6, 15),
+                // Master: a diamond antenna (emeralds and a diamond) and a coverage map.
+                new Trade(5, stack(Items.EMERALD, 24), stack(Items.DIAMOND, 1), stack(ModRegistry.DIAMOND_ANTENNA.get(), 1), 3, 30),
+                Trade.sell(5, 12, ModRegistry.COVERAGE_MAP.get(), 1, 6, 30));
+    }
+
     /** What a Radio Operator trades, by level (1 Novice ... 5 Master). */
     public static void addTrades(it.unimi.dsi.fastutil.ints.Int2ObjectMap<List<VillagerTrades.ItemListing>> trades) {
-        // Novice: they buy redstone and copper, and sell masts and a tuner.
-        trades.get(1).add(new BasicItemListing(stack(Items.REDSTONE, 12), stack(Items.EMERALD, 1), 16, 2, 0.05F));
-        trades.get(1).add(new BasicItemListing(stack(Items.COPPER_INGOT, 8), stack(Items.EMERALD, 1), 16, 2, 0.05F));
-        trades.get(1).add(new BasicItemListing(1, stack(ModRegistry.RADIO_MAST_ITEM.get(), 4), 16, 1, 0.05F));
-        trades.get(1).add(new BasicItemListing(3, stack(ModRegistry.FREQUENCY_TUNER.get(), 1), 12, 1, 0.05F));
-        // Apprentice: receivers, transmitters and guy wire anchors.
-        trades.get(2).add(new BasicItemListing(stack(Items.IRON_INGOT, 4), stack(Items.EMERALD, 1), 12, 10, 0.05F));
-        trades.get(2).add(new BasicItemListing(4, stack(ModRegistry.RADIO_RECEIVER_ITEM.get(), 1), 12, 5, 0.05F));
-        trades.get(2).add(new BasicItemListing(5, stack(ModRegistry.RADIO_TRANSMITTER_ITEM.get(), 1), 12, 5, 0.05F));
-        trades.get(2).add(new BasicItemListing(3, stack(ModRegistry.GUY_ANCHOR_ITEM.get(), 3), 12, 5, 0.05F));
-        // Journeyman: an iron antenna, platforms, a battery and a scanner.
-        trades.get(3).add(new BasicItemListing(6, stack(ModRegistry.IRON_ANTENNA.get(), 1), 8, 10, 0.05F));
-        trades.get(3).add(new BasicItemListing(3, stack(ModRegistry.TOWER_PLATFORM_ITEM.get(), 8), 12, 10, 0.05F));
-        trades.get(3).add(new BasicItemListing(8, stack(ModRegistry.RADIO_BATTERY_ITEM.get(), 1), 8, 10, 0.05F));
-        trades.get(3).add(new BasicItemListing(7, stack(ModRegistry.SIGNAL_SCANNER.get(), 1), 6, 10, 0.05F));
-        // Expert: a gold antenna, a solar panel and a pager.
-        trades.get(4).add(new BasicItemListing(14, stack(ModRegistry.GOLD_ANTENNA.get(), 1), 6, 15, 0.05F));
-        trades.get(4).add(new BasicItemListing(10, stack(ModRegistry.SOLAR_PANEL_ITEM.get(), 1), 8, 15, 0.05F));
-        trades.get(4).add(new BasicItemListing(8, stack(ModRegistry.PAGER.get(), 1), 6, 15, 0.05F));
-        // Master: a diamond antenna (emeralds and a diamond) and a coverage map.
-        trades.get(5).add(new BasicItemListing(stack(Items.EMERALD, 24), stack(Items.DIAMOND, 1),
-                stack(ModRegistry.DIAMOND_ANTENNA.get(), 1), 3, 30, 0.05F));
-        trades.get(5).add(new BasicItemListing(12, stack(ModRegistry.COVERAGE_MAP.get(), 1), 6, 30, 0.05F));
+        for (Trade trade : trades()) {
+            trades.get(trade.level()).add(trade.listing());
+        }
     }
 
     private static void onVillagerTrades(VillagerTradesEvent event) {
