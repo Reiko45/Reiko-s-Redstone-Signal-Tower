@@ -108,13 +108,24 @@ public final class Telegraph {
                 sender.getGameProfile().getName(), text);
         telegraph.markSent(now);
         level.playSound(null, pos, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS, 0.7F, 1.6F);
+        int[] read = deliver(level, pos, frequency, coverage, message);
+        int pagers = read[0];
+        int telegraphs = read[1];
+        Component reach = RemoteControlItem.describeReach(own.get(0).reach(), own.size() - 1, coverage.size() - own.size());
+        Component sent = Component.translatable(KEY + "telegraph_sent", FrequencyNames.label(level, frequency), reach)
+                .withStyle(ChatFormatting.GREEN);
+        return new Result(Component.translatable(KEY + "remote_result", sent, readBy(pagers, telegraphs)), true, pagers, telegraphs);
+    }
 
+    /** Hands {@code message} to the pagers and (other) telegraphs on {@code frequency} in {@code coverage}: how many of each read it. */
+    private static int[] deliver(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
+                                 SignalNetwork.Message message) {
         int pagers = 0;
         for (ServerPlayer player : level.players()) {
             pagers += PagerItem.deliverMessage(level, player, frequency, message);
         }
         int telegraphs = 0;
-        for (SignalNetwork.TrackedReceiver other : network.telegraphsOn(frequency)) {
+        for (SignalNetwork.TrackedReceiver other : SignalNetwork.get(level).telegraphsOn(frequency)) {
             if (other.pos().equals(pos) || !SignalNetwork.covers(coverage, other.pos()) || !level.isLoaded(other.pos())) {
                 continue;
             }
@@ -123,10 +134,19 @@ public final class Telegraph {
                 telegraphs++;
             }
         }
-        Component reach = RemoteControlItem.describeReach(own.get(0).reach(), own.size() - 1, coverage.size() - own.size());
-        Component sent = Component.translatable(KEY + "telegraph_sent", FrequencyNames.label(level, frequency), reach)
-                .withStyle(ChatFormatting.GREEN);
-        return new Result(Component.translatable(KEY + "remote_result", sent, readBy(pagers, telegraphs)), true, pagers, telegraphs);
+        return new int[]{pagers, telegraphs};
+    }
+
+    /**
+     * v0.53.0: sends {@code text} as a message from something that isn't a player (a Radio Weather
+     * Station at {@code pos}, named {@code name}), over {@code coverage}: remembered for telegraphs'
+     * feeds and Status Boards, and handed to pagers and telegraphs in it, as {@link #send} does.
+     */
+    public static SignalNetwork.Message broadcast(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
+                                                  String name, String text) {
+        SignalNetwork.Message message = SignalNetwork.get(level).recordMessage(frequency, coverage, pos, null, name, text);
+        deliver(level, pos, frequency, coverage, message);
+        return message;
     }
 
     /** "Read by 2 pagers and 1 telegraph", or that nothing was in range. */

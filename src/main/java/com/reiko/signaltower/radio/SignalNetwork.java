@@ -135,6 +135,14 @@ public final class SignalNetwork extends SavedData {
                 : new Coverage(pos, near, true, reachNow(level, pos, Math.max(reach, AntennaTier.dishReach(reach))), aim);
     }
 
+    /**
+     * v0.53.0: where a message from the Radio Weather Station at {@code pos} can be read: its own
+     * reach (in the weather there, dish included) and the repeaters on {@code frequency}.
+     */
+    public List<Coverage> stationCoverage(ServerLevel level, BlockPos pos, int frequency, int reach) {
+        return withRepeaters(level, frequency, List.of(towerCoverage(level, pos, reach)));
+    }
+
     /** The coverage of a remote used from {@code origin} with no towers: just the player's own reach. */
     public static List<Coverage> ownCoverage(BlockPos origin, int reach) {
         return List.of(new Coverage(origin, reach, false));
@@ -263,6 +271,13 @@ public final class SignalNetwork extends SavedData {
     private @Nullable Weather lastWeather;
     /** Weather the GameTests set for one network (null: the level's). */
     private @Nullable Weather forcedWeather;
+    /**
+     * v0.53.0, with Reiko's Weather: the storm cell over each tower (its weather, or null for none),
+     * worked out again every {@link #STORM_CHECK_TICKS} (not saved).
+     */
+    private final Map<BlockPos, java.util.Optional<Weather>> storms = new HashMap<>();
+    /** How often the storm cells over towers are looked at again (they drift a few blocks in that time). */
+    public static final int STORM_CHECK_TICKS = 40;
     /** The game time and day time of the last tick, used to stamp {@link TurnOn}s. */
     private long now;
     private long nowDayTime;
@@ -961,7 +976,9 @@ public final class SignalNetwork extends SavedData {
     public enum CauseKind {
         UNKNOWN, TRANSMITTER, REMOTE_PULSE, REMOTE_TOGGLE, KEYPAD, SENSOR, GATE, TIMER, RECORDER,
         /** v0.51.0: a Radio Telegraph message (in the log only; it doesn't turn the frequency on). */
-        TELEGRAPH;
+        TELEGRAPH,
+        /** v0.53.0: a Radio Weather Station's reading. */
+        WEATHER_STATION;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1017,6 +1034,11 @@ public final class SignalNetwork extends SavedData {
         /** A Radio Timer Transmitter's clock (v0.42.0): where it is and who tuned it. */
         public static Cause timer(BlockPos pos, @Nullable UUID tunedBy) {
             return new Cause(CauseKind.TIMER, pos.immutable(), tunedBy, "");
+        }
+
+        /** A Radio Weather Station's reading (v0.53.0): where it is and who tuned it. */
+        public static Cause station(BlockPos pos, @Nullable UUID tunedBy) {
+            return new Cause(CauseKind.WEATHER_STATION, pos.immutable(), tunedBy, "");
         }
 
         /** A Radio Signal Recorder playing its recording (v0.44.0): where it is and who tuned it. */
@@ -2213,11 +2235,24 @@ public final class SignalNetwork extends SavedData {
         return at == null ? Weather.CLEAR : Weather.of(at);
     }
 
-    /** The weather a tower at {@code pos} is in: the dimension's, or clear where it never rains (by biome). */
+    /**
+     * The weather a tower at {@code pos} is in: the dimension's, or clear where it never rains (by
+     * biome). v0.53.0: with Reiko's Weather, a storm cell over it brings the cell's weather instead
+     * (rain or thunder, or clear for a dry one), and the world's weather everywhere else.
+     */
     public Weather weatherAt(@Nullable ServerLevel level, BlockPos pos) {
         Weather now = weather(level);
         ServerLevel at = level != null ? level : world;
-        if (now == Weather.CLEAR || at == null) {
+        if (at == null) {
+            return Weather.CLEAR;
+        }
+        if (forcedWeather == null) {
+            Weather storm = stormAt(at, pos);
+            if (storm != null) {
+                now = storm;
+            }
+        }
+        if (now == Weather.CLEAR) {
             return Weather.CLEAR;
         }
         Boolean wet = wetSpots.get(pos);
@@ -2252,7 +2287,65 @@ public final class SignalNetwork extends SavedData {
                 bumpEverything();
             }
         }
+        if (level.getGameTime() % STORM_CHECK_TICKS == 0) {
+            watchStorms(level);
+        }
     }
+
+    /** v0.53.0: the storm cell over {@code pos} (Reiko's Weather), as last worked out; null for none. */
+    private @Nullable Weather stormAt(ServerLevel level, BlockPos pos) {
+        if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+            return null;
+        }
+        java.util.Optional<Weather> known = storms.get(pos);
+        if (known == null) {
+            known = java.util.Optional.ofNullable(com.reiko.signaltower.compat.ReikosWeatherCompat.stormOver(level, pos));
+            if (storms.size() >= 8192) {
+                storms.clear();
+            }
+            storms.put(pos.immutable(), known);
+        }
+        return known.orElse(null);
+    }
+
+    /**
+     * v0.53.0: looks again at the storm cells over every tower (Reiko's Weather moves them across
+     * the map); where one has come or gone, that tower's frequency is worked out again.
+     */
+    private void watchStorms(ServerLevel level) {
+        if (storms.isEmpty() && !com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+            return;
+        }
+        storms.clear();
+        if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+            relayEpoch++;
+            bumpEverything(); // it was switched off (the GameTests): back to the world's weather
+            return;
+        }
+        Set<BlockPos> towers = new HashSet<>(transmitters.keySet());
+        towers.addAll(repeaters.keySet());
+        towers.addAll(jammers.keySet());
+        Map<BlockPos, java.util.Optional<Weather>> before = new HashMap<>(lastStorms);
+        lastStorms.clear();
+        boolean changed = false;
+        for (BlockPos pos : towers) {
+            java.util.Optional<Weather> now = java.util.Optional.ofNullable(com.reiko.signaltower.compat.ReikosWeatherCompat.stormOver(level, pos));
+            storms.put(pos, now);
+            if (now.isPresent()) {
+                lastStorms.put(pos, now);
+            }
+            if (!now.equals(before.getOrDefault(pos, java.util.Optional.empty()))) {
+                changed = true;
+                bumpTower(pos);
+            }
+        }
+        if (changed) {
+            relayEpoch++; // relayed presses and repeaters go by reach too
+        }
+    }
+
+    /** v0.53.0: the towers a storm cell was over at the last look, to notice it moving on. */
+    private final Map<BlockPos, java.util.Optional<Weather>> lastStorms = new HashMap<>();
 
     private void bumpEverything() {
         Set<Integer> all = new HashSet<>(byFrequency.keySet());

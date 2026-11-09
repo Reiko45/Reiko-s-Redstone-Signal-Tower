@@ -169,6 +169,7 @@ public final class RadioInfo {
                 tag.putString("top", top instanceof RadioConverterBlock ? "converter"
                         : top instanceof RadioRepeaterBlock ? "repeater"
                         : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter"
+                        : top instanceof com.reiko.signaltower.block.RadioWeatherStationBlock ? "weather_station"
                         : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder"
                         : top instanceof com.reiko.signaltower.block.RadioJammerBlock ? "jammer" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
@@ -232,6 +233,16 @@ public final class RadioInfo {
                 tag.putBoolean("timer_paused", timer.isPaused(level));
                 tag.putBoolean("timer_clock", timer.clockOn(level));
                 tag.putLong("change_in", timer.changeIn(level));
+            }
+            if (radio instanceof com.reiko.signaltower.blockentity.WeatherStationBlockEntity station) {
+                // v0.53.0: what it reads, what that says now, whether redstone pauses it and whether it announces.
+                com.reiko.signaltower.radio.StationReading.Value value = station.reading(level);
+                tag.putInt("station_mode", station.getMode().ordinal());
+                tag.putInt("station_strength", value.strength());
+                putComponent(tag, "station_label", value.label());
+                tag.putBoolean("station_paused", station.isPaused(level));
+                tag.putBoolean("station_announce", station.isAnnouncing());
+                tag.putBoolean("station_offered", station.getMode().offered());
             }
             if (radio instanceof com.reiko.signaltower.blockentity.SignalRecorderBlockEntity recorder) {
                 // v0.44.0: what it records from (as "second", so it gets a name and a note), its tape and what it's doing.
@@ -359,7 +370,25 @@ public final class RadioInfo {
         if (weather.loss() > 0) {
             tag.putInt("weather", weather.ordinal());
             tag.putInt("weather_loss", weather.loss());
+            // v0.53.0: Reiko's Weather's own name for it ("Supercell"), when it agrees.
+            ReikosWeatherCompat.Local local = ReikosWeatherCompat.local(level, pos);
+            if (local != null && local.weather() == weather) {
+                tag.putString("weather_reikos", local.id());
+            }
         }
+    }
+
+    /** v0.53.0: a text that's worked out on the server (a weather station's reading), kept as it is. */
+    private static void putComponent(CompoundTag tag, String key, Component component) {
+        net.minecraft.network.chat.ComponentSerialization.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, component)
+                .result().ifPresent(encoded -> tag.put(key, encoded));
+    }
+
+    private static Component getComponent(CompoundTag tag, String key) {
+        net.minecraft.nbt.Tag encoded = tag.get(key);
+        return encoded == null ? Component.empty()
+                : net.minecraft.network.chat.ComponentSerialization.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, encoded)
+                        .result().orElse(Component.empty());
     }
 
     /**
@@ -423,7 +452,9 @@ public final class RadioInfo {
         }
         if (data != null && data.contains("weather")) {
             // v0.46.0: rain or a thunderstorm where a tower stands shortens its reach (the reach shown already is).
-            lines.add(Component.translatable(LANG + "weather", com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
+            lines.add(Component.translatable(LANG + "weather", data.contains("weather_reikos")
+                            ? ReikosWeatherCompat.weatherName(data.getString("weather_reikos"))
+                            : com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
                     data.getInt("weather_loss")).withStyle(ChatFormatting.DARK_AQUA));
         }
         if (data != null && data.contains("struck")) {
@@ -730,6 +761,21 @@ public final class RadioInfo {
                     : Component.translatable(LANG + "broadcasting").withStyle(ChatFormatting.GREEN));
             if (hasData && data.contains("recorder_phase")) {
                 recorderLines(lines, data);
+            }
+            if (hasData && data.contains("station_mode")) {
+                // v0.53.0: a weather station's reading, then a pause, and whether it announces.
+                com.reiko.signaltower.radio.StationReading mode = com.reiko.signaltower.radio.StationReading.of(data.getInt("station_mode"));
+                lines.add(data.getBoolean("station_offered")
+                        ? Component.translatable(LANG + "station_reading", mode.label(), getComponent(data, "station_label"),
+                                value(data.getInt("station_strength"))).withStyle(ChatFormatting.YELLOW)
+                        : Component.translatable(LANG + "station_needs_reikos", mode.label()).withStyle(ChatFormatting.RED));
+                lines.add(Component.translatable(LANG + "station_scale", mode.scale()).withStyle(ChatFormatting.GRAY));
+                if (data.getBoolean("station_paused")) {
+                    lines.add(Component.translatable(LANG + "timer_paused").withStyle(ChatFormatting.GOLD));
+                }
+                if (data.getBoolean("station_announce")) {
+                    lines.add(Component.translatable(LANG + "station_announces").withStyle(ChatFormatting.AQUA));
+                }
             }
             if (hasData && data.contains("timer_daily")) {
                 // v0.42.0: a timer's schedule, then a pause or what happens next.

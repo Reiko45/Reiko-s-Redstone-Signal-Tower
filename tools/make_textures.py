@@ -255,6 +255,36 @@ def timer_transmitter_side(lit):
     return img
 
 
+def weather_station_side(lit):
+    """A sun behind a rain cloud between outgoing waves (v0.53.0): the waves and raindrops glow red while it's sending."""
+    r = ON if lit else OFF
+    img = casing(14)
+    px = img.load()
+    vents(img)
+    sun = [(250, 196, 40, 255), (255, 226, 92, 255)]
+    # Sun, peeking out top left
+    for (x, y) in [(5, 2), (6, 2), (4, 3), (5, 3), (6, 3), (7, 3), (4, 4), (5, 4), (6, 4)]:
+        px[x, y] = sun[1] if (x + y) % 3 else sun[0]
+    for (x, y) in [(3, 2), (5, 1), (8, 2), (3, 5)]:
+        px[x, y] = sun[0]  # rays
+    # Cloud: outline, then a light fill
+    cloud = [(7, 3), (8, 3), (9, 3), (6, 4), (10, 4), (11, 5), (12, 5), (5, 5), (4, 6), (13, 6), (4, 7), (13, 7), (5, 8),
+             (6, 8), (7, 8), (8, 8), (9, 8), (10, 8), (11, 8), (12, 8)]
+    for p in cloud:
+        px[p] = O
+    for (x, y) in [(7, 4), (8, 4), (9, 4), (6, 5), (7, 5), (8, 5), (9, 5), (10, 5), (5, 6), (6, 6), (7, 6), (8, 6), (9, 6),
+                   (10, 6), (11, 6), (12, 6), (5, 7), (6, 7), (7, 7), (8, 7), (9, 7), (10, 7), (11, 7), (12, 7)]:
+        px[x, y] = H if y < 7 else L
+    # Raindrops under it
+    for (x, y) in [(6, 9), (9, 9), (12, 9), (5, 10), (8, 10), (11, 10)]:
+        px[x, y] = r[2] if lit else r[1]
+    # Outgoing waves left and right
+    for (x, y) in [(2, 5), (1, 6), (1, 7), (2, 8)]:
+        px[x, y] = r[1] if lit else r[0]
+        px[15 - x, y] = px[x, y]
+    return img
+
+
 def speaker_side(lit):
     """A speaker cone under incoming waves (v0.43.0): its middle glows red while it hears its frequency."""
     r = ON if lit else OFF
@@ -1240,6 +1270,10 @@ blocks = {
     "aviation_beacon_red": beacon_dome("red"),
     "aviation_beacon_white": beacon_dome("white"),
     "aviation_beacon_base": beacon_base(),
+    "radio_weather_station_side": weather_station_side(False),  # v0.53.0
+    "radio_weather_station_side_on": weather_station_side(True),
+    "radio_weather_station_top": top(False, receiver=False),
+    "radio_weather_station_top_on": top(True, receiver=False),
     "radio_timer_transmitter_side": timer_transmitter_side(False),
     "radio_timer_transmitter_side_on": timer_transmitter_side(True),
     "radio_timer_transmitter_top": top(False, receiver=False),

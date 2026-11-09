@@ -202,6 +202,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenTimerScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTimerScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureTimerPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureTimerPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureTimerPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenStationScreenPayload.TYPE,
+                com.reiko.signaltower.network.OpenStationScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenStationScreenPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureStationPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureStationPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureStationPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenCounterScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenCounterScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenCounterScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureCounterPayload.TYPE,
@@ -287,6 +291,7 @@ public final class SignalTower {
             event.accept(ModRegistry.CODE_KEYPAD_ITEM.get());
             event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
             event.accept(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get());
+            event.accept(ModRegistry.RADIO_WEATHER_STATION_ITEM.get());
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
             event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());

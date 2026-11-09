@@ -99,6 +99,16 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(0, 1200))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** A Radio Weather Station's reading (by name) and whether it announces, kept on the item (v0.53.0). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> STATION_MODE =
+            DATA_COMPONENTS.registerComponentType("station_mode", builder -> builder
+                    .persistent(Codec.string(1, 32))
+                    .networkSynchronized(ByteBufCodecs.STRING_UTF8));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> STATION_ANNOUNCE =
+            DATA_COMPONENTS.registerComponentType("station_announce", builder -> builder
+                    .persistent(Codec.BOOL)
+                    .networkSynchronized(ByteBufCodecs.BOOL));
+
     /** A Radio Timer Transmitter's schedule, kept on the item (v0.42.0): mode (0 interval, 1 daily), interval and pulse in ticks, and on hour × 24 + off hour. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> TIMER_MODE =
             DATA_COMPONENTS.registerComponentType("timer_mode", builder -> builder
@@ -371,6 +381,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
 
+    /** A transmitter that broadcasts the weather, the time or the moon where it stands (v0.53.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioWeatherStationBlock> RADIO_WEATHER_STATION = BLOCKS.register("radio_weather_station",
+            () -> new com.reiko.signaltower.block.RadioWeatherStationBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+
     /** A receiver with a delay and a hold (v0.41.0). */
     public static final DeferredBlock<RadioDelayReceiverBlock> RADIO_DELAY_RECEIVER = BLOCKS.register("radio_delay_receiver",
             () -> new RadioDelayReceiverBlock(BlockBehaviour.Properties.of()
@@ -489,6 +508,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_counter_receiver", RADIO_COUNTER_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_TIMER_TRANSMITTER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_timer_transmitter", RADIO_TIMER_TRANSMITTER);
+    public static final DeferredItem<BlockItem> RADIO_WEATHER_STATION_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_weather_station", RADIO_WEATHER_STATION);
     public static final DeferredItem<BlockItem> RADIO_SIGNAL_RECORDER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_signal_recorder", RADIO_SIGNAL_RECORDER);
     public static final DeferredItem<BlockItem> RADIO_JAMMER_ITEM =
@@ -577,6 +598,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity>> TIMER_TRANSMITTER_BE =
             BLOCK_ENTITIES.register("radio_timer_transmitter",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity::new, RADIO_TIMER_TRANSMITTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.WeatherStationBlockEntity>> WEATHER_STATION_BE =
+            BLOCK_ENTITIES.register("radio_weather_station",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.WeatherStationBlockEntity::new, RADIO_WEATHER_STATION.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SignalRecorderBlockEntity>> SIGNAL_RECORDER_BE =
             BLOCK_ENTITIES.register("radio_signal_recorder",

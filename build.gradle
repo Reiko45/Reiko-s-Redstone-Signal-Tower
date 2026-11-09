@@ -37,6 +37,12 @@ dependencies {
     if (!project.hasProperty('noJade')) {
         localRuntime "maven.modrinth:jade:${jade_version}"
     }
+    // Reiko's Weather (v0.53.0) is optional too, and read through reflection (compat/ReikosWeatherCompat),
+    // so nothing is compiled against it. To try the two together, build its jar and pass its path:
+    // ./gradlew runGameTestServer -PwithWeather=/path/to/reikos_weather-1.7.0.jar
+    if (project.hasProperty('withWeather')) {
+        localRuntime files(project.property('withWeather'))
+    }
 }
 
 base {

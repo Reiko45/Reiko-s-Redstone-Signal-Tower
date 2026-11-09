@@ -38,7 +38,9 @@ public final class FrequencyAudit {
 
     /** What a row is. Sent by ordinal: add new ones at the end. */
     public enum Kind {
-        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP, JAMMER, TELEGRAPH;
+        TRANSMITTER, REPEATER, CONVERTER_SENDS, CONVERTER_LISTENS, RECEIVER, TOGGLE_RECEIVER, COMPACT_RECEIVER, COMPACT_TRANSMITTER, INVERTED_RECEIVER, MOTION_SENSOR, LOGIC_RECEIVER, DELAY_RECEIVER, TIMER_TRANSMITTER, COUNTER_RECEIVER, SPEAKER, SIGNAL_RECORDER, LAMP, JAMMER, TELEGRAPH,
+        /** v0.53.0. */
+        WEATHER_STATION;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -102,6 +104,7 @@ public final class FrequencyAudit {
 
             network.transmittersOn(level, frequency).forEach((pos, tx) -> found.add(row(server, claim, !tx.compact()
                     ? (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? Kind.TIMER_TRANSMITTER
+                        : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioWeatherStationBlock ? Kind.WEATHER_STATION
                         : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? Kind.SIGNAL_RECORDER
                         : Kind.TRANSMITTER)
                     : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? Kind.MOTION_SENSOR

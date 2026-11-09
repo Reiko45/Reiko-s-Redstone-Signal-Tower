@@ -32,6 +32,8 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
     public static final int SIGNAL_RECORDER = 7;
     /** A Radio Jammer (v0.46.0): the ring is how far it jams. */
     public static final int JAMMER = 8;
+    /** A Radio Weather Station (v0.53.0). */
+    public static final int WEATHER_STATION = 9;
 
     public ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency) {
         this(pos, reach, kind, frequency, reach, -1);

@@ -102,6 +102,48 @@ public final class SignalTowerGameTests {
         com.reiko.signaltower.radio.PowerCost.powerForTests(null);
     }
 
+    /** v0.53.0: the Radio Weather Station tests that set the weather, in a batch of their own (the weather is the whole dimension's). */
+    private static final String STATION = "station_weather";
+    /** v0.53.0: the Reiko's Weather test, in a batch of its own: it changes that mod's weather and storm cells. */
+    private static final String REIKOS = "reikos_weather";
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = STATION)
+    public static void beforeStation(ServerLevel level) {
+        withoutFade(level);
+        SignalNetwork.get(level).forceWeather(com.reiko.signaltower.radio.Weather.CLEAR);
+    }
+
+    @net.minecraft.gametest.framework.AfterBatch(batch = STATION)
+    public static void afterStation(ServerLevel level) {
+        SignalNetwork.get(level).forceWeather(null);
+    }
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = REIKOS)
+    public static void beforeReikos(ServerLevel level) {
+        withoutFade(level);
+        SignalNetwork.get(level).forceWeather(null);
+    }
+
+    @net.minecraft.gametest.framework.AfterBatch(batch = REIKOS)
+    public static void afterReikos(ServerLevel level) {
+        com.reiko.signaltower.compat.ReikosWeatherCompat.forTests(null);
+        try {
+            if (com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+                reikosCells(level).clear();
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // nothing to tidy up
+        }
+        setWeatherNow(level, false, false);
+    }
+
+    /** Sets vanilla's weather and skips its fade (rain takes a second or so to set in, thunder longer). */
+    private static void setWeatherNow(ServerLevel level, boolean rain, boolean thunder) {
+        level.setWeatherParameters(rain ? 0 : 6000, rain ? 6000 : 0, rain, thunder);
+        level.setRainLevel(rain ? 1.0F : 0.0F);
+        level.setThunderLevel(thunder ? 1.0F : 0.0F);
+    }
+
     // ---- helpers ----
 
     private static void place(GameTestHelper helper, BlockPos pos, Block block, int frequency) {
@@ -7949,6 +7991,365 @@ public final class SignalTowerGameTests {
                     helper.setBlock(new BlockPos(13, 2, 1), Blocks.AIR);
                 })
                 .thenWaitUntil(() -> check(com.reiko.signaltower.radio.AntennaTier.aimOf(helper.getBlockState(top)) == 4, "Off: back east"))
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.53.0: Radio Weather Station, Reiko's Weather
+
+    private static com.reiko.signaltower.radio.StationReading.Value stationRead(ServerLevel level, BlockPos pos,
+                                                                           com.reiko.signaltower.radio.StationReading reading) {
+        return reading.read(level, pos);
+    }
+
+    /**
+     * The Radio Weather Station: the arithmetic of its readings (time of day, temperature, storm
+     * distance, moon names); set by Dev's packet to the moon, a receiver on its frequency outputs the
+     * moon's number and the log names the station; Jade, the screen packet (round trip) and the item
+     * know its reading; redstone into it pauses it; a reading that needs Reiko's Weather can't be
+     * picked without it; a stranger can't change it on someone else's private frequency, nor anyone
+     * out of reach; it's saved, and drops with its settings.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void weatherStation(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos pause = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_WEATHER_STATION.get(), 4551);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4551);
+        com.reiko.signaltower.blockentity.WeatherStationBlockEntity station = helper.getBlockEntity(tx);
+        BlockPos abs = helper.absolutePos(tx);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player far = namedPlayer(helper, new BlockPos(70, 1, 0), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        var MOON = com.reiko.signaltower.radio.StationReading.MOON;
+        int[] moon = new int[1];
+
+        check(com.reiko.signaltower.radio.StationReading.timeStrength(0) == 0 && com.reiko.signaltower.radio.StationReading.timeStrength(6000) == 4
+                && com.reiko.signaltower.radio.StationReading.timeStrength(12000) == 8 && com.reiko.signaltower.radio.StationReading.timeStrength(18000) == 12
+                && com.reiko.signaltower.radio.StationReading.timeStrength(23999) == 15 && com.reiko.signaltower.radio.StationReading.timeStrength(25500) == 1
+                && com.reiko.signaltower.radio.StationReading.timeStrength(-1) == 15, "Time of day: 16 steps from 06:00");
+        check(com.reiko.signaltower.radio.StationReading.clock(0).equals("06:00") && com.reiko.signaltower.radio.StationReading.clock(18000).equals("00:00")
+                && com.reiko.signaltower.radio.StationReading.clock(12750).equals("18:45"), "Clock");
+        check(com.reiko.signaltower.radio.StationReading.temperatureStrength(-10) == 0 && com.reiko.signaltower.radio.StationReading.temperatureStrength(-30) == 0
+                && com.reiko.signaltower.radio.StationReading.temperatureStrength(0) == 3 && com.reiko.signaltower.radio.StationReading.temperatureStrength(20) == 10
+                && com.reiko.signaltower.radio.StationReading.temperatureStrength(35) == 15 && com.reiko.signaltower.radio.StationReading.temperatureStrength(60) == 15
+                && com.reiko.signaltower.radio.StationReading.temperatureStrength(Float.NaN) == 0, "Temperature: 3 degrees a step from -10");
+        check(com.reiko.signaltower.radio.StationReading.stormStrength(0) == 15 && com.reiko.signaltower.radio.StationReading.stormStrength(100) == 14
+                && com.reiko.signaltower.radio.StationReading.stormStrength(149) == 14 && com.reiko.signaltower.radio.StationReading.stormStrength(151) == 13
+                && com.reiko.signaltower.radio.StationReading.stormStrength(1500) == 0 && com.reiko.signaltower.radio.StationReading.stormStrength(5000) == 0,
+                "Nearest storm: 1 less every 100 blocks, like Reiko's Weather Radar");
+        check(keyOf(com.reiko.signaltower.radio.StationReading.moonName(0)).endsWith("moon.0")
+                && keyOf(com.reiko.signaltower.radio.StationReading.moonName(12)).endsWith("moon.4"), "Moon names");
+        check(com.reiko.signaltower.radio.StationReading.named("storm_near") == com.reiko.signaltower.radio.StationReading.STORM_NEAR
+                && com.reiko.signaltower.radio.StationReading.named("nonsense") == com.reiko.signaltower.radio.StationReading.WEATHER, "Saved by name");
+
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(station.getMode() == com.reiko.signaltower.radio.StationReading.WEATHER && !station.isAnnouncing(), "Weather, not announcing, at first");
+                    var weather = SignalNetwork.get(level).weatherAt(level, abs);
+                    check(station.output(level) == (weather == com.reiko.signaltower.radio.Weather.THUNDER ? 15
+                            : weather == com.reiko.signaltower.radio.Weather.RAIN ? 8 : 0), "Weather: " + weather);
+                    Component set = com.reiko.signaltower.network.ConfigureStationPayload.apply(dev,
+                            new com.reiko.signaltower.network.ConfigureStationPayload(abs, MOON.ordinal(), false));
+                    check(set != null && keyOf(set).endsWith("station_set") && station.getMode() == MOON, "Set to the moon: " + set);
+                    moon[0] = stationRead(level, abs, MOON).strength();
+                    boolean blood = com.reiko.signaltower.compat.ReikosWeatherCompat.bloodMoon(level);
+                    check(blood ? moon[0] == 15 : moon[0] == level.getMoonPhase() + 1, "The moon's number: " + moon[0]);
+                    check(keyOf(stationRead(level, abs, MOON).label()).endsWith(blood ? "blood_moon" : "moon." + level.getMoonPhase()), "Its name");
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == moon[0], "The receiver hears the moon: " + outputAt(helper, rx)))
+                .thenExecute(() -> {
+                    var history = SignalNetwork.get(level).history(4551);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.WEATHER_STATION
+                            && abs.equals(history.get(history.size() - 1).cause().pos()), "The log names the station");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    List<Component> lines = com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info);
+                    List<String> keys = lineKeys(lines);
+                    check(keys.contains("station_reading") && keys.contains("station_scale") && !keys.contains("station_announces"), "Jade: " + keys);
+                    Component reading = lines.stream().filter(line -> keyOf(line).endsWith("station_reading")).findFirst().orElseThrow();
+                    Object label = ((TranslatableContents) reading.getContents()).getArgs()[1];
+                    check(label instanceof Component c && keyOf(c).contains("moon"), "Jade shows the moon's name, as the server worked it out: " + label);
+
+                    var screen = com.reiko.signaltower.network.OpenStationScreenPayload.of(level, station);
+                    check(screen.frequency() == 4551 && screen.mode() == MOON.ordinal() && !screen.announce()
+                            && screen.status() == com.reiko.signaltower.network.OpenStationScreenPayload.SENDING
+                            && (screen.offered() & 0b111) == 0b111 && screen.strengths().size() == com.reiko.signaltower.radio.StationReading.values().length
+                            && screen.strengths().get(MOON.ordinal()) == moon[0]
+                            && screen.reikos() == com.reiko.signaltower.compat.ReikosWeatherCompat.available(), "Screen: " + screen);
+                    var buffer = new net.minecraft.network.RegistryFriendlyByteBuf(Unpooled.buffer(), level.registryAccess());
+                    com.reiko.signaltower.network.OpenStationScreenPayload.STREAM_CODEC.encode(buffer, screen);
+                    check(com.reiko.signaltower.network.OpenStationScreenPayload.STREAM_CODEC.decode(buffer).equals(screen), "Screen packet round trip");
+                    var settings = new com.reiko.signaltower.network.ConfigureStationPayload(abs, 3, true);
+                    var plain = Unpooled.buffer();
+                    com.reiko.signaltower.network.ConfigureStationPayload.STREAM_CODEC.encode(plain, settings);
+                    check(com.reiko.signaltower.network.ConfigureStationPayload.STREAM_CODEC.decode(plain).equals(settings), "Settings packet round trip");
+
+                    if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+                        Component refused = com.reiko.signaltower.network.ConfigureStationPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureStationPayload(abs, com.reiko.signaltower.radio.StationReading.CONDITIONS.ordinal(), false));
+                        check(refused != null && keyOf(refused).endsWith("station_needs_reikos") && station.getMode() == MOON,
+                                "Without Reiko's Weather its readings can't be picked");
+                        check((screen.offered() & ~0b111) == 0, "Only three on offer");
+                    }
+                    check(com.reiko.signaltower.network.ConfigureStationPayload.apply(far,
+                            new com.reiko.signaltower.network.ConfigureStationPayload(abs, 1, false)) == null && station.getMode() == MOON, "Out of reach");
+                    helper.setBlock(pause, Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0 && station.isPaused(level), "Redstone pauses it"))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("timer_paused"), "Jade says paused");
+                    check(com.reiko.signaltower.network.OpenStationScreenPayload.of(level, station).status()
+                            == com.reiko.signaltower.network.OpenStationScreenPayload.PAUSED, "The screen says paused");
+                    helper.setBlock(pause, Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == moon[0], "It starts again"))
+                .thenExecute(() -> {
+                    var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+                    claims.put(4551, UUID.randomUUID(), "Owner", java.util.Map.of());
+                    try {
+                        Component refused = com.reiko.signaltower.network.ConfigureStationPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureStationPayload(abs, 1, true));
+                        check(refused != null && keyOf(refused).endsWith("private_refused_block") && station.getMode() == MOON && !station.isAnnouncing(),
+                                "A stranger can't change it on someone else's private frequency");
+                    } finally {
+                        claims.remove(4551);
+                    }
+                    station.setSettings(com.reiko.signaltower.radio.StationReading.TIME, true);
+                    check(station.output(level) == com.reiko.signaltower.radio.StationReading.timeStrength(level.getDayTime()), "Time of day now");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info)).contains("station_announces"), "Jade: announces");
+                    CompoundTag saved = station.saveWithoutMetadata(level.registryAccess());
+                    var copy = new com.reiko.signaltower.blockentity.WeatherStationBlockEntity(abs, helper.getBlockState(tx));
+                    copy.loadWithComponents(saved, level.registryAccess());
+                    check(copy.getMode() == com.reiko.signaltower.radio.StationReading.TIME && copy.isAnnouncing() && copy.getFrequency() == 4551, "Saved");
+                    level.destroyBlock(abs, true);
+                })
+                .thenWaitUntil(() -> check(helper.getEntities(EntityType.ITEM).stream().map(ItemEntity::getItem)
+                        .anyMatch(stack -> stack.is(ModRegistry.RADIO_WEATHER_STATION_ITEM.get())
+                                && "TIME".equals(stack.get(ModRegistry.STATION_MODE.get()))
+                                && Boolean.TRUE.equals(stack.get(ModRegistry.STATION_ANNOUNCE.get()))
+                                && Integer.valueOf(4551).equals(stack.get(ModRegistry.FREQUENCY.get()))), "Dropped with its settings"))
+                .thenSucceed();
+    }
+
+    /**
+     * The Radio Weather Station in the weather (a batch of its own, since the weather is the whole
+     * dimension's): clear 0, rain 8, thunder 15 on a receiver. Announcing, it sends "Now: Rain" to a
+     * telegraph on its frequency once rain has held for two looks (not after one, and not for a
+     * flicker back), named "Weather Station"; not while it's paused.
+     */
+    @GameTest(template = PLATFORM, batch = STATION, timeoutTicks = 300)
+    public static void weatherStationAnnounces(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos pause = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        BlockPos tele = new BlockPos(9, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_WEATHER_STATION.get(), 4552);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4552);
+        place(helper, tele, ModRegistry.RADIO_TELEGRAPH.get(), 4552);
+        com.reiko.signaltower.blockentity.WeatherStationBlockEntity station = helper.getBlockEntity(tx);
+        BlockPos abs = helper.absolutePos(tx);
+        SignalNetwork network = SignalNetwork.get(level);
+        var CLEAR = com.reiko.signaltower.radio.Weather.CLEAR;
+        var RAIN = com.reiko.signaltower.radio.Weather.RAIN;
+        var THUNDER = com.reiko.signaltower.radio.Weather.THUNDER;
+        int[] count = new int[1];
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    network.forceWeather(CLEAR);
+                    station.setSettings(com.reiko.signaltower.radio.StationReading.WEATHER, true);
+                    check(station.output(level) == 0 && station.checkWeather(level) == null, "Clear: 0, nothing to announce");
+                    network.forceWeather(RAIN);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 8, "Rain: 8"))
+                .thenExecute(() -> {
+                    check(keyOf(station.reading(level).label()).endsWith(".rain"), "Its label: " + station.reading(level).label());
+                    count[0] = network.messages(4552).size();
+                    check(station.checkWeather(level) == null && network.messages(4552).size() == count[0], "Not after one look");
+                    SignalNetwork.Message message = station.checkWeather(level);
+                    check(message != null && message.text().equals("Now: Rain") && message.name().equals("Weather Station") && message.who() == null,
+                            "Announced after two: " + message);
+                    check(network.messages(4552).size() == count[0] + 1, "Remembered on its frequency");
+                    check(helper.getBlockState(tele).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED), "The telegraph on it clicks");
+                    List<com.reiko.signaltower.radio.Telegraph.Line> feed = com.reiko.signaltower.radio.Telegraph.feed(level, helper.absolutePos(tele), 4552, null);
+                    check(!feed.isEmpty() && feed.get(feed.size() - 1).who().equals("Weather Station")
+                            && feed.get(feed.size() - 1).text().equals("Now: Rain"), "Its screen shows it: " + feed);
+                    check(station.checkWeather(level) == null, "Still raining: nothing new");
+                    network.forceWeather(THUNDER);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "Thunder: 15"))
+                .thenExecute(() -> {
+                    check(station.checkWeather(level) == null, "Thunder, one look");
+                    network.forceWeather(RAIN);
+                    check(station.checkWeather(level) == null, "A flicker back to rain isn't announced");
+                    network.forceWeather(THUNDER);
+                    check(station.checkWeather(level) == null, "Thunder again: one look");
+                    SignalNetwork.Message message = station.checkWeather(level);
+                    check(message != null && message.text().equals("Now: Thunderstorm"), "Two looks: " + message);
+                    count[0] = network.messages(4552).size();
+                    helper.setBlock(pause, Blocks.REDSTONE_BLOCK);
+                    network.forceWeather(CLEAR);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0 && station.isPaused(level), "Paused"))
+                .thenExecute(() -> {
+                    station.checkWeather(level);
+                    check(station.checkWeather(level) == null && network.messages(4552).size() == count[0], "Nothing while it's paused");
+                    helper.setBlock(pause, Blocks.AIR);
+                    network.forceWeather(null);
+                })
+                .thenSucceed();
+    }
+
+    // Reiko's Weather through reflection, for the test below only.
+
+    private static Object reikosState(ServerLevel level) throws ReflectiveOperationException {
+        return Class.forName("com.reiko.weather.weather.WeatherManager").getMethod("activeState", net.minecraft.world.level.Level.class)
+                .invoke(null, level);
+    }
+
+    private static List<Object> reikosCells(ServerLevel level) throws ReflectiveOperationException {
+        Object state = reikosState(level);
+        @SuppressWarnings("unchecked")
+        List<Object> cells = state == null ? new java.util.ArrayList<>() : (List<Object>) state.getClass().getField("cells").get(state);
+        return cells;
+    }
+
+    /** A storm cell of {@code type} centred on {@code x, z} that stays put at full strength. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object reikosCell(ServerLevel level, String type, double x, double z, float radius) throws ReflectiveOperationException {
+        Class<?> manager = Class.forName("com.reiko.weather.weather.WeatherManager");
+        Class<?> stateClass = Class.forName("com.reiko.weather.weather.WeatherState");
+        Class typeClass = Class.forName("com.reiko.weather.weather.WeatherType");
+        Object cell = manager.getMethod("spawnCell", ServerLevel.class, stateClass, typeClass, double.class, double.class, float.class,
+                        double.class, double.class, int.class, int.class, boolean.class)
+                .invoke(null, level, reikosState(level), Enum.valueOf(typeClass, type), x, z, radius, 0.0, 0.0, 100_000, 1, false);
+        cell.getClass().getField("age").setInt(cell, 1); // built up already
+        return cell;
+    }
+
+    /**
+     * Reiko's Weather. Without it: only three readings, the others read 0 and say they need it, and
+     * nothing is read from it. With it (./gradlew runGameTestServer -PwithWeather=...): in rain the
+     * station's weather code is 4, storm danger 5, weather 8, named as Reiko's Weather names it, and
+     * temperature, season and wind come from it; in a thunderstorm 6, 15, 15. A heavy rain cell over a
+     * tower (with clear skies elsewhere) cuts its reach 15% there and not 5,000 blocks away, the
+     * station reads it as rain (code 5) with the storm overhead (15), and the tower's frequency is
+     * worked out again; a spot 300 blocks from the cell's edge reads 12 for the nearest storm. Switched
+     * off, everything goes back to vanilla weather.
+     */
+    @GameTest(template = PLATFORM, batch = REIKOS, timeoutTicks = 400)
+    public static void reikosWeather(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(2, 1, 1);
+        BlockPos rx = new BlockPos(6, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_WEATHER_STATION.get(), 4561);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4561);
+        com.reiko.signaltower.blockentity.WeatherStationBlockEntity station = helper.getBlockEntity(tx);
+        BlockPos abs = helper.absolutePos(tx);
+        SignalNetwork network = SignalNetwork.get(level);
+        boolean recipe = level.getRecipeManager().byKey(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID,
+                "radio_weather_station_from_reikos_weather")).isPresent();
+        check(recipe == com.reiko.signaltower.compat.ReikosWeatherCompat.installed(),
+                "The recipe from Reiko's Weather Station is there only with Reiko's Weather: " + recipe);
+        if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+            check(com.reiko.signaltower.radio.StationReading.offeredHere().size() == 3
+                    && !com.reiko.signaltower.radio.StationReading.CONDITIONS.offered(), "Three readings without Reiko's Weather");
+            var code = stationRead(level, abs, com.reiko.signaltower.radio.StationReading.CONDITIONS);
+            check(code.strength() == 0 && keyOf(code.label()).endsWith("needs_reikos_weather"), "Its readings say they need it");
+            check(com.reiko.signaltower.compat.ReikosWeatherCompat.local(level, abs) == null
+                    && com.reiko.signaltower.compat.ReikosWeatherCompat.stormOver(level, abs) == null
+                    && com.reiko.signaltower.compat.ReikosWeatherCompat.nearestStorm(level, abs) == null
+                    && com.reiko.signaltower.compat.ReikosWeatherCompat.season() == null
+                    && !com.reiko.signaltower.compat.ReikosWeatherCompat.bloodMoon(level)
+                    && Float.isNaN(com.reiko.signaltower.compat.ReikosWeatherCompat.temperature(level, abs, null)), "Nothing read from it");
+            helper.succeed();
+            return;
+        }
+        Object[] cell = new Object[1];
+        long[] before = new long[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> check(com.reiko.signaltower.compat.ReikosWeatherCompat.runs(level), "Reiko's Weather runs the Overworld"))
+                .thenExecute(() -> {
+                    try {
+                        reikosCells(level).clear();
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't reach Reiko's Weather: " + e);
+                    }
+                    setWeatherNow(level, true, false); // Reiko's Weather follows /weather
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    var local = com.reiko.signaltower.compat.ReikosWeatherCompat.local(level, abs);
+                    check(local != null && local.rain() && !local.thunder() && local.id().equals("rain") && local.code() == 4, "Rain: " + local);
+                    check(stationRead(level, abs, com.reiko.signaltower.radio.StationReading.CONDITIONS).strength() == 4, "Weather code 4");
+                    check(stationRead(level, abs, com.reiko.signaltower.radio.StationReading.STORM).strength() == 5, "Storm danger 5");
+                    var weather = stationRead(level, abs, com.reiko.signaltower.radio.StationReading.WEATHER);
+                    check(weather.strength() == 8 && keyOf(weather.label()).equals("weather.reikos_weather.rain"), "Weather 8, named by Reiko's Weather: " + weather);
+                    check(stationRead(level, abs, com.reiko.signaltower.radio.StationReading.PRECIPITATION).strength() > 0, "It rains");
+                    float celsius = com.reiko.signaltower.compat.ReikosWeatherCompat.temperature(level, abs, local);
+                    check(!Float.isNaN(celsius) && stationRead(level, abs, com.reiko.signaltower.radio.StationReading.TEMPERATURE).strength()
+                            == com.reiko.signaltower.radio.StationReading.temperatureStrength(celsius), "Temperature " + celsius);
+                    var season = com.reiko.signaltower.compat.ReikosWeatherCompat.season();
+                    check(season == null || season.number() >= 1 && season.number() <= 4
+                            && (season.days() <= 0 || season.day() >= 1 && season.day() <= season.days())
+                            && stationRead(level, abs, com.reiko.signaltower.radio.StationReading.SEASON).strength() == season.number(),
+                            "Season, its day counted from 1: " + season);
+                    var wind = stationRead(level, abs, com.reiko.signaltower.radio.StationReading.WIND);
+                    check(keyOf(wind.label()).endsWith("station_wind"), "Wind: " + wind.label());
+                    var near = stationRead(level, abs, com.reiko.signaltower.radio.StationReading.STORM_NEAR);
+                    check(near.strength() == 0 && keyOf(near.label()).endsWith("no_storms"), "No storms: " + near.label());
+                    check(com.reiko.signaltower.radio.StationReading.offeredHere().size() == com.reiko.signaltower.radio.StationReading.values().length,
+                            "All ten on offer");
+                    station.setSettings(com.reiko.signaltower.radio.StationReading.CONDITIONS, false);
+                    setWeatherNow(level, true, true);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 6, "Thunderstorm: code 6 on the receiver"))
+                .thenExecute(() -> {
+                    check(stationRead(level, abs, com.reiko.signaltower.radio.StationReading.STORM).strength() == 15
+                            && stationRead(level, abs, com.reiko.signaltower.radio.StationReading.WEATHER).strength() == 15, "Danger 15, weather 15");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+                    check("thunderstorm".equals(info.getString("weather_reikos")), "Jade names Reiko's thunderstorm: " + info);
+                    setWeatherNow(level, false, false);
+                    before[0] = network.revision(4561);
+                    try {
+                        cell[0] = reikosCell(level, "HEAVY_RAIN", abs.getX() + 0.5, abs.getZ() + 0.5, 64);
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't make a storm cell: " + e);
+                    }
+                    station.setSettings(com.reiko.signaltower.radio.StationReading.WEATHER, false);
+                })
+                .thenIdle(SignalNetwork.STORM_CHECK_TICKS + 5)
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.compat.ReikosWeatherCompat.stormOver(level, abs) == com.reiko.signaltower.radio.Weather.RAIN, "A rain cell overhead");
+                    check(network.weatherAt(level, abs) == com.reiko.signaltower.radio.Weather.RAIN && network.reachNow(level, abs, 100) == 85,
+                            "It cuts the tower's reach 15%");
+                    BlockPos away = abs.offset(5000, 0, 0);
+                    check(network.weatherAt(level, away) == com.reiko.signaltower.radio.Weather.CLEAR && network.reachNow(level, away, 100) == 100,
+                            "Not 5,000 blocks away, where it's clear");
+                    check(network.revision(4561) > before[0], "The tower's frequency was worked out again");
+                    check(station.output(level) == 8, "The station reads rain");
+                    check(stationRead(level, abs, com.reiko.signaltower.radio.StationReading.CONDITIONS).strength() == 5, "Heavy rain: code 5");
+                    var near = stationRead(level, abs, com.reiko.signaltower.radio.StationReading.STORM_NEAR);
+                    check(near.strength() == 15 && keyOf(near.label()).endsWith("storm_overhead"), "The storm is overhead: " + near.label());
+                    var storm = com.reiko.signaltower.compat.ReikosWeatherCompat.nearestStorm(level, abs.offset(64 + 300, 0, 0));
+                    check(storm != null && storm.id().equals("heavy_rain") && Math.abs(storm.edge() - 300) <= 1
+                            && com.reiko.signaltower.radio.StationReading.stormStrength(storm.edge()) == 12, "300 blocks from its edge: 12 (" + storm + ")");
+                    com.reiko.signaltower.compat.ReikosWeatherCompat.forTests(false);
+                    check(!com.reiko.signaltower.compat.ReikosWeatherCompat.available()
+                            && network.weatherAt(level, abs) == com.reiko.signaltower.radio.Weather.CLEAR
+                            && stationRead(level, abs, com.reiko.signaltower.radio.StationReading.CONDITIONS).strength() == 0,
+                            "Switched off: back to vanilla weather");
+                    com.reiko.signaltower.compat.ReikosWeatherCompat.forTests(null);
+                    try {
+                        reikosCells(level).remove(cell[0]);
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't remove the storm cell: " + e);
+                    }
+                })
                 .thenSucceed();
     }
 }

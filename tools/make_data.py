@@ -118,6 +118,7 @@ for lit in (False, True):
     write(models / f"radio_counter_receiver{suffix}.json", receiver_model(lit, "radio_counter_receiver_side"))
     write(models / f"radio_speaker{suffix}.json", receiver_model(lit, "radio_speaker_side"))
     write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
+    write(models / f"radio_weather_station{suffix}.json", transmitter_model(lit, "radio_weather_station"))  # v0.53.0
     write(models / f"radio_signal_recorder{suffix}.json", transmitter_model(lit, "radio_signal_recorder"))
     write(models / f"radio_jammer{suffix}.json", transmitter_model(lit, "radio_jammer", "jammer_tip"))
 
@@ -307,7 +308,7 @@ write(models / "radio_mast.json", {
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast"):
+             "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast", "radio_weather_station"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
@@ -494,6 +495,7 @@ tower_states("radio_repeater", "lit")
 tower_states("radio_converter", "lit")
 tower_states("radio_signal_recorder", "powered")
 tower_states("radio_timer_transmitter", "powered")
+tower_states("radio_weather_station", "powered")  # v0.53.0
 tower_states("radio_jammer", "powered")
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
@@ -784,6 +786,88 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.rotator_no_dish": "No Dish Antenna on top to turn",
     f"jade.{MOD}.rotator_overruled": "A Dish Rotator higher up turns the dish instead",
     f"jade.{MOD}.dish_rotated": "Turned by a Dish Rotator (redstone %s)",
+    # v0.53.0: the Radio Weather Station, and Reiko's Weather
+    f"block.{MOD}.radio_weather_station": "Radio Weather Station",
+    f"block.{MOD}.radio_weather_station.short": "Weather Station",
+    f"block.{MOD}.radio_weather_station.tooltip": "A transmitter that broadcasts the conditions where it stands: the weather, the time of day or the moon (more with Reiko's Weather). A redstone signal into it pauses it. Right-click it with an empty hand to pick what it reads.",
+    f"tooltip.{MOD}.station_reading": "Reads: %1$s (%2$s)",
+    f"tooltip.{MOD}.station_announces": "Announces weather changes",
+    f"message.{MOD}.station_status": "Weather Station | Frequency %1$s | %2$s: %3$s | Sending %4$s | Reach %5$s blocks",
+    f"message.{MOD}.station_set": "Radio Weather Station: %1$s, now %2$s (%3$s)",
+    f"message.{MOD}.station_needs_reikos": "%s needs Reiko's Weather",
+    f"message.{MOD}.station_announce": "Now: %s",
+    f"message.{MOD}.station_announce_severe": "Now: %s. Severe weather!",
+    f"message.{MOD}.station_wind": "%1$s km/h from the %2$s",
+    f"compass.{MOD}.n": "north", f"compass.{MOD}.ne": "north-east", f"compass.{MOD}.e": "east", f"compass.{MOD}.se": "south-east",
+    f"compass.{MOD}.s": "south", f"compass.{MOD}.sw": "south-west", f"compass.{MOD}.w": "west", f"compass.{MOD}.nw": "north-west",
+    f"station.{MOD}.mode.weather": "Weather",
+    f"station.{MOD}.mode.time": "Time of day",
+    f"station.{MOD}.mode.moon": "Moon",
+    f"station.{MOD}.mode.conditions": "Weather code",
+    f"station.{MOD}.mode.storm": "Storm danger",
+    f"station.{MOD}.mode.wind": "Wind",
+    f"station.{MOD}.mode.precipitation": "Precipitation",
+    f"station.{MOD}.mode.temperature": "Temperature",
+    f"station.{MOD}.mode.season": "Season",
+    f"station.{MOD}.mode.storm_near": "Nearest storm",
+    f"station.{MOD}.scale.weather": "clear 0, rain or snow 8, thunderstorm 15",
+    f"station.{MOD}.scale.time": "06:00 is 0, then 1 more every 1.5 hours: noon 4, 18:00 8, midnight 12",
+    f"station.{MOD}.scale.moon": "full moon 1 ... new moon 5 ... 8; a Blood Moon 15",
+    f"station.{MOD}.scale.conditions": "Reiko's Weather's code: clear 0, rain 4, thunderstorm 6, snow 11, heatwave 15...",
+    f"station.{MOD}.scale.storm": "thunder or severe 15, hail or heavy rain 10, rain 5, else 0",
+    f"station.{MOD}.scale.wind": "calm 0 to a gale 15",
+    f"station.{MOD}.scale.precipitation": "dry 0 to a downpour 15",
+    f"station.{MOD}.scale.temperature": "-10 \u00b0C 0, then 1 more every 3 \u00b0C: 20 \u00b0C 10, 35 \u00b0C 15",
+    f"station.{MOD}.scale.season": "spring 1, summer 2, autumn 3, winter 4",
+    f"station.{MOD}.scale.storm_near": "overhead 15, then 1 less every 100 blocks to its edge",
+    f"station.{MOD}.needs_reikos_weather": "Needs Reiko's Weather",
+    f"station.{MOD}.blood_moon": "Blood Moon",
+    f"station.{MOD}.no_sky": "No sky here",
+    f"station.{MOD}.moon.0": "Full moon",
+    f"station.{MOD}.moon.1": "Waning gibbous",
+    f"station.{MOD}.moon.2": "Last quarter",
+    f"station.{MOD}.moon.3": "Waning crescent",
+    f"station.{MOD}.moon.4": "New moon",
+    f"station.{MOD}.moon.5": "Waxing crescent",
+    f"station.{MOD}.moon.6": "First quarter",
+    f"station.{MOD}.moon.7": "Waxing gibbous",
+    f"station.{MOD}.no_seasons": "No seasons",
+    f"station.{MOD}.season_day": "%1$s, day %2$s of %3$s",
+    f"station.{MOD}.no_storms": "No storms",
+    f"station.{MOD}.not_here": "Reiko's Weather doesn't run here",
+    f"station.{MOD}.storm_overhead": "%s overhead",
+    f"station.{MOD}.storm_away": "%1$s, %2$s blocks away",
+    f"station.{MOD}.percent": "%1$s, %2$s%%",
+    f"station.{MOD}.degrees": "%1$s \u00b0C (%2$s \u00b0F)",
+    f"screen.{MOD}.station.reading": "Reading",
+    f"screen.{MOD}.station.announce": "Announce weather changes",
+    f"screen.{MOD}.station.announce_tip": "Sends a message on its frequency when the weather where it stands changes (\"Now: Rain\"): pagers, Radio Telegraphs and Status Boards in its reach show it.",
+    f"screen.{MOD}.station.mode.weather_tip": "Rain and thunder where it stands, as towers' reach goes by. Shift-click or scroll to go back.",
+    f"screen.{MOD}.station.mode.time_tip": "The time of day, in 16 steps: 8 or more is night (18:00 to 06:00).",
+    f"screen.{MOD}.station.mode.moon_tip": "Tonight's moon, from full (1) to waxing gibbous (8).",
+    f"screen.{MOD}.station.mode.conditions_tip": "Reiko's Weather's weather code, the same as its own Weather Station's.",
+    f"screen.{MOD}.station.mode.storm_tip": "How dangerous the weather is, the same as Reiko's Weather Station's.",
+    f"screen.{MOD}.station.mode.wind_tip": "How strong the wind is where it stands (higher up is windier).",
+    f"screen.{MOD}.station.mode.precipitation_tip": "How hard it rains or snows where it stands.",
+    f"screen.{MOD}.station.mode.temperature_tip": "The air temperature where it stands (season, height, time of day and weather count).",
+    f"screen.{MOD}.station.mode.season_tip": "The season, from Reiko's Weather (or Serene Seasons through it).",
+    f"screen.{MOD}.station.mode.storm_near_tip": "How close the nearest storm is, like Reiko's Weather Radar: bases can get ready before it arrives.",
+    f"screen.{MOD}.station.frequency": "Sends on %s",
+    f"screen.{MOD}.station.now": "Now: %1$s \u2192 %2$s",
+    f"screen.{MOD}.station.needs_reikos": "This reading needs Reiko's Weather",
+    f"screen.{MOD}.station.silenced": "Silent: %s is private to %s",
+    f"screen.{MOD}.station.paused": "Paused: a redstone signal reaches it",
+    f"screen.{MOD}.station.down": "Not sending: knocked out or out of power",
+    f"screen.{MOD}.station.will_send": "Done sends %1$s on %2$s",
+    f"screen.{MOD}.station.sending": "Sending %1$s on %2$s",
+    f"screen.{MOD}.station.sending_zero": "Sending 0 on %s right now",
+    f"screen.{MOD}.station.more_with_reikos": "Install Reiko's Weather for 7 more readings",
+    f"jade.{MOD}.station_reading": "%1$s: %2$s (%3$s)",
+    f"jade.{MOD}.station_needs_reikos": "%s needs Reiko's Weather",
+    f"jade.{MOD}.station_scale": "Scale: %s",
+    f"jade.{MOD}.station_announces": "Announces weather changes",
+    f"screen.{MOD}.audit.kind_weather_station": "Weather Station",
+    f"screen.{MOD}.log.kind_weather_station": "Weather Station",
     # v0.51.0: the mast builder and the Radio Telegraph
     f"tooltip.{MOD}.mast_builder": "Right-click a tower's mast or top with this to add a mast under the top. Sneak to place it normally.",
     f"message.{MOD}.mast_added": "Mast added: the %1$s is %2$s masts up, reach %3$s \u2192 %4$s blocks",
@@ -896,13 +980,13 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.faded": "Faded: -%s (far out in its tower's reach)",
     # v0.50.0: the Ender Antenna and the Solar Panel
     f"item.{MOD}.ender_antenna": "Ender Antenna",
-    f"tooltip.{MOD}.ender_item": "Fit it to a Radio Transmitter (plain, timer or recorder) and it also sends into another dimension, from the same spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and into the Overworld from anywhere else. Use another on it to pick the next dimension. Its reach stays as with no antenna.",
+    f"tooltip.{MOD}.ender_item": "Fit it to a Radio Transmitter (plain, timer, recorder or weather station) and it also sends into another dimension, from the same spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and into the Overworld from anywhere else. Use another on it to pick the next dimension. Its reach stays as with no antenna.",
     f"tooltip.{MOD}.antenna_ender": "Antenna: %s (also sends into another dimension)",
     f"jade.{MOD}.antenna_ender": "Antenna: %s (also sends into %s at %s)",
     f"message.{MOD}.ender_fitted": "%s: Ender Antenna fitted: sending into %s too (arriving at %s)",
     f"message.{MOD}.ender_relinked": "%s: Ender Antenna now sends into %s (arriving at %s)",
     f"message.{MOD}.ender_nowhere": "%s: Ender Antenna fitted, but there's no other dimension to send into",
-    f"message.{MOD}.ender_transmitters_only": "Only a Radio Transmitter (plain, timer or recorder) can send into another dimension",
+    f"message.{MOD}.ender_transmitters_only": "Only a Radio Transmitter (plain, timer, recorder or weather station) can send into another dimension",
     f"dimension.{MOD}.overworld": "the Overworld",
     f"dimension.{MOD}.the_nether": "the Nether",
     f"dimension.{MOD}.the_end": "the End",
@@ -2088,6 +2172,22 @@ recipes["radio_timer_transmitter"] = ({
     "result": {"count": 1, "id": f"{MOD}:radio_timer_transmitter"},
 }, f"{MOD}:radio_transmitter")
 recipes["radio_transmitter_from_timer"] = (shapeless("radio_timer_transmitter", "radio_transmitter"), f"{MOD}:radio_timer_transmitter")
+recipes["radio_weather_station"] = ({  # v0.53.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "minecraft:daylight_detector"}, {"item": "minecraft:lightning_rod"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_weather_station"},
+}, f"{MOD}:radio_transmitter")
+# With Reiko's Weather: its own Weather Station works too (only loaded when it's installed).
+REIKOS = [{"type": "neoforge:mod_loaded", "modid": "reikos_weather"}]
+recipes["radio_weather_station_from_reikos_weather"] = ({
+    "neoforge:conditions": REIKOS,
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "reikos_weather:weather_station"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_weather_station"},
+}, f"{MOD}:radio_transmitter")
+recipes["radio_transmitter_from_weather_station"] = (shapeless("radio_weather_station", "radio_transmitter"), f"{MOD}:radio_weather_station")
 recipes["iron_antenna"] = ({
     "type": "minecraft:crafting_shaped",
     "category": "redstone",
@@ -2246,6 +2346,7 @@ for name, (recipe, trigger) in recipes.items():
     write(DATA / "recipe" / f"{name}.json", recipe)
     # Unlocks the recipe in the recipe book once the player picks up the trigger item.
     write(DATA / "advancement" / "recipes" / "redstone" / f"{name}.json", {
+        **({"neoforge:conditions": recipe["neoforge:conditions"]} if "neoforge:conditions" in recipe else {}),
         "parent": "minecraft:recipes/root",
         "criteria": {
             "has_item": {"trigger": "minecraft:inventory_changed",
@@ -2263,7 +2364,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
-             "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator"):
+             "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2283,12 +2384,14 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                           if name == "radio_counter_receiver" else [])
                        + ([f"{MOD}:timer_mode", f"{MOD}:timer_interval", f"{MOD}:timer_pulse", f"{MOD}:timer_hours"]
                           if name == "radio_timer_transmitter" else [])
+                       + ([f"{MOD}:station_mode", f"{MOD}:station_announce"] if name == "radio_weather_station" else [])
                        + ([f"{MOD}:speaker"] if name == "radio_speaker" else [])
                        + ([f"{MOD}:recorder_tape"] if name == "radio_signal_recorder" else [])
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
-    if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter"):
+    if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter",
+                "radio_weather_station"):
         # v0.45.0: its antenna (only if it has one, so plain ones still stack with older items).
         entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:{name}", "properties": ["antenna"],
                                    "conditions": [{"condition": "minecraft:inverted", "term": {
@@ -2315,7 +2418,8 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_speaker", f"{MOD}:radio_status_board", f"{MOD}:radio_signal_recorder", f"{MOD}:radio_jammer", f"{MOD}:aviation_beacon", f"{MOD}:radio_lamp",
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
-               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator"]
+               f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
+               f"{MOD}:radio_weather_station"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

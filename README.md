@@ -11,6 +11,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Timer Transmitter** | A transmitter with a clock. It sends full strength on a schedule: a pulse every 1 second to 20 minutes, or on between two in-game times (on at 18:00, off at 06:00 lights the night). A redstone signal into it pauses it. Otherwise it's a full-size transmitter, with reach by height. |
 | **Radio Signal Recorder** | A transmitter with a tape. It records up to 30 seconds of a frequency (every on, off and strength, to the tick) and plays it back on its own frequency: once each time a redstone pulse reaches it, or on a loop while it's powered. Record a rhythm on a remote and get it back as a doorbell tune, a light show or a secret knock. |
+| **Radio Weather Station** | A transmitter that broadcasts the conditions where it stands as a strength: the weather (clear 0, rain 8, thunder 15), the time of day or the moon phase. Far-away bases can close shutters before a storm or switch the lights on at dusk. With [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) installed it reads that mod's local weather and gets 7 more readings: weather code, storm danger, wind, precipitation, temperature, season and nearest storm. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength (weaker far out toward the edge of a tower's reach). Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the strength it was sent at, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
 | **Radio Converter** | A repeater that changes the frequency. It picks up one frequency and broadcasts it on another, so one switch can drive receivers on a second frequency, or two networks can be joined. Its teal light glows while it's converting. Its **signal gate** can make it a wireless comparator (send only at a level or more) or a wireless NOT gate (send 15 while it hears nothing). |
@@ -26,7 +27,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Motion Sensor** | A button-sized eye for a wall, floor or ceiling. It sends on its frequency while it sees a player nearby, over a compact transmitter's short reach. Its owner sets how far it looks and whether it reacts to everyone or only to strangers, and the frequency log names who set it off. |
 | **Code Keypad** | A keypad for a wall, floor or ceiling. Type the right code and it sends a pulse on its frequency, and powers the block it's on, so it opens a door right next to it too. Only its owner sets the code, and three wrong codes in a row lock the typer out and alert the owner. |
 | **Aviation Beacon** | A red (or white) warning light for the top or the side of a tower, or any block. It blinks at night, is seen from far beyond where the tower itself fades into the dark, and all beacons blink together. It can also blink only while its tower is broadcasting, so you can see from across the map whether the tower is on. |
-| **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer or recorder), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
+| **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer, recorder or weather station), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
@@ -483,7 +484,7 @@ An **Aviation Beacon** (since 0.44) is a warning light for towers. Put it on top
 
 ### Antennas
 
-**Antennas** (since 0.45) make a tower reach farther. Right-click a full-size Radio Transmitter, Radio Timer Transmitter, Radio Signal Recorder, Radio Repeater, Radio Converter or (since 0.46) Radio Jammer with one:
+**Antennas** (since 0.45) make a tower reach farther. Right-click a full-size Radio Transmitter, Radio Timer Transmitter, Radio Signal Recorder, Radio Weather Station (since 0.53), Radio Repeater, Radio Converter or (since 0.46) Radio Jammer with one:
 
 | Antenna | Reach | Made from |
 |---|---|---|
@@ -515,7 +516,8 @@ A **Radio Lamp** (since 0.45) is a lamp with a receiver built in. Tune it like a
 
 Since 0.46 the world gets in the way of signals:
 
-- **Rain and thunderstorms** shorten the reach of transmitters (plain, timer and recorder), repeaters, converters and jammers: by 15% while it rains or snows where the tower stands, by 30% in a thunderstorm. A tower in a desert, savanna or badlands (where it never rains), or in the Nether or the End, isn't affected. Compact transmitters, motion sensors, keypads and remotes don't mind the weather.
+- **Rain and thunderstorms** shorten the reach of transmitters (plain, timer, recorder and weather station), repeaters, converters and jammers: by 15% while it rains or snows where the tower stands, by 30% in a thunderstorm. A tower in a desert, savanna or badlands (where it never rains), or in the Nether or the End, isn't affected. Compact transmitters, motion sensors, keypads and remotes don't mind the weather.
+- With Reiko's Weather (since 0.53), it's the weather where each tower stands: a storm cell drifting over a tower shortens its reach and towers outside it aren't affected (see Reiko's Weather).
 - When the weather changes, everything on every frequency is worked out again at once: a receiver at the edge of a tower's reach can go dark when a storm rolls in, and come back when it clears. Jade shows the tower's reach in the weather now, with a line saying why ("Thunderstorm: reach -30%"), and the reach ring and the meter's distance to the edge move in too.
 - **Hills** between a tower and what hears it weaken the signal. The game follows a straight line from the top of the tower to the receiver (or the pager, meter or scanner in your hand), and every 8 blocks of solid ground or water that line runs through takes 1 off the strength, so 32 blocks of hill turn 15 into 11 and 120 blocks block it completely. Leaves, caves and roofs above the line don't count, and neither do the first and last 8 blocks (the tower's own base, or the walls round your receiver). A taller tower, or a repeater on top of the hill, gets the signal over it.
 - Only loaded chunks count for hills (the game can't look inside unloaded ones, so they count as clear). Remote presses don't mind hills.
@@ -555,7 +557,7 @@ Since 0.48 a signal **fades toward the edge** of a tower's reach. Out to half it
 
 ### Dish Antenna
 
-A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-size Radio Transmitter, Timer Transmitter, Signal Recorder, Repeater, Converter or Jammer with it, and the dish faces the way you're looking (one of 16 directions: north, north-north-east, north-east and so on):
+A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-size Radio Transmitter, Timer Transmitter, Signal Recorder, Weather Station, Repeater, Converter or Jammer with it, and the dish faces the way you're looking (one of 16 directions: north, north-north-east, north-east and so on):
 
 - **In its beam,** 15° either side of where it points, the tower reaches **three times** as far as with no antenna. Everywhere else it reaches as far as with no antenna. A transmitter with a reach of 56 then reaches 168 blocks east and 56 every other way ("Radio Transmitter: Dish Antenna aimed east: 168 blocks that way, 56 elsewhere"). The server config's `maxReach` still caps it.
 - **To turn it,** right-click the tower with another Dish Antenna while looking the new way: the dish turns (nothing is used up). Or let a **Dish Rotator** in its mast turn it with redstone (since 0.52). Fitting a different antenna replaces it and gives the dish back; sneak + right-click with an empty hand takes it off.
@@ -568,7 +570,7 @@ A **Dish Antenna** (since 0.48) is an antenna that points. Right-click a full-si
 
 ### Power cost
 
-Since 0.49 **towers need power to send.** A full-size transmitter (plain, timer or recorder), repeater, converter or jammer uses charge from a **Radio Battery** next to it, or next to any mast in the column under it, while it sends. Without a battery, or with only empty ones, it's **out of power**: it sends, relays and jams nothing, and its light stays off, until a battery next to it has charge again.
+Since 0.49 **towers need power to send.** A full-size transmitter (plain, timer, recorder or weather station), repeater, converter or jammer uses charge from a **Radio Battery** next to it, or next to any mast in the column under it, while it sends. Without a battery, or with only empty ones, it's **out of power**: it sends, relays and jams nothing, and its light stays off, until a battery next to it has charge again.
 
 - **What it costs:** 1 charge a second for every 64 blocks of reach, only while it's sending (a transmitter with redstone, a repeater or converter hearing something, a jammer with redstone). A transmitter reaching 56 blocks uses 0.88 a second, so a full battery (100,000) lasts it over a day of sending; one with a Netherite Antenna reaching 2,080 blocks uses 32.5 a second. A Dish Antenna adds nothing to the cost.
 - **Charging a battery:** right-click it with Redstone Dust (1,000 charge each) or Blocks of Redstone (9,000); it takes as many as fit. Hoppers and item pipes can feed it redstone, and FE cables from other mods charge it too (10 FE a charge). It holds 100,000.
@@ -591,7 +593,7 @@ A **Coverage Map** (since 0.49) is a map for one frequency. Sneak + right-click 
 
 ### Ender Antenna
 
-An **Ender Antenna** (since 0.50) lets a Radio Transmitter (plain, timer or recorder) send into **another dimension** as well as its own. Right-click the transmitter with it:
+An **Ender Antenna** (since 0.50) lets a Radio Transmitter (plain, timer, recorder or weather station) send into **another dimension** as well as its own. Right-click the transmitter with it:
 
 - It sends from **the same spot** in the other dimension: the x and z scaled the way portals scale them, so a transmitter at 620, 90 in the Overworld arrives at 77, 11 in the Nether (1/8), and one in the Nether arrives 8 times farther out in the Overworld. The End and other dimensions are 1:1. The height is kept (inside the other dimension's build limits).
 - Over there it's heard as if a transmitter stood at that spot: the same frequency and strength, the tower's own reach (in the weather where the tower stands), fading toward the edge. Hills don't block it. Receivers, lamps, repeaters (which carry it on), meters, scanners and Coverage Maps there all hear it, and it changes the moment the tower does.
@@ -661,6 +663,44 @@ A **Radio Telegraph** (since 0.51) is a desk for sending short text messages ove
 - Jade: "Last message (just now): “Lights on in the hall too” from Dev", "Messages here: 2", "A message just arrived" while its lamp is lit.
 
 ![Dev raising the tower on 4601 by right-clicking its bottom mast with a Radio Mast: "Mast added: the Radio Transmitter is 3 masts up, reach 72 → 80 blocks", Jade on the mast "Top: Radio Transmitter, 3 blocks up"; the raised tower with its Aviation Beacon still on top, Jade "Reach: 80 blocks", "Battery: 80% (about 17h 45m left at 1.25 a second)"; Dev's Radio Telegraph screen on 4600 with two messages and "Sent on 4600 (reach 56 blocks + 2 towers) | Read by 1 pager and 1 telegraph"; Alex 40 blocks away by his own telegraph, its lamp lit, Jade "Last message (just now): “Lights on in the hall too” from Dev", "A message just arrived", and his pager's line in chat; the Status Board with the message under row 4600; and Alex logging back in to "Radio Pager: while you were away, a message on 4600 from Dev (Day 1, 12:00): “Back in 5 minutes”"](docs/images/mast-builder-and-telegraph.png)
+
+### Radio Weather Station
+
+A **Radio Weather Station** (since 0.53) is a full-size transmitter with a sun and a rain cloud on its sides. Instead of the redstone it gets, it broadcasts one **reading** of the conditions where it stands. Right-click it with an empty hand to pick which:
+
+| Reading | Strength | Needs |
+|---|---|---|
+| **Weather** (the default) | clear 0, rain or snow 8, thunderstorm 15: the weather that shortens towers' reach (a desert stays clear) | nothing |
+| **Time of day** | 0 at 06:00, then 1 more every 1.5 hours: noon 4, 18:00 8, midnight 12, 15 just before dawn. 8 or more is night | nothing |
+| **Moon** | full moon 1, waning gibbous 2, ... new moon 5, ... waxing gibbous 8. A Blood Moon is 15 | nothing |
+| **Weather code** | Reiko's Weather's own 0–15 code: clear 0, overcast 1, fog 2, drizzle 3, rain 4, heavy rain 5, thunderstorm 6, supercell 7, hurricane 8, hail 9, sleet 10, snow 11, blizzard 12, windy 13, sandstorm 14, heatwave 15 | Reiko's Weather |
+| **Storm danger** | thunder or severe weather 15, hail or heavy rain 10, rain 5, else 0 | Reiko's Weather |
+| **Wind** | calm 0 to a gale 15 | Reiko's Weather |
+| **Precipitation** | dry 0 to a downpour 15 | Reiko's Weather |
+| **Temperature** | −10 °C or colder 0, then 1 more every 3 °C: 20 °C 10, 35 °C or hotter 15 | Reiko's Weather |
+| **Season** | spring 1, summer 2, autumn 3, winter 4 | Reiko's Weather |
+| **Nearest storm** | a storm overhead 15, then 1 less every 100 blocks to its edge (0 from 1,500 blocks away) | Reiko's Weather |
+
+The last seven use the same scales as Reiko's Weather's own Weather Station and Weather Radar, so the same comparator setup works with either.
+
+- **Pausing:** a redstone signal into it (or into a mast under it) stops it sending, like the Timer Transmitter.
+- **Announce weather changes** (off by default): when the weather where it stands changes, it sends a message on its frequency, "Now: Thunderstorm" (with Reiko's Weather "Now: Supercell. Severe weather!"), from "Weather Station". Pagers, Radio Telegraphs and Status Boards in its reach show it, like a telegraph message. A new weather has to last two checks (5 seconds apart) first, so a storm's ragged edge doesn't send message after message. Nothing is sent while it's paused, out of power or silenced.
+- **The screen** shows each reading's value there and then as you click through ("Now: 13 °C (55 °F) → 8"), its scale, and what it's doing ("Sending 8 on 4612", or "Done sends 1 on 4612" while you change it). Shift-click or scroll goes back. Without Reiko's Weather only the first three readings are offered, and a grey line says so.
+- **Jade:** "Weather code: Thunderstorm (6)", the scale, "Paused" and "Announces weather changes".
+- **It's a transmitter:** reach by height, masts, antennas (an Ender Antenna sends the weather into the Nether), batteries, relaying remote presses, the tuner and the reach ring all work as usual. On a private frequency only members can change it. The log lists its turn-ons as "Weather Station", the audit too.
+- Breaking it keeps its frequency, reading and announcing on the item ("Reads: Moon (full moon 1 ... new moon 5 ... 8; a Blood Moon 15)").
+
+### Reiko's Weather
+
+Since 0.53 this mod works with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) (`reikos_weather`, 1.21.1 NeoForge). Nothing to set up: install both. Reiko's Weather has 26 weathers, seasons, and storm cells that drift across the map, so whether it rains depends on where you are. With it:
+
+- **Towers feel the storm they're in.** A storm cell over a tower shortens its reach (rain 15%, thunder 30%, as in Weather and terrain), and towers outside the cell keep their full reach. Without it, rain is everywhere at once. Cells are checked every 2 seconds as they move, and frequencies are worked out again when one arrives or leaves. Jade uses Reiko's Weather's name: "Heavy Rain: reach -15%".
+- **The Radio Weather Station** reads the weather there (a storm cell overhead counts), names it the way Reiko's Weather does ("Heavy Rain", "Sandstorm"), and offers the 7 extra readings above. A Blood Moon reads 15 on the Moon reading.
+- **Recipe:** a Radio Transmitter and Reiko's Weather's own Weather Station also make a Radio Weather Station.
+
+There's no hard dependency either way. Signal Tower reads Reiko's Weather by reflection when it's installed, and if a version changes what it reads it logs that once and falls back to vanilla weather. Reiko's Weather needs no changes. Its own redstone blocks (Weather Station, Tornado Siren, Weather Radar, Weather Vane, Windmill, Seismograph) can also feed any Radio Transmitter like other redstone does.
+
+![Four Radio Weather Stations in a Reiko's Weather thunderstorm, all lit, with Alex next to them; the Status Board behind them showing 4610: 15 (weather), "Weather Station: Now: Thunderstorm", 4611: 6 (weather code), 4612: 8 (temperature) and 4613: 15 (nearest storm); Jade on the weather-code station "Weather code: Thunderstorm (6)", its scale, "Reach: 45 blocks", "Thunderstorm: reach -30%"; Alex's station screen "Reading: Temperature", "Now: 13 °C (55 °F) → 8", "Sending 8 on 4612"; Alex's pager after the storm was cleared, "Radio Pager: message on 4610 from Weather Station: “Now: Clear”"; and Jade on the nearest-storm station with a hailstorm far to the east, "Nearest storm: Hailstorm, 502 blocks away (10)", "Reach: 64 blocks"](docs/images/weather-station-and-reikos-weather.png)
 
 ### Radio Jammers
 
@@ -837,6 +877,8 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **Radio Timer Transmitter:** a Radio Transmitter and a Clock, in any arrangement in the crafting grid. Put a timer transmitter in the grid on its own to get the Radio Transmitter back.
 
+**Radio Weather Station:** a Radio Transmitter, a Daylight Detector and a Lightning Rod, in any arrangement in the crafting grid. With Reiko's Weather installed, a Radio Transmitter and Reiko's Weather Station work too. Put a weather station in the grid on its own to get the Radio Transmitter back.
+
 **Radio Counter Receiver:** a Radio Receiver and a Hopper, in any arrangement in the crafting grid. Put a counter receiver in the grid on its own to get the Radio Receiver back.
 
 **Radio Delay Receiver:** a Radio Receiver and a Redstone Repeater, in any arrangement in the crafting grid. Put a delay receiver in the grid on its own to get the Radio Receiver back.
@@ -880,6 +922,8 @@ You need **Java 21**. If Gradle can't find it, it downloads one automatically.
 
 The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optional tooltip plugin (it isn't bundled in the jar). Add `-PnoJade` to any run to leave it out, for example `./gradlew runGameTestServer -PnoJade`.
 
+To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod), build that mod's jar (`./gradlew jar` in its folder) and pass its path: `./gradlew runClient -PwithWeather=/path/to/reikos_weather-1.7.0.jar`. Nothing is compiled against it.
+
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
 **IntelliJ IDEA:** File → Open → pick this folder's `build.gradle` → Open as Project. Wait for the Gradle sync to finish, then use the generated run configurations (Client, Server, GameTestServer).
@@ -906,6 +950,10 @@ src/main/java/com/reiko/signaltower/
   network/OpenDelayScreenPayload.java, ConfigureDelayPayload.java  delay receiver screen <-> server
   block/RadioTimerTransmitterBlock.java  transmitter on a schedule; opens its screen
   blockentity/TimerTransmitterBlockEntity.java  the timer's clock: interval or daily, pause, labels
+  block/RadioWeatherStationBlock.java    transmitter that broadcasts the weather, time or moon; opens its screen
+  blockentity/WeatherStationBlockEntity.java  the station's reading, pause and weather announcements
+  radio/StationReading.java              the station's readings and their scales
+  client/StationScreen.java              the station's screen: reading, announcing, what it reads now
   client/TimerScreen.java                the timer transmitter's screen
   network/OpenTimerScreenPayload.java, ConfigureTimerPayload.java  timer screen <-> server
   radio/AntennaTier.java                 the antenna tiers (block state "antenna"), multipliers, item tooltips
@@ -992,6 +1040,7 @@ src/main/java/com/reiko/signaltower/
   client/GroupsScreen.java               the friend groups screen
   network/EditGroupPayload.java, GroupsPayload.java  saving a friend group, and sending a player their groups
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
+  compat/ReikosWeatherCompat.java        reads Reiko's Weather by reflection (local weather, storm cells, season, temperature)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/DirectoryScreen.java            the frequency directory
@@ -1193,7 +1242,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 160. Wall Redstone on ceilings and round corners: clicking the underside of a block puts it on the ceiling; along the ceiling it goes 15, 14 with its lines drawn, and drops off when the block above goes; round a vertical edge to the next wall of the same block it goes 15 → 14 with both lines drawn, cut off (0) when the edge is filled in; round the bottom edge from a wall to the ceiling under the block (15 → 14); over the top edge from dust on a glass block (14);
 161. the Dish Rotator: north, east, south and west are aims 0, 4, 8 and 12; it's a mast (the column goes through it, 2 masts under the top); the higher of two turns the dish; a dish fitted on top points the rotator's way (east), not the player's; the mast builder puts one in under another tower's top, its arrow the way the player looks (south) and that dish turned south; redstone 5 turns the dish 5 steps clockwise (south-south-west), in the network too, without the redstone reaching the tower; Jade on the rotator, on the lower one ("A Dish Rotator higher up turns the dish") and on the tower; no re-aiming by hand while it holds the dish; off again, back east.
 
-All 161 also pass with `-PnoJade`, so the mod runs the same without Jade.
+162. the Radio Weather Station: the time of day in 16 steps from 06:00, the clock, temperature 3 °C a step from −10, the nearest storm 1 less every 100 blocks, moon names, readings saved by name; set by Dev's packet to the moon, a receiver outputs the moon's number and the log names the station; Jade shows the reading as the server worked it out, its scale and announcing; the screen and settings packets (round trip); without Reiko's Weather its readings can't be picked; out of reach and a stranger on a private frequency can't change it; redstone pauses it (Jade and the screen say so) and it starts again; saved; dropped with its reading and announcing.
+163. the Radio Weather Station in the weather (in a batch of its own, since the weather is the whole dimension's): clear 0, rain 8, thunder 15 on a receiver; announcing, "Now: Rain" goes to a telegraph on its frequency (it clicks, its screen shows it from "Weather Station") only after the rain has held for two looks; a flicker back isn't announced; nothing while it's paused.
+164. Reiko's Weather (in a batch of its own): without it, three readings on offer, the others read 0 and say they need it, nothing is read from it, and its recipe isn't there. With it (`-PwithWeather=...`): the recipe is there; in rain the weather code is 4, storm danger 5, weather 8 named by Reiko's Weather, with temperature, season (its day counted from 1), wind and "No storms" read from it; in a thunderstorm 6 on a receiver, danger 15, weather 15, and Jade names it; a heavy rain cell over a tower with clear skies elsewhere cuts its reach to 85 there and not 5,000 blocks away, the tower's frequency is worked out again, the station reads rain, code 5 and the storm overhead (15), and 300 blocks from the cell's edge reads 12; switched off, back to vanilla weather.
+
+All 164 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where test 164 checks the readings from it.
 
 ## License
 

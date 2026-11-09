@@ -275,6 +275,7 @@ public final class ReachRing {
             case ReachPreviewPayload.COMPACT_TRANSMITTER -> "compact_radio_transmitter";
             case ReachPreviewPayload.MOTION_SENSOR -> "radio_motion_sensor";
             case ReachPreviewPayload.TIMER_TRANSMITTER -> "radio_timer_transmitter";
+            case ReachPreviewPayload.WEATHER_STATION -> "radio_weather_station";
             case ReachPreviewPayload.SIGNAL_RECORDER -> "radio_signal_recorder";
             case ReachPreviewPayload.JAMMER -> "radio_jammer";
             default -> "radio_transmitter";
