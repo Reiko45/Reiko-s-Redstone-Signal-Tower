@@ -68,6 +68,116 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     private boolean villageStation;
     public static final String STATION_SIGN_KEY = "sign.reikos_signal_tower.radio_tower.station";
 
+    // ---- v0.58.0: raid alerts (village stations) and computers (CC: Tweaked) ----
+
+    /** The raid a village station is following (its id), or -1; the last wave it announced, and how many there'll be. */
+    private int raidId = -1;
+    private int raidWave;
+    private int raidWaves;
+    private int raidTimer;
+    /** What a computer set it to send (0-15; not saved: a computer sets it again when it starts up). */
+    private int computerSignal;
+
+    /** v0.58.0: true while a village station is warning of a raid (it sends 15). */
+    public boolean isRaidAlert() {
+        return raidId >= 0;
+    }
+
+    /** The wave of the raid it last announced (0 before the first comes). */
+    public int raidWave() {
+        return raidWave;
+    }
+
+    /** How many waves the raid it's following will have. */
+    public int raidWaves() {
+        return raidWaves;
+    }
+
+    /** v0.58.0: the strength a computer set it to send (it sends the higher of this and its redstone). */
+    public int getComputerSignal() {
+        return computerSignal;
+    }
+
+    public void setComputerSignal(int strength) {
+        int clamped = Math.max(0, Math.min(15, strength));
+        if (clamped != computerSignal) {
+            computerSignal = clamped;
+            refresh();
+        }
+    }
+
+    /** What it sends besides its redstone: a computer's strength, or 15 during a raid alert. */
+    private int extraInput() {
+        return Math.max(computerSignal, raidId >= 0 ? 15 : 0);
+    }
+
+    /**
+     * v0.58.0: a village station's look at the raid near it ({@code now}: null if there's none).
+     * A new raid: it sends 15 and telegraphs "RAID!"; each new wave: "Raid: wave 2 of 5"; the end:
+     * whether the village held or fell (or that the raid has ended, if it just went away).
+     */
+    public void updateRaid(ServerLevel level, com.reiko.signaltower.radio.RaidAlerts.@Nullable Snapshot now) {
+        if (!villageStation) {
+            return;
+        }
+        if (!Config.RAID_ALERTS.get()) {
+            if (raidId >= 0) {
+                raidId = -1;
+                setChanged();
+                refresh();
+            }
+            return;
+        }
+        if (raidId >= 0 && (now == null || now.id() != raidId)) {
+            announceRaid(level, com.reiko.signaltower.radio.RaidAlerts.endText(null)); // it went away (stopped)
+            raidId = -1;
+            setChanged();
+            refresh();
+        }
+        if (now == null) {
+            return;
+        }
+        if (raidId < 0) {
+            if (now.status() != com.reiko.signaltower.radio.RaidAlerts.Status.ONGOING) {
+                return; // one that was already over when it first saw it
+            }
+            raidId = now.id();
+            raidWave = now.wave();
+            raidWaves = now.waves();
+            setChanged();
+            refresh(); // on the air at 15 before the message goes out
+            announceRaid(level, com.reiko.signaltower.radio.RaidAlerts.startText());
+            return;
+        }
+        raidWaves = now.waves();
+        if (now.status() != com.reiko.signaltower.radio.RaidAlerts.Status.ONGOING) {
+            announceRaid(level, com.reiko.signaltower.radio.RaidAlerts.endText(now.status()));
+            raidId = -1;
+            setChanged();
+            refresh();
+            return;
+        }
+        if (now.wave() > raidWave) {
+            raidWave = now.wave();
+            setChanged();
+            announceRaid(level, com.reiko.signaltower.radio.RaidAlerts.waveText(raidWave, raidWaves));
+        }
+    }
+
+    /** Telegraphs {@code text} on its frequency from "Village Radio", over its reach: not while it's silenced or out of power. */
+    private void announceRaid(ServerLevel level, String text) {
+        SignalNetwork network = SignalNetwork.get(level);
+        if (network.isSilenced(level, worldPosition) || network.isDown(worldPosition)) {
+            return;
+        }
+        BlockState state = level.getBlockState(worldPosition);
+        com.reiko.signaltower.radio.Telegraph.broadcast(level, worldPosition, getFrequency(),
+                network.stationCoverage(level, worldPosition, getFrequency(), reachOf(level, worldPosition, state)),
+                com.reiko.signaltower.radio.RaidAlerts.senderName(), text);
+        level.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BELL.value(),
+                net.minecraft.sounds.SoundSource.BLOCKS, 0.8F, 0.8F);
+    }
+
     /** True for the transmitter of an old radio tower generated in the world (or a village's). */
     public boolean isFoundTower() {
         return foundTower;
@@ -154,6 +264,11 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
                 tag.putLong("found_sign", foundSign.asLong());
             }
         }
+        if (raidId >= 0) {
+            tag.putInt("raid_id", raidId);
+            tag.putInt("raid_wave", raidWave);
+            tag.putInt("raid_waves", raidWaves);
+        }
     }
 
     @Override
@@ -167,6 +282,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         foundQuiet = tag.getBoolean("found_quiet");
         villageStation = tag.getBoolean("village_station");
         foundSign = tag.contains("found_sign") ? BlockPos.of(tag.getLong("found_sign")) : null;
+        raidId = tag.contains("raid_id") ? tag.getInt("raid_id") : -1;
+        raidWave = tag.getInt("raid_wave");
+        raidWaves = tag.getInt("raid_waves");
     }
 
     /** Re-reads input power, height and frequency, and tells the network. Safe to call any time. */
@@ -252,9 +370,11 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         if (state.getBlock() instanceof RadioMotionSensorBlock) {
             return level.getBlockEntity(pos) instanceof MotionSensorBlockEntity sensor && sensor.isSensing() ? 15 : 0;
         }
-        return state.getBlock() instanceof CompactRadioTransmitterBlock
+        int redstone = state.getBlock() instanceof CompactRadioTransmitterBlock
                 ? level.getBestNeighborSignal(pos)
                 : RadioHelper.readTransmitterInput(level, pos);
+        // v0.58.0: a computer's strength, or a village station's raid alert, if higher.
+        return level.getBlockEntity(pos) instanceof RadioTransmitterBlockEntity tx ? Math.max(redstone, tx.extraInput()) : redstone;
     }
 
     /**
@@ -292,6 +412,10 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadioTransmitterBlockEntity be) {
         if (be.foundTower && !be.foundChecked && level instanceof ServerLevel serverLevel) {
             be.checkFound(serverLevel); // v0.55.0
+        }
+        if (be.villageStation && level instanceof ServerLevel serverLevel && --be.raidTimer <= 0) {
+            be.raidTimer = com.reiko.signaltower.radio.RaidAlerts.CHECK_TICKS; // v0.58.0
+            be.updateRaid(serverLevel, com.reiko.signaltower.radio.RaidAlerts.near(serverLevel, pos));
         }
         if (be.timer-- > 0) {
             return;

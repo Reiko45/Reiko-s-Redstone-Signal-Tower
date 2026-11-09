@@ -194,6 +194,11 @@ public final class Config {
                     "(a library is 5, a cartographer 1); 0 for none. Read when the world starts; only new villages get them.")
             .defineInRange("villageRadioShacks", 3, 0, 50);
 
+    public static final ModConfigSpec.BooleanValue RAID_ALERTS = BUILDER
+            .comment("A village radio station warns of a raid (v0.58.0): while one is on within 96 blocks it sends 15,",
+                    "and it telegraphs on its frequency when the raid starts, at each wave and when it ends.")
+            .define("raidAlerts", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

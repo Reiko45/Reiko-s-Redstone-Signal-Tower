@@ -30,3 +30,12 @@ description = '''${mod_description}'''
     versionRange = "[15.0,)"
     ordering = "NONE"
     side = "BOTH"
+
+# Optional (v0.58.0): CC: Tweaked computers can use radio transmitters, receivers and telegraphs as
+# peripherals. 1.114.0 is the first 1.21.1 release with the API this uses.
+[[dependencies.${mod_id}]]
+    modId = "computercraft"
+    type = "optional"
+    versionRange = "[1.114.0,)"
+    ordering = "NONE"
+    side = "BOTH"

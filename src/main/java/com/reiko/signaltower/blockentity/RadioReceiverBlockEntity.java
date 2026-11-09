@@ -169,6 +169,8 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     /** Logic receiver: what it heard on each frequency at the last check (not saved; for the screen). A counter's second is its reset frequency. */
     private int heardA;
     private int heardB;
+    /** v0.58.0: what it heard last (not saved): computers get an event when it changes. */
+    private int computerHeard = -1;
 
     public RadioReceiverBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.RADIO_RECEIVER_BE.get(), pos, state);
@@ -688,6 +690,10 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             be.primed = false; // starting or stopping hearing an encrypted frequency isn't a turn-on
         }
         int heard = deaf ? 0 : network.listen(serverLevel, frequency, pos).power();
+        if (heard != be.computerHeard) {
+            be.computerHeard = heard; // v0.58.0: a "radio_signal" event for computers on it
+            com.reiko.signaltower.compat.RadioComputer.signalChanged(serverLevel, pos, frequency, heard);
+        }
         int power;
         if (logic) {
             boolean deafB = !FrequencyClaims.mayHear(serverLevel, second, tunedBy);

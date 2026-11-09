@@ -54,6 +54,12 @@ dependencies {
     if (project.hasProperty('withEmi')) {
         localRuntime "maven.modrinth:emi:${emi_version}"
     }
+    // CC: Tweaked (v0.58.0) is optional too: compat/cct registers the peripherals only when it's loaded.
+    // Add it to a dev run with -PwithCct. (cct_version is a Modrinth version id, the NeoForge 1.21.1 jar.)
+    compileOnly "maven.modrinth:cc-tweaked:${cct_version}"
+    if (project.hasProperty('withCct')) {
+        localRuntime "maven.modrinth:cc-tweaked:${cct_version}"
+    }
 }
 
 base {

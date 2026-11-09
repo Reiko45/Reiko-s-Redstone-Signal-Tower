@@ -31,7 +31,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
-| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. |
+| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
@@ -803,11 +803,55 @@ Since 0.57 villages sometimes have a **radio shack**: a one-room hut in the vill
 - **It's public and untuned**, like the old towers in the wild: listen in, re-tune it, take it apart or build on it. It isn't an old tower, though, so it doesn't count for Lost Signal or Finders Keepers.
 - **How many:** `villageRadioShacks` in the server config is the shack's weight among a village's houses (3 by default, so a plains village picks it for about one house in 30). 0 stops new ones. It's read when the world starts, and villages already made keep what they have.
 
+### Raid alerts
+
+Since 0.58 a village radio station warns of a raid. While a raid is on within 96 blocks of it, the station:
+
+- **sends 15**, even if its torch is gone;
+- **telegraphs on its frequency**, as "Village Radio": "RAID! Pillagers are coming to the village" when the raid starts (before the first wave arrives), "Raid: wave 2 of 3" as each wave comes, and "The raid is over: the village held" (or "the village fell") at the end. If a raid just stops, for example when everyone leaves, it says "The raid has ended". Pagers, telegraphs and Status Boards on its frequency within its reach (512 blocks for a station 60 blocks above sea level) get the messages, so you hear about a raid from far away, and a telegraph gives a redstone pulse with each one;
+- shows it in **Jade**: "Raid! Wave 1 of 3".
+
+`raidAlerts` in the server config turns it off. A raid has 3 waves on Easy, 5 on Normal and 7 on Hard, and one more when the bad omen was strong.
+
 ### JEI and EMI
 
 Since 0.57, with [JEI](https://modrinth.com/mod/jei) or [EMI](https://modrinth.com/mod/emi) installed, every block and item of the mod has an **information page** (JEI's Information tab, EMI's Info) saying what it does and how to use it. There's also a **Radio Operator Trades** page, with the Radio Telegraph as its workstation, listing all 17 trades and the level each one comes at. Look up the uses of a telegraph, or of an item you'd buy or sell, to find it. Neither mod is needed.
 
 ![A plains village's radio shack, an oak hut with its mast, transmitter and beacon behind it; a snowy village from above with two radio shacks, a villager by one's mast; Jade on a snowy shack's transmitter "Frequency: 473679", "Sending: 15", "Reach: 136 blocks", "A village's radio station", "Battery: 80%"; JEI's Radio Operator Trades page 2 of 3, Apprentice to Expert; JEI's Information page for the Radio Telegraph; and EMI's Radio Operator Trades page 3 of 4, Journeyman and Expert](docs/images/jei-emi-and-village-radio-shacks.png)
+
+### CC: Tweaked
+
+Since 0.58, with [CC: Tweaked](https://modrinth.com/mod/cc-tweaked) (1.114 or later) installed, a computer can use the radio blocks next to it as peripherals:
+
+| Peripheral | Blocks | Functions |
+|---|---|---|
+| `radio_transmitter` | Radio Transmitter, Compact Radio Transmitter | `setSignal(strength)`, `getSignal()`, `getSending()`, `getStatus()` (`"sending"`, `"quiet"`, `"silenced"`, `"struck"` or `"no_power"`), `getReach()` |
+| `radio_receiver` | every Radio Receiver (toggle, inverted, logic, delay, counter, lamp, speaker...) | `getSignal()` (what it hears), `getOutput()` (its redstone), `scan()` (everything it could hear: frequency, strength and name) |
+| `radio_telegraph` | Radio Telegraph | `send(text)` (true, or false and why not), `getMessages()` (text, from, secondsAgo) |
+
+All three also have `getFrequency()`, `setFrequency(frequency)`, `getFrequencyName()` and `listen(frequency)`: the strength heard where the block stands, on any frequency.
+
+- **A transmitter sends the higher** of its redstone and what a computer set. When the last computer goes (shut down, or broken), it's back to its redstone. Jade on it says "A computer sends: 9".
+- **Events:** `radio_signal` (side, frequency, strength) when what a receiver hears changes, and `radio_message` (side, frequency, text, from) when a message reaches a telegraph.
+- **The same rules as players:** a computer can't tune a transmitter onto a private frequency its tuner isn't allowed on; a telegraph sends on a private frequency only if its tuner may; on someone else's encrypted frequency a receiver hears nothing and a telegraph gets no text. A computer's messages are signed "Computer 3".
+
+A small program that watches a village station and turns on an alarm at your base during a raid:
+
+```lua
+local telegraph = peripheral.find("radio_telegraph") -- tuned to the village station
+local alarm = peripheral.find("radio_transmitter")   -- tuned to your base's alarm
+while true do
+  local _, _, _, text, from = os.pullEvent("radio_message")
+  print(from .. ": " .. text)
+  if text:find("RAID") or text:find("wave") then
+    alarm.setSignal(15)
+  elseif text:find("over") or text:find("ended") then
+    alarm.setSignal(0)
+  end
+end
+```
+
+![Jade on a plains village's station during a raid: "Sending: 15", "Reach: 512 blocks", "A village's radio station", "Raid! Wave 1 of 3", under the raid bar, with a pillager and an iron golem below; a base 160 blocks away: an Advanced Computer between a Radio Telegraph and a Radio Transmitter, a receiver on top, and a Radio Lamp the computer has lit red; the computer's monitor program listing the raid from "RAID!" through waves 1 to 3 to "the village held", its alarm "sending" and then "quiet"; Alex's chat with the pager's messages from Village Radio; the Lua prompt reading the receiver, scanning 9 frequencies, the alarm "sending" 9, and sending a telegraph message as "Computer 0"; and Jade on the alarm transmitter: "Sending: 9", "A computer sends: 9"](docs/images/cc-tweaked-and-raid-alerts.png)
 
 ### Radio Jammers
 
@@ -1064,7 +1108,7 @@ The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optio
 
 To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod), build that mod's jar (`./gradlew jar` in its folder) and pass its path: `./gradlew runClient -PwithWeather=/path/to/reikos_weather-1.7.0.jar`. Nothing is compiled against it.
 
-To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run. Otherwise they're only compiled against.
+To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, and `-PwithCct` for CC: Tweaked. Otherwise they're only compiled against.
 
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
@@ -1132,6 +1176,7 @@ src/main/java/com/reiko/signaltower/
   advancement/TowerAdvancements.java     registers it, and fires its events for a tower's tuner and the players near it
   world/ModVillagers.java                the Radio Operator: its workstation (the Radio Telegraph), the profession and its trades
   world/VillageRadioShacks.java          adds the radio shack to the five villages' house pools, villageRadioShacks times each
+  radio/RaidAlerts.java                  a village station's look at the raid near it, and the messages it sends
   block/TowerPlatformBlock.java          the Tower Platform: rails, a deck solid only from above, rings round a mast
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
@@ -1206,6 +1251,8 @@ src/main/java/com/reiko/signaltower/
   compat/RecipeViewerInfo.java           what JEI and EMI show: every item's info text and the Radio Operator's trades (works without either)
   compat/jei/SignalTowerJeiPlugin.java, RadioOperatorCategory.java  the JEI plugin and its trades page (only loaded by JEI)
   compat/emi/SignalTowerEmiPlugin.java, RadioOperatorEmiRecipe.java  the EMI plugin and its trades page (only loaded by EMI)
+  compat/RadioComputer.java              what a computer can do with a radio block, and its events (works without CC: Tweaked)
+  compat/cct/CctCompat.java, RadioPeripheral.java and the three *Peripheral.java  the CC: Tweaked peripherals (only loaded with it)
   client/FrequencyScreen.java            the frequency (and remote mode) screen
   client/DirectoryScreen.java            the frequency directory
   network/DirectoryRequestPayload.java, DirectoryResultPayload.java  the directory asking the server what's on
@@ -1427,9 +1474,13 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site;
 178. JEI and EMI: all 46 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
 179. village radio shacks: at the default weight of 3, each of the five villages' house pools (plains, desert, savanna, snowy, taiga) holds the shack 3 times, and adding it again changes nothing; each shack is 8 by 7 by 7, with a telegraph, a 2-block bed, 4 masts, a transmitter marked as a village station, a battery charged to 80,000, a "Radio Station" sign, and its two jigsaws (onto the street, and for its villager);
-180. two plains shacks placed as a village would (one turned a quarter): both go on the air, each on its own free frequency between 100,000 and 999,999 written on its sign; Jade calls each a village's radio station; taking its torch away and putting it back doesn't count as an old tower going quiet and coming back (no Finders Keepers).
+180. two plains shacks placed as a village would (one turned a quarter): both go on the air, each on its own free frequency between 100,000 and 999,999 written on its sign; Jade calls each a village's radio station; taking its torch away and putting it back doesn't count as an old tower going quiet and coming back (no Finders Keepers);
+181. computers (without CC: Tweaked's classes): a transmitter sends what a computer sets, and stops when the last computer goes; a receiver's computers get `radio_signal` as what it hears changes, and it can listen on any frequency and scan; a transmitter can't be tuned onto someone else's private frequency or out of range (a receiver can listen to it); a telegraph sends as "Computer 7", the other one's computers get `radio_message`, and its messages are listed; too fast and empty are refused; Jade shows what the computer sends;
+182. with CC: Tweaked loaded: transmitters, receivers (plain, toggle, lamp) and telegraphs are its peripherals, and a mast isn't (without it there's nothing to check);
+183. raid alerts step by step: a raid puts a station whose torch is gone on the air at 15, and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each wave once; a won raid "the village held", and it goes quiet; a raid that goes away "The raid has ended"; one already over when it's first seen, nothing; a lost one "the village fell"; Jade shows the raid, and it's saved;
+184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended".
 
-All 180 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it.
+All 184 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where test 182 checks the peripherals.
 
 ## License
 

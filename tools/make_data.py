@@ -894,6 +894,18 @@ write(ASSETS / "lang" / "en_us.json", {
     f"tooltip.{MOD}.mast_climb": "Walk into a mast to climb it; let go to slide down, sneak to hold still.",
     f"jade.{MOD}.found_tower": "An old radio tower, found in the world",
     f"jade.{MOD}.village_station": "A village's radio station",
+    # v0.58.0: raid alerts and computers (CC: Tweaked)
+    f"jade.{MOD}.raid_coming": "Raid! The pillagers are on their way",
+    f"jade.{MOD}.raid_alert": "Raid! Wave %s of %s",
+    f"jade.{MOD}.computer_signal": "A computer sends: %s",
+    f"block.{MOD}.village_station.short": "Village Radio",
+    f"message.{MOD}.raid_start": "RAID! Pillagers are coming to the village",
+    f"message.{MOD}.raid_wave": "Raid: wave %s of %s",
+    f"message.{MOD}.raid_victory": "The raid is over: the village held",
+    f"message.{MOD}.raid_loss": "The raid is over: the village fell",
+    f"message.{MOD}.raid_ended": "The raid has ended",
+    f"computer.{MOD}.sender": "Computer %s",
+    f"computer.{MOD}.frequency_range": "Frequency must be %s to %s",
     f"sign.{MOD}.radio_tower.station": "Radio Station",
     f"sign.{MOD}.radio_tower.frequency": "Frequency",
     # v0.56.0: advancements and the Radio Operator

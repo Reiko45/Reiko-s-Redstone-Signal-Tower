@@ -9529,4 +9529,278 @@ public final class SignalTowerGameTests {
                         && f.event().equals(com.reiko.signaltower.advancement.TowerAdvancements.FOUND_TOWER_REVIVED)), "No Finders Keepers"))
                 .thenSucceed();
     }
+
+    // ---- v0.58.0: computers (CC: Tweaked) and raid alerts ----
+
+    /** Records a computer's events as "rx signal 4619 9" or "tb message 4621 text|from". */
+    private static com.reiko.signaltower.compat.RadioComputer.Listener recording(List<String> events, String name) {
+        return new com.reiko.signaltower.compat.RadioComputer.Listener() {
+            @Override
+            public void signal(int frequency, int strength) {
+                events.add(name + " signal " + frequency + " " + strength);
+            }
+
+            @Override
+            public void message(int frequency, String text, String from) {
+                events.add(name + " message " + frequency + " " + text + "|" + from);
+            }
+        };
+    }
+
+    /**
+     * What a computer can do (CC: Tweaked's peripherals only call these): a transmitter sends what a
+     * computer sets, and stops when the last computer goes; a receiver's computers get "radio_signal"
+     * when what it hears changes, and it can listen on any frequency and scan; a transmitter can't be
+     * tuned onto a private frequency its tuner isn't allowed on (a receiver can), or out of range; a
+     * telegraph sends as "Computer 7", the other one's computers get "radio_message", and its
+     * messages are listed; too fast and empty are refused.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void computerRadio(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos rx = new BlockPos(5, 1, 1);
+        BlockPos ta = new BlockPos(8, 1, 1);
+        BlockPos tb = new BlockPos(11, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4619);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4619);
+        place(helper, ta, ModRegistry.RADIO_TELEGRAPH.get(), 4621);
+        place(helper, tb, ModRegistry.RADIO_TELEGRAPH.get(), 4621);
+        BlockPos absTx = helper.absolutePos(tx);
+        BlockPos absRx = helper.absolutePos(rx);
+        BlockPos absTb = helper.absolutePos(tb);
+        com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity transmitter = helper.getBlockEntity(tx);
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity receiver = helper.getBlockEntity(rx);
+        com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraphA = helper.getBlockEntity(ta);
+        com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraphB = helper.getBlockEntity(tb);
+        List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        var onTx = recording(events, "tx");
+        var onRx = recording(events, "rx");
+        var onTb = recording(events, "tb");
+        com.reiko.signaltower.compat.RadioComputer.attach(level, absTx, onTx);
+        com.reiko.signaltower.compat.RadioComputer.attach(level, absRx, onRx);
+        com.reiko.signaltower.compat.RadioComputer.attach(level, absTb, onTb);
+        claims.put(4620, UUID.randomUUID(), "Owner", java.util.Map.of());
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.compat.RadioComputer.status(transmitter).equals("quiet")
+                            && com.reiko.signaltower.compat.RadioComputer.sending(transmitter) == 0, "Quiet at first");
+                    transmitter.setComputerSignal(9);
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 9, "The receiver hears what the computer sends"))
+                .thenExecute(() -> {
+                    check(com.reiko.signaltower.compat.RadioComputer.sending(transmitter) == 9
+                            && com.reiko.signaltower.compat.RadioComputer.status(transmitter).equals("sending"), "Sending 9");
+                    check(com.reiko.signaltower.compat.RadioComputer.reach(transmitter) > 0, "Its reach");
+                    check(com.reiko.signaltower.compat.RadioComputer.listen(receiver, 4619) == 9
+                            && com.reiko.signaltower.compat.RadioComputer.listen(receiver, 4622) == 0
+                            && com.reiko.signaltower.compat.RadioComputer.output(receiver) == 9, "Listening on any frequency, and its output");
+                    var scan = com.reiko.signaltower.compat.RadioComputer.scan(receiver);
+                    check(scan.stream().anyMatch(row -> Integer.valueOf(4619).equals(row.get("frequency")) && Integer.valueOf(9).equals(row.get("strength"))),
+                            "Scanned: " + scan);
+                    check(events.contains("rx signal 4619 9"), "radio_signal: " + events);
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    check(info.getInt("computer_signal") == 9 && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), info))
+                            .contains("computer_signal"), "Jade: what the computer sends " + info);
+                    transmitter.setTunedBy(UUID.randomUUID());
+                    check(com.reiko.signaltower.compat.RadioComputer.setFrequency(transmitter, 4620) != null && transmitter.getFrequency() == 4619,
+                            "Not onto someone else's private frequency");
+                    check(com.reiko.signaltower.compat.RadioComputer.setFrequency(transmitter, 0) != null
+                            && com.reiko.signaltower.compat.RadioComputer.setFrequency(transmitter, 1_000_000_000L) != null, "Out of range");
+                    check(com.reiko.signaltower.compat.RadioComputer.setFrequency(receiver, 4620) == null && receiver.getFrequency() == 4620
+                            && com.reiko.signaltower.compat.RadioComputer.setFrequency(receiver, 4619) == null, "A receiver may listen to it");
+                    com.reiko.signaltower.compat.RadioComputer.detach(level, absTx, onTx); // its last computer
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "Quiet when the computer goes"))
+                .thenExecute(() -> {
+                    check(transmitter.getComputerSignal() == 0 && events.contains("rx signal 4619 0"), "Back to 0: " + events);
+                    check(com.reiko.signaltower.compat.RadioComputer.send(telegraphA, 7, "Hello from Lua") == null, "Sent");
+                    check(events.contains("tb message 4621 Hello from Lua|Computer 7"), "radio_message: " + events);
+                    var listed = com.reiko.signaltower.compat.RadioComputer.messages(telegraphB);
+                    check(!listed.isEmpty() && "Hello from Lua".equals(listed.get(listed.size() - 1).get("text"))
+                            && "Computer 7".equals(listed.get(listed.size() - 1).get("from")), "Listed: " + listed);
+                    check(com.reiko.signaltower.compat.RadioComputer.send(telegraphA, 7, "again") != null
+                            && com.reiko.signaltower.compat.RadioComputer.send(telegraphB, 7, "   ") != null, "Too fast, and empty: refused");
+                    check(events.stream().noneMatch(e -> e.startsWith("tx ")), "A transmitter has no events");
+                    com.reiko.signaltower.compat.RadioComputer.detach(level, absRx, onRx);
+                    com.reiko.signaltower.compat.RadioComputer.detach(level, absTb, onTb);
+                    check(!com.reiko.signaltower.compat.RadioComputer.watched(level, absRx), "Detached");
+                    claims.remove(4620);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * With CC: Tweaked loaded (the -PwithCct run), radio blocks are peripherals: transmitters
+     * "radio_transmitter", every kind of receiver "radio_receiver", telegraphs "radio_telegraph"; a
+     * mast isn't one. Without it, there's nothing to check.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void computerPeripherals(GameTestHelper helper) {
+        if (!net.neoforged.fml.ModList.get().isLoaded(com.reiko.signaltower.compat.cct.CctCompat.MOD_ID)) {
+            helper.succeed();
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos[] spots = {new BlockPos(1, 1, 1), new BlockPos(3, 1, 1), new BlockPos(5, 1, 1), new BlockPos(7, 1, 1), new BlockPos(9, 1, 1), new BlockPos(11, 1, 1)};
+        Block[] blocks = {ModRegistry.RADIO_TRANSMITTER.get(), ModRegistry.RADIO_RECEIVER.get(), ModRegistry.RADIO_TOGGLE_RECEIVER.get(),
+                ModRegistry.RADIO_LAMP.get(), ModRegistry.RADIO_TELEGRAPH.get(), ModRegistry.RADIO_MAST.get()};
+        String[] types = {"radio_transmitter", "radio_receiver", "radio_receiver", "radio_receiver", "radio_telegraph", null};
+        for (int i = 0; i < spots.length; i++) {
+            helper.setBlock(spots[i], blocks[i]);
+        }
+        helper.runAfterDelay(2, () -> {
+            for (int i = 0; i < spots.length; i++) {
+                String type = com.reiko.signaltower.compat.cct.CctCompat.typeAt(level, helper.absolutePos(spots[i]));
+                check(java.util.Objects.equals(type, types[i]), blocks[i] + ": " + type);
+            }
+            SignalTower.LOGGER.info("computerPeripherals: CC: Tweaked found the {} radio peripherals", spots.length - 1);
+            helper.succeed();
+        });
+    }
+
+    /** Places a plains radio shack at the tower site's corner (on stone) and returns its transmitter's position. */
+    private static BlockPos placeShack(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var template = level.getStructureManager().get(com.reiko.signaltower.world.VillageRadioShacks.template("plains")).orElseThrow();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+        var settings = new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings()
+                .addProcessor(net.minecraft.world.level.levelgen.structure.templatesystem.JigsawReplacementProcessor.INSTANCE)
+                .addProcessor(net.minecraft.world.level.levelgen.structure.templatesystem.BlockIgnoreProcessor.STRUCTURE_AND_AIR);
+        BlockPos origin = helper.absolutePos(new BlockPos(0, 1, 0));
+        template.placeInWorld(level, origin, origin, settings, level.getRandom(), Block.UPDATE_ALL);
+        return origin.offset(6, 5, 3);
+    }
+
+    /**
+     * Raid alerts, step by step: a raid near a village station puts it on the air at 15 (its torch
+     * gone) and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each
+     * new wave "Raid: wave 2 of 5" (once); a won raid "the village held", and it goes quiet again; a
+     * raid that just goes away "The raid has ended"; one already over when it's first seen, nothing;
+     * a lost one "the village fell". Jade shows the raid; it's saved.
+     */
+    @GameTest(template = TOWER_SITE, timeoutTicks = 200)
+    public static void raidAlertMessages(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos top = placeShack(helper);
+        BlockPos torch = top.below(4).north();
+        BlockPos telegraphAt = new BlockPos(12, 1, 12);
+        helper.setBlock(telegraphAt, ModRegistry.RADIO_TELEGRAPH.get());
+        var poweredKey = com.reiko.signaltower.block.RadioTransmitterBlock.POWERED;
+        helper.startSequence()
+                .thenWaitUntil(() -> check(level.getBlockState(top).getValue(poweredKey), "On the air"))
+                .thenExecute(() -> {
+                    var station = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+                    setFrequency(helper, telegraphAt, station.getFrequency());
+                    level.setBlock(torch, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                })
+                .thenWaitUntil(() -> check(!level.getBlockState(top).getValue(poweredKey), "Off the air without its torch"))
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    var station = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+                    int f = station.getFrequency();
+                    SignalNetwork network = SignalNetwork.get(level);
+                    int before = network.messages(f).size();
+                    var ongoing = com.reiko.signaltower.radio.RaidAlerts.Status.ONGOING;
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_001, 0, 5, ongoing));
+                    var last = network.messages(f).get(network.messages(f).size() - 1);
+                    check(station.isRaidAlert() && level.getBlockState(top).getValue(poweredKey)
+                            && com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, top, level.getBlockState(top)) == 15,
+                            "On the air at 15 for the raid");
+                    check(last.text().equals("RAID! Pillagers are coming to the village") && last.name().equals("Village Radio"), "RAID!: " + last);
+                    check(helper.getBlockState(telegraphAt).getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED), "A telegraph on it pulses");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, top);
+                    check(info.getInt("raid_waves") == 5 && info.getInt("raid_wave") == 0
+                            && lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(level.getBlockState(top), info)).contains("raid_coming"),
+                            "Jade: the raid's coming " + info);
+                    CompoundTag saved = station.saveWithoutMetadata(level.registryAccess());
+                    check(saved.getInt("raid_id") == 900_001 && saved.getInt("raid_waves") == 5, "Saved: " + saved);
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_001, 1, 5, ongoing));
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_001, 1, 5, ongoing));
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_001, 2, 5, ongoing));
+                    List<String> texts = network.messages(f).stream().map(SignalNetwork.Message::text).toList();
+                    check(texts.subList(before, texts.size()).equals(List.of("RAID! Pillagers are coming to the village",
+                            "Raid: wave 1 of 5", "Raid: wave 2 of 5")), "Each wave once: " + texts);
+                    info = com.reiko.signaltower.compat.RadioInfo.read(level, top);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(level.getBlockState(top), info)).contains("raid_alert"), "Jade: wave 2 of 5");
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_001, 5, 5,
+                            com.reiko.signaltower.radio.RaidAlerts.Status.VICTORY));
+                    check(!station.isRaidAlert() && !level.getBlockState(top).getValue(poweredKey), "Quiet again after the raid");
+                    station.updateRaid(level, null);
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_002, 0, 3, ongoing));
+                    station.updateRaid(level, null);
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_003, 2, 3,
+                            com.reiko.signaltower.radio.RaidAlerts.Status.LOSS));
+                    check(!station.isRaidAlert(), "Not for a raid already over");
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_004, 0, 3, ongoing));
+                    station.updateRaid(level, new com.reiko.signaltower.radio.RaidAlerts.Snapshot(900_004, 2, 3,
+                            com.reiko.signaltower.radio.RaidAlerts.Status.LOSS));
+                    texts = network.messages(f).stream().map(SignalNetwork.Message::text).toList();
+                    check(texts.subList(before, texts.size()).equals(List.of("RAID! Pillagers are coming to the village",
+                            "Raid: wave 1 of 5", "Raid: wave 2 of 5", "The raid is over: the village held",
+                            "RAID! Pillagers are coming to the village", "The raid has ended",
+                            "RAID! Pillagers are coming to the village", "The raid is over: the village fell")), "All the messages: " + texts);
+                    check(!station.isRaidAlert() && !station.saveWithoutMetadata(level.registryAccess()).contains("raid_id"), "Nothing left of it");
+                })
+                .thenSucceed();
+    }
+
+    /** v0.58.0: the real raid test, in a batch of its own (a raid reaches 96 blocks, and its pillagers further). */
+    private static final String RAIDS = "raid_alerts";
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = RAIDS)
+    public static void beforeRaids(ServerLevel level) {
+        withoutFade(level);
+    }
+
+    /**
+     * A real raid: started (as a player with a bad omen would) at a village radio shack whose bed
+     * is someone's home, the station picks it up within 2 seconds and telegraphs "RAID!"; Jade
+     * shows the raid coming (5 waves, Normal); the raid stopped, it telegraphs "The raid has ended".
+     */
+    @GameTest(template = TOWER_SITE, batch = RAIDS, timeoutTicks = 300)
+    public static void raidNearVillageStation(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos top = placeShack(helper);
+        var poweredKey = com.reiko.signaltower.block.RadioTransmitterBlock.POWERED;
+        net.minecraft.world.entity.raid.Raid[] raid = new net.minecraft.world.entity.raid.Raid[1];
+        BlockPos[] home = new BlockPos[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> check(level.getBlockState(top).getValue(poweredKey), "On the air"))
+                .thenExecute(() -> {
+                    var taken = level.getPoiManager().take(type -> type.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.HOME),
+                            (type, pos) -> true, top, 16);
+                    check(taken.isPresent(), "The shack's bed is a home");
+                    home[0] = taken.get();
+                    var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+                    player.moveTo(home[0].getX() + 0.5, home[0].getY(), home[0].getZ() + 0.5);
+                    raid[0] = level.getRaids().createOrExtendRaid(player, home[0]);
+                    check(raid[0] != null, "A raid");
+                })
+                .thenWaitUntil(() -> {
+                    var station = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+                    var messages = SignalNetwork.get(level).messages(station.getFrequency());
+                    check(station.isRaidAlert() && !messages.isEmpty()
+                            && messages.get(messages.size() - 1).text().equals(com.reiko.signaltower.radio.RaidAlerts.startText()), "RAID! telegraphed");
+                })
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, top);
+                    check(info.getInt("raid_waves") == 5 && info.getInt("raid_wave") == 0, "Jade: 5 waves coming " + info);
+                    raid[0].stop();
+                })
+                .thenWaitUntil(() -> {
+                    var station = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+                    var messages = SignalNetwork.get(level).messages(station.getFrequency());
+                    check(!station.isRaidAlert() && messages.get(messages.size() - 1).text().equals(com.reiko.signaltower.radio.RaidAlerts.endText(null)),
+                            "The raid has ended");
+                })
+                .thenExecute(() -> level.getPoiManager().release(home[0]))
+                .thenSucceed();
+    }
 }

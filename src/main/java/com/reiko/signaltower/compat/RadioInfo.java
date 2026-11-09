@@ -238,6 +238,9 @@ public final class RadioInfo {
             // A compact one (v0.38.0) reads only what's around it and has its fixed reach.
             tag.putInt("power", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.inputOf(level, pos, state));
             tag.putInt("reach", com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, pos, state));
+            if (radio instanceof com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity tx && tx.getComputerSignal() > 0) {
+                tag.putInt("computer_signal", tx.getComputerSignal()); // v0.58.0: what a computer set it to send
+            }
             if (!(block instanceof com.reiko.signaltower.block.CompactRadioTransmitterBlock)) {
                 putWeather(level, pos, tag);
             }
@@ -408,7 +411,12 @@ public final class RadioInfo {
         if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity found && found.isFoundTower()) {
             // v0.55.0: an old tower generated in the world; v0.57.0: or a village's radio shack
             tag.putBoolean(found.isVillageStation() ? "village_station" : "found_tower", true);
+            if (found.isRaidAlert()) {
+                tag.putInt("raid_wave", found.raidWave()); // v0.58.0
+                tag.putInt("raid_waves", found.raidWaves());
+            }
         }
+
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
             tag.putLong("struck", struck);
@@ -511,6 +519,15 @@ public final class RadioInfo {
         }
         if (data != null && data.getBoolean("village_station")) {
             lines.add(Component.translatable(LANG + "village_station").withStyle(ChatFormatting.DARK_GREEN));
+        }
+        if (data != null && data.contains("raid_waves")) {
+            // v0.58.0: a village station warning of a raid
+            int wave = data.getInt("raid_wave");
+            lines.add((wave == 0 ? Component.translatable(LANG + "raid_coming")
+                    : Component.translatable(LANG + "raid_alert", wave, data.getInt("raid_waves"))).withStyle(ChatFormatting.RED));
+        }
+        if (data != null && data.contains("computer_signal")) {
+            lines.add(Component.translatable(LANG + "computer_signal", value(data.getInt("computer_signal"))).withStyle(ChatFormatting.AQUA));
         }
         if (data != null && data.contains("storm_damaged")) {
             // v0.54.0

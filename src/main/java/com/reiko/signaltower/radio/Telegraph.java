@@ -83,6 +83,19 @@ public final class Telegraph {
      * Returns what happened (also played as a click), or null if there's no telegraph there.
      */
     public static @Nullable Result send(ServerLevel level, BlockPos pos, Player sender, String raw) {
+        return send(level, pos, sender.getUUID(), sender.getGameProfile().getName(), sender, raw);
+    }
+
+    /**
+     * v0.58.0: sends {@code raw} from the telegraph at {@code pos} for a computer: {@code who} (the
+     * telegraph's tuner) decides whether it may send on a private frequency, {@code name} ("Computer 3")
+     * is shown as the sender. Null if there's no telegraph there.
+     */
+    public static @Nullable Result sendAs(ServerLevel level, BlockPos pos, @Nullable UUID who, String name, String raw) {
+        return send(level, pos, who, name, null, raw);
+    }
+
+    private static @Nullable Result send(ServerLevel level, BlockPos pos, @Nullable UUID who, String name, @Nullable Player sender, String raw) {
         if (!(level.getBlockEntity(pos) instanceof TelegraphBlockEntity telegraph)) {
             return null;
         }
@@ -95,17 +108,18 @@ public final class Telegraph {
         if (telegraph.coolingDown(now)) {
             return new Result(Component.translatable(KEY + "telegraph_too_fast").withStyle(ChatFormatting.GOLD), false, 0, 0);
         }
-        Component refused = FrequencyClaims.refusal(level, frequency, sender.getUUID(), "private_refused_telegraph");
+        Component refused = FrequencyClaims.refusal(level, frequency, who, "private_refused_telegraph");
         if (refused != null) {
-            IntruderAlerts.report(level.getServer(), frequency, sender, IntruderAlerts.Kind.TELEGRAPH, level.getBlockState(pos).getBlock());
+            if (sender != null) {
+                IntruderAlerts.report(level.getServer(), frequency, sender, IntruderAlerts.Kind.TELEGRAPH, level.getBlockState(pos).getBlock());
+            }
             level.playSound(null, pos, SoundEvents.STONE_BUTTON_CLICK_OFF, SoundSource.BLOCKS, 0.6F, 0.7F);
             return new Result(refused, false, 0, 0);
         }
         SignalNetwork network = SignalNetwork.get(level);
         List<SignalNetwork.Coverage> own = network.remoteCoverage(level, pos, RadioHelper.reachAt(level, pos), Config.TOWERS_RELAY_REMOTES.get());
         List<SignalNetwork.Coverage> coverage = network.withRepeaters(level, frequency, own);
-        SignalNetwork.Message message = network.recordMessage(frequency, coverage, pos, sender.getUUID(),
-                sender.getGameProfile().getName(), text);
+        SignalNetwork.Message message = network.recordMessage(frequency, coverage, pos, who, name, text);
         telegraph.markSent(now);
         level.playSound(null, pos, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS, 0.7F, 1.6F);
         int[] read = deliver(level, pos, frequency, coverage, message);

@@ -61,6 +61,7 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
             level.setBlock(worldPosition, state.setValue(RadioTelegraphBlock.POWERED, true), Block.UPDATE_ALL);
             RadioTelegraphBlock.updateBelow(level, worldPosition, state.getBlock());
         }
+        com.reiko.signaltower.compat.RadioComputer.messageArrived(level, worldPosition, getFrequency(), message); // v0.58.0
         return true;
     }
 

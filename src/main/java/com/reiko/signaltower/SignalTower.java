@@ -70,6 +70,9 @@ public final class SignalTower {
         com.reiko.signaltower.advancement.TowerAdvancements.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.ModVillagers.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.VillageRadioShacks.register(); // v0.57.0
+        if (net.neoforged.fml.ModList.get().isLoaded("computercraft")) {
+            com.reiko.signaltower.compat.cct.CctCompat.register(modEventBus); // v0.58.0: only with CC: Tweaked
+        }
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
         modEventBus.addListener(SignalTower::registerCapabilities);
