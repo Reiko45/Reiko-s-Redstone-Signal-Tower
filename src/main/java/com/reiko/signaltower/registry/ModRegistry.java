@@ -440,6 +440,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
 
+    /** A transmitter with a record player, broadcasting the music disc in it (v0.60.0). */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioJukeboxBlock> RADIO_JUKEBOX = BLOCKS.register("radio_jukebox",
+            () -> new com.reiko.signaltower.block.RadioJukeboxBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.DIRT)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+
     /** A receiver with a delay and a hold (v0.41.0). */
     public static final DeferredBlock<RadioDelayReceiverBlock> RADIO_DELAY_RECEIVER = BLOCKS.register("radio_delay_receiver",
             () -> new RadioDelayReceiverBlock(BlockBehaviour.Properties.of()
@@ -568,6 +577,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_weather_station", RADIO_WEATHER_STATION);
     public static final DeferredItem<BlockItem> RADIO_SIGNAL_RECORDER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_signal_recorder", RADIO_SIGNAL_RECORDER);
+    public static final DeferredItem<BlockItem> RADIO_JUKEBOX_ITEM =
+            ITEMS.registerSimpleBlockItem("radio_jukebox", RADIO_JUKEBOX); // v0.60.0
     public static final DeferredItem<BlockItem> RADIO_JAMMER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_jammer", RADIO_JAMMER);
     public static final DeferredItem<BlockItem> AVIATION_BEACON_ITEM =
@@ -672,6 +683,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SignalRecorderBlockEntity>> SIGNAL_RECORDER_BE =
             BLOCK_ENTITIES.register("radio_signal_recorder",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.SignalRecorderBlockEntity::new, RADIO_SIGNAL_RECORDER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity>> RADIO_JUKEBOX_BE =
+            BLOCK_ENTITIES.register("radio_jukebox",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity::new, RADIO_JUKEBOX.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadioJammerBlockEntity>> RADIO_JAMMER_BE =
             BLOCK_ENTITIES.register("radio_jammer",

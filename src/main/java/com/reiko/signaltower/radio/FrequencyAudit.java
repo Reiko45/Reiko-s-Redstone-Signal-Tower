@@ -42,7 +42,9 @@ public final class FrequencyAudit {
         /** v0.53.0. */
         WEATHER_STATION,
         /** v0.54.0. */
-        BUNDLED_TRANSMITTER;
+        BUNDLED_TRANSMITTER,
+        /** v0.60.0. */
+        JUKEBOX;
 
         public static Kind of(int ordinal) {
             Kind[] all = values();
@@ -109,6 +111,7 @@ public final class FrequencyAudit {
                         : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioWeatherStationBlock ? Kind.WEATHER_STATION
                         : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.BundledTransmitterBlock ? Kind.BUNDLED_TRANSMITTER
                         : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? Kind.SIGNAL_RECORDER
+                        : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioJukeboxBlock ? Kind.JUKEBOX
                         : Kind.TRANSMITTER)
                     : level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.RadioMotionSensorBlock ? Kind.MOTION_SENSOR
                     : Kind.COMPACT_TRANSMITTER,

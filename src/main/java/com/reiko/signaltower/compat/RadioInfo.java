@@ -193,6 +193,7 @@ public final class RadioInfo {
                         : top instanceof com.reiko.signaltower.block.RadioTimerTransmitterBlock ? "timer_transmitter"
                         : top instanceof com.reiko.signaltower.block.RadioWeatherStationBlock ? "weather_station"
                         : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder"
+                        : top instanceof com.reiko.signaltower.block.RadioJukeboxBlock ? "jukebox"
                         : top instanceof com.reiko.signaltower.block.RadioJammerBlock ? "jammer" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(level.getBlockState(cursor));
@@ -272,6 +273,19 @@ public final class RadioInfo {
                 tag.putBoolean("station_announce", station.isAnnouncing());
                 tag.putBoolean("station_offered", station.getMode().offered());
             }
+            if (radio instanceof com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity jukebox) {
+                // v0.60.0: its disc's song, and how far into it it is.
+                long now = level.getGameTime();
+                var song = jukebox.song();
+                tag.putBoolean("jukebox", true);
+                if (song != null) {
+                    putComponent(tag, "jukebox_song", song.value().description());
+                }
+                tag.putBoolean("jukebox_playing", jukebox.isPlaying(now));
+                tag.putInt("jukebox_elapsed", jukebox.elapsed(now));
+                tag.putInt("jukebox_length", jukebox.playLength());
+                tag.putBoolean("jukebox_loop", jukebox.isLooping());
+            }
             if (radio instanceof com.reiko.signaltower.blockentity.SignalRecorderBlockEntity recorder) {
                 // v0.44.0: what it records from (as "second", so it gets a name and a note), its tape and what it's doing.
                 if (recorder.getListenFrequency() > 0) {
@@ -350,6 +364,16 @@ public final class RadioInfo {
                 // v0.43.0: what it plays, and what it hears.
                 tag.putInt("speaker", speaker.packedSpeaker());
                 tag.putInt("heard", reception.power());
+                // v0.60.0: the song it plays from a Radio Jukebox, and how far into it.
+                SignalNetwork.MusicHeard music = reception.power() > 0 && speaker.deafFrequency(level) <= 0
+                        ? SignalNetwork.get(level).musicHeard(level, speaker.getFrequency(), pos) : null;
+                var song = music == null ? null : level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.JUKEBOX_SONG)
+                        .getHolder(music.music().song()).orElse(null);
+                if (song != null) {
+                    putComponent(tag, "music_song", song.value().description());
+                    tag.putInt("music_elapsed", (int) Math.max(0, level.getGameTime() - music.start()));
+                    tag.putInt("music_length", music.music().length());
+                }
             } else if (block instanceof com.reiko.signaltower.block.RadioCounterReceiverBlock && radio instanceof RadioReceiverBlockEntity counter) {
                 // v0.42.0: the count, its settings and its reset frequency (as "second", so it gets a name, note and deafness).
                 tag.putInt("count", counter.getCount());
@@ -888,6 +912,13 @@ public final class RadioInfo {
             if (hasData && data.contains("recorder_phase")) {
                 recorderLines(lines, data);
             }
+            if (hasData && data.getBoolean("jukebox")) {
+                // v0.60.0: what it plays.
+                lines.add(Component.translatable(LANG + "jukebox_disc", com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity.statusText(
+                        data.contains("jukebox_song") ? getComponent(data, "jukebox_song") : null, data.getBoolean("jukebox_playing"),
+                        data.getInt("jukebox_elapsed"), data.getInt("jukebox_length"), data.getBoolean("jukebox_loop")))
+                        .withStyle(data.getBoolean("jukebox_playing") ? ChatFormatting.GREEN : ChatFormatting.YELLOW));
+            }
             if (hasData && data.contains("bundle_channels")) {
                 // v0.54.0: the frequencies its bundle goes out on, and what's on each color.
                 lines.add(Component.translatable(LANG + "bundle_range",
@@ -988,6 +1019,15 @@ public final class RadioInfo {
             if (hasData) {
                 lines.add(Component.translatable(LANG + "speaker_plays", RadioReceiverBlockEntity.speakerText(data.getInt("speaker")))
                         .withStyle(ChatFormatting.YELLOW));
+                if (data.contains("music_song")) {
+                    // v0.60.0: a song from a Radio Jukebox, in place of its own sound.
+                    int length = data.getInt("music_length");
+                    lines.add(Component.translatable(LANG + "speaker_music", getComponent(data, "music_song"),
+                            com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity.clock(data.getInt("music_elapsed")),
+                            com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity.clock(
+                                    Math.max(0, length - com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity.SONG_END_PADDING)))
+                            .withStyle(ChatFormatting.GREEN));
+                }
                 lines.add(Component.translatable(LANG + "towers", data.getInt("towers")));
             }
         } else if (block instanceof com.reiko.signaltower.block.RadioInvertedReceiverBlock) {

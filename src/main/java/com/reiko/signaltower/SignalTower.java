@@ -94,6 +94,9 @@ public final class SignalTower {
                 (battery, side) -> battery.items());
         event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage.BLOCK, ModRegistry.RADIO_BATTERY_BE.get(),
                 (battery, side) -> battery.energy());
+        // v0.60.0: hoppers and pipes can feed a Radio Jukebox discs, and take them out once a song is over.
+        event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.RADIO_JUKEBOX_BE.get(),
+                (jukebox, side) -> jukebox.items());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -308,6 +311,7 @@ public final class SignalTower {
             event.accept(ModRegistry.GUY_ANCHOR_ITEM.get());
             event.accept(ModRegistry.TOWER_PLATFORM_ITEM.get());
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
+            event.accept(ModRegistry.RADIO_JUKEBOX_ITEM.get());
             event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());
             event.accept(ModRegistry.DISH_ROTATOR_ITEM.get());

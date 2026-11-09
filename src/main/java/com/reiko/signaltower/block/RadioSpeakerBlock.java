@@ -62,6 +62,15 @@ public class RadioSpeakerBlock extends RadioReceiverBlock {
                 RadioReceiverBlockEntity.speakerText(rx.packedSpeaker()), state.getValue(POWER));
     }
 
+    /** v0.60.0: on a client, a ticker that hands the speaker's music to the sound player. */
+    @Override
+    public <T extends net.minecraft.world.level.block.entity.BlockEntity> net.minecraft.world.level.block.entity.@org.jetbrains.annotations.Nullable BlockEntityTicker<T> getTicker(
+            Level level, BlockState state, net.minecraft.world.level.block.entity.BlockEntityType<T> type) {
+        return level.isClientSide
+                ? createTickerHelper(type, ModRegistry.RADIO_RECEIVER_BE.get(), RadioReceiverBlockEntity::clientTick)
+                : super.getTicker(level, state, type);
+    }
+
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         String prefix = "tooltip." + SignalTower.MOD_ID + ".";

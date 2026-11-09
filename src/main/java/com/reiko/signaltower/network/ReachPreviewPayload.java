@@ -36,6 +36,8 @@ public record ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequen
     public static final int WEATHER_STATION = 9;
     /** A Bundled Radio Transmitter (v0.54.0). */
     public static final int BUNDLED_TRANSMITTER = 10;
+    /** A Radio Jukebox (v0.60.0). */
+    public static final int JUKEBOX = 11;
 
     public ReachPreviewPayload(BlockPos pos, int reach, int kind, int frequency) {
         this(pos, reach, kind, frequency, reach, -1);

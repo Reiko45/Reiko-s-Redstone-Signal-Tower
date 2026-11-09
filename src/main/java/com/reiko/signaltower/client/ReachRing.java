@@ -279,6 +279,7 @@ public final class ReachRing {
             case ReachPreviewPayload.BUNDLED_TRANSMITTER -> "bundled_transmitter";
             case ReachPreviewPayload.SIGNAL_RECORDER -> "radio_signal_recorder";
             case ReachPreviewPayload.JAMMER -> "radio_jammer";
+            case ReachPreviewPayload.JUKEBOX -> "radio_jukebox";
             default -> "radio_transmitter";
         };
         Component name = Component.translatable("block." + SignalTower.MOD_ID + "." + block);

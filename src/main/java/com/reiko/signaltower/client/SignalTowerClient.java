@@ -58,6 +58,7 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(ReachRing::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(ReachRing::onClientTick);
         NeoForge.EVENT_BUS.addListener(SignalMeterHud::onClientTick);
+        NeoForge.EVENT_BUS.addListener(BroadcastMusic::onClientTick); // v0.60.0
     }
 
     /**
@@ -155,5 +156,6 @@ public final class SignalTowerClient {
         ReachRing.clear();
         SignalMeterHud.clear();
         com.reiko.signaltower.radio.FrequencyClaims.clientClear();
+        BroadcastMusic.clear();
     }
 }

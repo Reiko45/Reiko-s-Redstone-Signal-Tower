@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "reikos_signal_tower:radio_jukebox",
+          "functions": [
+            {
+              "function": "minecraft:copy_components",
+              "source": "block_entity",
+              "include": [
+                "reikos_signal_tower:frequency"
+              ]
+            },
+            {
+              "function": "minecraft:copy_state",
+              "block": "reikos_signal_tower:radio_jukebox",
+              "properties": [
+                "antenna"
+              ],
+              "conditions": [
+                {
+                  "condition": "minecraft:inverted",
+                  "term": {
+                    "condition": "minecraft:block_state_property",
+                    "block": "reikos_signal_tower:radio_jukebox",
+                    "properties": {
+                      "antenna": "none"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ],
+  "random_sequence": "reikos_signal_tower:blocks/radio_jukebox"
+}

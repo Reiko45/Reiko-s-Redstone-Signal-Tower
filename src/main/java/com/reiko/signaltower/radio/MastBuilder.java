@@ -142,6 +142,9 @@ public final class MastBuilder {
         BlockState state = level.getBlockState(from);
         BlockEntity entity = level.getBlockEntity(from);
         CompoundTag data = entity == null ? null : entity.saveWithoutMetadata(level.registryAccess());
+        if (entity instanceof net.minecraft.world.Clearable contents) {
+            contents.clearContent(); // v0.60.0: a Radio Jukebox's disc moves with it, and isn't dropped where it was
+        }
         level.setBlock(to, state, Block.UPDATE_ALL);
         BlockEntity moved = level.getBlockEntity(to);
         if (data != null && moved != null) {

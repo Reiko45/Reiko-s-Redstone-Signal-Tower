@@ -34,6 +34,13 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, favorites, sound, chatLog));
     }
 
+    /** v0.60.0: what the Radio Speaker at {@code pos} plays now, from a Radio Jukebox (null: nothing). */
+    public static void speakerMusic(net.minecraft.core.BlockPos pos,
+                                    net.minecraft.resources.@Nullable ResourceKey<net.minecraft.world.item.JukeboxSong> song,
+                                    long start, com.reiko.signaltower.radio.SpeakerSound.Volume volume) {
+        BroadcastMusic.set(pos, song, start, volume);
+    }
+
     /** A locator answer arrived: hand it to the open remote screen, if there is one. */
     public static void onRemoteScan(RemoteScanResultPayload result) {
         if (Minecraft.getInstance().screen instanceof RemoteScanListener listener) {

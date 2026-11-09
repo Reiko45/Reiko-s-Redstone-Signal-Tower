@@ -404,6 +404,34 @@ def recorder_side(lit):
     return img
 
 
+def jukebox_side(lit):
+    """A record between two music notes (v0.60.0): its label and the notes glow red while it plays."""
+    r = ON if lit else OFF
+    img = casing(23)
+    px = img.load()
+    vents(img)
+    import math
+    for y in range(0, 11):
+        for x in range(1, 15):
+            d = math.hypot(x + 0.5 - 8, y + 0.5 - 5.5)
+            if d > 4.7:
+                continue
+            if d > 4.0:
+                px[x, y] = O
+            elif d > 1.6:
+                px[x, y] = (24, 24, 29, 255) if int((d - 1.6) / 0.8) % 2 == 0 else (52, 52, 60, 255)  # grooves
+            elif d > 0.75:
+                px[x, y] = r[2] if lit else r[1]  # the label
+            else:
+                px[x, y] = O  # the hole
+    note = r[2] if lit else r[1]
+    for (x, y) in [(2, 2), (2, 3), (2, 4), (2, 5), (1, 5), (1, 6), (2, 6), (3, 2), (3, 3)]:
+        px[x, y] = note
+    for (x, y) in [(13, 4), (13, 5), (13, 6), (13, 7), (12, 7), (12, 8), (13, 8), (14, 4), (14, 5)]:
+        px[x, y] = note
+    return img
+
+
 def jammer_side(lit):
     """A jagged burst of static struck through by a slash (v0.46.0): it glows magenta while jamming."""
     r = MAGENTA_ON if lit else MAGENTA_OFF
@@ -1391,6 +1419,10 @@ blocks = {
     "cable_tap_in": cable_tap_side(False),
     "cable_tap_out": cable_tap_side(True),
     "cable_tap_band": cable_tap_band(),
+    "radio_jukebox_side": jukebox_side(False),  # v0.60.0
+    "radio_jukebox_side_on": jukebox_side(True),
+    "radio_jukebox_top": top(False, receiver=False),
+    "radio_jukebox_top_on": top(True, receiver=False),
     "radio_weather_station_side": weather_station_side(False),  # v0.53.0
     "radio_weather_station_side_on": weather_station_side(True),
     "radio_weather_station_top": top(False, receiver=False),

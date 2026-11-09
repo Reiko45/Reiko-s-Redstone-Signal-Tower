@@ -122,6 +122,7 @@ for lit in (False, True):
     write(models / f"bundled_transmitter{suffix}.json", transmitter_model(lit, "bundled_transmitter"))  # v0.54.0
     write(models / f"bundled_receiver{suffix}.json", receiver_model(lit, "bundled_receiver_side"))
     write(models / f"radio_signal_recorder{suffix}.json", transmitter_model(lit, "radio_signal_recorder"))
+    write(models / f"radio_jukebox{suffix}.json", transmitter_model(lit, "radio_jukebox"))  # v0.60.0
     write(models / f"radio_jammer{suffix}.json", transmitter_model(lit, "radio_jammer", "jammer_tip"))
 
 
@@ -311,7 +312,7 @@ items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast", "radio_weather_station",
-             "bundled_transmitter", "bundled_receiver"):
+             "bundled_transmitter", "bundled_receiver", "radio_jukebox"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
@@ -500,6 +501,7 @@ tower_states("radio_signal_recorder", "powered")
 tower_states("radio_timer_transmitter", "powered")
 tower_states("radio_weather_station", "powered")  # v0.53.0
 tower_states("bundled_transmitter", "powered")  # v0.54.0
+tower_states("radio_jukebox", "powered")  # v0.60.0
 write(states / "bundled_receiver.json", {"variants": {
     "lit=false": {"model": f"{MOD}:block/bundled_receiver"}, "lit=true": {"model": f"{MOD}:block/bundled_receiver_on"}}})
 
@@ -1321,7 +1323,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.audit.kind_signal_recorder": "Signal Recorder",
     # v0.43.0: Radio Speaker and Radio Status Board
     f"block.{MOD}.radio_speaker": "Radio Speaker",
-    f"block.{MOD}.radio_speaker.tooltip": "A receiver that also plays a sound when its frequency turns on: a bell, chime, doorbell and more, once or every second while it's on. Right-click it with an empty hand to pick the sound.",
+    f"block.{MOD}.radio_speaker.tooltip": "A receiver that also plays a sound when its frequency turns on: a bell, chime, doorbell and more, once or every second while it's on. Right-click it with an empty hand to pick the sound. It plays a Radio Jukebox's song instead.",
     f"block.{MOD}.radio_status_board": "Radio Status Board",
     f"block.{MOD}.radio_status_board.tooltip": "A panel for a wall that shows up to four frequencies: each one's name, a light and the strength heard there, readable in the dark. Right-click it with an empty hand to pick them.",
     f"message.{MOD}.speaker_sound_bell": "Bell",
@@ -1344,6 +1346,21 @@ write(ASSETS / "lang" / "en_us.json", {
     f"subtitles.{MOD}.tower.on": "Tower goes on the air",
     f"subtitles.{MOD}.tower.off": "Tower goes off the air",
     f"subtitles.{MOD}.station.siren": "Raid siren wails",
+    # v0.60.0: the Radio Jukebox, and speakers playing its music
+    f"block.{MOD}.radio_jukebox": "Radio Jukebox",
+    f"block.{MOD}.radio_jukebox.tooltip": "A transmitter with a record player. Put a music disc in and it broadcasts the song on its frequency: Radio Speakers that hear it play the song. A redstone pulse plays it again; steady redstone repeats it. Empty hand takes the disc out.",
+    f"tooltip.{MOD}.jukebox_plays_on": "Plays on: %s",
+    f"message.{MOD}.jukebox_no_disc": "no disc",
+    f"message.{MOD}.jukebox_stopped": "%s (stopped)",
+    f"message.{MOD}.jukebox_playing": "%s (%s / %s)",
+    f"message.{MOD}.jukebox_playing_loop": "%s (%s / %s, repeating)",
+    f"message.{MOD}.jukebox_now_on": "On the air: %s, on %s",
+    f"message.{MOD}.jukebox_status": "Radio Jukebox | Frequency %s | %s | Reach %s blocks",
+    f"jade.{MOD}.jukebox_disc": "Disc: %s",
+    f"jade.{MOD}.speaker_music": "Playing: %s (%s / %s)",
+    f"screen.{MOD}.log.kind_jukebox": "Radio Jukebox",
+    f"screen.{MOD}.log.tip_jukebox": "Played %s",
+    f"screen.{MOD}.audit.kind_jukebox": "Radio Jukebox",
     f"message.{MOD}.speaker_volume_quiet": "quiet",
     f"message.{MOD}.speaker_volume_normal": "normal",
     f"message.{MOD}.speaker_volume_loud": "loud",
@@ -2414,6 +2431,13 @@ recipes["tower_platform"] = ({
     "result": {"count": 8, "id": f"{MOD}:tower_platform"},
 }, f"{MOD}:radio_mast")
 recipes["radio_transmitter_from_weather_station"] = (shapeless("radio_weather_station", "radio_transmitter"), f"{MOD}:radio_weather_station")
+recipes["radio_jukebox"] = ({  # v0.60.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "minecraft:jukebox"}],
+    "result": {"count": 1, "id": f"{MOD}:radio_jukebox"},
+}, f"{MOD}:radio_transmitter")
+recipes["radio_transmitter_from_jukebox"] = (shapeless("radio_jukebox", "radio_transmitter"), f"{MOD}:radio_jukebox")
 recipes["iron_antenna"] = ({
     "type": "minecraft:crafting_shaped",
     "category": "redstone",
@@ -2591,7 +2615,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
-             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform"):
+             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2618,7 +2642,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter",
-                "radio_weather_station", "bundled_transmitter"):
+                "radio_weather_station", "bundled_transmitter", "radio_jukebox"):
         # v0.45.0: its antenna (only if it has one, so plain ones still stack with older items).
         entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:{name}", "properties": ["antenna"],
                                    "conditions": [{"condition": "minecraft:inverted", "term": {
@@ -2647,7 +2671,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor", f"{MOD}:tower_platform"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -2701,7 +2725,7 @@ INFO = {
     "radio_inverted_receiver": "Gives out 15 while its frequency is silent, and 0 while it hears it.",
     "radio_logic_receiver": "Listens on two frequencies and puts them together: AND (both on), OR (either) or XOR (just one). Right-click it to set them.",
     "radio_delay_receiver": "A receiver that holds every change back, by up to 60 seconds, and can keep its output on for a while after.",
-    "radio_speaker": "A receiver that plays a sound (a bell, a chime, a doorbell and more) each time its frequency turns on.",
+    "radio_speaker": "A receiver that plays a sound (a bell, a chime, a doorbell and more) each time its frequency turns on. When a Radio Jukebox broadcasts on its frequency, it plays the song instead.",
     "radio_status_board": "A panel for walls that shows up to four frequencies: their names, strengths and the last telegraph message.",
     "radio_counter_receiver": "Counts the times its frequency turns on; at the number you set it gives a pulse, or stays on until its reset frequency turns on.",
     "radio_timer_transmitter": "Sends 15 on a timer: a short pulse every so often, or every day between two hours. Redstone pauses it.",
@@ -2713,6 +2737,7 @@ INFO = {
     "bundled_receiver": "Listens on its frequency and the 15 after it, and puts what it hears onto the Bundled Cable touching it, one channel each.",
     "radio_weather_station": "A transmitter that sends a reading where it stands instead of redstone: the weather, the time of day or the moon (and more with Reiko's Weather). It can also tell pagers when the weather changes.",
     "radio_signal_recorder": "Records up to 30 seconds of a frequency, then plays it back on its own frequency: once for each redstone pulse, or over and over while powered.",
+    "radio_jukebox": "A tower top with a record player. Put a music disc in and it broadcasts the song on its frequency, sending 15 while it plays: Radio Speakers that hear the frequency within its reach play the song where they stand (16, 32 or 64 blocks round, by their volume). A redstone pulse plays it again, steady redstone repeats it, and an empty hand takes the disc out. Hoppers can put discs in, and take them out when a song ends.",
     "radio_jammer": "Stand it on masts like a transmitter: anything in its reach hears its frequency weaker by the redstone strength it gets (15 silences it).",
     "aviation_beacon": "A red or white warning light for the top or side of a tower: on at night, always, or while its tower sends; blinking, flashing or steady. Right-click it to set it.",
     "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",

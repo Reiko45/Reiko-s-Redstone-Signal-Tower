@@ -3618,6 +3618,7 @@ public final class SignalTowerGameTests {
                     helper.setBlock(tx.above(), Blocks.AIR);
                 })
                 .thenWaitUntil(() -> assertOutput(helper, strangers, 0))
+                .thenIdle(3) // the toggle receiver has heard it go off too (it may check later in the same tick)
                 .thenExecute(() -> helper.setBlock(tx.above(), Blocks.REDSTONE_BLOCK))
                 .thenWaitUntil(() -> assertOutput(helper, toggle, 15)) // a real turn-on flips it
                 .thenExecute(() -> {
@@ -9358,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 46) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 47) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9366,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 46, "All the mod's items: " + items.size());
+        check(items.size() == 47, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9990,6 +9991,154 @@ public final class SignalTowerGameTests {
         List<String> problems = com.reiko.signaltower.compat.cct.CctCompat.checkRadioUpgrades(helper.getLevel(), helper.absolutePos(new BlockPos(1, 1, 1)));
         check(problems.isEmpty(), "Radio upgrades: " + problems);
         SignalTower.LOGGER.info("radioUpgrades: CC: Tweaked has the Radio Turtle and Radio Pocket Computer");
+        helper.succeed();
+    }
+
+    /**
+     * The Radio Jukebox: no disc, no signal; stone doesn't go in; a disc does and plays (15, the
+     * network has its song, a receiver on its frequency hears it); one disc at a time, and a
+     * hopper can't take it out while it plays. A speaker on its frequency plays the song in place
+     * of its own sound (and tells clients), one on another frequency doesn't; Jade shows the song
+     * on both. A redstone pulse plays it again from the start, and while the redstone stays it
+     * repeats; when the redstone goes, the play going on is the last. At the end of the song it
+     * goes quiet and the speaker stops; a hopper takes the disc out, another goes in and plays.
+     * An empty hand takes it out; broken, it drops its disc.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void radioJukebox(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos jb = new BlockPos(2, 1, 2);
+        BlockPos speakerPos = new BlockPos(6, 1, 2);
+        BlockPos otherPos = new BlockPos(6, 1, 5);
+        BlockPos rx = new BlockPos(2, 1, 6);
+        place(helper, jb, ModRegistry.RADIO_JUKEBOX.get(), 4629);
+        place(helper, speakerPos, ModRegistry.RADIO_SPEAKER.get(), 4629);
+        place(helper, otherPos, ModRegistry.RADIO_SPEAKER.get(), 4630);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4629);
+        com.reiko.signaltower.blockentity.RadioJukeboxBlockEntity jukebox = helper.getBlockEntity(jb);
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity speaker = helper.getBlockEntity(speakerPos);
+        com.reiko.signaltower.blockentity.RadioReceiverBlockEntity other = helper.getBlockEntity(otherPos);
+        BlockPos at = helper.absolutePos(jb);
+        SignalNetwork network = SignalNetwork.get(level);
+        var cat = net.minecraft.world.item.JukeboxSongs.CAT;
+        var thirteen = net.minecraft.world.item.JukeboxSongs.THIRTEEN;
+        var powered = com.reiko.signaltower.block.RadioTransmitterBlock.POWERED;
+        long[] started = new long[2];
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(jukebox.getOutput() == 0 && !helper.getBlockState(jb).getValue(powered) && network.musicAt(at) == null, "Quiet with no disc");
+                    check(!jukebox.insert(new ItemStack(Items.STONE)), "Stone isn't a disc");
+                    check(jukebox.items().insertItem(0, new ItemStack(Items.STONE), true).getCount() == 1, "Nor from a hopper");
+                    check(jukebox.insert(new ItemStack(Items.MUSIC_DISC_CAT)), "A disc goes in");
+                    started[0] = level.getGameTime();
+                    check(!jukebox.insert(new ItemStack(Items.MUSIC_DISC_13)), "One disc at a time");
+                    check(jukebox.items().insertItem(0, new ItemStack(Items.MUSIC_DISC_13), false).getCount() == 1, "Even from a hopper");
+                    check(jukebox.items().extractItem(0, 1, false).isEmpty() && jukebox.hasDisc(), "A hopper can't take it out while it plays");
+                    check(jukebox.getOutput() == 15 && helper.getBlockState(jb).getValue(powered), "On the air");
+                    SignalNetwork.Music music = network.musicAt(at);
+                    check(music != null && music.song() == cat && music.frequency() == 4629 && !music.loop() && music.start() == started[0]
+                            && music.length() == 185 * 20 + 20, "It broadcasts cat: " + music);
+                    check(level.getBlockState(at).getAnalogOutputSignal(level, at) == 2, "A comparator reads cat's level");
+                })
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "A receiver on it hears it"))
+                .thenWaitUntil(() -> check(cat.equals(speaker.getMusicSong()) && speaker.getMusicStart() == started[0], "The speaker plays cat"))
+                .thenExecute(() -> {
+                    check(speaker.getNotesPlayed() == 0, "In place of its own sound: " + speaker.getNotesPlayed());
+                    check(other.getMusicSong() == null, "Not on another frequency");
+                    CompoundTag update = speaker.getUpdateTag(level.registryAccess());
+                    check("minecraft:cat".equals(update.getString("music_song")) && update.getLong("music_start") == started[0],
+                            "Clients are told: " + update);
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, at);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(level.getBlockState(at), info)).contains("jukebox_disc"), "Jade on the jukebox");
+                    CompoundTag heard = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(speakerPos));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(speakerPos), heard)).contains("speaker_music"),
+                            "Jade on the speaker: " + heard);
+                    helper.setBlock(jb.east(), Blocks.REDSTONE_BLOCK); // a pulse, and it stays: play again, and repeat
+                })
+                .thenWaitUntil(() -> check(jukebox.isLooping(), "Redstone: it repeats"))
+                .thenExecute(() -> {
+                    started[1] = network.musicAt(at).start();
+                    check(started[1] > started[0] && network.musicAt(at).loop(), "From the start again: " + started[1]);
+                })
+                .thenWaitUntil(() -> check(speaker.getMusicStart() == started[1], "The speaker starts it again"))
+                .thenExecute(() -> {
+                    jukebox.startedAtForTests(level.getGameTime() - jukebox.playLength() - 100); // a play and a bit ago
+                    long now = level.getGameTime();
+                    check(jukebox.isPlaying(now) && jukebox.playStart(now) > now - jukebox.playLength(), "Still playing: its second time round");
+                    check(network.musicAt(at).startAt(now) == jukebox.playStart(now), "The network agrees");
+                    helper.setBlock(jb.east(), Blocks.AIR);
+                })
+                .thenWaitUntil(() -> check(!jukebox.isLooping(), "No redstone: this play is the last"))
+                .thenExecute(() -> {
+                    long now = level.getGameTime();
+                    check(jukebox.isPlaying(now) && jukebox.getOutput() == 15, "It finishes the song");
+                    jukebox.startedAtForTests(now - jukebox.playLength() + 3); // nearly over
+                })
+                .thenWaitUntil(() -> check(jukebox.getOutput() == 0 && !helper.getBlockState(jb).getValue(powered), "Over: quiet"))
+                .thenWaitUntil(() -> check(speaker.getMusicSong() == null && network.musicAt(at) == null, "The speaker stops"))
+                .thenWaitUntil(() -> check(helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "The receiver too"))
+                .thenExecute(() -> {
+                    ItemStack out = jukebox.items().extractItem(0, 1, false);
+                    check(out.is(Items.MUSIC_DISC_CAT) && !jukebox.hasDisc(), "A hopper takes the disc out once it's over");
+                    check(jukebox.items().insertItem(0, new ItemStack(Items.MUSIC_DISC_13), false).isEmpty(), "and another goes in");
+                    check(network.musicAt(at) != null && network.musicAt(at).song() == thirteen, "It plays 13");
+                })
+                .thenWaitUntil(() -> check(thirteen.equals(speaker.getMusicSong()), "So does the speaker"))
+                .thenExecute(() -> {
+                    ItemStack out = jukebox.eject();
+                    check(out.is(Items.MUSIC_DISC_13) && jukebox.getOutput() == 0 && network.musicAt(at) == null, "Taken out: quiet");
+                    check(jukebox.insert(new ItemStack(Items.MUSIC_DISC_CAT)), "Back in");
+                    level.destroyBlock(at, true);
+                    check(network.musicAt(at) == null, "Broken: off the air");
+                    check(helper.getEntities(EntityType.ITEM).stream().anyMatch(item -> item.getItem().is(Items.MUSIC_DISC_CAT)), "and its disc drops");
+                })
+                .thenWaitUntil(() -> check(speaker.getMusicSong() == null, "The speaker stops"))
+                .thenSucceed();
+    }
+
+    /**
+     * Music broadcasts in the network, with a jukebox far away (its chunk not loaded): a spot in its
+     * reach hears its song, one outside doesn't, nor one on another frequency; out of power, it's
+     * off. A repeating song tells the speakers each time it starts again; a song that's over is
+     * taken off, and the jukebox goes quiet, without its chunk. A broadcast is saved with the network.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void musicBroadcasts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        network.forceWeather(com.reiko.signaltower.radio.Weather.CLEAR);
+        BlockPos far = new BlockPos(8_300_000, 100, 8_300_000);
+        BlockPos loopFar = far.offset(0, 0, 2000);
+        long now = level.getGameTime();
+        var cat = net.minecraft.world.item.JukeboxSongs.CAT;
+        network.updateTransmitter(far, 4631, 15, 120, null);
+        network.setMusic(far, new SignalNetwork.Music(4631, cat, now - 100, 400, false));
+        SignalNetwork.MusicHeard heard = network.musicHeard(level, 4631, far.offset(80, 0, 0));
+        check(heard != null && heard.from().equals(far) && heard.start() == now - 100 && heard.music().song() == cat, "Heard in its reach: " + heard);
+        check(network.musicHeard(level, 4631, far.offset(400, 0, 0)) == null, "Not out of its reach");
+        check(network.musicHeard(level, 4632, far.offset(80, 0, 0)) == null, "Not on another frequency");
+        network.updateTransmitter(far, 4631, 0, 120, null);
+        check(network.musicHeard(level, 4631, far.offset(80, 0, 0)) == null, "Not while it sends nothing");
+        network.updateTransmitter(far, 4631, 15, 120, null);
+
+        network.updateTransmitter(loopFar, 4632, 15, 120, null);
+        network.setMusic(loopFar, new SignalNetwork.Music(4632, cat, now - 1000, 400, true));
+        SignalNetwork.MusicHeard looped = network.musicHeard(level, 4632, loopFar);
+        check(looped != null && looped.start() == now - 200, "Repeating: its latest start: " + looped);
+
+        CompoundTag saved = network.save(new CompoundTag(), level.registryAccess());
+        SignalNetwork loaded = SignalNetwork.load(saved, level.registryAccess()).attachTo(level);
+        check(java.util.Objects.equals(loaded.musicAt(far), network.musicAt(far)) && java.util.Objects.equals(loaded.musicAt(loopFar), network.musicAt(loopFar)),
+                "Saved with the network");
+
+        long revision = network.revision(4632);
+        network.tick(now + 200, 0); // the repeat starts again
+        check(network.revision(4632) > revision, "Speakers are told when it starts again");
+        network.tick(now + 300, 0); // cat (400 ticks here) started 100 ago is over
+        check(network.musicAt(far) == null, "Over: taken off");
+        check(network.transmitterAt(far) != null && network.transmitterAt(far).power() == 0, "and the jukebox is quiet, without its chunk");
+        check(network.musicAt(loopFar) != null, "The repeating one goes on");
         helper.succeed();
     }
 }

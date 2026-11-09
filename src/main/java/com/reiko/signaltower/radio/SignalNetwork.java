@@ -438,6 +438,7 @@ public final class SignalNetwork extends SavedData {
             removeFromIndex(pos, previous.frequency());
             setDirty();
         }
+        setMusic(pos, null); // v0.60.0: a Radio Jukebox's song goes with it
         Bundle bundle = bundles.remove(pos);
         if (bundle != null) {
             unindexBundle(pos, bundle); // v0.54.0
@@ -1070,6 +1071,154 @@ public final class SignalNetwork extends SavedData {
         return nowOn;
     }
 
+    // ---- Music broadcasts (v0.60.0) ----
+
+    /**
+     * A song a Radio Jukebox is broadcasting on {@code frequency}: from {@code start} (game time),
+     * {@code length} ticks a play (the song and the gap after it), over and over while {@code loop}.
+     * Kept here (and saved) rather than only in the jukebox, so a jukebox whose chunk isn't loaded
+     * keeps playing to the speakers that hear it, and stops when its song ends.
+     */
+    public record Music(int frequency, ResourceKey<net.minecraft.world.item.JukeboxSong> song, long start, int length, boolean loop) {
+        /** True if it's playing at {@code now}. */
+        public boolean playingAt(long now) {
+            return now >= start && (loop || now - start < length);
+        }
+
+        /** When the play going on at {@code now} began: {@link #start}, or the latest repeat while looping. */
+        public long startAt(long now) {
+            return loop && length > 0 && now > start ? start + (now - start) / length * length : start;
+        }
+    }
+
+    /** What a speaker at a spot hears played: the broadcast, the jukebox it comes from, and when this play began. */
+    public record MusicHeard(BlockPos from, Music music, long start) {
+    }
+
+    /** The song each Radio Jukebox is broadcasting, by its position. Saved. */
+    private final Map<BlockPos, Music> music = new HashMap<>();
+    /** Where each broadcast reaches (its tower and the repeaters on its frequency), and when that was worked out. Not saved. */
+    private final Map<BlockPos, CachedCoverage> musicCoverage = new HashMap<>();
+    /** How long a broadcast's coverage is trusted before it's worked out again. */
+    private static final int MUSIC_COVERAGE_TICKS = 20;
+
+    private record CachedCoverage(long at, int frequency, int reach, List<Coverage> coverage) {
+    }
+
+    /**
+     * What the Radio Jukebox at {@code pos} broadcasts (null: nothing). Speakers on the frequency
+     * look again at once when it changes.
+     */
+    public void setMusic(BlockPos pos, @Nullable Music next) {
+        BlockPos key = pos.immutable();
+        Music previous = next == null ? music.remove(key) : music.put(key, next);
+        if (java.util.Objects.equals(previous, next)) {
+            return;
+        }
+        musicCoverage.remove(key);
+        if (previous != null) {
+            bump(previous.frequency());
+        }
+        if (next != null && (previous == null || previous.frequency() != next.frequency())) {
+            bump(next.frequency());
+        } else if (next != null) {
+            revisions.merge(next.frequency(), 1L, Long::sum);
+        }
+        setDirty();
+    }
+
+    /** What the transmitter at {@code pos} sends, as last told (null: none). */
+    public @Nullable Transmitter transmitterAt(BlockPos pos) {
+        return transmitters.get(pos);
+    }
+
+    /** What the Radio Jukebox at {@code pos} is broadcasting, or null. */
+    public @Nullable Music musicAt(BlockPos pos) {
+        return music.get(pos);
+    }
+
+    /**
+     * The song played at {@code pos} on {@code frequency}: from a Radio Jukebox on it that's playing
+     * and sending (on the air, not out of power or kept quiet on someone else's private frequency),
+     * whose reach (or a repeater's on the frequency) covers {@code pos}; the nearest if several do.
+     * Null if none. (Whether a speaker there hears the frequency at all is up to it.)
+     */
+    public @Nullable MusicHeard musicHeard(ServerLevel level, int frequency, BlockPos pos) {
+        if (music.isEmpty()) {
+            return null;
+        }
+        long gameTime = level.getGameTime();
+        MusicHeard best = null;
+        long bestDistSq = Long.MAX_VALUE;
+        List<BlockPos> stale = null;
+        for (Map.Entry<BlockPos, Music> entry : music.entrySet()) {
+            BlockPos from = entry.getKey();
+            Music song = entry.getValue();
+            if (song.frequency() != frequency || !song.playingAt(gameTime)) {
+                continue;
+            }
+            if (level.isLoaded(from) && !(level.getBlockState(from).getBlock() instanceof com.reiko.signaltower.block.RadioJukeboxBlock)) {
+                if (stale == null) stale = new ArrayList<>();
+                stale.add(from);
+                continue;
+            }
+            Transmitter tx = transmitters.get(from);
+            if (tx == null || tx.frequency() != frequency || tx.power() <= 0 || isDown(from) || blocked(level, frequency, tx.tunedBy())) {
+                continue;
+            }
+            CachedCoverage cached = musicCoverage.get(from);
+            if (cached == null || gameTime - cached.at() >= MUSIC_COVERAGE_TICKS || gameTime < cached.at()
+                    || cached.frequency() != frequency || cached.reach() != tx.reach()) {
+                cached = new CachedCoverage(gameTime, frequency, tx.reach(), stationCoverage(level, from, frequency, tx.reach()));
+                musicCoverage.put(from, cached);
+            }
+            if (!covers(cached.coverage(), pos)) {
+                continue;
+            }
+            long distSq = horizontalDistSq(from, pos);
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                best = new MusicHeard(from, song, song.startAt(gameTime));
+            }
+        }
+        if (stale != null) {
+            stale.forEach(at -> setMusic(at, null));
+        }
+        return best;
+    }
+
+    /**
+     * Each tick: a song that has ended (and doesn't repeat) is taken off, and its jukebox goes off
+     * the air, even if its chunk isn't loaded; a repeating one starting again tells the speakers.
+     */
+    private void tickMusic(long gameTime) {
+        if (music.isEmpty()) {
+            return;
+        }
+        List<BlockPos> ended = null;
+        for (Map.Entry<BlockPos, Music> entry : music.entrySet()) {
+            Music song = entry.getValue();
+            if (song.length() <= 0 || gameTime <= song.start()) {
+                continue;
+            }
+            if (!song.loop() && gameTime - song.start() >= song.length()) {
+                if (ended == null) ended = new ArrayList<>();
+                ended.add(entry.getKey());
+            } else if (song.loop() && (gameTime - song.start()) % song.length() == 0) {
+                revisions.merge(song.frequency(), 1L, Long::sum); // it starts again: speakers start it again
+            }
+        }
+        if (ended != null) {
+            for (BlockPos pos : ended) {
+                setMusic(pos, null);
+                Transmitter tx = transmitters.get(pos);
+                if (tx != null && tx.power() > 0) {
+                    updateTransmitter(pos, tx.frequency(), 0, tx.reach(), tx.tunedBy(), tx.compact());
+                }
+            }
+        }
+    }
+
     // ---- History, for the pagers' catch-up ----
 
     /** The most turn-ons remembered per frequency. */
@@ -1081,7 +1230,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.51.0: a Radio Telegraph message (in the log only; it doesn't turn the frequency on). */
         TELEGRAPH,
         /** v0.53.0: a Radio Weather Station's reading. */
-        WEATHER_STATION;
+        WEATHER_STATION,
+        /** v0.60.0: a Radio Jukebox playing a song (the detail is the song). */
+        JUKEBOX;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1142,6 +1293,11 @@ public final class SignalNetwork extends SavedData {
         /** A Radio Weather Station's reading (v0.53.0): where it is and who tuned it. */
         public static Cause station(BlockPos pos, @Nullable UUID tunedBy) {
             return new Cause(CauseKind.WEATHER_STATION, pos.immutable(), tunedBy, "");
+        }
+
+        /** A Radio Jukebox playing {@code song} (v0.60.0): where it is and who tuned it. */
+        public static Cause jukebox(BlockPos pos, @Nullable UUID tunedBy, String song) {
+            return new Cause(CauseKind.JUKEBOX, pos.immutable(), tunedBy, "", song == null ? "" : song);
         }
 
         /** A Radio Signal Recorder playing its recording (v0.44.0): where it is and who tuned it. */
@@ -1304,6 +1460,7 @@ public final class SignalNetwork extends SavedData {
     public void tick(long gameTime, long dayTime) {
         now = gameTime;
         nowDayTime = dayTime;
+        tickMusic(gameTime); // v0.60.0
         if (pulses.isEmpty()) {
             return;
         }
@@ -2791,6 +2948,20 @@ public final class SignalNetwork extends SavedData {
             });
             tag.put("bundles", bundleList);
         }
+        if (!music.isEmpty()) {
+            ListTag musicList = new ListTag(); // v0.60.0
+            music.forEach((pos, song) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putInt("frequency", song.frequency());
+                entry.putString("song", song.song().location().toString());
+                entry.putLong("start", song.start());
+                entry.putInt("length", song.length());
+                entry.putBoolean("loop", song.loop());
+                musicList.add(entry);
+            });
+            tag.put("music", musicList);
+        }
         if (!links.isEmpty()) {
             ListTag linkList = new ListTag();
             links.forEach((pos, target) -> {
@@ -2974,6 +3145,16 @@ public final class SignalNetwork extends SavedData {
             Bundle bundle = new Bundle(main.frequency(), channels);
             network.bundles.put(pos, bundle);
             network.indexBundle(pos, bundle, main);
+        }
+        ListTag musicList = tag.getList("music", Tag.TAG_COMPOUND);
+        for (int i = 0; i < musicList.size(); i++) {
+            CompoundTag entry = musicList.getCompound(i);
+            net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(entry.getString("song"));
+            if (id != null && entry.getInt("length") > 0) {
+                network.music.put(BlockPos.of(entry.getLong("pos")), new Music(entry.getInt("frequency"),
+                        ResourceKey.create(net.minecraft.core.registries.Registries.JUKEBOX_SONG, id), entry.getLong("start"),
+                        entry.getInt("length"), entry.getBoolean("loop")));
+            }
         }
         ListTag linkList = tag.getList("links", Tag.TAG_COMPOUND);
         for (int i = 0; i < linkList.size(); i++) {

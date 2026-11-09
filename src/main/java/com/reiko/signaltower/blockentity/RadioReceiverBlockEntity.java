@@ -171,6 +171,17 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     private int heardB;
     /** v0.58.0: what it heard last (not saved): computers get an event when it changes. */
     private int computerHeard = -1;
+    /**
+     * v0.60.0, a speaker: the song it plays from a Radio Jukebox it hears (null: none), and when that
+     * play began (game time). Not saved; sent to clients, which play it.
+     */
+    private @Nullable net.minecraft.resources.ResourceKey<net.minecraft.world.item.JukeboxSong> musicSong;
+    private long musicStart;
+    /** On a client: the music changed, so its next tick tells the sound player. */
+    private boolean musicDirty;
+    private static final String MUSIC_SYNC_TAG = "music_sync";
+    private static final String MUSIC_TAG = "music_song";
+    private static final String MUSIC_START_TAG = "music_start";
 
     public RadioReceiverBlockEntity(BlockPos pos, BlockState state) {
         super(ModRegistry.RADIO_RECEIVER_BE.get(), pos, state);
@@ -347,6 +358,9 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         speakerVolume = volume;
         speakerRepeat = repeat;
         setChanged();
+        if (level instanceof ServerLevel serverLevel) {
+            serverLevel.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS); // its music's loudness
+        }
     }
 
     /** Its settings in one number: sound + 16 × volume + 64 × repeat + 128 × note (the item's {@code speaker} component). */
@@ -391,12 +405,68 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         nextRingAt = now + SPEAKER_REPEAT_TICKS;
     }
 
-    /** A speaker's sound for this check: a ring when its frequency turns on, again every second while on if it repeats, and the doorbell's second note. */
+    // ---- v0.60.0: music from a Radio Jukebox ----
+
+    /** The song a speaker plays (null: none). */
+    public @Nullable net.minecraft.resources.ResourceKey<net.minecraft.world.item.JukeboxSong> getMusicSong() {
+        return musicSong;
+    }
+
+    /** When the play of {@link #getMusicSong()} began (game time). */
+    public long getMusicStart() {
+        return musicStart;
+    }
+
+    /** Looks for a song on its frequency where it stands; if that changed, tells clients (which play it). */
+    private void updateMusic(ServerLevel level, int heard) {
+        SignalNetwork.MusicHeard music = heard > 0 ? SignalNetwork.get(level).musicHeard(level, getFrequency(), worldPosition) : null;
+        var song = music == null ? null : music.music().song();
+        long start = music == null ? 0 : music.start();
+        if (!Objects.equals(song, musicSong) || start != musicStart) {
+            musicSong = song;
+            musicStart = start;
+            BlockState state = getBlockState();
+            level.sendBlockUpdated(worldPosition, state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** What clients get, for a speaker: its settings and its music. */
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        if (!isSpeaker()) {
+            return super.getUpdateTag(registries);
+        }
+        CompoundTag tag = new CompoundTag();
+        tag.putInt(SPEAKER_TAG, packedSpeaker());
+        tag.putBoolean(MUSIC_SYNC_TAG, true);
+        if (musicSong != null) {
+            tag.putString(MUSIC_TAG, musicSong.location().toString());
+            tag.putLong(MUSIC_START_TAG, musicStart);
+        }
+        return tag;
+    }
+
+    @Override
+    public net.minecraft.network.protocol.@Nullable Packet<net.minecraft.network.protocol.game.ClientGamePacketListener> getUpdatePacket() {
+        return isSpeaker() ? net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this) : null;
+    }
+
+    /** On a client: tells the sound player what a speaker plays now. */
+    public static void clientTick(Level level, BlockPos pos, BlockState state, RadioReceiverBlockEntity be) {
+        if (be.musicDirty) {
+            be.musicDirty = false;
+            com.reiko.signaltower.client.ClientHooks.speakerMusic(pos.immutable(), be.musicSong, be.musicStart, be.speakerVolume);
+        }
+    }
+
+    /** A speaker's sound for this check: a ring when its frequency turns on, again every second while on if it repeats, and the doorbell's second note. While it plays a song (v0.60.0), it doesn't ring. */
     private void speakerTick(ServerLevel level, long now, int heard) {
         boolean hearing = heard > 0;
         if (!primed) {
             // Placed, loaded or re-tuned: whatever is on now isn't a turn-on.
             primed = true;
+        } else if (musicSong != null) {
+            nextRingAt = now + SPEAKER_REPEAT_TICKS;
         } else if (hearing && !lastHeard) {
             ring(level, now);
         } else if (hearing && speakerRepeat && now >= nextRingAt) {
@@ -628,6 +698,8 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         super.setRemoved();
         if (level instanceof ServerLevel serverLevel) {
             SignalNetwork.get(serverLevel).untrackReceiver(worldPosition);
+        } else if (level != null && level.isClientSide && musicSong != null) {
+            com.reiko.signaltower.client.ClientHooks.speakerMusic(worldPosition.immutable(), null, 0, speakerVolume); // v0.60.0
         }
     }
 
@@ -709,6 +781,7 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
             power = be.delayOutput(serverLevel.getGameTime(), heard);
         } else if (be.isSpeaker()) {
             be.heardA = heard;
+            be.updateMusic(serverLevel, heard); // v0.60.0: a song from a Radio Jukebox, in place of its own sound
             be.speakerTick(serverLevel, serverLevel.getGameTime(), heard);
             power = heard;
         } else {
@@ -775,6 +848,14 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         counterOnUntil = tag.getLong(UNTIL_TAG);
         if (tag.contains(SPEAKER_TAG)) {
             unpackSpeaker(tag.getInt(SPEAKER_TAG));
+        }
+        if (tag.getBoolean(MUSIC_SYNC_TAG)) {
+            // v0.60.0: from the server, on a client: what the speaker plays.
+            net.minecraft.resources.ResourceLocation id = tag.contains(MUSIC_TAG)
+                    ? net.minecraft.resources.ResourceLocation.tryParse(tag.getString(MUSIC_TAG)) : null;
+            musicSong = id == null ? null : net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.JUKEBOX_SONG, id);
+            musicStart = tag.getLong(MUSIC_START_TAG);
+            musicDirty = true;
         }
         primed = false;
     }

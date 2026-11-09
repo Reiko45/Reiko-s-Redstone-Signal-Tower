@@ -11,6 +11,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Transmitter** | Broadcasts the redstone signal it receives (strength 0–15) on its frequency. The higher above sea level it sits, the farther it reaches. Its warning light glows while it's broadcasting. It also relays Remote Control presses made within reach of it. |
 | **Radio Timer Transmitter** | A transmitter with a clock. It sends full strength on a schedule: a pulse every 1 second to 20 minutes, or on between two in-game times (on at 18:00, off at 06:00 lights the night). A redstone signal into it pauses it. Otherwise it's a full-size transmitter, with reach by height. |
 | **Radio Signal Recorder** | A transmitter with a tape. It records up to 30 seconds of a frequency (every on, off and strength, to the tick) and plays it back on its own frequency: once each time a redstone pulse reaches it, or on a loop while it's powered. Record a rhythm on a remote and get it back as a doorbell tune, a light show or a secret knock. |
+| **Radio Jukebox** | A transmitter with a record player. Put a music disc in and it broadcasts the song on its frequency: Radio Speakers that hear it play the song where they stand, so a whole base (or a whole village) hears the same music. Hoppers can feed it a playlist. |
 | **Radio Weather Station** | A transmitter that broadcasts the conditions where it stands as a strength: the weather (clear 0, rain 8, thunder 15), the time of day or the moon phase. Far-away bases can close shutters before a storm or switch the lights on at dusk. With [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) installed it reads that mod's local weather and gets 7 more readings: weather code, storm danger, wind, precipitation, temperature, season and nearest storm. |
 | **Radio Receiver** | Outputs the strongest signal it hears on its frequency, at the same strength (weaker far out toward the edge of a tower's reach). Works like a redstone block with a dimmer. |
 | **Radio Repeater** | A relay station. It picks up its frequency where it stands and broadcasts it again, at the strength it was sent at, with its own reach. Put repeaters on towers along the way to send a signal much farther than one transmitter can. Needs no redstone. Its amber light glows while it's repeating. |
@@ -20,7 +21,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
 | **Radio Counter Receiver** | Counts how many times its frequency turns on, and turns on once the count reaches a set number (1 to 64): for a 1-second pulse, or until a second **reset frequency** turns on. It can forget the count after a pause, so three quick presses work and three slow ones don't (a secret knock). |
-| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass, beep, pager, static or siren, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver. |
+| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass, beep, pager, static or siren, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver, and plays a Radio Jukebox's song when one broadcasts on its frequency. |
 | **Radio Status Board** | A panel for a wall that shows up to four frequencies at a glance: each one's name, a light and the strength heard there, glowing so it reads at night. A control-room display for your base. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
@@ -447,6 +448,7 @@ A **Radio Speaker** (since 0.43) is a receiver (it outputs what it hears, like a
 - **Test** plays the sound just for you, so you can try sounds before saving.
 - A note particle pops out of the top each time it plays. Placing it, loading it or re-tuning it while its frequency is on doesn't ring it.
 - **An example:** a speaker on 4410 set to Doorbell. Any remote press on 4410 within reach rings it, with "Note Block plays" in the subtitles.
+- **Music:** since 0.60, when a Radio Jukebox broadcasts a song on its frequency, it plays the song instead of its own sound (see Radio Jukebox).
 - Jade shows what it plays ("Plays: Doorbell, F♯4, normal, once"). It counts as a receiver ("Heard by", the remote's light, the locator, the audit as "Speaker"), and breaking it keeps its frequency and sound on the item.
 
 ### Status boards
@@ -473,6 +475,22 @@ A **Radio Signal Recorder** (since 0.44) is a full-size transmitter (reach by he
 - **Jade** shows what it records from, the tape ("Tape: 4.7s, 10 changes; plays on a loop while powered") and "Playing: 1.1s of 4.7s". The log lists its turn-ons as "Signal Recorder", the audit as "Signal Recorder", and the tuner shows its reach ring.
 - **Private and encrypted frequencies:** pressing a button makes you its tuner. It only plays on a private frequency for members (others get a red refusal, and the owner an alert), and records someone else's encrypted frequency as silence ("Deaf: 4410 is encrypted by Dev").
 - Breaking it keeps its frequencies, mode and recording on the dropped item, and the item's tooltip shows them.
+
+### Radio Jukebox
+
+A **Radio Jukebox** (since 0.60) is a full-size transmitter with a record player: it goes on top of a tower, reaches as far as its height lets it, takes antennas and needs a battery like any tower. Put a music disc in and it broadcasts the song on its frequency.
+
+- **It plays the disc** once when it goes in, sending 15 while the song plays (so receivers, lamps and pagers on its frequency see it on), and goes quiet when the song is over.
+- **Redstone:** a pulse into it (or into a mast under it) plays the disc again from the start. While the redstone stays on, it plays it over and over. When the redstone goes, the song playing is the last one.
+- **An empty hand** takes the disc out (sneak to take an antenna off instead). Breaking it drops the disc.
+- **Radio Speakers** on its frequency that hear it, within its reach or a repeater's on the frequency, play the song where they stand, instead of their own sound. A speaker set to quiet is heard 16 blocks round, normal 32, loud 64 (a jukebox's own range). You get "Now Playing" when you come in earshot.
+- **The same song everywhere:** every speaker plays from where the broadcast is, so speakers round a base play in step, and if you arrive in the middle of a song you hear the middle. At most the 4 nearest speakers in earshot play at once (the game only streams a few sounds at a time).
+- **Far away:** the jukebox keeps playing to the speakers that hear it while its chunk isn't loaded, and goes quiet on time when the song ends.
+- **A playlist:** hoppers and pipes can put a disc in when it's empty, and take it out once the song is over. A hopper pointing into it with discs in, and one under it, play them one after another. The jukebox can sit on the hopper on top of its masts: the reach comes from its height.
+- **Jade** shows the song and how far into it it is ("Disc: C418 - cat (1:12 / 3:05)", "repeating" while redstone keeps it going) on the jukebox, and "Playing: C418 - cat (1:12 / 3:05)" on a speaker. A comparator next to it reads the song's level, like a jukebox. The frequency log lists it as "Radio Jukebox" and the song, the audit as "Radio Jukebox".
+- **Recipe:** Radio Transmitter + Jukebox (and back).
+
+![Dev putting C418 - cat into a Radio Jukebox on a tower by a plains village, "On the air: C418 - cat, on 7000", Jade "Disc: C418 - cat (0:01 / 3:05)", "Reach: 512 blocks"; Alex's base 145 blocks away, "Now Playing: C418 - cat" and Jade on a Radio Speaker "Playing: C418 - cat (0:01 / 3:05)"; the debug screen showing both of the base's speakers streaming ("Sounds: 0/247 + 2/8"), joined 51 seconds into the song; the jukebox on a hopper on its masts, with a hopper of discs pointing into it: cat over and in the hopper below, "Disc: C418 - blocks (0:05 / 5:45)"; the speaker still playing blocks a minute in while the jukebox's chunk isn't loaded; and the Radio Jukebox's recipe tooltip](docs/images/radio-jukebox.png)
 
 ### Aviation beacons
 
@@ -1064,6 +1082,8 @@ G = Glass Pane   C = Copper Ingot   D = Daylight Detector
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
 
+**Radio Jukebox:** a Radio Transmitter and a Jukebox, in any arrangement in the crafting grid. Put a Radio Jukebox in the grid on its own to get the Radio Transmitter back.
+
 **Radio Jammer:** a Radio Transmitter, a Note Block and a Redstone Dust, in any arrangement in the crafting grid.
 
 **Aviation Beacon** (makes 2):
@@ -1200,6 +1220,9 @@ src/main/java/com/reiko/signaltower/
   block/RadioLampBlock.java              receiver that's a light: light level = strength, dye colors, no redstone
   block/RadioJammerBlock.java            tower top that drowns out its frequency around it while powered
   blockentity/RadioJammerBlockEntity.java  tells the network how strongly and how far it jams
+  block/RadioJukeboxBlock.java           tower top with a record player: discs in and out, the comparator
+  blockentity/RadioJukeboxBlockEntity.java  plays the disc (once, again on a pulse, repeating with redstone), puts the song in the network, the hopper slot
+  client/BroadcastMusic.java             plays a speaker's song on the client, from where the broadcast is, the 4 nearest in earshot
   radio/Weather.java                     clear, rain, thunder: how much reach each takes off (config)
   radio/Lightning.java                   lightning strikes on towers: chance, outages, lightning rods
   radio/PowerCost.java                   power cost: finding a tower's batteries, paying each second, out of power
@@ -1538,9 +1561,11 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended";
 185. sounds: all nine are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static and Siren are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
 186. a radio on the move (without CC: Tweaked's classes): it hears a tower where it is and scans it; its pulse reaches a receiver (heard by 1) and ends; its message, signed "Turtle 3", reaches a telegraph and is listed, but not back to itself; empty is refused, and so is someone else's private frequency; a telegraph's message reaches it, but not once it has moved 5,000 blocks away;
-187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check).
+187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check);
+188. the Radio Jukebox: quiet with no disc; stone doesn't go in (by hand or hopper); a disc does and it goes on the air with its song in the network, and a comparator reads the song's level; one disc at a time, and no taking it out while it plays; a receiver on its frequency hears it; a speaker on it plays the song (not its own sound) and tells clients, one on another frequency doesn't; Jade shows the song on both; a redstone pulse plays it again from the start and the speaker starts again, steady redstone repeats it (the network agrees on when this repeat began), and without the redstone the play going on is the last; at the end it goes quiet and the speaker and receiver stop; a hopper takes the disc out and another goes in and plays; taken out by hand, it's quiet; broken, it's off the air and drops its disc;
+189. music broadcasts with a jukebox far away (not loaded): a spot in its reach hears its song, from when it started, one outside it or on another frequency doesn't, nor while it sends nothing; a repeating song gives its latest start; broadcasts are saved with the network; each repeat tells the speakers; a song that's over is taken off and the jukebox goes quiet without its chunk, while the repeating one goes on.
 
-All 187 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
+All 189 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
 
 ## License
 
