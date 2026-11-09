@@ -179,6 +179,15 @@ public final class Config {
                     "where the tower's top is.")
             .defineInRange("iceThawSeconds", 120, 0, 86400);
 
+    public static final ModConfigSpec.BooleanValue WORLD_TOWERS = BUILDER
+            .comment("Old radio towers generate in new chunks: a hut with a mast, a transmitter on top and a chest of",
+                    "parts, some still on the air on a random frequency (v0.55.0). Chunks already made keep what they have.")
+            .define("worldTowers", true);
+
+    public static final ModConfigSpec.BooleanValue CLIMBABLE_MASTS = BUILDER
+            .comment("Masts can be climbed like ladders: walk into one to go up, let go to slide down, sneak to hold still (v0.55.0).")
+            .define("climbableMasts", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

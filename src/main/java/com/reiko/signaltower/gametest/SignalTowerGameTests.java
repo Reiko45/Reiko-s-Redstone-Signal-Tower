@@ -8733,4 +8733,346 @@ public final class SignalTowerGameTests {
                 })
                 .thenSucceed();
     }
+
+    // ---------------------------------------------------------------- v0.55.0: old radio towers, climbing, platforms
+
+    /** v0.55.0: a 16-block cube, room for a whole old radio tower. */
+    private static final String TOWER_SITE = "tower_site";
+
+    private static net.minecraft.world.level.block.state.BlockState stateAt(ServerLevel level, BlockPos pos) {
+        return level.getBlockState(pos);
+    }
+
+    /**
+     * An old tower still on the air, built whole: the mast (6 masts), the transmitter on top with an
+     * Iron Antenna, marked as found, on its frequency (4611), and on the air (a receiver nearby hears
+     * 15); the beacon on top, the torch at its foot, a charged battery with a solar panel, three guy
+     * wires that brace it, a platform round its mast just under the top, rails only on the outside, a chest of
+     * parts with the tower loot table, the sign by the door with the frequency, and Jade's line.
+     */
+    @GameTest(template = TOWER_SITE, timeoutTicks = 200)
+    public static void foundTowerOnTheAir(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var plan = new com.reiko.signaltower.world.RadioTowerPiece.Plan(6, true, 4611,
+                com.reiko.signaltower.radio.AntennaTier.IRON, 3, true, true, 50_000);
+        var piece = new com.reiko.signaltower.world.RadioTowerPiece(helper.absolutePos(new BlockPos(1, 0, 3)),
+                net.minecraft.world.level.block.Rotation.NONE, plan);
+        piece.buildAll(level, level.getChunkSource().getGenerator(), level.getRandom());
+        BlockPos rx = new BlockPos(14, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4611);
+        BlockPos foot = piece.mastFoot();
+        BlockPos top = piece.top();
+        for (int y = 0; y < 6; y++) {
+            check(level.getBlockState(foot.above(y)).is(ModRegistry.RADIO_MAST.get()), "A mast at " + y);
+        }
+        check(level.getBlockState(top).is(ModRegistry.RADIO_TRANSMITTER.get())
+                && level.getBlockState(top).getValue(com.reiko.signaltower.radio.AntennaTier.PROPERTY) == com.reiko.signaltower.radio.AntennaTier.IRON,
+                "The transmitter on top, with an Iron Antenna");
+        var transmitter = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+        check(transmitter.isFoundTower() && transmitter.getFrequency() == 4611, "Marked as found, on 4611");
+        check(level.getBlockState(top.above()).is(ModRegistry.AVIATION_BEACON.get()), "A beacon on top");
+        check(level.getBlockState(piece.at(6, 1, 4)).is(Blocks.REDSTONE_TORCH), "A redstone torch at its foot");
+        BlockPos batteryPos = piece.at(8, 1, 4);
+        check(level.getBlockEntity(batteryPos) instanceof com.reiko.signaltower.blockentity.RadioBatteryBlockEntity battery
+                && battery.getCharge() == 50_000 && level.getBlockState(batteryPos.above()).is(ModRegistry.SOLAR_PANEL.get()),
+                "A charged battery with a solar panel");
+        check(level.getBlockEntity(piece.chest()) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chest
+                && com.reiko.signaltower.world.ModWorldgen.TOWER_CHEST.equals(chest.getLootTable()), "A chest of parts");
+        check(level.getBlockEntity(piece.sign()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign
+                && sign.getFrontText().getMessage(2, false).getString().equals("4611") && sign.isWaxed(), "The sign shows 4611");
+        BlockPos mast = foot.above(4); // one below the top
+        check(level.getBlockState(foot.above(5).north()).isAir(), "Nothing round the top mast");
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx != 0 || dz != 0) {
+                    check(level.getBlockState(mast.offset(dx, 0, dz)).is(ModRegistry.TOWER_PLATFORM.get()), "A platform at " + dx + "," + dz);
+                }
+            }
+        }
+        var north = level.getBlockState(mast.north());
+        check(north.getValue(com.reiko.signaltower.block.TowerPlatformBlock.NORTH) && !north.getValue(com.reiko.signaltower.block.TowerPlatformBlock.SOUTH)
+                && !north.getValue(com.reiko.signaltower.block.TowerPlatformBlock.EAST) && !north.getValue(com.reiko.signaltower.block.TowerPlatformBlock.WEST),
+                "The north platform: a rail on its outside only");
+        var corner = level.getBlockState(mast.north().east());
+        check(corner.getValue(com.reiko.signaltower.block.TowerPlatformBlock.NORTH) && corner.getValue(com.reiko.signaltower.block.TowerPlatformBlock.EAST)
+                && !corner.getValue(com.reiko.signaltower.block.TowerPlatformBlock.SOUTH) && !corner.getValue(com.reiko.signaltower.block.TowerPlatformBlock.WEST),
+                "The corner: rails on its two outsides");
+        SignalNetwork network = SignalNetwork.get(level);
+        helper.startSequence()
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "It's on the air: " + outputAt(helper, rx)))
+                .thenWaitUntil(() -> check(network.bracesOf(foot) == 3, "Three guy wires brace it: " + network.bracesOf(foot)))
+                .thenExecute(() -> {
+                    check(transmitter.getFrequency() == 4611, "Its frequency is free, so it keeps it");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, top);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(level.getBlockState(top), info)).contains("found_tower"), "Jade: an old tower");
+                    CompoundTag saved = transmitter.saveWithoutMetadata(level.registryAccess());
+                    check(saved.getBoolean("found_tower") && saved.getBoolean("found_checked"), "Found and checked, saved");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * An old tower off the air, built turned round (180 degrees): its blocks turn with it (the chest
+     * faces west, the mast is where it should be); a lever (off) instead of a torch, no beacon or
+     * platform, one guy wire and a flat battery. With power on (this batch), the lever alone doesn't
+     * get it on the air; charging the battery does.
+     */
+    @GameTest(template = TOWER_SITE, batch = POWER, timeoutTicks = 200)
+    public static void foundTowerOffTheAir(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var plan = new com.reiko.signaltower.world.RadioTowerPiece.Plan(5, false, 4612,
+                com.reiko.signaltower.radio.AntennaTier.NONE, 1, false, true, 0);
+        var piece = new com.reiko.signaltower.world.RadioTowerPiece(helper.absolutePos(new BlockPos(13, 0, 12)),
+                net.minecraft.world.level.block.Rotation.CLOCKWISE_180, plan);
+        piece.buildAll(level, level.getChunkSource().getGenerator(), level.getRandom());
+        check(piece.getBoundingBox().getXSpan() == 12 && piece.getBoundingBox().getZSpan() == 9
+                && piece.getBoundingBox().minX() == helper.absolutePos(new BlockPos(2, 0, 0)).getX(), "Turned round: " + piece.getBoundingBox());
+        BlockPos rx = new BlockPos(1, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4612);
+        BlockPos top = piece.top();
+        BlockPos lever = piece.at(6, 1, 4);
+        check(level.getBlockState(piece.mastFoot()).is(ModRegistry.RADIO_MAST.get()) && level.getBlockState(top).is(ModRegistry.RADIO_TRANSMITTER.get()),
+                "The mast and transmitter, turned");
+        check(level.getBlockState(piece.chest()).getValue(net.minecraft.world.level.block.ChestBlock.FACING) == Direction.WEST, "The chest turned to face west");
+        check(level.getBlockState(lever).is(Blocks.LEVER) && !level.getBlockState(lever).getValue(net.minecraft.world.level.block.LeverBlock.POWERED),
+                "A lever, off");
+        check(level.getBlockState(top.above()).isAir() && level.getBlockState(top.below().north()).isAir(), "No beacon, no platform");
+        check(level.getBlockState(piece.anchor(0)).is(ModRegistry.GUY_ANCHOR.get()) && piece.anchor(1) == null, "One guy wire");
+        var battery = (com.reiko.signaltower.blockentity.RadioBatteryBlockEntity) level.getBlockEntity(piece.at(8, 1, 4));
+        helper.startSequence()
+                .thenIdle(30)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 0 && battery.getCharge() == 0, "Off the air");
+                    level.setBlock(lever, level.getBlockState(lever).setValue(net.minecraft.world.level.block.LeverBlock.POWERED, true), Block.UPDATE_ALL);
+                })
+                .thenIdle(30)
+                .thenExecute(() -> {
+                    check(outputAt(helper, rx) == 0, "The lever on, but the battery's flat");
+                    battery.setCharge(20_000);
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "Charged: on the air"))
+                .thenSucceed();
+    }
+
+    /**
+     * An old tower's frequency is checked the first time it ticks: one someone has made private (or
+     * named) moves to a free one between 100,000 and 999,999, and its sign is changed to match; a free
+     * one stays; the check is done once (saved), so the tower's finder can claim it later.
+     */
+    @GameTest(template = PLATFORM)
+    public static void foundTowerFrequencyTaken(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        var names = com.reiko.signaltower.radio.FrequencyNames.get(level.getServer());
+        UUID owner = UUID.randomUUID();
+        try {
+            claims.put(4613, owner, "Owner", java.util.Map.of());
+            names.set(4615, "Garage");
+            BlockPos signPos = new BlockPos(3, 1, 1);
+            helper.setBlock(signPos, Blocks.OAK_SIGN);
+            BlockPos absSign = helper.absolutePos(signPos);
+            int[] frequencies = {4613, 4614, 4615};
+            for (int i = 0; i < frequencies.length; i++) {
+                BlockPos at = new BlockPos(6 + i * 4, 1, 1);
+                helper.setBlock(at, ModRegistry.RADIO_TRANSMITTER.get());
+                var tx = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) helper.getBlockEntity(at);
+                tx.markFound(frequencies[i], i == 0 ? absSign : null);
+                tx.checkFound(level);
+                int now = tx.getFrequency();
+                if (i == 1) {
+                    check(now == 4614, "A free frequency stays: " + now);
+                } else {
+                    check(now != frequencies[i] && now >= 100_000 && now < 1_000_000
+                            && !com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.frequencyTaken(level, now),
+                            "Taken (" + frequencies[i] + "): moved to a free one, " + now);
+                }
+                if (i == 0) {
+                    var sign = (net.minecraft.world.level.block.entity.SignBlockEntity) level.getBlockEntity(absSign);
+                    check(sign.getFrontText().getMessage(2, false).getString().equals(Integer.toString(now)), "The sign follows it");
+                    tx.setFrequency(4613);
+                    tx.checkFound(level);
+                    check(tx.getFrequency() == 4613, "Checked once: later on it can be tuned to anything");
+                }
+            }
+        } finally {
+            claims.remove(4613);
+            names.set(4615, "");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The structure is in the game: its type, the structure, its structure set and biome tag
+     * (plains, desert; not the ocean). In the test world (flat plains) a tower would go at a chunk's
+     * middle on the ground, in one piece 12 by 9 that saves and loads. Its chest's loot is 3 to 6
+     * stacks of tower parts and materials.
+     */
+    @GameTest(template = PLATFORM)
+    public static void radioTowerStructure(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var access = level.registryAccess();
+        var structure = access.registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE)
+                .get(com.reiko.signaltower.world.ModWorldgen.RADIO_TOWER_STRUCTURE);
+        check(structure instanceof com.reiko.signaltower.world.RadioTowerStructure, "The structure: " + structure);
+        var set = access.registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE_SET).get(com.reiko.signaltower.world.ModWorldgen.RADIO_TOWERS);
+        check(set != null && set.structures().stream().anyMatch(entry -> entry.structure().value() == structure), "Its structure set");
+        var biomes = access.registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        check(biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS).is(com.reiko.signaltower.world.ModWorldgen.HAS_RADIO_TOWER)
+                && biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.DESERT).is(com.reiko.signaltower.world.ModWorldgen.HAS_RADIO_TOWER)
+                && !biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.OCEAN).is(com.reiko.signaltower.world.ModWorldgen.HAS_RADIO_TOWER),
+                "Its biomes");
+        var generator = level.getChunkSource().getGenerator();
+        net.minecraft.world.level.ChunkPos chunk = new net.minecraft.world.level.ChunkPos(helper.absolutePos(BlockPos.ZERO));
+        var context = new net.minecraft.world.level.levelgen.structure.Structure.GenerationContext(access, generator, generator.getBiomeSource(),
+                level.getChunkSource().randomState(), level.getStructureManager(), level.getSeed(), chunk, level, structure.biomes()::contains);
+        var stub = structure.findValidGenerationPoint(context);
+        check(stub.isPresent(), "A tower can go here");
+        var pieces = stub.get().getPiecesBuilder().build().pieces();
+        check(pieces.size() == 1 && pieces.get(0) instanceof com.reiko.signaltower.world.RadioTowerPiece, "One piece: " + pieces);
+        var piece = (com.reiko.signaltower.world.RadioTowerPiece) pieces.get(0);
+        var box = piece.getBoundingBox();
+        int ground = generator.getFirstOccupiedHeight(chunk.getMiddleBlockX(), chunk.getMiddleBlockZ(),
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, level.getChunkSource().randomState());
+        check(Math.min(box.getXSpan(), box.getZSpan()) == 9 && Math.max(box.getXSpan(), box.getZSpan()) == 12
+                && box.getYSpan() == piece.plan().height() && box.minY() == ground, "12 by 9, on the ground (" + ground + "): " + box);
+        check(box.isInside(new BlockPos(chunk.getMiddleBlockX(), ground, chunk.getMiddleBlockZ())), "Round the chunk's middle");
+        check(piece.plan().frequency() >= 100_000 && piece.plan().frequency() < 1_000_000 && piece.plan().masts() >= 5, "Its plan: " + piece.plan());
+        CompoundTag tag = piece.createTag(net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext.fromLevel(level));
+        var loaded = new com.reiko.signaltower.world.RadioTowerPiece(tag);
+        check(loaded.getBoundingBox().equals(box) && loaded.plan().equals(piece.plan()) && loaded.rotation() == piece.rotation(), "Saved and loaded");
+        var table = level.getServer().reloadableRegistries().getLootTable(com.reiko.signaltower.world.ModWorldgen.TOWER_CHEST);
+        java.util.Set<Item> parts = java.util.Set.of(ModRegistry.RADIO_MAST_ITEM.get(), Items.REDSTONE, Items.IRON_INGOT, Items.COPPER_INGOT,
+                ModRegistry.GUY_ANCHOR_ITEM.get(), ModRegistry.TOWER_PLATFORM_ITEM.get(), ModRegistry.FREQUENCY_TUNER.get(),
+                ModRegistry.RADIO_RECEIVER_ITEM.get(), ModRegistry.COMPACT_RADIO_RECEIVER_ITEM.get(), ModRegistry.IRON_ANTENNA.get(),
+                ModRegistry.RADIO_BATTERY_ITEM.get(), ModRegistry.SOLAR_PANEL_ITEM.get(), ModRegistry.GOLD_ANTENNA.get(), ModRegistry.DIAMOND_ANTENNA.get());
+        for (int i = 0; i < 20; i++) {
+            var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(level)
+                    .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, Vec3.atCenterOf(helper.absolutePos(BlockPos.ZERO)))
+                    .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.CHEST);
+            List<ItemStack> loot = table.getRandomItems(params);
+            check(loot.size() >= 3 && loot.stream().allMatch(stack -> parts.contains(stack.getItem())), "Tower parts in the chest: " + loot);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Climbing a mast: walking into it you go up at a ladder's speed and the fall is forgotten;
+     * sneaking you hold still; letting go you slide down no faster than on a ladder. Away from the
+     * mast, standing by it without walking into it, flying, or above its top, nothing happens.
+     */
+    @GameTest(template = PLATFORM)
+    public static void climbingMasts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int y = 1; y <= 6; y++) {
+            helper.setBlock(new BlockPos(2, y, 1), ModRegistry.RADIO_MAST.get());
+        }
+        BlockPos mast = helper.absolutePos(new BlockPos(2, 3, 1));
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        double besideX = mast.getX() + 13 / 16.0 + 0.3; // its left side against the mast's east face
+        player.moveTo(besideX, mast.getY() + 0.2, mast.getZ() + 0.5);
+        check(com.reiko.signaltower.radio.MastClimbing.touchingMast(level, player.getBoundingBox()), "Touching the mast");
+        player.setOnGround(false);
+        player.horizontalCollision = true;
+        player.setDeltaMovement(0, -0.5, 0);
+        player.fallDistance = 4;
+        check(com.reiko.signaltower.radio.MastClimbing.apply(player) && player.getDeltaMovement().y == com.reiko.signaltower.radio.MastClimbing.CLIMB_SPEED
+                && player.fallDistance == 0, "Walking into it: up");
+        player.horizontalCollision = false;
+        player.setShiftKeyDown(true);
+        player.setDeltaMovement(0, -0.3, 0);
+        check(com.reiko.signaltower.radio.MastClimbing.apply(player) && player.getDeltaMovement().y == 0, "Sneaking: holding on");
+        player.setShiftKeyDown(false);
+        player.setDeltaMovement(0.4, -0.6, 0);
+        check(com.reiko.signaltower.radio.MastClimbing.apply(player) && player.getDeltaMovement().y == -com.reiko.signaltower.radio.MastClimbing.SLIDE_SPEED
+                && player.getDeltaMovement().x == com.reiko.signaltower.radio.MastClimbing.SLIDE_SPEED, "Letting go: sliding down slowly");
+        player.setOnGround(true);
+        player.setDeltaMovement(0, -0.08, 0);
+        check(!com.reiko.signaltower.radio.MastClimbing.apply(player), "Standing by it: nothing");
+        player.setOnGround(false);
+        player.getAbilities().flying = true;
+        check(!com.reiko.signaltower.radio.MastClimbing.apply(player), "Flying: nothing");
+        player.getAbilities().flying = false;
+        player.moveTo(besideX + 1.0, mast.getY() + 0.2, mast.getZ() + 0.5);
+        check(!com.reiko.signaltower.radio.MastClimbing.touchingMast(level, player.getBoundingBox()) && !com.reiko.signaltower.radio.MastClimbing.apply(player),
+                "A block away: nothing");
+        player.moveTo(besideX, helper.absolutePos(new BlockPos(2, 7, 1)).getY(), mast.getZ() + 0.5);
+        check(!com.reiko.signaltower.radio.MastClimbing.touchingMast(level, player.getBoundingBox()), "Above its top: nothing to hold");
+        helper.succeed();
+    }
+
+    /**
+     * Tower Platforms: right-clicking a mast with 8 puts in all 8 round it (the stack used up), with
+     * rails only on the outside (none against a wall); the deck holds you from above, lets you through from below, and lets
+     * you down beside the mast when you sneak. Taking a corner away puts rails on the two next to it.
+     * With 3 in hand only 3 go in; with no room, none (and the click goes on to place one normally).
+     */
+    @GameTest(template = PLATFORM)
+    public static void towerPlatforms(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int y = 1; y <= 4; y++) {
+            helper.setBlock(new BlockPos(5, y, 1), ModRegistry.RADIO_MAST.get());
+        }
+        Player player = namedPlayer(helper, new BlockPos(12, 1, 1), UUID.randomUUID(), "Climber", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack platforms = new ItemStack(ModRegistry.TOWER_PLATFORM_ITEM.get(), 8);
+        player.setItemInHand(InteractionHand.MAIN_HAND, platforms);
+        BlockPos mast = helper.absolutePos(new BlockPos(5, 2, 1));
+        var result = level.getBlockState(mast).useItemOn(platforms, level, player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(mast), Direction.SOUTH, mast, false));
+        check(result.consumesAction() && platforms.isEmpty(), "Used: " + result + ", " + platforms);
+        int count = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if ((dx != 0 || dz != 0) && level.getBlockState(mast.offset(dx, 0, dz)).is(ModRegistry.TOWER_PLATFORM.get())) {
+                    count++;
+                }
+            }
+        }
+        check(count == 8, "All 8 round the mast: " + count);
+        // (North and south of the ring are the test's barrier walls: solid, so no rail there.)
+        var west = level.getBlockState(mast.west());
+        check(west.getValue(com.reiko.signaltower.block.TowerPlatformBlock.WEST) && !west.getValue(com.reiko.signaltower.block.TowerPlatformBlock.EAST)
+                && !west.getValue(com.reiko.signaltower.block.TowerPlatformBlock.NORTH) && !west.getValue(com.reiko.signaltower.block.TowerPlatformBlock.SOUTH),
+                "A rail on the outside only: " + west);
+        check(!level.getBlockState(mast.north()).getValue(com.reiko.signaltower.block.TowerPlatformBlock.NORTH), "No rail against a wall");
+        BlockPos cell = mast.west();
+        player.moveTo(cell.getX() + 0.5, cell.getY() + 0.2, cell.getZ() + 0.5);
+        check(com.reiko.signaltower.block.TowerPlatformBlock.deckSolidFor(level, cell, net.minecraft.world.phys.shapes.CollisionContext.of(player)),
+                "Standing on it: solid");
+        player.moveTo(cell.getX() + 0.5, cell.getY() - 1.0, cell.getZ() + 0.5);
+        check(!com.reiko.signaltower.block.TowerPlatformBlock.deckSolidFor(level, cell, net.minecraft.world.phys.shapes.CollisionContext.of(player)),
+                "From below: through it");
+        // Beside the mast (against its west face), sneaking: down through it.
+        player.moveTo(mast.getX() + 3 / 16.0 - 0.3, cell.getY() + 0.2, mast.getZ() + 0.5);
+        player.setShiftKeyDown(true);
+        check(!com.reiko.signaltower.block.TowerPlatformBlock.deckSolidFor(level, cell, net.minecraft.world.phys.shapes.CollisionContext.of(player)),
+                "Sneaking by the mast: down through it");
+        player.setShiftKeyDown(false);
+        check(com.reiko.signaltower.block.TowerPlatformBlock.deckSolidFor(level, cell, net.minecraft.world.phys.shapes.CollisionContext.of(player)),
+                "Not sneaking: it holds");
+        player.moveTo(helper.absoluteVec(new Vec3(12.5, 1, 1.5)));
+        level.setBlock(mast.north().east(), Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        check(level.getBlockState(mast.north()).getValue(com.reiko.signaltower.block.TowerPlatformBlock.EAST)
+                && level.getBlockState(mast.east()).getValue(com.reiko.signaltower.block.TowerPlatformBlock.NORTH), "A corner gone: rails beside it");
+        ItemStack three = new ItemStack(ModRegistry.TOWER_PLATFORM_ITEM.get(), 3);
+        player.setItemInHand(InteractionHand.MAIN_HAND, three);
+        BlockPos higher = mast.above();
+        level.getBlockState(higher).useItemOn(three, level, player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(Vec3.atCenterOf(higher), Direction.SOUTH, higher, false));
+        int up = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if ((dx != 0 || dz != 0) && level.getBlockState(higher.offset(dx, 0, dz)).is(ModRegistry.TOWER_PLATFORM.get())) {
+                    up++;
+                }
+            }
+        }
+        check(up == 3 && three.isEmpty(), "Only 3 with 3 in hand: " + up);
+        ItemStack more = new ItemStack(ModRegistry.TOWER_PLATFORM_ITEM.get(), 8);
+        player.setItemInHand(InteractionHand.MAIN_HAND, more);
+        level.getBlockState(mast).useItemOn(more, level, player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(mast), Direction.SOUTH, mast, false));
+        check(more.getCount() == 7 && level.getBlockState(mast.north().east()).is(ModRegistry.TOWER_PLATFORM.get()), "The gap filled: one used");
+        var none = level.getBlockState(mast).useItemOn(more, level, player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(mast), Direction.SOUTH, mast, false));
+        check(none == net.minecraft.world.ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION && more.getCount() == 7, "No room: none (" + none + ")");
+        helper.succeed();
+    }
 }

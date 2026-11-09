@@ -1,0 +1,7 @@
+{
+  "type": "reikos_signal_tower:radio_tower",
+  "biomes": "#reikos_signal_tower:has_structure/radio_tower",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

@@ -36,7 +36,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
 | **Radio Jammer** | A tower top that drowns out one frequency around it while it gets redstone. Everything there that listens on that frequency hears that much less, and a full-strength signal silences it completely. It reaches half as far as a transmitter at the same height. On someone else's private frequency it does nothing, and the owner is told. |
-| **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. Right-click a tower's mast with another one and it goes in under the top, so you can raise a tower from the ground. |
+| **Radio Mast** | Lattice tower segment for building your tower. A mast column also carries redstone **up**: power any mast in the column and the transmitter on top broadcasts it. Right-click a tower's mast with another one and it goes in under the top, so you can raise a tower from the ground. You can **climb** a mast like a ladder: walk into it. |
 | **Frequency Tuner** | Sets which frequency a transmitter or receiver uses. Keeps 5 favorite frequencies, and sneak + scroll changes its frequency without opening a screen. Its screen can also name a frequency, or make it private to you and your friends, and its **Directory** button lists every named and private frequency in the world. Hold it and look at a tower to see a ring on the ground where its reach ends. |
 | **Remote Control** | A handheld transmitter, like a garage door opener. Press it to send a signal on its frequency: a 1-second pulse like a button, or toggle on/off. Has the same scrolling and favorites as the tuner. |
 | **Multi-Button Remote** | A remote with 4 buttons, each with its own frequency, mode, name and color. One remote can run your door, lights and farm. |
@@ -49,6 +49,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Cable Tap** | Joins a Bundled Cable to normal redstone. Set to **in**, it puts the redstone it gets onto its color; set to **out**, it gives that color out as redstone. Dye it to pick the color. |
 | **Bundled Radio Transmitter** and **Bundled Radio Receiver** | Send a whole Bundled Cable over the radio. The transmitter, tuned to F, sends white on F, orange on F+1 ... black on F+15, and the receiver at the other end puts all 16 back onto its own cable. Sixteen wireless lines with one tower. |
 | **Guy Wire Anchor** | Goes on the ground near a tower, and a steel wire runs from it up the mast. Three of them brace a tall tower, so that with Reiko's Weather tornadoes, hurricanes and derechos can't blow it down. |
+| **Tower Platform** | A steel grating with rails, to stand on up a tower. Right-click a mast with them and they go in all round it at that height. You come up through one as you climb, and sneak beside the mast to go back down. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
 
@@ -735,6 +736,31 @@ With [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) installed
 
 ![Dev's Bundled Radio Transmitter on 4620, Jade "Bundle on 4620–4635", "Sending: Blue 15, Red 15", "Reach: 80 blocks", with the red, lime and blue input taps beside it; 24 blocks away Alex's Bundled Radio Receiver, Jade "Hears: Blue 15, Red 15", with the red and blue lamps on its output taps lit and the lime one dark; Jade on Dev's red input tap "Cable Tap: Red, in (puts 15 onto it)", "Carries: Blue 15, Red 15", "4 cables, 4 devices", the red and blue levers on and lime off behind; a tower braced by three guy wires, Jade on an anchor "Braces the mast at 752, -60, 230 (6 tall)", "3 of 3 guy wires: braced"; Dev's unbraced tower after a Reiko's Weather derecho, smoking, Jade "Derecho: reach -30%", "Blown down by a derecho: right-click it with an Iron Ingot to repair", and in chat "Storm damage: a derecho blew down your Radio Transmitter at 740, -55, 230"; and a tower in an ice storm with snowflakes at its top, Jade "Ice Storm: reach -15%", "Iced up: reach -30% until it thaws (0 of 120 s above freezing)"](docs/images/bundled-cable-and-guy-wires.png)
 
+### Old radio towers in the world
+
+Since 0.55 old radio towers **generate in new chunks**: a small stone-and-spruce hut, and beside it a mast 6 to 10 tall with a transmitter on top. They turn up on fairly level, dry ground in plains, meadows, cherry groves, savannas, windswept hills, taigas (snowy and old-growth too), deserts, badlands, sparse jungles and groves, usually several hundred blocks apart. `/locate structure reikos_signal_tower:radio_tower` finds the nearest.
+
+- **Some are still on the air**, broadcasting full strength on a random frequency between 100,000 and 999,999. These have a redstone torch at the foot of the mast, a charged battery with a solar panel, an aviation beacon on top (blinking red at night, so you can spot them from far off), three guy wires, and a platform round the mast just under the top. Sometimes an Iron Antenna too. A Signal Scanner picks them up from as far as they reach, and its arrow leads you there.
+- **Others are off the air**: a lever (off) where the torch would be, a flat battery or none, fewer guy wires, maybe no platform. Charge the battery and flip the lever and it's yours.
+- **The hut** has a chest of tower parts (masts, guy wires, platforms, antennas, a battery or solar panel, a receiver, a tuner, redstone and ingots), a crafting table, a lantern, and a sign by the door: "Radio Station, Frequency 681675".
+- The tower is like any other, public and untuned. You can listen in, re-tune it, take it apart or build on it. **Jade** on its top says "An old radio tower, found in the world".
+- **It never breaks into a private frequency.** The first time it loads, if its frequency is already someone's private one (or has a name), it moves to a free one and its sign is changed to match. After that it keeps its frequency, so whoever finds it can claim it.
+- `worldTowers = false` in the server config stops new ones generating. Chunks already made keep theirs.
+
+### Climbing masts and Tower Platforms
+
+Since 0.55 masts are **climbable**. Walk into one and you go up at about a ladder's speed. Let go and you slide down slowly, without taking fall damage. Sneak and you hold still. It works on every mast segment, the Dish Rotator too, but not on the tower's top block (`climbableMasts = false` turns it off).
+
+**Tower Platforms** give you somewhere to stand. Right-click a mast with them and they go in on all eight sides at that height (as many as you're holding; sneak to place just one, as a normal block). Each has a rail on any side with nothing next to it, so a ring round a mast has rails all the way round the outside. Rails are 1.5 blocks high for walking into, like a fence. The deck works like scaffolding:
+
+- climbing the mast you come up **through** it, and stand on it when you let go;
+- sneak while you're next to the mast and you go back **down** through it;
+- anything above it stands on it.
+
+Put a ring round the mast **one below the top**. Standing on that, your head clears the transmitter, and it's in reach for antennas, Jade, a dish or an Iron Ingot after a storm. That's where the old towers have theirs. You can also add a ring partway up while you're climbing: hold sneak to stay put and right-click the mast in front of you.
+
+![An old radio tower found in an old-growth taiga, a stone-and-spruce hut beside a mast 10 tall with a platform near the top, a beacon and guy wires, and Alex's scanner arrow "Frequency 681675: 25 blocks"; Dev climbing the mast by walking into it, past the guy wires, with the battery and solar panel at its foot; Dev standing on the platform under the top, Jade on the transmitter "Frequency: 681675", "Sending: 15", "Reach: 152 blocks", "An old radio tower, found in the world", "Braced by 3 guy wires", "Battery: 70%"; the hut's door with its sign "Radio Station, Frequency 681675", the chest inside and the redstone torch at the mast's foot; Alex's Signal Scanner 89 blocks away "681,675 ON 15 Transmitter, 89 blocks north-west"; and Dev standing on a second ring of platforms he put in halfway up the mast by hand while climbing](docs/images/old-radio-towers-and-climbing.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -966,6 +992,15 @@ S = String   R = Redstone Dust
 C = Chain   I = Iron Ingot   S = Stone
 ```
 
+**Tower Platform** (makes 8, a ring round one mast):
+
+```
+     B  B  B
+     I  I  I
+
+B = Iron Bars   I = Iron Ingot
+```
+
 ## Building and running
 
 You need **Java 21**. If Gradle can't find it, it downloads one automatically.
@@ -1039,6 +1074,11 @@ src/main/java/com/reiko/signaltower/
   block/GuyAnchorBlock.java              the Guy Wire Anchor
   blockentity/GuyAnchorBlockEntity.java  finds the mast it braces and tells the network
   client/GuyWireRenderer.java            draws the wire from an anchor up the mast
+  world/RadioTowerStructure.java         where an old radio tower can go (dry, fairly level ground in its biomes)
+  world/RadioTowerPiece.java             builds one: hut, chest, sign, mast, transmitter, battery, guy wires, platform
+  world/ModWorldgen.java                 registers the structure type and piece, and the keys for its data
+  radio/MastClimbing.java                climbing masts like ladders
+  block/TowerPlatformBlock.java          the Tower Platform: rails, a deck solid only from above, rings round a mast
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
   blockentity/TelegraphBlockEntity.java  checks in with the network; clicks and pulses; sending cooldown
@@ -1318,7 +1358,14 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 167. guy wires and storm damage (no storm needed): a tower 5 masts tall is at risk; three anchors near it each find its foot and brace it (Jade on the tower and on an anchor), one taken away and it's at risk again; blown down, it goes quiet (its receiver dark, Jade says so) and that's saved, a stick doesn't repair it, an Iron Ingot on one of its masts does (one used), and a second ingot does nothing; iced, it reaches 30% less (Jade, saved) until it has thawed 2 minutes' worth; a tower that's gone takes its damage and ice with it;
 168. storm damage with Reiko's Weather (in a batch of its own): without it nothing blows down and ice melts; with it, under a derecho cell a tall unbraced tower blows down and a braced one and a short one stand; an ice storm ices up the tower under it; a tornado touches the tower it's at and not one 30 blocks off; once the ice storm has gone, above freezing, the tower thaws.
 
-All 168 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164 and 168 check what's read from it.
+169. an old radio tower on the air, built whole (6 masts): the masts and the transmitter on top (with an Iron Antenna), marked as found, on 4611, and a receiver beside it hears 15; the beacon, the redstone torch, a battery with 50,000 in it and a solar panel, three guy wires that brace it, a platform all round the mast under the top (nothing round the top mast) with rails only on the outside, the chest with the tower loot table, the waxed sign with "4611", Jade's "An old radio tower" line; found and checked, saved;
+170. an old tower off the air, built turned round 180 degrees (in the power batch): the box 12 by 9 where it should be, the mast and transmitter, the chest turned to face west, a lever (off), no beacon or platform, one guy wire, a flat battery; it stays quiet; the lever on, still quiet; the battery charged, on the air;
+171. an old tower's frequency: on someone's private frequency (4613) or a named one (4615) it moves to a free one between 100,000 and 999,999 and the sign follows; on a free one (4614) it stays; checked only once, so it can be tuned to anything later;
+172. the structure: the structure, its set and biome tag (plains and desert, not ocean) are in the game; in the test world a tower goes at a chunk's middle on the ground, one piece 12 by 9 as tall as its plan, which saves and loads; the chest's loot (20 rolls) is 3 or more stacks, all tower parts and materials;
+173. climbing a mast: walking into it you go up at 0.12 a tick and the fall is forgotten; sneaking you hold still; letting go you slide at no more than 0.15 down (and sideways); standing by it, flying, a block away or above its top, nothing happens;
+174. Tower Platforms: right-clicking a mast with 8 puts in all 8 round it, the stack used up, a rail on the outside only and none against a wall; the deck holds you from above, lets you through from below, and lets you down beside the mast when you sneak; a corner taken away puts rails on the two beside it; with 3 in hand only 3 go in; the gap filled with one; with no room none, and the click goes on to place one normally.
+
+All 174 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164 and 168 check what's read from it.
 
 ## License
 

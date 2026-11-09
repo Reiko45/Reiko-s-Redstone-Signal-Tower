@@ -405,6 +405,9 @@ public final class RadioInfo {
             tag.putInt("braces_needed", com.reiko.signaltower.Config.GUY_WIRES_TO_BRACE.get());
             tag.putBoolean("braces_tall", assessment.tall());
         }
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity found && found.isFoundTower()) {
+            tag.putBoolean("found_tower", true); // v0.55.0: an old tower generated in the world
+        }
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
             tag.putLong("struck", struck);
@@ -501,6 +504,9 @@ public final class RadioInfo {
                             ? ReikosWeatherCompat.weatherName(data.getString("weather_reikos"))
                             : com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
                     data.getInt("weather_loss")).withStyle(ChatFormatting.DARK_AQUA));
+        }
+        if (data != null && data.getBoolean("found_tower")) {
+            lines.add(Component.translatable(LANG + "found_tower").withStyle(ChatFormatting.DARK_GREEN));
         }
         if (data != null && data.contains("storm_damaged")) {
             // v0.54.0

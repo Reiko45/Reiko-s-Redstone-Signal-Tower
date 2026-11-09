@@ -409,6 +409,19 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.BundledReceiverBlock.LIT) ? 5 : 0)));
 
+    /** v0.55.0: a grating to stand on up a tower, put in all round a mast at once. */
+    public static final DeferredBlock<com.reiko.signaltower.block.TowerPlatformBlock> TOWER_PLATFORM = BLOCKS.register("tower_platform",
+            () -> new com.reiko.signaltower.block.TowerPlatformBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .isValidSpawn((state, level, pos, type) -> false)
+                    .isRedstoneConductor((state, level, pos) -> false)
+                    .isSuffocating((state, level, pos) -> false)
+                    .isViewBlocking((state, level, pos) -> false)));
+
     /** v0.54.0: braces a tower's mast against storms. */
     public static final DeferredBlock<com.reiko.signaltower.block.GuyAnchorBlock> GUY_ANCHOR = BLOCKS.register("guy_anchor",
             () -> new com.reiko.signaltower.block.GuyAnchorBlock(BlockBehaviour.Properties.of()
@@ -546,6 +559,7 @@ public final class ModRegistry {
     public static final DeferredItem<BlockItem> RADIO_TIMER_TRANSMITTER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_timer_transmitter", RADIO_TIMER_TRANSMITTER);
     public static final DeferredItem<BlockItem> GUY_ANCHOR_ITEM = ITEMS.registerSimpleBlockItem("guy_anchor", GUY_ANCHOR);
+    public static final DeferredItem<BlockItem> TOWER_PLATFORM_ITEM = ITEMS.registerSimpleBlockItem("tower_platform", TOWER_PLATFORM);
     public static final DeferredItem<BlockItem> BUNDLED_CABLE_ITEM = ITEMS.registerSimpleBlockItem("bundled_cable", BUNDLED_CABLE);
     public static final DeferredItem<BlockItem> CABLE_TAP_ITEM = ITEMS.registerSimpleBlockItem("cable_tap", CABLE_TAP);
     public static final DeferredItem<BlockItem> BUNDLED_TRANSMITTER_ITEM = ITEMS.registerSimpleBlockItem("bundled_transmitter", BUNDLED_TRANSMITTER);

@@ -873,6 +873,39 @@ def mast_lattice():
     return img
 
 
+def platform_deck():
+    """v0.55.0: Tower Platform deck: a steel frame round a grating with see-through holes."""
+    img = blank()
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            edge = x in (0, 15) or y in (0, 15)
+            bar = x % 3 == 0 or y % 3 == 0
+            if edge:
+                px[x, y] = O if (x + y) % 5 else D
+            elif bar:
+                px[x, y] = L if (x + y) % 2 else M
+    for i in range(1, 15):
+        px[i, 1] = H
+        px[1, i] = H
+    return img
+
+
+def platform_rail():
+    """v0.55.0: Tower Platform rail: posts at the ends and middle, a top rail and a mid rail."""
+    img = blank()
+    px = img.load()
+    for y in range(16):
+        for x in (0, 1, 7, 8, 14, 15):
+            px[x, y] = L if x in (0, 7, 14) else D
+    for x in range(16):
+        px[x, 2] = H
+        px[x, 3] = M
+        px[x, 9] = L
+        px[x, 10] = D
+    return img
+
+
 def antenna_tip(lit, amber=False, teal=False, magenta=False):
     """Warning light at the top of the antenna: red on a transmitter, amber on a repeater, teal on a converter."""
     img = blank()
@@ -1377,6 +1410,8 @@ blocks = {
     "radio_bottom": bottom(),
     "radio_mast_post": mast_post(),
     "radio_mast_lattice": mast_lattice(),
+    "tower_platform_deck": platform_deck(),
+    "tower_platform_rail": platform_rail(),
     "antenna_tip": antenna_tip(False),
     "antenna_tip_on": antenna_tip(True),
     "radio_repeater_side": repeater_side(False),

@@ -53,11 +53,76 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         refresh();
     }
 
+    // ---- v0.55.0: an old tower generated in the world ----
+
+    /** The frequencies an old tower in the world is given: 100,000 to 999,999. */
+    public static final int FOUND_FREQUENCY_MIN = 100_000;
+    public static final int FOUND_FREQUENCY_SPAN = 900_000;
+    private boolean foundTower;
+    /** Whether its frequency has been checked against the world's private frequencies and names (once). */
+    private boolean foundChecked;
+    private @Nullable BlockPos foundSign;
+
+    /** True for the transmitter of an old radio tower generated in the world. */
+    public boolean isFoundTower() {
+        return foundTower;
+    }
+
+    /**
+     * World generation: makes this the transmitter of an old tower, on {@code frequency}, with the hut's
+     * sign (showing the frequency) at {@code sign}. Only sets its own fields (the level isn't there yet).
+     */
+    public void markFound(int frequency, @Nullable BlockPos sign) {
+        foundTower = true;
+        foundChecked = false;
+        foundSign = sign == null ? null : sign.immutable();
+        setFrequency(frequency);
+        setChanged();
+    }
+
+    /**
+     * The first time an old tower ticks: if someone has already made its frequency private, or named
+     * it, it moves to a free one (and its sign says so), so it never breaks into anyone's frequency.
+     */
+    public void checkFound(ServerLevel level) {
+        if (!foundTower || foundChecked) {
+            return;
+        }
+        foundChecked = true;
+        setChanged();
+        if (!frequencyTaken(level, getFrequency())) {
+            return;
+        }
+        for (int i = 0; i < 64; i++) {
+            int frequency = FOUND_FREQUENCY_MIN + level.getRandom().nextInt(FOUND_FREQUENCY_SPAN);
+            if (!frequencyTaken(level, frequency)) {
+                setFrequency(frequency);
+                if (foundSign != null && level.getBlockEntity(foundSign) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+                    sign.setText(com.reiko.signaltower.world.RadioTowerPiece.signText(frequency), true);
+                }
+                return;
+            }
+        }
+    }
+
+    /** True if {@code frequency} is someone's private frequency, or has a name. */
+    public static boolean frequencyTaken(ServerLevel level, int frequency) {
+        return com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer()).get(frequency) != null
+                || com.reiko.signaltower.radio.FrequencyNames.nameOf(level, frequency) != null;
+    }
+
     @Override
     protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         if (linkTarget != null) {
             tag.putString("link_target", linkTarget.location().toString());
+        }
+        if (foundTower) {
+            tag.putBoolean("found_tower", true);
+            tag.putBoolean("found_checked", foundChecked);
+            if (foundSign != null) {
+                tag.putLong("found_sign", foundSign.asLong());
+            }
         }
     }
 
@@ -67,6 +132,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         net.minecraft.resources.ResourceLocation id = tag.contains("link_target")
                 ? net.minecraft.resources.ResourceLocation.tryParse(tag.getString("link_target")) : null;
         linkTarget = id == null ? null : net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id);
+        foundTower = tag.getBoolean("found_tower");
+        foundChecked = tag.getBoolean("found_checked");
+        foundSign = tag.contains("found_sign") ? BlockPos.of(tag.getLong("found_sign")) : null;
     }
 
     /** Re-reads input power, height and frequency, and tells the network. Safe to call any time. */
@@ -159,6 +227,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadioTransmitterBlockEntity be) {
+        if (be.foundTower && !be.foundChecked && level instanceof ServerLevel serverLevel) {
+            be.checkFound(serverLevel); // v0.55.0
+        }
         if (be.timer-- > 0) {
             return;
         }

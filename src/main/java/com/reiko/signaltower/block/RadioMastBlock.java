@@ -25,7 +25,9 @@ import java.util.List;
  * A lattice tower segment. Stack these to lift a transmitter high into the air. A mast column also
  * works like a redstone cable: power any mast in it and the transmitter on top broadcasts that signal.
  * Right-click one with another mast (v0.51.0) and it goes in under the tower's top, see
- * {@link com.reiko.signaltower.radio.MastBuilder}.
+ * {@link com.reiko.signaltower.radio.MastBuilder}. Since v0.55.0 you can climb it like a ladder
+ * ({@link com.reiko.signaltower.radio.MastClimbing}), and right-clicking it with Tower Platforms puts
+ * them in all round it.
  */
 public class RadioMastBlock extends Block {
     public static final MapCodec<RadioMastBlock> CODEC = simpleCodec(RadioMastBlock::new);
@@ -52,6 +54,11 @@ public class RadioMastBlock extends Block {
         if (repaired != null) {
             return repaired;
         }
+        if (stack.is(com.reiko.signaltower.registry.ModRegistry.TOWER_PLATFORM_ITEM.get())) {
+            // v0.55.0: platforms all round the mast at this height (sneak to place just one).
+            int placed = TowerPlatformBlock.ring(level, pos, player, stack, level.isClientSide);
+            return placed > 0 ? ItemInteractionResult.sidedSuccess(level.isClientSide) : ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
+        }
         if (!com.reiko.signaltower.radio.MastBuilder.isMast(stack)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
@@ -65,6 +72,7 @@ public class RadioMastBlock extends Block {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable(getDescriptionId() + ".tooltip").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + com.reiko.signaltower.SignalTower.MOD_ID + ".mast_builder").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("tooltip." + com.reiko.signaltower.SignalTower.MOD_ID + ".mast_climb").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     /** Something next to this mast changed, maybe a lever or wire: tell the transmitter on top. */

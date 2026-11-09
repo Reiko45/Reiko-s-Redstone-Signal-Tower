@@ -66,6 +66,7 @@ public final class SignalTower {
 
     public SignalTower(IEventBus modEventBus, ModContainer modContainer) {
         ModRegistry.register(modEventBus);
+        com.reiko.signaltower.world.ModWorldgen.register(modEventBus); // v0.55.0
         modEventBus.addListener(SignalTower::addToCreativeTabs);
         modEventBus.addListener(SignalTower::registerPayloads);
         modEventBus.addListener(SignalTower::registerCapabilities);
@@ -74,6 +75,7 @@ public final class SignalTower {
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
         NeoForge.EVENT_BUS.addListener(SignalTower::onServerTick);
         NeoForge.EVENT_BUS.addListener(SignalTower::onEntityJoin);
+        NeoForge.EVENT_BUS.addListener(com.reiko.signaltower.radio.MastClimbing::onPlayerTick); // v0.55.0
 
         // Server config: lives in each world's serverconfig folder and is synced to players.
         modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
@@ -297,6 +299,7 @@ public final class SignalTower {
             event.accept(ModRegistry.BUNDLED_CABLE_ITEM.get());
             event.accept(ModRegistry.CABLE_TAP_ITEM.get());
             event.accept(ModRegistry.GUY_ANCHOR_ITEM.get());
+            event.accept(ModRegistry.TOWER_PLATFORM_ITEM.get());
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
             event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());

@@ -566,6 +566,28 @@ write(models / "guy_anchor.json", {
     ]})
 write(states / "guy_anchor.json", {"variants": {"": {"model": f"{MOD}:block/guy_anchor"}}})
 write(items / "guy_anchor.json", {"parent": f"{MOD}:block/guy_anchor"})
+
+# v0.55.0 Tower Platform: a grating deck, and a rail on each side that has nothing next to it.
+PLATFORM_TEXTURES = {"particle": tex("tower_platform_deck"), "deck": tex("tower_platform_deck"), "rail": tex("tower_platform_rail")}
+PLATFORM_DECK = {"from": [0, 0, 0], "to": [16, 2, 16], "faces": {
+    **{f: {"texture": "#deck", "uv": [0, 14, 16, 16]} for f in SIDES},
+    "up": {"texture": "#deck", "uv": [0, 0, 16, 16]}, "down": {"texture": "#deck", "uv": [0, 0, 16, 16], "cullface": "down"}}}
+def platform_rail(element_from, element_to):
+    return {"from": element_from, "to": element_to, "faces": {
+        **{f: {"texture": "#rail", "uv": [0, 2, 16, 16]} for f in SIDES},
+        "up": {"texture": "#rail", "uv": [0, 2, 16, 3]}}}
+write(models / "tower_platform_deck.json", {"parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+                                             "textures": PLATFORM_TEXTURES, "elements": [PLATFORM_DECK]})
+write(models / "tower_platform_rail.json", {"parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+                                             "textures": PLATFORM_TEXTURES, "elements": [platform_rail([0, 2, 0], [16, 16, 1])]})
+write(models / "tower_platform_inventory.json", {"parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+                                                  "textures": PLATFORM_TEXTURES,
+                                                  "elements": [PLATFORM_DECK, platform_rail([0, 2, 0], [16, 16, 1]),
+                                                               platform_rail([0, 2, 0], [1, 16, 16])]})
+RAIL_TURN = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}}
+write(states / "tower_platform.json", {"multipart": [{"apply": {"model": f"{MOD}:block/tower_platform_deck"}}] + [
+    {"when": {side: "true"}, "apply": {"model": f"{MOD}:block/tower_platform_rail", **turn}} for side, turn in RAIL_TURN.items()]})
+write(items / "tower_platform.json", {"parent": f"{MOD}:block/tower_platform_inventory"})
 tower_states("radio_jammer", "powered")
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
@@ -867,6 +889,12 @@ write(ASSETS / "lang" / "en_us.json", {
     f"block.{MOD}.bundled_receiver.tooltip": "Hears the 16 frequencies from its own on (F white ... F+15 black) and puts them on the Bundled Cables touching it.",
     f"block.{MOD}.guy_anchor": "Guy Wire Anchor",
     f"block.{MOD}.guy_anchor.tooltip": "Put it on the ground 2 to 12 blocks from a tower: a steel wire runs to its mast. Three on one mast brace the tower, so tornadoes, hurricanes and derechos (Reiko's Weather) can't blow it down.",
+    f"block.{MOD}.tower_platform": "Tower Platform",
+    f"block.{MOD}.tower_platform.tooltip": "Right-click a mast with these and they go in all round it at that height, with rails. You come up through it climbing the mast; sneak beside the mast to go back down.",
+    f"tooltip.{MOD}.mast_climb": "Walk into a mast to climb it; let go to slide down, sneak to hold still.",
+    f"jade.{MOD}.found_tower": "An old radio tower, found in the world",
+    f"sign.{MOD}.radio_tower.station": "Radio Station",
+    f"sign.{MOD}.radio_tower.frequency": "Frequency",
     f"tooltip.{MOD}.bundle_frequencies": "Frequency %1$s (uses %2$s)",
     f"message.{MOD}.cable_status": "Bundled Cable | %1$s cables, %2$s devices | %3$s",
     f"message.{MOD}.tap_in": "Cable Tap: %1$s, in (puts %2$s onto it)",
@@ -2329,6 +2357,12 @@ recipes["guy_anchor"] = ({
     "key": {"C": {"item": "minecraft:chain"}, "I": {"item": "minecraft:iron_ingot"}, "S": {"item": "minecraft:stone"}},
     "result": {"count": 2, "id": f"{MOD}:guy_anchor"},
 }, f"{MOD}:radio_mast")
+recipes["tower_platform"] = ({
+    "type": "minecraft:crafting_shaped", "category": "building",
+    "pattern": ["BBB", "III"],
+    "key": {"B": {"item": "minecraft:iron_bars"}, "I": {"item": "minecraft:iron_ingot"}},
+    "result": {"count": 8, "id": f"{MOD}:tower_platform"},
+}, f"{MOD}:radio_mast")
 recipes["radio_transmitter_from_weather_station"] = (shapeless("radio_weather_station", "radio_transmitter"), f"{MOD}:radio_weather_station")
 recipes["iron_antenna"] = ({
     "type": "minecraft:crafting_shaped",
@@ -2507,7 +2541,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
-             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor"):
+             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2516,7 +2550,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
-    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor"):
+    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor", "tower_platform"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -2563,7 +2597,47 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform"]
+})
+
+# ---------------------------------------------------------------- v0.55.0: old radio towers in the world
+
+write(DATA / "worldgen" / "structure" / "radio_tower.json", {
+    "type": f"{MOD}:radio_tower",
+    "biomes": f"#{MOD}:has_structure/radio_tower",
+    "step": "surface_structures",
+    "spawn_overrides": {},
+    "terrain_adaptation": "beard_thin",
+})
+write(DATA / "worldgen" / "structure_set" / "radio_towers.json", {
+    "structures": [{"structure": f"{MOD}:radio_tower", "weight": 1}],
+    "placement": {"type": "minecraft:random_spread", "spacing": 24, "separation": 8, "salt": 1408155011},
+})
+write(DATA / "tags" / "worldgen" / "biome" / "has_structure" / "radio_tower.json", {"values": [
+    "minecraft:plains", "minecraft:sunflower_plains", "minecraft:meadow", "minecraft:cherry_grove", "minecraft:savanna",
+    "minecraft:savanna_plateau", "minecraft:windswept_hills", "minecraft:windswept_gravelly_hills", "minecraft:windswept_savanna",
+    "minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga", "minecraft:snowy_plains",
+    "minecraft:snowy_taiga", "minecraft:desert", "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands",
+    "minecraft:sparse_jungle", "minecraft:grove"]})
+
+def loot_item(name, weight, low=1, high=1, mod=True):
+    entry = {"type": "minecraft:item", "name": f"{MOD}:{name}" if mod else f"minecraft:{name}", "weight": weight}
+    if high > 1:
+        entry["functions"] = [{"function": "minecraft:set_count", "count": {"type": "minecraft:uniform", "min": low, "max": high}}]
+    return entry
+
+write(DATA / "loot_table" / "chests" / "radio_tower.json", {
+    "type": "minecraft:chest",
+    "pools": [
+        {"rolls": {"type": "minecraft:uniform", "min": 3, "max": 6}, "bonus_rolls": 0.0, "entries": [
+            loot_item("radio_mast", 20, 2, 6), loot_item("redstone", 15, 2, 8, mod=False), loot_item("iron_ingot", 10, 1, 4, mod=False),
+            loot_item("copper_ingot", 10, 2, 6, mod=False), loot_item("guy_anchor", 8, 1, 3), loot_item("tower_platform", 6, 2, 6),
+            loot_item("frequency_tuner", 5), loot_item("radio_receiver", 5), loot_item("compact_radio_receiver", 4),
+            loot_item("iron_antenna", 5), loot_item("radio_battery", 4), loot_item("solar_panel", 4), loot_item("gold_antenna", 2)]},
+        {"rolls": 1.0, "bonus_rolls": 0.0, "entries": [
+            {"type": "minecraft:empty", "weight": 9}, loot_item("diamond_antenna", 1)]},
+    ],
+    "random_sequence": f"{MOD}:chests/radio_tower",
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)
@@ -2599,5 +2673,15 @@ root = (
 structure = DATA / "structure" / "test_platform.nbt"
 structure.parent.mkdir(parents=True, exist_ok=True)
 structure.write_bytes(gzip.compress(bytes([10]) + nbt_string("") + root + b"\x00", mtime=0))
+
+# v0.55.0: a 16-block cube for building a whole old radio tower in a test.
+site = (
+    tag(3, "DataVersion", struct.pack(">i", 3955))
+    + tag(9, "size", int_list([16, 16, 16]))
+    + tag(9, "palette", compound_list([tag(8, "Name", nbt_string("minecraft:air")) + b"\x00"]))
+    + tag(9, "blocks", compound_list([]))
+    + tag(9, "entities", compound_list([]))
+)
+(DATA / "structure" / "tower_site.nbt").write_bytes(gzip.compress(bytes([10]) + nbt_string("") + site + b"\x00", mtime=0))
 
 print("data written to", RES)
