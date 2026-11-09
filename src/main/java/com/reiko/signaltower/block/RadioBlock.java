@@ -54,6 +54,11 @@ public abstract class RadioBlock extends BaseEntityBlock {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hitResult) {
+        // v0.54.0: an Iron Ingot repairs a storm-damaged tower.
+        ItemInteractionResult repaired = com.reiko.signaltower.radio.StormDamage.repairWith(stack, level, pos, player);
+        if (repaired != null) {
+            return repaired;
+        }
         // v0.51.0: a mast on a tower top goes in under it (sneak to place it the normal way).
         if (com.reiko.signaltower.radio.MastBuilder.isMast(stack) && com.reiko.signaltower.radio.MastBuilder.builds(state)) {
             if (!level.isClientSide) {

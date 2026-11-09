@@ -292,6 +292,11 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_MOTION_SENSOR_ITEM.get());
             event.accept(ModRegistry.RADIO_TIMER_TRANSMITTER_ITEM.get());
             event.accept(ModRegistry.RADIO_WEATHER_STATION_ITEM.get());
+            event.accept(ModRegistry.BUNDLED_TRANSMITTER_ITEM.get());
+            event.accept(ModRegistry.BUNDLED_RECEIVER_ITEM.get());
+            event.accept(ModRegistry.BUNDLED_CABLE_ITEM.get());
+            event.accept(ModRegistry.CABLE_TAP_ITEM.get());
+            event.accept(ModRegistry.GUY_ANCHOR_ITEM.get());
             event.accept(ModRegistry.RADIO_SIGNAL_RECORDER_ITEM.get());
             event.accept(ModRegistry.RADIO_JAMMER_ITEM.get());
             event.accept(ModRegistry.RADIO_MAST_ITEM.get());

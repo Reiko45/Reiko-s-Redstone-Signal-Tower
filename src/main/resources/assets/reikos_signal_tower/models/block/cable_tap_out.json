@@ -1,0 +1,196 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "reikos_signal_tower:block/cable_tap_out",
+    "side": "reikos_signal_tower:block/cable_tap_out",
+    "end": "reikos_signal_tower:block/radio_bottom",
+    "band": "reikos_signal_tower:block/cable_tap_band",
+    "cable": "reikos_signal_tower:block/bundled_cable"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        0,
+        3
+      ],
+      "to": [
+        13,
+        10,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side",
+          "uv": [
+            3,
+            6,
+            13,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            3,
+            6,
+            13,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            3,
+            6,
+            13,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            3,
+            6,
+            13,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#end",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ]
+        },
+        "down": {
+          "texture": "#end",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ],
+          "cullface": "down"
+        }
+      }
+    },
+    {
+      "from": [
+        2.9,
+        1,
+        2.9
+      ],
+      "to": [
+        13.1,
+        4,
+        13.1
+      ],
+      "faces": {
+        "north": {
+          "texture": "#band",
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "tintindex": 0
+        },
+        "south": {
+          "texture": "#band",
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "tintindex": 0
+        },
+        "east": {
+          "texture": "#band",
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "tintindex": 0
+        },
+        "west": {
+          "texture": "#band",
+          "uv": [
+            3,
+            0,
+            13,
+            3
+          ],
+          "tintindex": 0
+        }
+      }
+    },
+    {
+      "from": [
+        5,
+        10,
+        5
+      ],
+      "to": [
+        11,
+        16,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#cable",
+          "uv": [
+            5,
+            0,
+            11,
+            6
+          ]
+        },
+        "south": {
+          "texture": "#cable",
+          "uv": [
+            5,
+            0,
+            11,
+            6
+          ]
+        },
+        "east": {
+          "texture": "#cable",
+          "uv": [
+            5,
+            0,
+            11,
+            6
+          ]
+        },
+        "west": {
+          "texture": "#cable",
+          "uv": [
+            5,
+            0,
+            11,
+            6
+          ]
+        },
+        "up": {
+          "texture": "#cable",
+          "uv": [
+            5,
+            5,
+            11,
+            11
+          ],
+          "cullface": "up"
+        }
+      }
+    }
+  ]
+}

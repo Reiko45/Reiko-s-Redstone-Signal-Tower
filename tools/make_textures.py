@@ -285,6 +285,84 @@ def weather_station_side(lit):
     return img
 
 
+# v0.54.0: bundled cable. The 16 dye colors, roughly as their wool looks.
+DYES = [(233, 236, 236), (240, 118, 19), (189, 68, 179), (58, 175, 217), (248, 197, 39), (112, 185, 25),
+        (237, 141, 172), (62, 68, 71), (142, 142, 134), (21, 137, 145), (121, 42, 172), (53, 57, 157),
+        (114, 71, 40), (84, 109, 27), (161, 39, 34), (20, 21, 25)]
+
+
+def bundled_cable():
+    """Black insulation with a rainbow of thin cores showing through, along the cable (x)."""
+    img = blank()
+    px = img.load()
+    for x in range(16):
+        for y in range(16):
+            px[x, y] = (34, 35, 40, 255) if (x + y) % 5 else (46, 47, 54, 255)
+    # 16 cores in 4 rows of 4 colors, seen as dashes along the cable
+    for i, (r, g, b) in enumerate(DYES):
+        row = 4 + (i // 4) * 2
+        x0 = (i % 4) * 4 + (i // 4) % 2 * 2
+        for dx in range(2):
+            px[(x0 + dx) % 16, row] = (r, g, b, 255)
+    for x in range(16):
+        px[x, 2] = (20, 20, 24, 255)
+        px[x, 13] = (20, 20, 24, 255)
+    return img
+
+
+def bundled_side(lit, receiver):
+    """A cable plug with rainbow pins, under waves going out (transmitter) or coming in (receiver)."""
+    r = ON if lit else OFF
+    img = casing(15 if receiver else 16)
+    px = img.load()
+    vents(img)
+    for x in range(4, 12):
+        px[x, 7] = O
+        px[x, 10] = O
+    px[4, 8] = px[4, 9] = px[11, 8] = px[11, 9] = O
+    for i, x in enumerate(range(5, 11)):
+        c = DYES[(i * 3) % 16]
+        px[x, 8] = (c[0], c[1], c[2], 255)
+        c = DYES[(i * 3 + 8) % 16]
+        px[x, 9] = (c[0], c[1], c[2], 255)
+    if receiver:
+        for p in [(6, 4), (7, 5), (8, 5), (9, 4)]:
+            px[p] = r[2]
+        for p in [(4, 3), (5, 2), (6, 2), (9, 2), (10, 2), (11, 3)]:
+            px[p] = r[1]
+    else:
+        for y in range(2, 6):
+            px[7, y] = r[2]
+            px[8, y] = r[1]
+        for (x, y) in [(5, 3), (4, 4), (5, 5)]:
+            px[x, y] = r[1]
+            px[15 - x, y] = r[1]
+    return img
+
+
+def cable_tap_side(output):
+    """A small casing with an arrow: into the cable (up, in) or out of it (down, out)."""
+    img = casing(17, rivets=False)
+    px = img.load()
+    arrow = (232, 236, 240, 255) if output else (250, 200, 60, 255)
+    for y in range(9, 15):
+        px[7, y] = px[8, y] = arrow
+    tip = [(6, 10), (9, 10), (5, 11), (10, 11)] if not output else [(6, 13), (9, 13), (5, 12), (10, 12)]
+    for p in tip:
+        px[p] = arrow
+    return img
+
+
+def cable_tap_band():
+    """A white band (tinted with the tap's color in the game)."""
+    img = blank()
+    px = img.load()
+    for x in range(16):
+        for y in range(16):
+            px[x, y] = (255, 255, 255, 255) if (x * 7 + y * 3) % 9 else (226, 226, 226, 255)
+    return img
+
+
 def speaker_side(lit):
     """A speaker cone under incoming waves (v0.43.0): its middle glows red while it hears its frequency."""
     r = ON if lit else OFF
@@ -1270,6 +1348,16 @@ blocks = {
     "aviation_beacon_red": beacon_dome("red"),
     "aviation_beacon_white": beacon_dome("white"),
     "aviation_beacon_base": beacon_base(),
+    "bundled_cable": bundled_cable(),  # v0.54.0
+    "bundled_transmitter_side": bundled_side(False, receiver=False),
+    "bundled_transmitter_side_on": bundled_side(True, receiver=False),
+    "bundled_transmitter_top": top(False, receiver=False),
+    "bundled_transmitter_top_on": top(True, receiver=False),
+    "bundled_receiver_side": bundled_side(False, receiver=True),
+    "bundled_receiver_side_on": bundled_side(True, receiver=True),
+    "cable_tap_in": cable_tap_side(False),
+    "cable_tap_out": cable_tap_side(True),
+    "cable_tap_band": cable_tap_band(),
     "radio_weather_station_side": weather_station_side(False),  # v0.53.0
     "radio_weather_station_side_on": weather_station_side(True),
     "radio_weather_station_top": top(False, receiver=False),

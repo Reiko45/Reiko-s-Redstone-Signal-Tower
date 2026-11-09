@@ -1,0 +1,216 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "powered": "false"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/bundled_transmitter"
+      }
+    },
+    {
+      "when": {
+        "powered": "true"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/bundled_transmitter_on"
+      }
+    },
+    {
+      "when": {
+        "antenna": "iron"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_iron"
+      }
+    },
+    {
+      "when": {
+        "antenna": "gold"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_gold"
+      }
+    },
+    {
+      "when": {
+        "antenna": "diamond"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_diamond"
+      }
+    },
+    {
+      "when": {
+        "antenna": "netherite"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_netherite"
+      }
+    },
+    {
+      "when": {
+        "antenna": "ender"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_ender"
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "0"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_0"
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "1"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw22"
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "2"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw45"
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "3"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_ccw22",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "4"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "5"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw22",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "6"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw45",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "7"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_ccw22",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "8"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "9"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw22",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "10"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw45",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "11"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_ccw22",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "12"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "13"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw22",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "14"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_cw45",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "antenna": "dish",
+        "rotation": "15"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_dish_ccw22"
+      }
+    }
+  ]
+}

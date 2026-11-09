@@ -91,6 +91,28 @@ public final class RadioInfo {
         if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return readBeacon(level, pos);
         }
+        if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.BundledCableBlock
+                || level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.CableTapBlock) {
+            // v0.54.0: what the cable network carries.
+            com.reiko.signaltower.radio.BundledCables.Net net = com.reiko.signaltower.radio.BundledCables.scan(level, pos);
+            CompoundTag tag = new CompoundTag();
+            tag.putIntArray("cable_channels", net.channels());
+            tag.putInt("cable_count", net.cables());
+            tag.putInt("cable_devices", net.devices().size());
+            return tag;
+        }
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.GuyAnchorBlockEntity anchor) {
+            // v0.54.0: the mast it braces, how tall, and how many anchors brace it.
+            CompoundTag tag = new CompoundTag();
+            BlockPos base = anchor.getBase();
+            if (base != null) {
+                tag.putLong("anchor_base", base.asLong());
+                tag.putInt("anchor_height", com.reiko.signaltower.blockentity.GuyAnchorBlockEntity.columnHeight(level, base));
+                tag.putInt("anchor_braces", SignalNetwork.get(level).bracesOf(base));
+            }
+            tag.putInt("anchor_needed", com.reiko.signaltower.Config.GUY_WIRES_TO_BRACE.get());
+            return tag;
+        }
         CompoundTag tag = gather(level, pos);
         if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor) {
             // v0.39.0: whose it is and whether it sees someone; its range, mode and who it saw only for its owner.
@@ -234,6 +256,9 @@ public final class RadioInfo {
                 tag.putBoolean("timer_clock", timer.clockOn(level));
                 tag.putLong("change_in", timer.changeIn(level));
             }
+            if (radio instanceof com.reiko.signaltower.blockentity.BundledTransmitterBlockEntity bundled) {
+                tag.putIntArray("bundle_channels", bundled.getChannels()); // v0.54.0
+            }
             if (radio instanceof com.reiko.signaltower.blockentity.WeatherStationBlockEntity station) {
                 // v0.53.0: what it reads, what that says now, whether redstone pauses it and whether it announces.
                 com.reiko.signaltower.radio.StationReading.Value value = station.reading(level);
@@ -281,6 +306,8 @@ public final class RadioInfo {
                 tag.putString("telegraph_text", last.text());
                 tag.putLong("telegraph_ago", Math.max(0, (level.getGameTime() - last.gameTime()) / 20));
             }
+        } else if (radio instanceof com.reiko.signaltower.blockentity.BundledReceiverBlockEntity bundled) {
+            tag.putIntArray("bundle_heard", bundled.getHeard()); // v0.54.0
         } else if (block instanceof CodeKeypadBlock && radio instanceof CodeKeypadBlockEntity keypad) {
             // v0.37.0: whose it is, whether it has a code (never the code) and how far its pulse reaches.
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
@@ -359,6 +386,24 @@ public final class RadioInfo {
             // v0.50.0: where its Ender Antenna sends into, and where it arrives there.
             tag.putString("link_dimension", target.location().toString());
             tag.putLong("link_at", com.reiko.signaltower.radio.CrossDimension.arrival(level, there, pos).asLong());
+        }
+        // v0.54.0: storm damage, ice, and how braced a tall tower is.
+        SignalNetwork storms = SignalNetwork.get(level);
+        String cause = storms.damageCause(pos);
+        if (cause != null) {
+            tag.putString("storm_damaged", cause);
+            tag.putInt("power", 0);
+        }
+        if (storms.isIced(pos)) {
+            tag.putInt("iced_thawed", storms.thawed(pos) / 20);
+            tag.putInt("iced_needed", com.reiko.signaltower.Config.ICE_THAW_SECONDS.get());
+            tag.putInt("iced_loss", com.reiko.signaltower.Config.ICE_REACH_LOSS_PERCENT.get());
+        }
+        com.reiko.signaltower.radio.StormDamage.Assessment assessment = com.reiko.signaltower.radio.StormDamage.assess(level, storms, pos);
+        if (assessment.braces() > 0 || assessment.tall() && com.reiko.signaltower.Config.STORM_DAMAGE.get() && ReikosWeatherCompat.available()) {
+            tag.putInt("braces", assessment.braces());
+            tag.putInt("braces_needed", com.reiko.signaltower.Config.GUY_WIRES_TO_BRACE.get());
+            tag.putBoolean("braces_tall", assessment.tall());
         }
         long struck = SignalNetwork.get(level).outageTicks(pos);
         if (struck > 0) {
@@ -457,6 +502,22 @@ public final class RadioInfo {
                             : com.reiko.signaltower.radio.Weather.of(data.getInt("weather")).label(),
                     data.getInt("weather_loss")).withStyle(ChatFormatting.DARK_AQUA));
         }
+        if (data != null && data.contains("storm_damaged")) {
+            // v0.54.0
+            lines.add(Component.translatable(LANG + "storm_damaged", com.reiko.signaltower.radio.StormDamage.causeName(data.getString("storm_damaged")))
+                    .withStyle(ChatFormatting.RED));
+        }
+        if (data != null && data.contains("iced_thawed")) {
+            lines.add(Component.translatable(LANG + "iced", data.getInt("iced_loss"), data.getInt("iced_thawed"), data.getInt("iced_needed"))
+                    .withStyle(ChatFormatting.AQUA));
+        }
+        if (data != null && data.contains("braces")) {
+            int braces = data.getInt("braces");
+            int needed = data.getInt("braces_needed");
+            lines.add(braces >= needed ? Component.translatable(LANG + "braced", braces).withStyle(ChatFormatting.GREEN)
+                    : data.getBoolean("braces_tall") ? Component.translatable(LANG + "not_braced", braces, needed).withStyle(ChatFormatting.GOLD)
+                    : Component.translatable(LANG + "braces_short", braces).withStyle(ChatFormatting.GRAY));
+        }
         if (data != null && data.contains("struck")) {
             lines.add(Component.translatable(LANG + "struck", RadioReceiverBlockEntity.countdownLabel(data.getLong("struck")))
                     .withStyle(ChatFormatting.YELLOW));
@@ -551,6 +612,35 @@ public final class RadioInfo {
         if (block instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return beaconLines(state, data);
         }
+        if (block instanceof com.reiko.signaltower.block.CableTapBlock || block instanceof com.reiko.signaltower.block.BundledCableBlock) {
+            // v0.54.0
+            List<Component> lines = new ArrayList<>();
+            if (block instanceof com.reiko.signaltower.block.CableTapBlock) {
+                lines.add(com.reiko.signaltower.block.CableTapBlock.describe(state).withStyle(ChatFormatting.AQUA));
+            }
+            if (data != null && data.contains("cable_channels")) {
+                lines.add(Component.translatable(LANG + "cable_carries",
+                        com.reiko.signaltower.block.CableTapBlock.channelsText(data.getIntArray("cable_channels"))).withStyle(ChatFormatting.YELLOW));
+                lines.add(Component.translatable(LANG + "cable_size", data.getInt("cable_count"), data.getInt("cable_devices"))
+                        .withStyle(ChatFormatting.GRAY));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.GuyAnchorBlock) {
+            List<Component> lines = new ArrayList<>();
+            if (data != null && data.contains("anchor_base")) {
+                BlockPos base = BlockPos.of(data.getLong("anchor_base"));
+                int braces = data.getInt("anchor_braces");
+                int needed = data.getInt("anchor_needed");
+                lines.add(Component.translatable(LANG + "anchor_braces", base.getX(), base.getY(), base.getZ(), data.getInt("anchor_height"))
+                        .withStyle(ChatFormatting.AQUA));
+                lines.add(Component.translatable(LANG + (braces >= needed ? "anchor_enough" : "anchor_short"), braces, needed)
+                        .withStyle(braces >= needed ? ChatFormatting.GREEN : ChatFormatting.GOLD));
+            } else if (data != null) {
+                lines.add(Component.translatable(LANG + "anchor_none").withStyle(ChatFormatting.GOLD));
+            }
+            return lines;
+        }
         List<Component> lines = new ArrayList<>();
         boolean hasData = data != null && data.contains("frequency");
         if (block instanceof RadioMastBlock) {
@@ -633,7 +723,8 @@ public final class RadioInfo {
             }
             return lines;
         }
-        if (!(block instanceof RadioTransmitterBlock || block instanceof RadioRepeaterBlock || block instanceof RadioReceiverBlock)) {
+        if (!(block instanceof RadioTransmitterBlock || block instanceof RadioRepeaterBlock || block instanceof RadioReceiverBlock
+                || block instanceof com.reiko.signaltower.block.BundledReceiverBlock)) {
             return lines;
         }
         if (block instanceof com.reiko.signaltower.block.RadioLogicReceiverBlock) {
@@ -754,6 +845,14 @@ public final class RadioInfo {
             if (hasData) {
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
             }
+        } else if (block instanceof com.reiko.signaltower.block.BundledReceiverBlock) {
+            // v0.54.0: the frequencies it hears its bundle on, and what's on each color.
+            if (hasData && data.contains("bundle_heard")) {
+                lines.add(Component.translatable(LANG + "bundle_range",
+                        com.reiko.signaltower.block.BundledTransmitterBlock.bundleRange(data.getInt("frequency"))).withStyle(ChatFormatting.AQUA));
+                lines.add(Component.translatable(LANG + "bundle_hears",
+                        com.reiko.signaltower.block.CableTapBlock.channelsText(data.getIntArray("bundle_heard"))).withStyle(ChatFormatting.YELLOW));
+            }
         } else if (block instanceof RadioTransmitterBlock) {
             boolean on = hasData ? data.getInt("power") > 0 : state.getValue(RadioTransmitterBlock.POWERED);
             lines.add(!on ? Component.translatable(LANG + "sending_nothing").withStyle(ChatFormatting.GRAY)
@@ -761,6 +860,13 @@ public final class RadioInfo {
                     : Component.translatable(LANG + "broadcasting").withStyle(ChatFormatting.GREEN));
             if (hasData && data.contains("recorder_phase")) {
                 recorderLines(lines, data);
+            }
+            if (hasData && data.contains("bundle_channels")) {
+                // v0.54.0: the frequencies its bundle goes out on, and what's on each color.
+                lines.add(Component.translatable(LANG + "bundle_range",
+                        com.reiko.signaltower.block.BundledTransmitterBlock.bundleRange(data.getInt("frequency"))).withStyle(ChatFormatting.AQUA));
+                lines.add(Component.translatable(LANG + "bundle_sending",
+                        com.reiko.signaltower.block.CableTapBlock.channelsText(data.getIntArray("bundle_channels"))).withStyle(ChatFormatting.YELLOW));
             }
             if (hasData && data.contains("station_mode")) {
                 // v0.53.0: a weather station's reading, then a pause, and whether it announces.

@@ -118,6 +118,21 @@ public final class SignalTowerGameTests {
         SignalNetwork.get(level).forceWeather(null);
     }
 
+    /** v0.54.0: storm damage with Reiko's Weather, in a batch of its own (its storm cells reach the tests beside it). */
+    private static final String STORMS = "reikos_storms";
+
+    @net.minecraft.gametest.framework.BeforeBatch(batch = STORMS)
+    public static void beforeStorms(ServerLevel level) {
+        withoutFade(level);
+        SignalNetwork.get(level).forceWeather(null);
+    }
+
+    @net.minecraft.gametest.framework.AfterBatch(batch = STORMS)
+    public static void afterStorms(ServerLevel level) {
+        com.reiko.signaltower.radio.StormDamage.chanceForTests(null);
+        afterReikos(level);
+    }
+
     @net.minecraft.gametest.framework.BeforeBatch(batch = REIKOS)
     public static void beforeReikos(ServerLevel level) {
         withoutFade(level);
@@ -8349,6 +8364,372 @@ public final class SignalTowerGameTests {
                     } catch (ReflectiveOperationException e) {
                         throw new GameTestAssertException("Can't remove the storm cell: " + e);
                     }
+                })
+                .thenSucceed();
+    }
+
+    // ---------------------------------------------------------------- v0.54.0: bundled cable, guy wires, storm damage
+
+    private static BlockState tap(net.minecraft.world.item.DyeColor color, Direction facing, boolean output) {
+        return ModRegistry.CABLE_TAP.get().defaultBlockState().setValue(com.reiko.signaltower.block.CableTapBlock.COLOR, color)
+                .setValue(com.reiko.signaltower.block.CableTapBlock.FACING, facing).setValue(com.reiko.signaltower.block.CableTapBlock.OUTPUT, output);
+    }
+
+    private static int tapPower(GameTestHelper helper, BlockPos pos) {
+        return helper.getBlockState(pos).getValue(com.reiko.signaltower.block.CableTapBlock.POWER);
+    }
+
+    /**
+     * Bundled Cable: a line of 9 cables joins up (arms drawn); a red input tap fed by a redstone block
+     * puts 15 on red, a blue one fed through 7 dust puts 8 on blue (two blue taps: the stronger
+     * counts), and the output taps on red, blue and white give 15, 8 and 0 out (a lamp by the red
+     * one lights); the scan finds 9 cables and 6 devices. Right-clicking a tap switches it out and
+     * back in; a dye recolors it (red goes off, green comes on). Breaking a cable in the middle
+     * cuts the far taps off; mending it brings them back. Jade shows what a cable carries.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void bundledCable(GameTestHelper helper) {
+        var DOWN = Direction.DOWN;
+        var RED = net.minecraft.world.item.DyeColor.RED;
+        var BLUE = net.minecraft.world.item.DyeColor.BLUE;
+        var WHITE = net.minecraft.world.item.DyeColor.WHITE;
+        for (int x = 2; x <= 10; x++) {
+            helper.setBlock(new BlockPos(x, 1, 1), ModRegistry.BUNDLED_CABLE.get());
+        }
+        BlockPos redIn = new BlockPos(2, 2, 1);
+        BlockPos blueIn = new BlockPos(3, 2, 1);
+        BlockPos blueIn2 = new BlockPos(4, 2, 1);
+        BlockPos whiteOut = new BlockPos(8, 2, 1);
+        BlockPos blueOut = new BlockPos(9, 2, 1);
+        BlockPos redOut = new BlockPos(10, 2, 1);
+        helper.setBlock(redIn, tap(RED, DOWN, false));
+        helper.setBlock(blueIn, tap(BLUE, DOWN, false));
+        helper.setBlock(blueIn2, tap(BLUE, DOWN, false));
+        helper.setBlock(whiteOut, tap(WHITE, DOWN, true));
+        helper.setBlock(blueOut, tap(BLUE, DOWN, true));
+        helper.setBlock(redOut, tap(RED, DOWN, true));
+        helper.setBlock(redIn.above(), Blocks.REDSTONE_BLOCK);
+        // blue: dust from a redstone block runs past both blue taps (10 at the second, 9 at the first)
+        for (int x = 3; x <= 9; x++) {
+            helper.setBlock(new BlockPos(x, 1, 0), Blocks.STONE);
+            helper.setBlock(new BlockPos(x, 2, 0), Blocks.REDSTONE_WIRE);
+        }
+        helper.setBlock(new BlockPos(10, 2, 0), Blocks.REDSTONE_BLOCK);
+        helper.setBlock(redOut.above(), Blocks.REDSTONE_LAMP);
+        BlockPos middle = new BlockPos(6, 1, 1);
+        helper.startSequence()
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 15, "Red comes out at 15: " + tapPower(helper, redOut)))
+                .thenExecute(() -> {
+                    BlockState cable = helper.getBlockState(middle);
+                    check(cable.getValue(net.minecraft.world.level.block.PipeBlock.EAST) && cable.getValue(net.minecraft.world.level.block.PipeBlock.WEST)
+                            && !cable.getValue(net.minecraft.world.level.block.PipeBlock.NORTH), "The cable joins its neighbours");
+                    check(helper.getBlockState(redIn.below()).getValue(net.minecraft.world.level.block.PipeBlock.UP), "And the tap on it");
+                    var wired = com.reiko.signaltower.radio.BundledCables.scan(helper.getLevel(), helper.absolutePos(middle));
+                    check(wired.cables() == 9 && wired.devices().size() == 6, "9 cables, 6 devices: " + wired.cables() + ", " + wired.devices().size());
+                    check(wired.channels()[RED.getId()] == 15 && wired.channels()[WHITE.getId()] == 0, "Red 15, white 0");
+                    int blue = wired.channels()[BLUE.getId()];
+                    check(blue == 10 && tapPower(helper, blueIn) == 9 && tapPower(helper, blueIn2) == 10,
+                            "Blue is the stronger of its two taps (9 and 10): " + blue);
+                    check(tapPower(helper, blueOut) == blue && tapPower(helper, whiteOut) == 0, "Blue comes out as it went in, white not at all");
+                    check(helper.getBlockState(redOut.above()).getValue(net.minecraft.world.level.block.RedstoneLampBlock.LIT), "The lamp by red lights");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(helper.getLevel(), helper.absolutePos(middle));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(middle), info)).containsAll(List.of("cable_carries", "cable_size")),
+                            "Jade on the cable");
+                    // switch the red output tap to input and back
+                    Player dev = namedPlayer(helper, new BlockPos(10, 1, 2), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    BlockState state = helper.getBlockState(redOut);
+                    state.useWithoutItem(helper.getLevel(), dev, new BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(redOut)),
+                            Direction.UP, helper.absolutePos(redOut), false));
+                    check(!helper.getBlockState(redOut).getValue(com.reiko.signaltower.block.CableTapBlock.OUTPUT) && tapPower(helper, redOut) == 0,
+                            "Switched to in");
+                    helper.getBlockState(redOut).useWithoutItem(helper.getLevel(), dev, new BlockHitResult(
+                            net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(redOut)), Direction.UP, helper.absolutePos(redOut), false));
+                    check(helper.getBlockState(redOut).getValue(com.reiko.signaltower.block.CableTapBlock.OUTPUT) && tapPower(helper, redOut) == 15,
+                            "And back out: 15 again");
+                    // a green dye on the red input tap: red goes off, green comes on
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.GREEN_DYE));
+                    helper.getLevel().getBlockState(helper.absolutePos(redIn)).useItemOn(dev.getMainHandItem(), helper.getLevel(), dev, InteractionHand.MAIN_HAND,
+                            new BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(redIn)), Direction.UP, helper.absolutePos(redIn), false));
+                    check(helper.getBlockState(redIn).getValue(com.reiko.signaltower.block.CableTapBlock.COLOR) == net.minecraft.world.item.DyeColor.GREEN,
+                            "Dyed green");
+                })
+                .thenWaitUntil(() -> {
+                    var wired = com.reiko.signaltower.radio.BundledCables.scan(helper.getLevel(), helper.absolutePos(middle));
+                    check(wired.channels()[net.minecraft.world.item.DyeColor.GREEN.getId()] == 15 && wired.channels()[RED.getId()] == 0
+                            && tapPower(helper, redOut) == 0, "Green on, red off");
+                })
+                .thenExecute(() -> {
+                    helper.setBlock(redIn, tap(RED, DOWN, false)); // red again (as placed: it reads its block next tick)
+                })
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 15, "Red back"))
+                .thenExecute(() -> helper.setBlock(middle, Blocks.AIR))
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 0 && tapPower(helper, blueOut) == 0, "Cut in the middle: the far taps go dark"))
+                .thenExecute(() -> helper.setBlock(middle, ModRegistry.BUNDLED_CABLE.get()))
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 15, "Mended"))
+                .thenExecute(() -> helper.setBlock(redIn.above(), Blocks.AIR))
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 0
+                        && !helper.getBlockState(redOut.above()).getValue(net.minecraft.world.level.block.RedstoneLampBlock.LIT), "Red off: the lamp goes out"))
+                .thenSucceed();
+    }
+
+    /**
+     * The bundled radio pair: a Bundled Radio Transmitter on 4571 fed by a cable with red (15) and
+     * lime (15) taps sends red on 4585 and lime on 4576; a plain receiver on 4585 picks out red (15),
+     * one on 4571 (white) hears nothing; a Bundled Radio Receiver on 4571 puts red and lime back on
+     * its cable (output taps 15, 15, white 0). A transmitter on a mast is fed through the mast. The
+     * log has red's turn-on on 4585; the bundle survives a save; Jade shows both ends. Broken, the
+     * transmitter's colors go (the receivers and taps go dark).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void bundledRadio(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var DOWN = Direction.DOWN;
+        var RED = net.minecraft.world.item.DyeColor.RED;
+        var LIME = net.minecraft.world.item.DyeColor.LIME;
+        var WHITE = net.minecraft.world.item.DyeColor.WHITE;
+        BlockPos tx = new BlockPos(2, 1, 1);
+        place(helper, tx, ModRegistry.BUNDLED_TRANSMITTER.get(), 4571);
+        helper.setBlock(new BlockPos(3, 1, 1), ModRegistry.BUNDLED_CABLE.get());
+        helper.setBlock(new BlockPos(4, 1, 1), ModRegistry.BUNDLED_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 1), tap(RED, DOWN, false));
+        helper.setBlock(new BlockPos(4, 2, 1), tap(LIME, DOWN, false));
+        helper.setBlock(new BlockPos(3, 3, 1), Blocks.REDSTONE_BLOCK);
+        helper.setBlock(new BlockPos(4, 3, 1), Blocks.REDSTONE_BLOCK);
+        BlockPos plainRed = new BlockPos(8, 1, 1);
+        BlockPos plainWhite = new BlockPos(9, 1, 1);
+        place(helper, plainRed, ModRegistry.RADIO_RECEIVER.get(), 4571 + RED.getId());
+        place(helper, plainWhite, ModRegistry.RADIO_RECEIVER.get(), 4571);
+        BlockPos rx = new BlockPos(14, 1, 1);
+        place(helper, rx, ModRegistry.BUNDLED_RECEIVER.get(), 4571);
+        for (int x = 15; x <= 17; x++) {
+            helper.setBlock(new BlockPos(x, 1, 1), ModRegistry.BUNDLED_CABLE.get());
+        }
+        BlockPos redOut = new BlockPos(15, 2, 1);
+        BlockPos limeOut = new BlockPos(16, 2, 1);
+        BlockPos whiteOut = new BlockPos(17, 2, 1);
+        helper.setBlock(redOut, tap(RED, DOWN, true));
+        helper.setBlock(limeOut, tap(LIME, DOWN, true));
+        helper.setBlock(whiteOut, tap(WHITE, DOWN, true));
+        // A second one on a mast, fed through the mast: green 15.
+        BlockPos mast = new BlockPos(30, 1, 1);
+        BlockPos tx2 = mast.above();
+        helper.setBlock(mast, ModRegistry.RADIO_MAST.get());
+        place(helper, tx2, ModRegistry.BUNDLED_TRANSMITTER.get(), 4591);
+        helper.setBlock(new BlockPos(31, 1, 1), ModRegistry.BUNDLED_CABLE.get());
+        helper.setBlock(new BlockPos(31, 2, 1), tap(net.minecraft.world.item.DyeColor.GREEN, DOWN, false));
+        helper.setBlock(new BlockPos(31, 3, 1), Blocks.REDSTONE_BLOCK);
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos absTx = helper.absolutePos(tx);
+        helper.startSequence()
+                .thenWaitUntil(() -> check(outputAt(helper, plainRed) == 15, "A plain receiver on 4585 picks out red: " + outputAt(helper, plainRed)))
+                .thenWaitUntil(() -> check(tapPower(helper, redOut) == 15 && tapPower(helper, limeOut) == 15, "Red and lime come out at the far end"))
+                .thenExecute(() -> {
+                    check(outputAt(helper, plainWhite) == 0 && tapPower(helper, whiteOut) == 0, "White: nothing");
+                    SignalNetwork.Bundle bundle = network.bundleAt(absTx);
+                    check(bundle != null && bundle.base() == 4571 && bundle.channel(4571 + RED.getId()) == 15 && bundle.channel(4571 + LIME.getId()) == 15
+                            && bundle.channel(4571) == 0 && bundle.covers(4586) && !bundle.covers(4587), "The bundle: " + bundle);
+                    check(helper.getBlockState(tx).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Its light is on");
+                    var history = network.history(4571 + RED.getId());
+                    check(!history.isEmpty() && absTx.equals(history.get(history.size() - 1).cause().pos()), "Red's turn-on is in the log");
+                    SignalNetwork.Bundle mastBundle = network.bundleAt(helper.absolutePos(tx2));
+                    check(mastBundle != null && mastBundle.channel(4591 + net.minecraft.world.item.DyeColor.GREEN.getId()) == 15,
+                            "The one on a mast is fed through it: " + mastBundle);
+                    CompoundTag txInfo = com.reiko.signaltower.compat.RadioInfo.read(level, absTx);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(tx), txInfo)).containsAll(List.of("bundle_range", "bundle_sending")),
+                            "Jade on the transmitter");
+                    CompoundTag rxInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(rx));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), rxInfo)).containsAll(List.of("bundle_range", "bundle_hears")),
+                            "Jade on the receiver: " + rxInfo + " " + lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(rx), rxInfo)));
+                    check(helper.getBlockState(rx).getValue(com.reiko.signaltower.block.BundledReceiverBlock.LIT), "The receiver's lit");
+                    SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+                    SignalNetwork.Bundle saved = loaded.bundleAt(absTx);
+                    check(saved != null && saved.base() == 4571 && java.util.Arrays.equals(saved.channels(), bundle.channels()), "Saved");
+                    helper.setBlock(new BlockPos(4, 3, 1), Blocks.AIR); // lime off
+                })
+                .thenWaitUntil(() -> check(tapPower(helper, limeOut) == 0 && tapPower(helper, redOut) == 15, "Lime off at the far end, red still on"))
+                .thenExecute(() -> level.destroyBlock(absTx, false))
+                .thenWaitUntil(() -> check(outputAt(helper, plainRed) == 0 && tapPower(helper, redOut) == 0 && network.bundleAt(absTx) == null,
+                        "Broken: its colors go"))
+                .thenSucceed();
+    }
+
+    /**
+     * Guy wires and storm damage (without a storm): a tower 5 masts tall is at risk; three anchors
+     * near it brace its mast (each finds it, the network counts 3), one taken away and it's at risk
+     * again. Blown down, it goes quiet (its receiver dark, Jade says so) until an Iron Ingot on one
+     * of its masts repairs it (the ingot used up; an ingot on a sound tower or a stick does nothing).
+     * An iced-up antenna loses 30% of its reach until it has thawed. Damage, ice and anchors are saved.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void guyWiresAndStormDamage(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos foot = new BlockPos(2, 1, 1);
+        for (int y = 0; y < 5; y++) {
+            helper.setBlock(foot.above(y), ModRegistry.RADIO_MAST.get());
+        }
+        BlockPos top = foot.above(5);
+        place(helper, top, ModRegistry.RADIO_TRANSMITTER.get(), 4592);
+        helper.setBlock(new BlockPos(1, 1, 1), Blocks.REDSTONE_BLOCK);
+        BlockPos rx = new BlockPos(12, 1, 1);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4592);
+        BlockPos[] anchors = {new BlockPos(4, 2, 1), new BlockPos(4, 2, 0), new BlockPos(5, 2, 2)};
+        for (BlockPos anchor : anchors) {
+            helper.setBlock(anchor.below(), Blocks.STONE);
+        }
+        BlockPos absTop = helper.absolutePos(top);
+        BlockPos absFoot = helper.absolutePos(foot);
+        SignalNetwork network = SignalNetwork.get(level);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 2), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        helper.startSequence()
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "The tower sends"))
+                .thenExecute(() -> {
+                    var risk = com.reiko.signaltower.radio.StormDamage.assess(level, network, absTop);
+                    check(risk.masts() == 5 && absFoot.equals(risk.base()) && risk.tall() && risk.braces() == 0 && risk.atRisk(), "Tall and unbraced: " + risk);
+                    for (BlockPos anchor : anchors) {
+                        helper.setBlock(anchor, ModRegistry.GUY_ANCHOR.get());
+                    }
+                })
+                .thenWaitUntil(() -> check(network.bracesOf(absFoot) == 3, "Three anchors brace it: " + network.bracesOf(absFoot)))
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.GuyAnchorBlockEntity anchor = helper.getBlockEntity(anchors[0]);
+                    check(absFoot.equals(anchor.getBase()) && com.reiko.signaltower.blockentity.GuyAnchorBlockEntity.columnHeight(level, absFoot) == 6,
+                            "It found the mast's foot (6 tall with the top)");
+                    var braced = com.reiko.signaltower.radio.StormDamage.assess(level, network, absTop);
+                    check(braced.braced() && !braced.atRisk(), "Braced: " + braced);
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTop);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(top), info)).contains("braced"), "Jade: braced");
+                    CompoundTag anchorInfo = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(anchors[0]));
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(anchors[0]), anchorInfo))
+                            .containsAll(List.of("anchor_braces", "anchor_enough")), "Jade on an anchor");
+                    helper.setBlock(anchors[2], Blocks.AIR);
+                    check(network.bracesOf(absFoot) == 2 && com.reiko.signaltower.radio.StormDamage.assess(level, network, absTop).atRisk(),
+                            "One taken away: at risk again");
+                    com.reiko.signaltower.radio.StormDamage.blowDown(level, network, absTop, "derecho");
+                    check("derecho".equals(network.damageCause(absTop)) && network.isDown(absTop), "Blown down by a derecho");
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 0, "Its receiver goes dark"))
+                .thenExecute(() -> {
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTop);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(top), info)).contains("storm_damaged"), "Jade: blown down");
+                    SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+                    check("derecho".equals(loaded.damageCause(absTop)) && loaded.bracesOf(absFoot) == 2, "Damage and anchors are saved");
+                    check(com.reiko.signaltower.radio.StormDamage.repairWith(new ItemStack(Items.STICK), level, helper.absolutePos(foot), dev) == null,
+                            "A stick doesn't repair it");
+                    ItemStack ingots = new ItemStack(Items.IRON_INGOT, 3);
+                    check(com.reiko.signaltower.radio.StormDamage.repairWith(ingots, level, helper.absolutePos(foot.above(2)), dev) != null
+                            && network.damageCause(absTop) == null && ingots.getCount() == 2, "An Iron Ingot on a mast repairs it");
+                    check(com.reiko.signaltower.radio.StormDamage.repairWith(ingots, level, absTop, dev) == null && ingots.getCount() == 2,
+                            "Not again: there's nothing to repair");
+                })
+                .thenWaitUntil(() -> check(outputAt(helper, rx) == 15, "Back up"))
+                .thenExecute(() -> {
+                    int clear = network.reachNow(level, absTop, 100);
+                    network.ice(absTop);
+                    check(network.isIced(absTop) && network.reachNow(level, absTop, 100) == clear * 70 / 100, "Iced up: 30% less reach");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absTop);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(top), info)).contains("iced"), "Jade: iced");
+                    SignalNetwork loaded = SignalNetwork.load(network.save(new CompoundTag(), level.registryAccess()), level.registryAccess());
+                    check(loaded.isIced(absTop), "Ice is saved");
+                    check(!network.thaw(absTop, 40, 2400) && network.thawed(absTop) == 40, "Thawing");
+                    check(network.thaw(absTop, 2400, 2400) && !network.isIced(absTop) && network.reachNow(level, absTop, 100) == clear, "Thawed");
+                    network.ice(absTop);
+                    com.reiko.signaltower.radio.StormDamage.blowDown(level, network, absTop, "tornado");
+                    level.destroyBlock(absTop, false);
+                    check(network.damageCause(absTop) == null && !network.isIced(absTop), "A tower that's gone takes its damage and ice with it");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Storm damage with Reiko's Weather (a batch of its own). Without it: a storm check leaves a tall
+     * tower alone and melts any ice. With it: under a derecho cell (chance 100% for the test), a tall
+     * unbraced tower blows down, a braced one and a short one stand; under an ice storm cell a tower
+     * ices up, and once the cell is gone (above freezing) it starts thawing.
+     */
+    @GameTest(template = PLATFORM, batch = STORMS, timeoutTicks = 400)
+    public static void stormDamageWithReikos(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos tallFoot = new BlockPos(2, 1, 1);
+        BlockPos bracedFoot = new BlockPos(20, 1, 1);
+        BlockPos shortFoot = new BlockPos(40, 1, 1);
+        for (int y = 0; y < 5; y++) {
+            helper.setBlock(tallFoot.above(y), ModRegistry.RADIO_MAST.get());
+            helper.setBlock(bracedFoot.above(y), ModRegistry.RADIO_MAST.get());
+        }
+        helper.setBlock(shortFoot, ModRegistry.RADIO_MAST.get());
+        place(helper, tallFoot.above(5), ModRegistry.RADIO_TRANSMITTER.get(), 4593);
+        place(helper, bracedFoot.above(5), ModRegistry.RADIO_TRANSMITTER.get(), 4594);
+        place(helper, shortFoot.above(1), ModRegistry.RADIO_TRANSMITTER.get(), 4595);
+        for (BlockPos anchor : new BlockPos[]{new BlockPos(22, 2, 1), new BlockPos(22, 2, 0), new BlockPos(23, 2, 2)}) {
+            helper.setBlock(anchor.below(), Blocks.STONE);
+            helper.setBlock(anchor, ModRegistry.GUY_ANCHOR.get());
+        }
+        BlockPos tall = helper.absolutePos(tallFoot.above(5));
+        BlockPos braced = helper.absolutePos(bracedFoot.above(5));
+        BlockPos low = helper.absolutePos(shortFoot.above(1));
+        if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
+            helper.startSequence()
+                    .thenIdle(3)
+                    .thenExecute(() -> {
+                        network.ice(tall);
+                        com.reiko.signaltower.radio.StormDamage.check(level, network);
+                        check(network.damageCause(tall) == null && !network.isIced(tall), "Without Reiko's Weather nothing blows down, and ice melts");
+                    })
+                    .thenSucceed();
+            return;
+        }
+        Object[] cell = new Object[1];
+        helper.startSequence()
+                .thenWaitUntil(() -> check(network.bracesOf(helper.absolutePos(bracedFoot)) == 3, "The middle tower is braced"))
+                .thenExecute(() -> {
+                    com.reiko.signaltower.radio.StormDamage.chanceForTests(100);
+                    try {
+                        reikosCells(level).clear();
+                        cell[0] = reikosCell(level, "DERECHO", (tall.getX() + low.getX()) / 2.0, tall.getZ() + 0.5, 90);
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't make a storm cell: " + e);
+                    }
+                    check("derecho".equals(com.reiko.signaltower.compat.ReikosWeatherCompat.typeAt(level, tall))
+                            && "derecho".equals(com.reiko.signaltower.compat.ReikosWeatherCompat.typeAt(level, low)), "A derecho over all three");
+                })
+                .thenIdle(SignalNetwork.STORM_CHECK_TICKS + 5)
+                .thenExecute(() -> {
+                    check("derecho".equals(network.damageCause(tall)), "The tall, unbraced one blew down");
+                    check(network.damageCause(braced) == null, "The braced one stands");
+                    check(network.damageCause(low) == null, "The short one stands");
+                    network.repair(tall);
+                    try {
+                        reikosCells(level).remove(cell[0]);
+                        cell[0] = reikosCell(level, "ICE_STORM", low.getX() + 0.5, low.getZ() + 0.5, 30);
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't make a storm cell: " + e);
+                    }
+                })
+                .thenIdle(SignalNetwork.STORM_CHECK_TICKS + 5)
+                .thenExecute(() -> {
+                    check(network.isIced(low) && !network.isIced(tall), "An ice storm ices up the tower under it");
+                    // A tornado right at a tower touches it; one 30 blocks off doesn't (looked at at once, then sent away).
+                    var type = net.minecraft.world.entity.EntityType.byString("reikos_weather:tornado").orElseThrow();
+                    net.minecraft.world.entity.Entity twister = type.create(level);
+                    twister.moveTo(braced.getX() + 0.5, braced.getY() - 5, braced.getZ() + 0.5);
+                    level.addFreshEntity(twister);
+                    boolean hits = com.reiko.signaltower.compat.ReikosWeatherCompat.tornadoHits(level, braced);
+                    boolean far = com.reiko.signaltower.compat.ReikosWeatherCompat.tornadoHits(level, braced.east(30));
+                    twister.discard();
+                    check(hits && !far, "A tornado touches the tower it's at (" + hits + "), not one 30 blocks off (" + far + ")");
+                    try {
+                        reikosCells(level).remove(cell[0]);
+                    } catch (ReflectiveOperationException e) {
+                        throw new GameTestAssertException("Can't remove the storm cell: " + e);
+                    }
+                })
+                .thenIdle(SignalNetwork.STORM_CHECK_TICKS * 2 + 5)
+                .thenExecute(() -> {
+                    float celsius = com.reiko.signaltower.compat.ReikosWeatherCompat.temperature(level, low, com.reiko.signaltower.compat.ReikosWeatherCompat.local(level, low));
+                    check(celsius <= 0 || network.thawed(low) >= SignalNetwork.STORM_CHECK_TICKS, "Above freezing (" + celsius + " C), it thaws: "
+                            + network.thawed(low));
+                    network.unice(low);
                 })
                 .thenSucceed();
     }

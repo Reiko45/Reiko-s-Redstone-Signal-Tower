@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "reikos_signal_tower:block/bundled_receiver_side",
+    "north": "reikos_signal_tower:block/bundled_receiver_side",
+    "south": "reikos_signal_tower:block/bundled_receiver_side",
+    "east": "reikos_signal_tower:block/bundled_receiver_side",
+    "west": "reikos_signal_tower:block/bundled_receiver_side",
+    "up": "reikos_signal_tower:block/radio_receiver_top",
+    "down": "reikos_signal_tower:block/radio_bottom"
+  }
+}

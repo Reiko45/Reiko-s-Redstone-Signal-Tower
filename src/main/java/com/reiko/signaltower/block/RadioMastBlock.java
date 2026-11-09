@@ -48,6 +48,10 @@ public class RadioMastBlock extends Block {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hitResult) {
+        ItemInteractionResult repaired = com.reiko.signaltower.radio.StormDamage.repairWith(stack, level, pos, player); // v0.54.0
+        if (repaired != null) {
+            return repaired;
+        }
         if (!com.reiko.signaltower.radio.MastBuilder.isMast(stack)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }

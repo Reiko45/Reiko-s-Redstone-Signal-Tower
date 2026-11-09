@@ -85,7 +85,7 @@ public final class ReikosWeatherCompat {
                           Method cellWeight, Method cellDistance,
                           @Nullable Method seasonInfo, @Nullable Method infoSeason, @Nullable Method infoDay, @Nullable Method infoDays,
                           @Nullable Method seasonId, @Nullable Method ambient, @Nullable Method bloodMoon,
-                          @Nullable Method compassFrom, @Nullable Method kmh) {}
+                          @Nullable Method compassFrom, @Nullable Method kmh, @Nullable Field stateType) {}
 
     private ReikosWeatherCompat() {}
 
@@ -153,13 +153,14 @@ public final class ReikosWeatherCompat {
         Class<?> wind = optional(() -> Class.forName(PKG + "weather.Wind", true, loader), "wind");
         Method compassFrom = wind == null ? null : optional(() -> wind.getMethod("compassFrom", float.class), "wind");
         Method kmh = wind == null ? null : optional(() -> wind.getMethod("kmh", float.class), "wind");
+        Field stateType = optional(() -> state.getField("type"), "the world's weather");
         return new Bridge(manager.getMethod("local", Level.class, BlockPos.class), manager.getMethod("activeState", Level.class),
                 local.getMethod("type"), local.getMethod("profile"),
                 profile.getField("rain"), profile.getField("wind"), type.getField("vanillaRain"), type.getField("vanillaThunder"),
                 type.getMethod("isSevere"), type.getMethod("signalCode"), type.getMethod("id"),
                 state.getField("cells"), state.getField("windAngle"), cell.getField("type"), cell.getField("radius"),
                 cell.getMethod("weightAt", double.class, double.class), cell.getMethod("distanceTo", double.class, double.class),
-                seasonInfo, infoSeason, infoDay, infoDays, seasonId, ambient, bloodMoon, compassFrom, kmh);
+                seasonInfo, infoSeason, infoDay, infoDays, seasonId, ambient, bloodMoon, compassFrom, kmh, stateType);
     }
 
     private interface Lookup<T> {
@@ -255,6 +256,77 @@ public final class ReikosWeatherCompat {
             broke(e);
             return null;
         }
+    }
+
+    /**
+     * v0.54.0: the id of the weather at {@code pos} ("derecho", "ice_storm"): a storm cell's over it
+     * (its core), else the world's. Only arithmetic. Null if Reiko's Weather doesn't run in {@code level}.
+     */
+    public static @Nullable String typeAt(Level level, BlockPos pos) {
+        Object state = state(level);
+        if (state == null) {
+            return null;
+        }
+        Bridge b = bridge;
+        try {
+            Object best = null;
+            float bestWeight = 0.0F;
+            for (Object cell : (List<?>) b.stateCells().get(state)) {
+                Object type = b.cellType().get(cell);
+                if ("dust_haze".equals(b.typeId().invoke(type))) {
+                    continue;
+                }
+                float weight = (float) b.cellWeight().invoke(cell, pos.getX() + 0.5, pos.getZ() + 0.5);
+                if (weight > bestWeight) {
+                    best = type;
+                    bestWeight = weight;
+                }
+            }
+            if (best != null && bestWeight >= 0.5F) {
+                return (String) b.typeId().invoke(best);
+            }
+            return b.stateType() == null ? null : (String) b.typeId().invoke(b.stateType().get(state));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            broke(e);
+            return null;
+        }
+    }
+
+    private static final net.minecraft.resources.ResourceLocation TORNADO =
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(MOD_ID, "tornado");
+
+    /**
+     * v0.54.0: true if a tornado or waterspout (not a dust devil) touches a tower whose top is at
+     * {@code top}: within its funnel's radius at that height, plus 2 blocks.
+     */
+    public static boolean tornadoHits(Level level, BlockPos top) {
+        if (!available() || !(level instanceof ServerLevel)) {
+            return false;
+        }
+        net.minecraft.world.phys.AABB around = new net.minecraft.world.phys.AABB(top).inflate(48, 96, 48);
+        for (net.minecraft.world.entity.Entity entity : level.getEntities((net.minecraft.world.entity.Entity) null, around,
+                e -> TORNADO.equals(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType())))) {
+            try {
+                Object kind = entity.getClass().getMethod("kind").invoke(entity);
+                if (kind instanceof Enum<?> e && e.name().equals("DUST_DEVIL")) {
+                    continue;
+                }
+                float height = (float) Math.max(0, top.getY() + 0.5 - entity.getY());
+                float radius = (float) entity.getClass().getMethod("radiusAt", float.class).invoke(entity, height);
+                double dx = entity.getX() - (top.getX() + 0.5);
+                double dz = entity.getZ() - (top.getZ() + 0.5);
+                if (dx * dx + dz * dz <= (radius + 2) * (radius + 2)) {
+                    return true;
+                }
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                double dx = entity.getX() - (top.getX() + 0.5);
+                double dz = entity.getZ() - (top.getZ() + 0.5);
+                if (dx * dx + dz * dz <= 64) {
+                    return true; // can't ask its size: within 8 blocks counts
+                }
+            }
+        }
+        return false;
     }
 
     /** The storm cell whose edge is nearest {@code pos} (0: it's overhead), or null if there are none. */

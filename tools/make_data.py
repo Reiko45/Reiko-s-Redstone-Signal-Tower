@@ -119,6 +119,8 @@ for lit in (False, True):
     write(models / f"radio_speaker{suffix}.json", receiver_model(lit, "radio_speaker_side"))
     write(models / f"radio_timer_transmitter{suffix}.json", transmitter_model(lit, "radio_timer_transmitter"))
     write(models / f"radio_weather_station{suffix}.json", transmitter_model(lit, "radio_weather_station"))  # v0.53.0
+    write(models / f"bundled_transmitter{suffix}.json", transmitter_model(lit, "bundled_transmitter"))  # v0.54.0
+    write(models / f"bundled_receiver{suffix}.json", receiver_model(lit, "bundled_receiver_side"))
     write(models / f"radio_signal_recorder{suffix}.json", transmitter_model(lit, "radio_signal_recorder"))
     write(models / f"radio_jammer{suffix}.json", transmitter_model(lit, "radio_jammer", "jammer_tip"))
 
@@ -308,7 +310,8 @@ write(models / "radio_mast.json", {
 items = ASSETS / "models" / "item"
 for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "radio_inverted_receiver", "radio_logic_receiver",
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
-             "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast", "radio_weather_station"):
+             "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter", "radio_mast", "radio_weather_station",
+             "bundled_transmitter", "bundled_receiver"):
     write(items / f"{name}.json", {"parent": f"{MOD}:block/{name}"})
 write(items / "aviation_beacon.json", {"parent": f"{MOD}:block/aviation_beacon_floor_red"})
 write(items / "radio_lamp.json", {"parent": f"{MOD}:block/radio_lamp"})
@@ -496,6 +499,73 @@ tower_states("radio_converter", "lit")
 tower_states("radio_signal_recorder", "powered")
 tower_states("radio_timer_transmitter", "powered")
 tower_states("radio_weather_station", "powered")  # v0.53.0
+tower_states("bundled_transmitter", "powered")  # v0.54.0
+write(states / "bundled_receiver.json", {"variants": {
+    "lit=false": {"model": f"{MOD}:block/bundled_receiver"}, "lit=true": {"model": f"{MOD}:block/bundled_receiver_on"}}})
+
+# v0.54.0: Bundled Cable, a core and an arm (pointing north) turned each way it joins.
+def cable_faces(uv):
+    return {f: {"texture": "#cable", "uv": uv} for f in ("north", "south", "east", "west", "up", "down")}
+
+write(models / "bundled_cable_core.json", {
+    "parent": "minecraft:block/block", "textures": {"particle": tex("bundled_cable"), "cable": tex("bundled_cable")},
+    "elements": [{"from": [5, 5, 5], "to": [11, 11, 11], "faces": cable_faces([5, 5, 11, 11])}]})
+write(models / "bundled_cable_arm.json", {
+    "parent": "minecraft:block/block", "textures": {"particle": tex("bundled_cable"), "cable": tex("bundled_cable")},
+    "elements": [{"from": [5, 5, 0], "to": [11, 11, 5], "faces": {
+        "north": {"texture": "#cable", "uv": [5, 5, 11, 11], "cullface": "north"},
+        "east": {"texture": "#cable", "uv": [0, 5, 5, 11]}, "west": {"texture": "#cable", "uv": [0, 5, 5, 11]},
+        "up": {"texture": "#cable", "uv": [5, 0, 11, 5], "rotation": 90}, "down": {"texture": "#cable", "uv": [5, 0, 11, 5], "rotation": 90}}}]})
+ARM_TURN = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
+write(states / "bundled_cable.json", {"multipart": [{"apply": {"model": f"{MOD}:block/bundled_cable_core"}}] + [
+    {"when": {side: "true"}, "apply": {"model": f"{MOD}:block/bundled_cable_arm", **turn}} for side, turn in ARM_TURN.items()]})
+write(items / "bundled_cable.json", {
+    "parent": "minecraft:block/block", "textures": {"particle": tex("bundled_cable"), "cable": tex("bundled_cable")},
+    "elements": [{"from": [5, 5, 0], "to": [11, 11, 16], "faces": {
+        "north": {"texture": "#cable", "uv": [5, 5, 11, 11]}, "south": {"texture": "#cable", "uv": [5, 5, 11, 11]},
+        "east": {"texture": "#cable", "uv": [0, 5, 16, 11]}, "west": {"texture": "#cable", "uv": [0, 5, 16, 11]},
+        "up": {"texture": "#cable", "uv": [0, 5, 16, 11], "rotation": 90}, "down": {"texture": "#cable", "uv": [0, 5, 16, 11], "rotation": 90}}}],
+    "display": {"gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.8, 0.8, 0.8]},
+                "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]}}})
+
+# Cable Tap: a small casing with a colored (tinted) band and a collar up to the cable; turned like a piston.
+def tap_model(output):
+    side = "cable_tap_out" if output else "cable_tap_in"
+    return {"parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+            "textures": {"particle": tex(side), "side": tex(side), "end": tex("radio_bottom"), "band": tex("cable_tap_band"),
+                         "cable": tex("bundled_cable")},
+            "elements": [
+                {"from": [3, 0, 3], "to": [13, 10, 13], "faces": {
+                    **{f: {"texture": "#side", "uv": [3, 6, 13, 16]} for f in SIDES},
+                    "up": {"texture": "#end", "uv": [3, 3, 13, 13]}, "down": {"texture": "#end", "uv": [3, 3, 13, 13], "cullface": "down"}}},
+                {"from": [2.9, 1, 2.9], "to": [13.1, 4, 13.1], "faces": {
+                    f: {"texture": "#band", "uv": [3, 0, 13, 3], "tintindex": 0} for f in SIDES}},
+                {"from": [5, 10, 5], "to": [11, 16, 11], "faces": {
+                    **{f: {"texture": "#cable", "uv": [5, 0, 11, 6]} for f in SIDES},
+                    "up": {"texture": "#cable", "uv": [5, 5, 11, 11], "cullface": "up"}}},
+            ]}
+
+write(models / "cable_tap_in.json", tap_model(False))
+write(models / "cable_tap_out.json", tap_model(True))
+TAP_TURN = {"up": {}, "down": {"x": 180}, "north": {"x": 90}, "south": {"x": 90, "y": 180}, "west": {"x": 90, "y": 270}, "east": {"x": 90, "y": 90}}
+write(states / "cable_tap.json", {"variants": {
+    f"facing={facing},output={'true' if out else 'false'}": {"model": f"{MOD}:block/cable_tap_{'out' if out else 'in'}", **turn}
+    for facing, turn in TAP_TURN.items() for out in (False, True)}})
+write(items / "cable_tap.json", {"parent": f"{MOD}:block/cable_tap_in"})
+
+# Guy Wire Anchor: a concrete footing with an eye bolt (the wire is drawn in the game).
+write(models / "guy_anchor.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": "minecraft:block/gray_concrete", "base": "minecraft:block/gray_concrete", "bolt": tex("radio_mast_post")},
+    "elements": [
+        {"from": [3, 0, 3], "to": [13, 3, 13], "faces": {
+            **{f: {"texture": "#base", "uv": [3, 13, 13, 16]} for f in SIDES},
+            "up": {"texture": "#base", "uv": [3, 3, 13, 13]}, "down": {"texture": "#base", "uv": [3, 3, 13, 13], "cullface": "down"}}},
+        {"from": [7, 3, 7], "to": [9, 6, 9], "faces": {f: {"texture": "#bolt", "uv": [6, 0, 8, 3]} for f in SIDES + ["up"]}},
+        {"from": [6.5, 6, 7.5], "to": [9.5, 7, 8.5], "faces": {f: {"texture": "#bolt", "uv": [6, 0, 9, 1]} for f in SIDES + ["up", "down"]}},
+    ]})
+write(states / "guy_anchor.json", {"variants": {"": {"model": f"{MOD}:block/guy_anchor"}}})
+write(items / "guy_anchor.json", {"parent": f"{MOD}:block/guy_anchor"})
 tower_states("radio_jammer", "powered")
 write(states / "radio_receiver.json", {"variants": {
     f"power={p}": {"model": f"{MOD}:block/radio_receiver" + ("_on" if p > 0 else "")} for p in range(16)
@@ -786,6 +856,48 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.rotator_no_dish": "No Dish Antenna on top to turn",
     f"jade.{MOD}.rotator_overruled": "A Dish Rotator higher up turns the dish instead",
     f"jade.{MOD}.dish_rotated": "Turned by a Dish Rotator (redstone %s)",
+    # v0.54.0: bundled cable, guy wires and storm damage
+    f"block.{MOD}.bundled_cable": "Bundled Cable",
+    f"block.{MOD}.bundled_cable.tooltip": "Carries all 16 colors at once, each 0-15, with no loss along the way. Cable Taps put redstone onto a color and take it off again; a Bundled Radio Transmitter sends the whole cable over the radio.",
+    f"block.{MOD}.cable_tap": "Cable Tap",
+    f"block.{MOD}.cable_tap.tooltip": "Put it against a Bundled Cable. In (the default): the redstone it gets goes onto its color. Out: it gives its color out as redstone. Right-click to switch; dye it to pick the color.",
+    f"block.{MOD}.bundled_transmitter": "Bundled Radio Transmitter",
+    f"block.{MOD}.bundled_transmitter.tooltip": "Sends a whole Bundled Cable: tuned to F, white goes out on F, orange on F+1 ... black on F+15. Feed it with a cable beside it or beside any mast of its tower.",
+    f"block.{MOD}.bundled_receiver": "Bundled Radio Receiver",
+    f"block.{MOD}.bundled_receiver.tooltip": "Hears the 16 frequencies from its own on (F white ... F+15 black) and puts them on the Bundled Cables touching it.",
+    f"block.{MOD}.guy_anchor": "Guy Wire Anchor",
+    f"block.{MOD}.guy_anchor.tooltip": "Put it on the ground 2 to 12 blocks from a tower: a steel wire runs to its mast. Three on one mast brace the tower, so tornadoes, hurricanes and derechos (Reiko's Weather) can't blow it down.",
+    f"tooltip.{MOD}.bundle_frequencies": "Frequency %1$s (uses %2$s)",
+    f"message.{MOD}.cable_status": "Bundled Cable | %1$s cables, %2$s devices | %3$s",
+    f"message.{MOD}.tap_in": "Cable Tap: %1$s, in (puts %2$s onto it)",
+    f"message.{MOD}.tap_out": "Cable Tap: %1$s, out (gives %2$s out)",
+    f"message.{MOD}.channel": "%1$s %2$s",
+    f"message.{MOD}.channels_none": "nothing on",
+    f"message.{MOD}.bundled_tx_status": "Bundled Radio Transmitter | Frequency %1$s (%2$s) | Sending %3$s | Reach %4$s blocks",
+    f"message.{MOD}.bundled_rx_status": "Bundled Radio Receiver | Frequency %1$s (%2$s) | Hears %3$s",
+    f"message.{MOD}.anchor_none": "No Radio Mast 2 to 12 blocks from this Guy Wire Anchor to brace",
+    f"message.{MOD}.anchor_braced": "Bracing the mast at %1$s, %2$s, %3$s (%4$s tall): %5$s of %6$s guy wires, it stands in any storm",
+    f"message.{MOD}.anchor_more": "Bracing the mast at %1$s, %2$s, %3$s (%4$s tall): %5$s of %6$s guy wires",
+    f"message.{MOD}.storm_damaged_owner": "Storm damage: %1$s blew down your %2$s at %3$s, %4$s, %5$s. Right-click it with an Iron Ingot to repair it",
+    f"message.{MOD}.storm_repaired": "Repaired the %s: it's back up",
+    f"message.{MOD}.storm_cause.tornado": "a tornado",
+    f"message.{MOD}.storm_cause.derecho": "a derecho",
+    f"message.{MOD}.storm_cause.hurricane": "a hurricane",
+    f"jade.{MOD}.bundle_range": "Bundle on %s",
+    f"jade.{MOD}.bundle_sending": "Sending: %s",
+    f"jade.{MOD}.bundle_hears": "Hears: %s",
+    f"jade.{MOD}.cable_carries": "Carries: %s",
+    f"jade.{MOD}.cable_size": "%1$s cables, %2$s devices",
+    f"jade.{MOD}.anchor_braces": "Braces the mast at %1$s, %2$s, %3$s (%4$s tall)",
+    f"jade.{MOD}.anchor_enough": "%1$s of %2$s guy wires: braced",
+    f"jade.{MOD}.anchor_short": "%1$s of %2$s guy wires",
+    f"jade.{MOD}.anchor_none": "No mast to brace (2 to 12 blocks out)",
+    f"jade.{MOD}.storm_damaged": "Blown down by %s: right-click it with an Iron Ingot to repair",
+    f"jade.{MOD}.iced": "Iced up: reach -%1$s%% until it thaws (%2$s of %3$s s above freezing)",
+    f"jade.{MOD}.braced": "Braced by %s guy wires",
+    f"jade.{MOD}.not_braced": "Not braced: %1$s of %2$s guy wires (storms can blow it down)",
+    f"jade.{MOD}.braces_short": "Guy wires: %s (too short to blow down)",
+    f"screen.{MOD}.audit.kind_bundled_transmitter": "Bundled Transmitter",
     # v0.53.0: the Radio Weather Station, and Reiko's Weather
     f"block.{MOD}.radio_weather_station": "Radio Weather Station",
     f"block.{MOD}.radio_weather_station.short": "Weather Station",
@@ -2187,6 +2299,36 @@ recipes["radio_weather_station_from_reikos_weather"] = ({
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "reikos_weather:weather_station"}],
     "result": {"count": 1, "id": f"{MOD}:radio_weather_station"},
 }, f"{MOD}:radio_transmitter")
+# v0.54.0: bundled cable and the bundled radio pair, and guy wires.
+recipes["bundled_cable"] = ({
+    "type": "minecraft:crafting_shaped", "category": "redstone",
+    "pattern": ["SSS", "RRR", "SSS"],
+    "key": {"S": {"item": "minecraft:string"}, "R": {"item": "minecraft:redstone"}},
+    "result": {"count": 6, "id": f"{MOD}:bundled_cable"},
+}, "minecraft:redstone")
+recipes["cable_tap"] = ({
+    "type": "minecraft:crafting_shapeless", "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:bundled_cable"}, {"item": "minecraft:redstone_torch"}, {"item": "minecraft:iron_nugget"}],
+    "result": {"count": 1, "id": f"{MOD}:cable_tap"},
+}, f"{MOD}:bundled_cable")
+recipes["bundled_transmitter"] = ({
+    "type": "minecraft:crafting_shapeless", "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:bundled_cable"}],
+    "result": {"count": 1, "id": f"{MOD}:bundled_transmitter"},
+}, f"{MOD}:bundled_cable")
+recipes["bundled_receiver"] = ({
+    "type": "minecraft:crafting_shapeless", "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": f"{MOD}:bundled_cable"}],
+    "result": {"count": 1, "id": f"{MOD}:bundled_receiver"},
+}, f"{MOD}:bundled_cable")
+recipes["radio_transmitter_from_bundled"] = (shapeless("bundled_transmitter", "radio_transmitter"), f"{MOD}:bundled_transmitter")
+recipes["radio_receiver_from_bundled"] = (shapeless("bundled_receiver", "radio_receiver"), f"{MOD}:bundled_receiver")
+recipes["guy_anchor"] = ({
+    "type": "minecraft:crafting_shaped", "category": "building",
+    "pattern": [" C ", " I ", "SSS"],
+    "key": {"C": {"item": "minecraft:chain"}, "I": {"item": "minecraft:iron_ingot"}, "S": {"item": "minecraft:stone"}},
+    "result": {"count": 2, "id": f"{MOD}:guy_anchor"},
+}, f"{MOD}:radio_mast")
 recipes["radio_transmitter_from_weather_station"] = (shapeless("radio_weather_station", "radio_transmitter"), f"{MOD}:radio_weather_station")
 recipes["iron_antenna"] = ({
     "type": "minecraft:crafting_shaped",
@@ -2364,7 +2506,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_delay_receiver", "radio_counter_receiver", "radio_timer_transmitter", "radio_speaker", "radio_status_board",
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
-             "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station"):
+             "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
+             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2373,7 +2516,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
-    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator"):
+    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -2391,7 +2534,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
         }]
     if name in ("radio_transmitter", "radio_timer_transmitter", "radio_signal_recorder", "radio_jammer", "radio_repeater", "radio_converter",
-                "radio_weather_station"):
+                "radio_weather_station", "bundled_transmitter"):
         # v0.45.0: its antenna (only if it has one, so plain ones still stack with older items).
         entry["functions"].append({"function": "minecraft:copy_state", "block": f"{MOD}:{name}", "properties": ["antenna"],
                                    "conditions": [{"condition": "minecraft:inverted", "term": {
@@ -2419,7 +2562,8 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_repeater", f"{MOD}:radio_converter",
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
-               f"{MOD}:radio_weather_station"]
+               f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
+               f"{MOD}:guy_anchor"]
 })
 
 # ---------------------------------------------------------------- game test structure (NBT)

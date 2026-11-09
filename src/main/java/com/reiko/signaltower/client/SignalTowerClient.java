@@ -49,6 +49,7 @@ public final class SignalTowerClient {
         modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) -> {
             event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.AVIATION_BEACON_BE.get(), AviationBeaconRenderer::new);
+            event.registerBlockEntityRenderer(ModRegistry.GUY_ANCHOR_BE.get(), GuyWireRenderer::new); // v0.54.0
         });
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
@@ -127,6 +128,9 @@ public final class SignalTowerClient {
         event.register((stack, tintIndex) -> tintIndex == 0
                 ? com.reiko.signaltower.block.RadioLampBlock.tint(com.reiko.signaltower.block.RadioLampBlock.colorOf(stack), 15) : -1,
                 ModRegistry.RADIO_LAMP_ITEM.get());
+        // v0.54.0: a Cable Tap's band (white on the item).
+        event.register((stack, tintIndex) -> tintIndex == 0 ? com.reiko.signaltower.block.CableTapBlock.tint(null) : -1,
+                ModRegistry.CABLE_TAP_ITEM.get());
     }
 
     private static void registerBlockColors(RegisterColorHandlersEvent.Block event) {
@@ -138,6 +142,9 @@ public final class SignalTowerClient {
                 ? com.reiko.signaltower.block.RadioLampBlock.tint(state.getValue(com.reiko.signaltower.block.RadioLampBlock.COLOR),
                         state.getValue(com.reiko.signaltower.block.RadioLampBlock.POWER)) : -1,
                 ModRegistry.RADIO_LAMP.get());
+        // v0.54.0: a Cable Tap's band, in its color and as bright as what it carries.
+        event.register((state, level, pos, tintIndex) -> tintIndex == 0 ? com.reiko.signaltower.block.CableTapBlock.tint(state) : -1,
+                ModRegistry.CABLE_TAP.get());
     }
 
     /** Leaving a world or server: forget its frequency names (the next one sends its own). */

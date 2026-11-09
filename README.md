@@ -45,6 +45,10 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Signal Scanner** | A handheld direction-finder. It lists every frequency you can hear where you stand, how strong it is and where it comes from, and can tune the radio item in your other hand. |
 | **Wall Redstone** | Redstone dust that sticks to the side of a block, or to a ceiling. It runs up, down and sideways along a wall, across a ceiling and round outside corners onto the next face, loses 1 strength per block like normal dust, connects to normal dust and redstone components, and powers the block it's on. |
 | **Dish Rotator** | A mast segment with a motor in it. In a tower with a Dish Antenna, the redstone strength it gets turns the dish: 0 points it the way its arrow does, each step one sixteenth of a turn clockwise. A lever, a comparator or a Radio Receiver can swing the beam from one base to another. |
+| **Bundled Cable** | A thick cable that carries all 16 dye colors at once, each at its own strength 0–15, with no loss along the way. Sixteen redstone lines in one block. |
+| **Cable Tap** | Joins a Bundled Cable to normal redstone. Set to **in**, it puts the redstone it gets onto its color; set to **out**, it gives that color out as redstone. Dye it to pick the color. |
+| **Bundled Radio Transmitter** and **Bundled Radio Receiver** | Send a whole Bundled Cable over the radio. The transmitter, tuned to F, sends white on F, orange on F+1 ... black on F+15, and the receiver at the other end puts all 16 back onto its own cable. Sixteen wireless lines with one tower. |
+| **Guy Wire Anchor** | Goes on the ground near a tower, and a steel wire runs from it up the mast. Three of them brace a tall tower, so that with Reiko's Weather tornadoes, hurricanes and derechos can't blow it down. |
 
 ![Compact Radio Receivers on a ceiling, on top of a block, on both sides of a block, and on a wall powering a lamp behind it](docs/images/compact-receivers.png)
 
@@ -697,10 +701,39 @@ Since 0.53 this mod works with [Reiko's Weather](https://github.com/Reiko45/Reik
 - **Towers feel the storm they're in.** A storm cell over a tower shortens its reach (rain 15%, thunder 30%, as in Weather and terrain), and towers outside the cell keep their full reach. Without it, rain is everywhere at once. Cells are checked every 2 seconds as they move, and frequencies are worked out again when one arrives or leaves. Jade uses Reiko's Weather's name: "Heavy Rain: reach -15%".
 - **The Radio Weather Station** reads the weather there (a storm cell overhead counts), names it the way Reiko's Weather does ("Heavy Rain", "Sandstorm"), and offers the 7 extra readings above. A Blood Moon reads 15 on the Moon reading.
 - **Recipe:** a Radio Transmitter and Reiko's Weather's own Weather Station also make a Radio Weather Station.
+- **Storms damage towers** (since 0.54): tornadoes, hurricanes and derechos can blow a tall tower down unless it's braced with guy wires, and an ice storm ices up its antenna. See Guy wires and storm damage.
 
 There's no hard dependency either way. Signal Tower reads Reiko's Weather by reflection when it's installed, and if a version changes what it reads it logs that once and falls back to vanilla weather. Reiko's Weather needs no changes. Its own redstone blocks (Weather Station, Tornado Siren, Weather Radar, Weather Vane, Windmill, Seismograph) can also feed any Radio Transmitter like other redstone does.
 
 ![Four Radio Weather Stations in a Reiko's Weather thunderstorm, all lit, with Alex next to them; the Status Board behind them showing 4610: 15 (weather), "Weather Station: Now: Thunderstorm", 4611: 6 (weather code), 4612: 8 (temperature) and 4613: 15 (nearest storm); Jade on the weather-code station "Weather code: Thunderstorm (6)", its scale, "Reach: 45 blocks", "Thunderstorm: reach -30%"; Alex's station screen "Reading: Temperature", "Now: 13 °C (55 °F) → 8", "Sending 8 on 4612"; Alex's pager after the storm was cleared, "Radio Pager: message on 4610 from Weather Station: “Now: Clear”"; and Jade on the nearest-storm station with a hailstorm far to the east, "Nearest storm: Hailstorm, 502 blocks away (10)", "Reach: 64 blocks"](docs/images/weather-station-and-reikos-weather.png)
+
+### Bundled cable
+
+A **Bundled Cable** (since 0.54) carries all 16 dye colors at once: white, orange, magenta ... black, each at its own strength from 0 to 15. Cables join up with the cables next to them in any direction, and a strength put on at one end is the same at the other, however long the run (up to 4,096 cables in one network).
+
+- **Cable Taps** connect it to normal redstone. Put one against a cable: the side touching the cable is its collar, and the colored band on it is its color (white at first; right-click it with a dye to change it). **In** (the default), it reads the redstone around it (a lever, dust, a comparator, a Radio Receiver) and puts it onto its color. **Out**, it gives its color out as redstone on every other side, like a redstone block at that strength. Right-click it with an empty hand to switch.
+- **Several taps on one color:** the strongest wins, as with dust.
+- **Two cables side by side are one network.** To keep two runs apart, leave a gap.
+- **Jade** and an empty-hand right-click on a cable show what it carries: "Carries: Blue 15, Red 15", "4 cables, 4 devices". On a tap: "Cable Tap: Red, in (puts 15 onto it)".
+
+**Over the radio.** A **Bundled Radio Transmitter** is a full-size transmitter that sends a whole cable. Tuned to F, it sends white on F, orange on F+1 ... black on F+15 (the tooltip shows "Frequency 4620 (uses 4620–4635)"). Feed it with a cable touching it, or touching any mast of its tower. A **Bundled Radio Receiver** tuned to the same F hears all 16 and puts them onto the cables touching it, where output taps take them off again. So 16 levers at one base can drive 16 different things at another, with one tower each end.
+
+- Each color is a normal frequency. A plain Radio Receiver (or a lamp, speaker, pager or status board) tuned to F+14 picks out red alone, and a repeater or a converter on one of them passes it on.
+- Everything else about towers holds for each of the 16: reach by height, antennas, weather, fade, jammers, private frequencies, the frequency log and the audit. Its battery pays for one tower, not 16. Its light is on while any color is.
+- **Jade:** "Bundle on 4620–4635", "Sending: Blue 15, Red 15" on the transmitter, "Hears: Blue 15, Red 15" on the receiver.
+- Breaking one keeps its frequency on the item. Put one in the crafting grid to get a plain transmitter or receiver back.
+
+### Guy wires and storm damage
+
+With [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) installed (since 0.54), its worst storms are hard on tall towers:
+
+- **Wind.** A tornado that touches a tower, or a hurricane or derecho cell over it, can blow it down if it's **tall** (4 or more masts under the top) and not **braced**. A tornado does it at once, while a hurricane or derecho has a 10% chance every 2 seconds. A blown-down tower goes quiet, its light off and smoke rising from it, and whoever tuned it is told: "Storm damage: a derecho blew down your Radio Transmitter at 740, -55, 230. Right-click it with an Iron Ingot to repair it". Right-click its top or any of its masts with an **Iron Ingot** and it's back up. Short towers and compact transmitters are never blown down.
+- **Guy wires.** A **Guy Wire Anchor** on the ground 2 to 12 blocks from a tower's mast (up to 6 blocks higher or lower) finds the mast's foot, and a steel wire runs from it to two thirds of the way up. **Three** anchors brace the tower, and then no storm can blow it down. Right-click an anchor for what it braces ("Bracing the mast at 752, -60, 230 (6 tall): 3 of 3 guy wires, it stands in any storm").
+- **Ice.** An ice storm cell over a tower ices its antenna up, with snowflakes around its top: it reaches 30% less until it has thawed, which takes 2 minutes above freezing once the storm has gone (a tower nobody's near stays frozen). Ice doesn't need a tall tower.
+- **Jade** on a tower top: "Not braced: 0 of 3 guy wires (storms can blow it down)" or "Braced by 3 guy wires" (tall towers only), "Blown down by a derecho: right-click it with an Iron Ingot to repair", "Iced up: reach -30% until it thaws (34 of 120 s above freezing)". On an anchor: "Braces the mast at 752, -60, 230 (6 tall)", "3 of 3 guy wires: braced".
+- Without Reiko's Weather nothing is ever blown down or iced. All the numbers (how tall, how many wires, the chance, the reach lost, the thaw time) are in the server config, and `stormDamage = false` turns it all off.
+
+![Dev's Bundled Radio Transmitter on 4620, Jade "Bundle on 4620–4635", "Sending: Blue 15, Red 15", "Reach: 80 blocks", with the red, lime and blue input taps beside it; 24 blocks away Alex's Bundled Radio Receiver, Jade "Hears: Blue 15, Red 15", with the red and blue lamps on its output taps lit and the lime one dark; Jade on Dev's red input tap "Cable Tap: Red, in (puts 15 onto it)", "Carries: Blue 15, Red 15", "4 cables, 4 devices", the red and blue levers on and lime off behind; a tower braced by three guy wires, Jade on an anchor "Braces the mast at 752, -60, 230 (6 tall)", "3 of 3 guy wires: braced"; Dev's unbraced tower after a Reiko's Weather derecho, smoking, Jade "Derecho: reach -30%", "Blown down by a derecho: right-click it with an Iron Ingot to repair", and in chat "Storm damage: a derecho blew down your Radio Transmitter at 740, -55, 230"; and a tower in an ice storm with snowflakes at its top, Jade "Ice Storm: reach -15%", "Iced up: reach -30% until it thaws (0 of 120 s above freezing)"](docs/images/bundled-cable-and-guy-wires.png)
 
 ### Radio Jammers
 
@@ -909,6 +942,30 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **Wall Redstone:** put one Redstone Dust in the crafting grid to get one Wall Redstone, and back again the same way. To place it, right-click the side of any solid block, or its underside for a ceiling.
 
+**Bundled Cable** (makes 6):
+
+```
+     S  S  S
+     R  R  R
+     S  S  S
+
+S = String   R = Redstone Dust
+```
+
+**Cable Tap:** a Bundled Cable, a Redstone Torch and an Iron Nugget, in any arrangement in the crafting grid.
+
+**Bundled Radio Transmitter:** a Radio Transmitter and a Bundled Cable, in any arrangement in the crafting grid. **Bundled Radio Receiver:** a Radio Receiver and a Bundled Cable. Put either in the grid on its own to get the plain one back.
+
+**Guy Wire Anchor** (makes 2):
+
+```
+     .  C  .
+     .  I  .
+     S  S  S
+
+C = Chain   I = Iron Ingot   S = Stone
+```
+
 ## Building and running
 
 You need **Java 21**. If Gradle can't find it, it downloads one automatically.
@@ -972,6 +1029,16 @@ src/main/java/com/reiko/signaltower/
   blockentity/SolarPanelBlockEntity.java  sunlight (like a Daylight Detector) into charge for the battery under it
   radio/MastBuilder.java                 a mast used on a tower goes in under its top (lifting the top and what's on it)
   block/DishRotatorBlock.java            the Dish Rotator: a mast whose redstone turns the dish on top
+  radio/BundledCables.java               bundled cable networks: what each color carries, feeding taps and bundled transmitters
+  block/BundledCableBlock.java           the cable: joins its neighbors, shows what it carries
+  block/CableTapBlock.java               a tap: in (redstone onto its color) or out (its color as redstone), dye for the color
+  block/BundledTransmitterBlock.java, BundledReceiverBlock.java  the bundled radio pair
+  blockentity/BundledTransmitterBlockEntity.java  sends the 16 colors on F..F+15 (SignalNetwork.updateBundle)
+  blockentity/BundledReceiverBlockEntity.java  hears F..F+15 and puts them on its cables
+  radio/StormDamage.java                 storm damage and ice with Reiko's Weather: who's at risk, blowing down, repairing
+  block/GuyAnchorBlock.java              the Guy Wire Anchor
+  blockentity/GuyAnchorBlockEntity.java  finds the mast it braces and tells the network
+  client/GuyWireRenderer.java            draws the wire from an anchor up the mast
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
   blockentity/TelegraphBlockEntity.java  checks in with the network; clicks and pulses; sending cooldown
@@ -1246,7 +1313,12 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 163. the Radio Weather Station in the weather (in a batch of its own, since the weather is the whole dimension's): clear 0, rain 8, thunder 15 on a receiver; announcing, "Now: Rain" goes to a telegraph on its frequency (it clicks, its screen shows it from "Weather Station") only after the rain has held for two looks; a flicker back isn't announced; nothing while it's paused.
 164. Reiko's Weather (in a batch of its own): without it, three readings on offer, the others read 0 and say they need it, nothing is read from it, and its recipe isn't there. With it (`-PwithWeather=...`): the recipe is there; in rain the weather code is 4, storm danger 5, weather 8 named by Reiko's Weather, with temperature, season (its day counted from 1), wind and "No storms" read from it; in a thunderstorm 6 on a receiver, danger 15, weather 15, and Jade names it; a heavy rain cell over a tower with clear skies elsewhere cuts its reach to 85 there and not 5,000 blocks away, the tower's frequency is worked out again, the station reads rain, code 5 and the storm overhead (15), and 300 blocks from the cell's edge reads 12; switched off, back to vanilla weather.
 
-All 164 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where test 164 checks the readings from it.
+165. Bundled Cable: a line of 9 cables joins up (arms drawn, and to the taps on it); a red input tap fed by a redstone block puts 15 on red, and two blue taps on one run of dust put the stronger (10) on blue; the output taps on red, blue and white give 15, 10 and 0 out, and a lamp by the red one lights; the network is 9 cables and 6 devices; right-clicking a tap switches it to in and back out; a green dye recolors a tap (red off, green on); breaking a cable in the middle cuts the far taps off, mending it brings them back; Jade shows what a cable carries;
+166. the bundled radio pair: a Bundled Radio Transmitter on 4571 with red and lime on its cable sends red on 4585 and lime on 4576; a plain receiver on 4585 picks out red, one on 4571 (white) hears nothing; a Bundled Radio Receiver on 4571 puts red and lime back on its cable (white 0); one on a mast is fed through the mast; its light is on; the log has red's turn-on; the bundle is saved; Jade on both ends; lime off at one end goes off at the other; broken, its colors go;
+167. guy wires and storm damage (no storm needed): a tower 5 masts tall is at risk; three anchors near it each find its foot and brace it (Jade on the tower and on an anchor), one taken away and it's at risk again; blown down, it goes quiet (its receiver dark, Jade says so) and that's saved, a stick doesn't repair it, an Iron Ingot on one of its masts does (one used), and a second ingot does nothing; iced, it reaches 30% less (Jade, saved) until it has thawed 2 minutes' worth; a tower that's gone takes its damage and ice with it;
+168. storm damage with Reiko's Weather (in a batch of its own): without it nothing blows down and ice melts; with it, under a derecho cell a tall unbraced tower blows down and a braced one and a short one stand; an ice storm ices up the tower under it; a tornado touches the tower it's at and not one 30 blocks off; once the ice storm has gone, above freezing, the tower thaws.
+
+All 168 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164 and 168 check what's read from it.
 
 ## License
 

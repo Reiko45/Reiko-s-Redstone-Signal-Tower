@@ -106,6 +106,10 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             // v0.42.0: full strength while its clock is on, unless redstone pauses it.
             return level.getBlockEntity(pos) instanceof TimerTransmitterBlockEntity timer ? timer.output(level) : 0;
         }
+        if (state.getBlock() instanceof com.reiko.signaltower.block.BundledTransmitterBlock) {
+            // v0.54.0: its strongest color (it sends each on its own frequency).
+            return level.getBlockEntity(pos) instanceof BundledTransmitterBlockEntity bundled ? bundled.strongest() : 0;
+        }
         if (state.getBlock() instanceof com.reiko.signaltower.block.RadioWeatherStationBlock) {
             // v0.53.0: its reading of the weather, time or moon where it stands (redstone only pauses it).
             return level.getBlockEntity(pos) instanceof WeatherStationBlockEntity station ? station.output(level) : 0;

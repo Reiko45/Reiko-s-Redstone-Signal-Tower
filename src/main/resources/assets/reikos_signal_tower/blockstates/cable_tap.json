@@ -1,0 +1,56 @@
+{
+  "variants": {
+    "facing=up,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in"
+    },
+    "facing=up,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out"
+    },
+    "facing=down,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in",
+      "x": 180
+    },
+    "facing=down,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out",
+      "x": 180
+    },
+    "facing=north,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in",
+      "x": 90
+    },
+    "facing=north,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out",
+      "x": 90
+    },
+    "facing=south,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in",
+      "x": 90,
+      "y": 180
+    },
+    "facing=south,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in",
+      "x": 90,
+      "y": 270
+    },
+    "facing=west,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out",
+      "x": 90,
+      "y": 270
+    },
+    "facing=east,output=false": {
+      "model": "reikos_signal_tower:block/cable_tap_in",
+      "x": 90,
+      "y": 90
+    },
+    "facing=east,output=true": {
+      "model": "reikos_signal_tower:block/cable_tap_out",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

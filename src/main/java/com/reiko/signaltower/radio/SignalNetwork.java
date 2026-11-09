@@ -403,9 +403,13 @@ public final class SignalNetwork extends SavedData {
     public void updateTransmitter(BlockPos pos, int frequency, int power, int reach, @Nullable UUID tunedBy, boolean compact,
                                   @Nullable Cause cause) {
         BlockPos key = pos.immutable();
+        Bundle bundle = bundles.remove(key);
+        if (bundle != null) {
+            unindexBundle(key, bundle); // v0.54.0: a plain transmitter took a bundled one's place
+        }
         Transmitter next = new Transmitter(frequency, power, reach, tunedBy, compact);
         Transmitter previous = transmitters.put(key, next);
-        if (next.equals(previous)) {
+        if (next.equals(previous) && bundle == null) {
             return;
         }
         if (power > 0 && (previous == null || previous.power() == 0 || previous.frequency() != frequency)
@@ -434,6 +438,19 @@ public final class SignalNetwork extends SavedData {
             removeFromIndex(pos, previous.frequency());
             setDirty();
         }
+        Bundle bundle = bundles.remove(pos);
+        if (bundle != null) {
+            unindexBundle(pos, bundle); // v0.54.0
+            setDirty();
+        }
+        forgetStorms(pos);
+    }
+
+    /** v0.54.0: a tower went: its storm damage and ice go with it. */
+    private void forgetStorms(BlockPos pos) {
+        if (damaged.remove(pos) != null | iced.remove(pos) != null) {
+            setDirty();
+        }
     }
 
     private void removeFromIndex(BlockPos pos, int frequency) {
@@ -445,6 +462,91 @@ public final class SignalNetwork extends SavedData {
             }
         }
         bump(frequency);
+    }
+
+    // ---- Bundles (v0.54.0) ----
+
+    /** How many colors a bundle carries: white, orange, ... black, as dyes are numbered. */
+    public static final int BUNDLE_SIZE = 16;
+
+    /**
+     * What a Bundled Radio Transmitter sends: color {@code c} on frequency {@code base + c}, at
+     * {@code channels[c]}. Saved, so a bundle tower in an unloaded chunk keeps sending all 16.
+     */
+    public record Bundle(int base, int[] channels) {
+        public int channel(int frequency) {
+            int c = frequency - base;
+            return c >= 0 && c < BUNDLE_SIZE ? channels[c] : 0;
+        }
+
+        public boolean covers(int frequency) {
+            return frequency >= base && frequency < base + BUNDLE_SIZE && frequency <= Frequency.MAX;
+        }
+    }
+
+    private final Map<BlockPos, Bundle> bundles = new HashMap<>();
+
+    /** The bundle the transmitter at {@code pos} sends, or null if it isn't a bundled one. */
+    public @Nullable Bundle bundleAt(BlockPos pos) {
+        return bundles.get(pos);
+    }
+
+    /**
+     * v0.54.0: a Bundled Radio Transmitter checks in. It's one tower (its reach, power cost,
+     * lightning, dish and Ender Antenna as usual, "sending" while any color is on), and 16
+     * transmitters for listening: color c is heard on {@code base + c} at {@code channels[c]}, so a
+     * plain receiver on base + 3 picks out light blue, and repeaters and converters pass colors on.
+     */
+    public void updateBundle(BlockPos pos, int base, int[] channels, int reach, @Nullable UUID tunedBy) {
+        BlockPos key = pos.immutable();
+        int max = 0;
+        for (int c = 0; c < BUNDLE_SIZE; c++) {
+            max = Math.max(max, channels[c]);
+        }
+        Transmitter main = new Transmitter(base, max, reach, tunedBy, false);
+        Transmitter previousMain = transmitters.put(key, main);
+        Bundle previous = bundles.get(key);
+        if (previous != null && previous.base() != base) {
+            unindexBundle(key, previous);
+            previous = null;
+        } else if (previous == null && previousMain != null) {
+            removeFromIndex(key, previousMain.frequency()); // it was a plain transmitter here
+        }
+        boolean changed = !main.equals(previousMain);
+        for (int c = 0; c < BUNDLE_SIZE; c++) {
+            int frequency = base + c;
+            if (frequency > Frequency.MAX) {
+                break;
+            }
+            Transmitter entry = new Transmitter(frequency, channels[c], reach, tunedBy, false);
+            Transmitter was = byFrequency.computeIfAbsent(frequency, f -> new HashMap<>()).put(key, entry);
+            if (!entry.equals(was)) {
+                if (channels[c] > 0 && (was == null || was.power() == 0) && !blocked(null, frequency, tunedBy)) {
+                    recordTurnOn(frequency, ownCoverage(key, reach), Cause.transmitter(key, tunedBy));
+                }
+                bump(frequency);
+                changed = true;
+            }
+        }
+        bundles.put(key, new Bundle(base, channels.clone()));
+        if (changed) {
+            setDirty();
+        }
+    }
+
+    /** Takes a bundle's 16 frequencies out of the index. */
+    private void unindexBundle(BlockPos pos, Bundle bundle) {
+        for (int c = 0; c < BUNDLE_SIZE && bundle.base() + c <= Frequency.MAX; c++) {
+            removeFromIndex(pos, bundle.base() + c);
+        }
+    }
+
+    /** Puts a loaded bundle's 16 frequencies in the index (the main entry is the base's). */
+    private void indexBundle(BlockPos pos, Bundle bundle, Transmitter main) {
+        for (int c = 0; c < BUNDLE_SIZE && bundle.base() + c <= Frequency.MAX; c++) {
+            byFrequency.computeIfAbsent(bundle.base() + c, f -> new HashMap<>()).put(pos,
+                    new Transmitter(bundle.base() + c, bundle.channels()[c], main.reach(), main.tunedBy(), false));
+        }
     }
 
     // ---- Repeaters and converters ----
@@ -495,6 +597,7 @@ public final class SignalNetwork extends SavedData {
             removeRepeaterFromIndex(pos, previous);
             setDirty();
         }
+        forgetStorms(pos);
     }
 
     private void removeRepeaterFromIndex(BlockPos pos, Repeater repeater) {
@@ -1454,6 +1557,17 @@ public final class SignalNetwork extends SavedData {
                 stale.add(at);
                 continue;
             }
+            Bundle bundle = bundles.get(at);
+            if (bundle != null) {
+                // v0.54.0: each color on its own frequency.
+                for (int c = 0; c < BUNDLE_SIZE && bundle.base() + c <= Frequency.MAX; c++) {
+                    int sent = bundle.channels()[c];
+                    int heard = sent > 0 && !isDown(at) && !blocked(level, bundle.base() + c, tx.tunedBy())
+                            ? Math.max(0, fade(sent, fadeFraction(distSq, reach)) - hillLoss(level, at, pos)) : 0;
+                    offer(best, bundle.base() + c, new BestTransmitter(heard, distSq, at, 1, Source.TRANSMITTER));
+                }
+                continue;
+            }
             int power = tx.power() > 0 && !isDown(at)
                     ? Math.max(0, (tx.compact() ? tx.power() : fade(tx.power(), fadeFraction(distSq, reach))) - hillLoss(level, at, pos)) : 0;
             offer(best, tx.frequency(), new BestTransmitter(power, distSq, at, 1, Source.TRANSMITTER));
@@ -1808,6 +1922,7 @@ public final class SignalNetwork extends SavedData {
             removeJammerFromIndex(pos, previous.frequency());
             setDirty();
         }
+        forgetStorms(pos);
     }
 
     private void removeJammerFromIndex(BlockPos pos, int frequency) {
@@ -2020,8 +2135,11 @@ public final class SignalNetwork extends SavedData {
         if (!java.util.Objects.equals(previous, target)) {
             Transmitter tx = transmitters.get(pos);
             if (tx != null) {
-                bumpLinked(previous, tx.frequency());
-                bumpLinked(target, tx.frequency());
+                Bundle bundle = bundles.get(pos);
+                for (int c = 0; c < (bundle != null ? BUNDLE_SIZE : 1) && tx.frequency() + c <= Frequency.MAX; c++) {
+                    bumpLinked(previous, tx.frequency() + c);
+                    bumpLinked(target, tx.frequency() + c);
+                }
             }
             setDirty();
         }
@@ -2089,6 +2207,21 @@ public final class SignalNetwork extends SavedData {
                     continue;
                 }
                 Transmitter tx = network.transmitters.get(link.getKey());
+                Bundle bundle = network.bundles.get(link.getKey());
+                if (tx != null && bundle != null && !tx.compact()) {
+                    // v0.54.0: a bundle sends every color across.
+                    for (int c = 0; c < BUNDLE_SIZE && bundle.base() + c <= Frequency.MAX; c++) {
+                        int f = bundle.base() + c;
+                        if (frequency >= 0 && f != frequency || network.blocked(other, f, tx.tunedBy())) {
+                            continue;
+                        }
+                        if (result == null) result = new ArrayList<>();
+                        result.add(new Phantom(CrossDimension.arrival(other, here, link.getKey()), f,
+                                network.isDown(link.getKey()) ? 0 : bundle.channels()[c], network.reachNow(other, link.getKey(), tx.reach()),
+                                other.dimension(), link.getKey()));
+                    }
+                    continue;
+                }
                 if (tx == null || tx.compact() || frequency >= 0 && tx.frequency() != frequency
                         || network.blocked(other, tx.frequency(), tx.tunedBy())) {
                     continue;
@@ -2109,9 +2242,127 @@ public final class SignalNetwork extends SavedData {
     /** Charge each tower owes, below 1 (it pays in whole units; not saved). */
     private final Map<BlockPos, Double> owed = new HashMap<>();
 
-    /** True if the tower at {@code pos} sends (relays, jams) nothing right now: lightning or no power. */
+    /** True if the tower at {@code pos} sends (relays, jams) nothing right now: lightning, no power, or (v0.54.0) storm damage. */
     public boolean isDown(BlockPos pos) {
-        return isKnockedOut(pos) || isDrained(pos);
+        return isKnockedOut(pos) || isDrained(pos) || damaged.containsKey(pos);
+    }
+
+    // ---- Storm damage, ice and guy wires (v0.54.0) ----
+
+    /** Towers blown down by a storm, by their top, with what did it ("derecho", "tornado"). Saved. */
+    private final Map<BlockPos, String> damaged = new HashMap<>();
+    /** Towers whose antenna is iced up, by their top, with how many ticks of thaw they've had. Saved. */
+    private final Map<BlockPos, Integer> iced = new HashMap<>();
+    /** Guy Wire Anchors, with the foot of the mast column each one braces. Saved. */
+    private final Map<BlockPos, BlockPos> anchors = new HashMap<>();
+
+    public @Nullable String damageCause(BlockPos top) {
+        return damaged.get(top);
+    }
+
+    public Set<BlockPos> damagedTowers() {
+        return Set.copyOf(damaged.keySet());
+    }
+
+    /** A storm blew the tower whose top is at {@code top} down: it's quiet until {@link #repair}. */
+    public void damage(BlockPos top, String cause) {
+        if (damaged.put(top.immutable(), cause) == null) {
+            relayEpoch++;
+            bumpTower(top);
+        }
+        setDirty();
+    }
+
+    /** Puts a storm-damaged tower right again; false if it wasn't damaged. */
+    public boolean repair(BlockPos top) {
+        if (damaged.remove(top) == null) {
+            return false;
+        }
+        relayEpoch++;
+        bumpTower(top);
+        setDirty();
+        return true;
+    }
+
+    public boolean isIced(BlockPos top) {
+        return iced.containsKey(top);
+    }
+
+    /** Ticks of thaw an iced tower has had (above freezing, after its ice storm). */
+    public int thawed(BlockPos top) {
+        return iced.getOrDefault(top, 0);
+    }
+
+    public Set<BlockPos> icedTowers() {
+        return Set.copyOf(iced.keySet());
+    }
+
+    /** An ice storm iced up the tower's antenna (again: it starts thawing from scratch). */
+    public void ice(BlockPos top) {
+        Integer was = iced.put(top.immutable(), 0);
+        if (was == null) {
+            relayEpoch++;
+            bumpTower(top);
+        }
+        if (was == null || was != 0) {
+            setDirty();
+        }
+    }
+
+    /** {@code ticks} more of thaw; the ice is gone after {@code needed}. True if that thawed it. */
+    public boolean thaw(BlockPos top, int ticks, int needed) {
+        Integer was = iced.get(top);
+        if (was == null) {
+            return false;
+        }
+        if (was + ticks >= needed) {
+            unice(top);
+            return true;
+        }
+        iced.put(top, was + ticks);
+        setDirty();
+        return false;
+    }
+
+    /** The ice is gone. */
+    public void unice(BlockPos top) {
+        if (iced.remove(top) != null) {
+            relayEpoch++;
+            bumpTower(top);
+            setDirty();
+        }
+    }
+
+    /** A Guy Wire Anchor at {@code anchor} braces the mast column whose foot is {@code base} (null: none). */
+    public void setAnchor(BlockPos anchor, @Nullable BlockPos base) {
+        BlockPos was = base == null ? anchors.remove(anchor) : anchors.put(anchor.immutable(), base.immutable());
+        if (!java.util.Objects.equals(was, base)) {
+            setDirty();
+        }
+    }
+
+    /** How many Guy Wire Anchors brace the mast column whose foot is {@code base}. */
+    public int bracesOf(BlockPos base) {
+        int count = 0;
+        for (BlockPos braced : anchors.values()) {
+            if (braced.equals(base)) count++;
+        }
+        return count;
+    }
+
+    /** Every full-size tower top: transmitters (not compact), repeaters, converters, jammers. */
+    public List<BlockPos> towerTops() {
+        return lightningTargets();
+    }
+
+    /** Who tuned the tower at {@code pos} (null if nobody's known). */
+    public @Nullable UUID tunerOf(BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        if (tx != null) return tx.tunedBy();
+        Repeater repeater = repeaters.get(pos);
+        if (repeater != null) return repeater.tunedBy();
+        Jammer jammer = jammers.get(pos);
+        return jammer != null ? jammer.tunedBy() : null;
     }
 
     /** True if the tower at {@code pos} is out of power (and power cost is on). */
@@ -2188,7 +2439,8 @@ public final class SignalNetwork extends SavedData {
     public List<Map.Entry<BlockPos, Integer>> towersOn(int frequency) {
         List<Map.Entry<BlockPos, Integer>> result = new ArrayList<>();
         transmitters.forEach((pos, tx) -> {
-            if (tx.frequency() == frequency) result.add(Map.entry(pos, 0));
+            Bundle bundle = bundles.get(pos);
+            if (bundle != null ? bundle.covers(frequency) : tx.frequency() == frequency) result.add(Map.entry(pos, 0));
         });
         repeaters.forEach((pos, repeater) -> {
             if (repeater.output() == frequency) result.add(Map.entry(pos, 1));
@@ -2206,6 +2458,10 @@ public final class SignalNetwork extends SavedData {
     private void bumpTower(BlockPos pos) {
         Transmitter tx = transmitters.get(pos);
         if (tx != null) bump(tx.frequency());
+        Bundle bundle = bundles.get(pos);
+        if (bundle != null) {
+            for (int c = 1; c < BUNDLE_SIZE && bundle.base() + c <= Frequency.MAX; c++) bump(bundle.base() + c);
+        }
         Repeater repeater = repeaters.get(pos);
         if (repeater != null) bump(repeater.output());
         Jammer jammer = jammers.get(pos);
@@ -2269,7 +2525,11 @@ public final class SignalNetwork extends SavedData {
 
     /** {@code reach} of a tower (not a compact transmitter) at {@code pos}, in the weather where it stands now. */
     public int reachNow(@Nullable ServerLevel level, BlockPos pos, int reach) {
-        return weatherAt(level, pos).apply(reach);
+        int now = weatherAt(level, pos).apply(reach);
+        if (!iced.isEmpty() && iced.containsKey(pos)) {
+            now = now * (100 - com.reiko.signaltower.Config.ICE_REACH_LOSS_PERCENT.get()) / 100; // v0.54.0: an iced-up antenna
+        }
+        return now;
     }
 
     private int reachNow(@Nullable ServerLevel level, BlockPos pos, Transmitter tx) {
@@ -2289,6 +2549,7 @@ public final class SignalNetwork extends SavedData {
         }
         if (level.getGameTime() % STORM_CHECK_TICKS == 0) {
             watchStorms(level);
+            StormDamage.check(level, this); // v0.54.0
         }
     }
 
@@ -2489,6 +2750,47 @@ public final class SignalNetwork extends SavedData {
         if (!drained.isEmpty()) {
             tag.putLongArray("drained", drained.stream().mapToLong(BlockPos::asLong).toArray());
         }
+        if (!damaged.isEmpty()) {
+            ListTag damagedList = new ListTag(); // v0.54.0
+            damaged.forEach((pos, cause) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putString("cause", cause);
+                damagedList.add(entry);
+            });
+            tag.put("storm_damaged", damagedList);
+        }
+        if (!iced.isEmpty()) {
+            ListTag icedList = new ListTag();
+            iced.forEach((pos, thawed) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putInt("thawed", thawed);
+                icedList.add(entry);
+            });
+            tag.put("iced", icedList);
+        }
+        if (!anchors.isEmpty()) {
+            ListTag anchorList = new ListTag();
+            anchors.forEach((pos, base) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putLong("base", base.asLong());
+                anchorList.add(entry);
+            });
+            tag.put("guy_anchors", anchorList);
+        }
+        if (!bundles.isEmpty()) {
+            ListTag bundleList = new ListTag(); // v0.54.0
+            bundles.forEach((pos, bundle) -> {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("pos", pos.asLong());
+                entry.putInt("base", bundle.base());
+                entry.putIntArray("channels", bundle.channels());
+                bundleList.add(entry);
+            });
+            tag.put("bundles", bundleList);
+        }
         if (!links.isEmpty()) {
             ListTag linkList = new ListTag();
             links.forEach((pos, target) -> {
@@ -2642,6 +2944,36 @@ public final class SignalNetwork extends SavedData {
         }
         for (long packed : tag.getLongArray("drained")) {
             network.drained.add(BlockPos.of(packed));
+        }
+        ListTag damagedList = tag.getList("storm_damaged", Tag.TAG_COMPOUND);
+        for (int i = 0; i < damagedList.size(); i++) {
+            CompoundTag entry = damagedList.getCompound(i);
+            network.damaged.put(BlockPos.of(entry.getLong("pos")), entry.getString("cause"));
+        }
+        ListTag icedList = tag.getList("iced", Tag.TAG_COMPOUND);
+        for (int i = 0; i < icedList.size(); i++) {
+            CompoundTag entry = icedList.getCompound(i);
+            network.iced.put(BlockPos.of(entry.getLong("pos")), Math.max(0, entry.getInt("thawed")));
+        }
+        ListTag anchorList = tag.getList("guy_anchors", Tag.TAG_COMPOUND);
+        for (int i = 0; i < anchorList.size(); i++) {
+            CompoundTag entry = anchorList.getCompound(i);
+            network.anchors.put(BlockPos.of(entry.getLong("pos")), BlockPos.of(entry.getLong("base")));
+        }
+        ListTag bundleList = tag.getList("bundles", Tag.TAG_COMPOUND);
+        for (int i = 0; i < bundleList.size(); i++) {
+            CompoundTag entry = bundleList.getCompound(i);
+            BlockPos pos = BlockPos.of(entry.getLong("pos"));
+            int[] saved = entry.getIntArray("channels");
+            Transmitter main = network.transmitters.get(pos);
+            if (main == null || saved.length != BUNDLE_SIZE) {
+                continue;
+            }
+            int[] channels = new int[BUNDLE_SIZE];
+            for (int c = 0; c < BUNDLE_SIZE; c++) channels[c] = Math.max(0, Math.min(15, saved[c]));
+            Bundle bundle = new Bundle(main.frequency(), channels);
+            network.bundles.put(pos, bundle);
+            network.indexBundle(pos, bundle, main);
         }
         ListTag linkList = tag.getList("links", Tag.TAG_COMPOUND);
         for (int i = 0; i < linkList.size(); i++) {

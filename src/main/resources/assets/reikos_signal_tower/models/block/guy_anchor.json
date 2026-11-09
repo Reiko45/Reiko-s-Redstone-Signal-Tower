@@ -1,0 +1,206 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "minecraft:block/gray_concrete",
+    "base": "minecraft:block/gray_concrete",
+    "bolt": "reikos_signal_tower:block/radio_mast_post"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        0,
+        3
+      ],
+      "to": [
+        13,
+        3,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base",
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#base",
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#base",
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#base",
+          "uv": [
+            3,
+            13,
+            13,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#base",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ]
+        },
+        "down": {
+          "texture": "#base",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ],
+          "cullface": "down"
+        }
+      }
+    },
+    {
+      "from": [
+        7,
+        3,
+        7
+      ],
+      "to": [
+        9,
+        6,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            8,
+            3
+          ]
+        },
+        "south": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            8,
+            3
+          ]
+        },
+        "east": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            8,
+            3
+          ]
+        },
+        "west": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            8,
+            3
+          ]
+        },
+        "up": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            8,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        6.5,
+        6,
+        7.5
+      ],
+      "to": [
+        9.5,
+        7,
+        8.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        },
+        "down": {
+          "texture": "#bolt",
+          "uv": [
+            6,
+            0,
+            9,
+            1
+          ]
+        }
+      }
+    }
+  ]
+}

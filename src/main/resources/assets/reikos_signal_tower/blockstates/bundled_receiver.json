@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "reikos_signal_tower:block/bundled_receiver"
+    },
+    "lit=true": {
+      "model": "reikos_signal_tower:block/bundled_receiver_on"
+    }
+  }
+}

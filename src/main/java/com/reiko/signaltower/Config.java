@@ -150,6 +150,35 @@ public final class Config {
                     "Server operators can always make any private frequency public again.")
             .defineInRange("privateFrequenciesPerPlayer", 32, 0, 100_000);
 
+    // v0.54.0: storm damage (only with Reiko's Weather) and guy wires.
+    public static final ModConfigSpec.BooleanValue STORM_DAMAGE = BUILDER
+            .comment("With Reiko's Weather: if true, a tornado, hurricane or derecho can blow a tall tower down (it goes",
+                    "quiet until someone repairs it with an Iron Ingot), unless enough Guy Wire Anchors brace it, and",
+                    "an ice storm ices up antennas (less reach until it thaws). Without Reiko's Weather nothing happens.")
+            .define("stormDamage", true);
+
+    public static final ModConfigSpec.IntValue STORM_DAMAGE_MIN_MASTS = BUILDER
+            .comment("How many masts a tower needs under its top before storms can blow it down (shorter ones stand).")
+            .defineInRange("stormDamageMinMasts", 4, 0, 4096);
+
+    public static final ModConfigSpec.IntValue GUY_WIRES_TO_BRACE = BUILDER
+            .comment("How many Guy Wire Anchors must brace a tower's mast for storms not to blow it down.")
+            .defineInRange("guyWiresToBrace", 3, 1, 64);
+
+    public static final ModConfigSpec.IntValue STORM_DAMAGE_CHANCE_PERCENT = BUILDER
+            .comment("While a hurricane or derecho blows over a tall, unbraced tower: the chance, every 2 seconds, that it",
+                    "blows down. A tornado touching it always does.")
+            .defineInRange("stormDamageChancePercent", 10, 0, 100);
+
+    public static final ModConfigSpec.IntValue ICE_REACH_LOSS_PERCENT = BUILDER
+            .comment("How much reach a tower's iced-up antenna loses after an ice storm, in percent (on top of the weather's).")
+            .defineInRange("iceReachLossPercent", 30, 0, 100);
+
+    public static final ModConfigSpec.IntValue ICE_THAW_SECONDS = BUILDER
+            .comment("How long the ice takes to thaw once the ice storm has moved on, counting only time above freezing",
+                    "where the tower's top is.")
+            .defineInRange("iceThawSeconds", 120, 0, 86400);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

@@ -381,6 +381,43 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
 
+    /** v0.54.0: Bundled Cable, Cable Tap, and the bundled radio pair. */
+    public static final DeferredBlock<com.reiko.signaltower.block.BundledCableBlock> BUNDLED_CABLE = BLOCKS.register("bundled_cable",
+            () -> new com.reiko.signaltower.block.BundledCableBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(0.3F)
+                    .sound(SoundType.WOOL)
+                    .noOcclusion()));
+    public static final DeferredBlock<com.reiko.signaltower.block.CableTapBlock> CABLE_TAP = BLOCKS.register("cable_tap",
+            () -> new com.reiko.signaltower.block.CableTapBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(1.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+    public static final DeferredBlock<com.reiko.signaltower.block.BundledTransmitterBlock> BUNDLED_TRANSMITTER = BLOCKS.register("bundled_transmitter",
+            () -> new com.reiko.signaltower.block.BundledTransmitterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 7 : 0)));
+    public static final DeferredBlock<com.reiko.signaltower.block.BundledReceiverBlock> BUNDLED_RECEIVER = BLOCKS.register("bundled_receiver",
+            () -> new com.reiko.signaltower.block.BundledReceiverBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .lightLevel(state -> state.getValue(com.reiko.signaltower.block.BundledReceiverBlock.LIT) ? 5 : 0)));
+
+    /** v0.54.0: braces a tower's mast against storms. */
+    public static final DeferredBlock<com.reiko.signaltower.block.GuyAnchorBlock> GUY_ANCHOR = BLOCKS.register("guy_anchor",
+            () -> new com.reiko.signaltower.block.GuyAnchorBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.STONE)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.STONE)
+                    .noOcclusion()));
+
     /** A transmitter that broadcasts the weather, the time or the moon where it stands (v0.53.0). */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioWeatherStationBlock> RADIO_WEATHER_STATION = BLOCKS.register("radio_weather_station",
             () -> new com.reiko.signaltower.block.RadioWeatherStationBlock(BlockBehaviour.Properties.of()
@@ -508,6 +545,11 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_counter_receiver", RADIO_COUNTER_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_TIMER_TRANSMITTER_ITEM =
             ITEMS.registerSimpleBlockItem("radio_timer_transmitter", RADIO_TIMER_TRANSMITTER);
+    public static final DeferredItem<BlockItem> GUY_ANCHOR_ITEM = ITEMS.registerSimpleBlockItem("guy_anchor", GUY_ANCHOR);
+    public static final DeferredItem<BlockItem> BUNDLED_CABLE_ITEM = ITEMS.registerSimpleBlockItem("bundled_cable", BUNDLED_CABLE);
+    public static final DeferredItem<BlockItem> CABLE_TAP_ITEM = ITEMS.registerSimpleBlockItem("cable_tap", CABLE_TAP);
+    public static final DeferredItem<BlockItem> BUNDLED_TRANSMITTER_ITEM = ITEMS.registerSimpleBlockItem("bundled_transmitter", BUNDLED_TRANSMITTER);
+    public static final DeferredItem<BlockItem> BUNDLED_RECEIVER_ITEM = ITEMS.registerSimpleBlockItem("bundled_receiver", BUNDLED_RECEIVER);
     public static final DeferredItem<BlockItem> RADIO_WEATHER_STATION_ITEM =
             ITEMS.registerSimpleBlockItem("radio_weather_station", RADIO_WEATHER_STATION);
     public static final DeferredItem<BlockItem> RADIO_SIGNAL_RECORDER_ITEM =
@@ -598,6 +640,16 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity>> TIMER_TRANSMITTER_BE =
             BLOCK_ENTITIES.register("radio_timer_transmitter",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity::new, RADIO_TIMER_TRANSMITTER.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.GuyAnchorBlockEntity>> GUY_ANCHOR_BE =
+            BLOCK_ENTITIES.register("guy_anchor",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.GuyAnchorBlockEntity::new, GUY_ANCHOR.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.BundledTransmitterBlockEntity>> BUNDLED_TRANSMITTER_BE =
+            BLOCK_ENTITIES.register("bundled_transmitter",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.BundledTransmitterBlockEntity::new, BUNDLED_TRANSMITTER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.BundledReceiverBlockEntity>> BUNDLED_RECEIVER_BE =
+            BLOCK_ENTITIES.register("bundled_receiver",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.BundledReceiverBlockEntity::new, BUNDLED_RECEIVER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.WeatherStationBlockEntity>> WEATHER_STATION_BE =
             BLOCK_ENTITIES.register("radio_weather_station",
