@@ -1,0 +1,35 @@
+{
+  "parent": "reikos_signal_tower:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:compass"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.lost_signal.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.lost_signal.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "found_a_tower": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "structures": "reikos_signal_tower:radio_tower"
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "found_a_tower"
+    ]
+  ]
+}

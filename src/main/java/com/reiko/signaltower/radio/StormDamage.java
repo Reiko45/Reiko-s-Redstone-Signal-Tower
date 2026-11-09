@@ -137,9 +137,15 @@ public final class StormDamage {
             if (!tornado && !gale) {
                 continue;
             }
-            if (assess(level, network, top).atRisk()
+            Assessment assessment = assess(level, network, top);
+            if (assessment.atRisk()
                     && (tornado || level.random.nextInt(100) < (chanceForTests != null ? chanceForTests : Config.STORM_DAMAGE_CHANCE_PERCENT.get()))) {
                 blowDown(level, network, top, tornado ? "tornado" : type);
+            } else if (assessment.tall() && assessment.braced()) {
+                // v0.56.0: Weathered the Storm, for its tuner and whoever's watching
+                com.reiko.signaltower.advancement.TowerAdvancements.fire(level, top,
+                        com.reiko.signaltower.advancement.TowerAdvancements.STORM_SURVIVED, assessment.masts(),
+                        network.tunerOf(top), com.reiko.signaltower.advancement.TowerAdvancements.STORM_RADIUS);
             }
         }
     }

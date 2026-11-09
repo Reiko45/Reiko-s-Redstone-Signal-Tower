@@ -62,6 +62,8 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
     /** Whether its frequency has been checked against the world's private frequencies and names (once). */
     private boolean foundChecked;
     private @Nullable BlockPos foundSign;
+    /** v0.56.0: an old tower that has gone quiet (not lightning): sending again earns Finders Keepers. */
+    private boolean foundQuiet;
 
     /** True for the transmitter of an old radio tower generated in the world. */
     public boolean isFoundTower() {
@@ -120,6 +122,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         if (foundTower) {
             tag.putBoolean("found_tower", true);
             tag.putBoolean("found_checked", foundChecked);
+            tag.putBoolean("found_quiet", foundQuiet);
             if (foundSign != null) {
                 tag.putLong("found_sign", foundSign.asLong());
             }
@@ -134,6 +137,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         linkTarget = id == null ? null : net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id);
         foundTower = tag.getBoolean("found_tower");
         foundChecked = tag.getBoolean("found_checked");
+        foundQuiet = tag.getBoolean("found_quiet");
         foundSign = tag.contains("found_sign") ? BlockPos.of(tag.getLong("found_sign")) : null;
     }
 
@@ -148,8 +152,9 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             return;
         }
         int power = inputOf(serverLevel, worldPosition, state);
+        int reach = reachOf(serverLevel, worldPosition, state);
         SignalNetwork.get(serverLevel).updateTransmitter(worldPosition, getFrequency(), power,
-                reachOf(serverLevel, worldPosition, state), getTunedBy(), state.getBlock() instanceof CompactRadioTransmitterBlock,
+                reach, getTunedBy(), state.getBlock() instanceof CompactRadioTransmitterBlock,
                 power > 0 ? turnOnCause() : null);
         SignalNetwork.get(serverLevel).setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state)); // v0.48.0
         SignalNetwork.get(serverLevel).setLink(worldPosition, // v0.50.0: an Ender Antenna sends into another dimension too
@@ -162,6 +167,33 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {
             serverLevel.setBlock(worldPosition, state.setValue(RadioTransmitterBlock.POWERED, powered), Block.UPDATE_CLIENTS);
         }
+        advancements(serverLevel, state, powered, reach);
+    }
+
+    /** v0.56.0: First Broadcast and Over the Horizon for its tuner; Finders Keepers for an old tower brought back. */
+    private void advancements(ServerLevel level, BlockState state, boolean sending, int reach) {
+        if (state.getBlock() instanceof com.reiko.signaltower.block.RadioJammerBlock) {
+            return; // jamming isn't broadcasting
+        }
+        if (sending) {
+            com.reiko.signaltower.advancement.TowerAdvancements.fire(level, worldPosition,
+                    com.reiko.signaltower.advancement.TowerAdvancements.ON_AIR, reach, getTunedBy(), 0);
+            if (foundTower && foundQuiet) {
+                foundQuiet = false;
+                setChanged();
+                com.reiko.signaltower.advancement.TowerAdvancements.fire(level, worldPosition,
+                        com.reiko.signaltower.advancement.TowerAdvancements.FOUND_TOWER_REVIVED, reach, getTunedBy(),
+                        com.reiko.signaltower.advancement.TowerAdvancements.REVIVED_RADIUS);
+            }
+        } else if (foundTower && !foundQuiet && !SignalNetwork.get(level).isKnockedOut(worldPosition)) {
+            foundQuiet = true;
+            setChanged();
+        }
+    }
+
+    /** v0.56.0: true while an old tower is quiet (it earns Finders Keepers when it sends again). */
+    public boolean isFoundQuiet() {
+        return foundQuiet;
     }
 
     /**

@@ -1447,4 +1447,82 @@ scanner_arrow().save(GUI / "scanner_arrow.png")
 MISC = ITEM.parent / "misc"
 MISC.mkdir(parents=True, exist_ok=True)
 beacon_glow().save(MISC / "aviation_beacon_glow.png")
+
+def radio_operator():
+    """v0.56.0: the Radio Operator villager's overlay (64x64, the villager model's layout): headphones
+    with a microphone on the hat layer, and an olive vest with a little radio on its back on the jacket."""
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    px = img.load()
+    rng = random.Random(56)
+    band, band_hi = (40, 40, 44, 255), (72, 72, 80, 255)
+    cup_rim, cup, cup_hi = (26, 26, 30, 255), (56, 56, 64, 255), (92, 92, 104, 255)
+    led = (214, 44, 30, 255)
+    vest, vest_dark, vest_light, seam = (96, 104, 58, 255), (78, 86, 46, 255), (114, 124, 70, 255), (60, 66, 36, 255)
+    pocket, flap = (110, 120, 66, 255), (66, 72, 40, 255)
+    gold, gold_dark = (232, 196, 64, 255), (176, 136, 36, 255)
+
+    # Headphones. Hat layer: top face u40-47 v0-7; right side u32-39, front u40-47, left u48-55 (v8-17).
+    for u in range(40, 48):
+        px[u, 3] = band_hi
+        px[u, 4] = band
+    for u0 in (32, 48):  # the band down each side to the ear cup
+        for v in range(8, 11):
+            px[u0 + 3, v] = band_hi
+            px[u0 + 4, v] = band
+        for u in range(u0 + 2, u0 + 6):
+            for v in range(11, 15):
+                edge = u in (u0 + 2, u0 + 5) or v in (11, 14)
+                px[u, v] = cup_rim if edge else cup
+        px[u0 + 3, 12] = cup_hi
+        px[u0 + 4, 13] = led if u0 == 48 else cup_hi
+    # The microphone boom, from the right ear cup down and round to the mouth.
+    px[37, 15] = band
+    for u in range(38, 42):
+        px[u, 16] = band
+    px[42, 16] = cup_rim
+
+    # The vest. Jacket layer: top u6-13 v38-43; right u0-5, front u6-13, left u14-19, back u20-27 (v44-63).
+    def fill(u, v, base=vest):
+        r = rng.random()
+        px[u, v] = vest_dark if r < 0.18 else vest_light if r > 0.88 else base
+    for u in range(6, 14):
+        for v in range(38, 44):
+            if not (8 <= u <= 11 and 40 <= v <= 42):  # the neck
+                fill(u, v)
+    for u in range(0, 28):
+        for v in range(44, 55):
+            fill(u, v)
+        px[u, 54] = seam  # the hem
+    for v in range(44, 51):  # open down the front, to a V
+        width = 2 if v < 49 else 1 if v < 50 else 0
+        for u in range(10 - width, 10 + width):
+            px[u, v] = (0, 0, 0, 0)
+        if width:
+            px[10 - width - 1, v] = seam
+            px[10 + width, v] = seam
+    for u0 in (7, 11):  # two pockets
+        for u in (u0, u0 + 1):
+            px[u, 51] = flap
+            px[u, 52] = pocket
+            px[u, 53] = pocket
+    px[12, 46], px[12, 47], px[11, 47] = gold, gold_dark, gold  # a lightning badge
+    for v in range(44, 55):  # side seams
+        px[0, v] = seam
+        px[19, v] = seam
+    # A little radio on the back, with its light.
+    for u in range(22, 26):
+        for v in range(45, 51):
+            px[u, v] = cup_rim if u in (22, 25) or v in (45, 50) else cup
+    px[23, 46], px[24, 46] = cup_hi, led
+    px[23, 48], px[24, 48] = band_hi, band_hi
+    for v in range(44, 46):
+        px[25, v] = band
+    return img
+
+
+VILLAGER = ROOT / "entity" / "villager" / "profession"
+ZOMBIE_VILLAGER = ROOT / "entity" / "zombie_villager" / "profession"
+for folder in (VILLAGER, ZOMBIE_VILLAGER):
+    folder.mkdir(parents=True, exist_ok=True)
+    radio_operator().save(folder / "radio_operator.png")
 print(f"wrote {len(blocks)} block and {len(items)} item textures to {ROOT}")

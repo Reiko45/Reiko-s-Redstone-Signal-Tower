@@ -1,0 +1,42 @@
+{
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:radio_transmitter"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.root.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.root.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "background": "minecraft:textures/block/stone_bricks.png"
+  },
+  "criteria": {
+    "has_radio_part": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "reikos_signal_tower:radio_mast",
+              "reikos_signal_tower:radio_transmitter",
+              "reikos_signal_tower:radio_receiver",
+              "reikos_signal_tower:frequency_tuner",
+              "reikos_signal_tower:compact_radio_transmitter",
+              "reikos_signal_tower:compact_radio_receiver"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_radio_part"
+    ]
+  ]
+}

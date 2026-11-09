@@ -1,0 +1,31 @@
+{
+  "parent": "reikos_signal_tower:root",
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:radio_mast"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.first_broadcast.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.first_broadcast.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "on_air": {
+      "trigger": "reikos_signal_tower:tower",
+      "conditions": {
+        "event": "on_air"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "on_air"
+    ]
+  ]
+}

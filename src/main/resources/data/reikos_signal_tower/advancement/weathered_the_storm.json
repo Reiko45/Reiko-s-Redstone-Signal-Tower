@@ -1,0 +1,40 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "reikos_weather"
+    }
+  ],
+  "parent": "reikos_signal_tower:head_for_heights",
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:guy_anchor"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.weathered_the_storm.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.weathered_the_storm.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "stood_through_a_storm": {
+      "trigger": "reikos_signal_tower:tower",
+      "conditions": {
+        "event": "storm_survived"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "stood_through_a_storm"
+    ]
+  ],
+  "rewards": {
+    "experience": 50
+  }
+}

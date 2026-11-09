@@ -1,0 +1,33 @@
+{
+  "parent": "reikos_signal_tower:root",
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:radio_telegraph"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.call_sign.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.call_sign.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "traded": {
+      "trigger": "minecraft:villager_trade",
+      "conditions": {
+        "villager": {
+          "nbt": "{VillagerData:{profession:\"reikos_signal_tower:radio_operator\"}}"
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "traded"
+    ]
+  ]
+}

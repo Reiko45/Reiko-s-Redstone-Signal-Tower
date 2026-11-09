@@ -8644,7 +8644,9 @@ public final class SignalTowerGameTests {
      * Storm damage with Reiko's Weather (a batch of its own). Without it: a storm check leaves a tall
      * tower alone and melts any ice. With it: under a derecho cell (chance 100% for the test), a tall
      * unbraced tower blows down, a braced one and a short one stand; under an ice storm cell a tower
-     * ices up, and once the cell is gone (above freezing) it starts thawing.
+     * ices up, and once the cell is gone (above freezing) it starts thawing. v0.56.0: the braced tower
+     * standing through the derecho fires Weathered the Storm (for its tuner and whoever's near; value:
+     * its masts), the others don't; without Reiko's Weather nothing fires.
      */
     @GameTest(template = PLATFORM, batch = STORMS, timeoutTicks = 400)
     public static void stormDamageWithReikos(GameTestHelper helper) {
@@ -8668,6 +8670,11 @@ public final class SignalTowerGameTests {
         BlockPos tall = helper.absolutePos(tallFoot.above(5));
         BlockPos braced = helper.absolutePos(bracedFoot.above(5));
         BlockPos low = helper.absolutePos(shortFoot.above(1));
+        UUID stormTuner = UUID.randomUUID();
+        ((RadioBlockEntity) helper.getBlockEntity(bracedFoot.above(5))).setTunedBy(stormTuner);
+        var fired = com.reiko.signaltower.advancement.TowerAdvancements.recordForTests();
+        java.util.function.Function<BlockPos, List<com.reiko.signaltower.advancement.TowerAdvancements.Fired>> storms = at -> fired.stream()
+                .filter(f -> f.pos().equals(at) && f.event().equals(com.reiko.signaltower.advancement.TowerAdvancements.STORM_SURVIVED)).toList();
         if (!com.reiko.signaltower.compat.ReikosWeatherCompat.available()) {
             helper.startSequence()
                     .thenIdle(3)
@@ -8675,6 +8682,7 @@ public final class SignalTowerGameTests {
                         network.ice(tall);
                         com.reiko.signaltower.radio.StormDamage.check(level, network);
                         check(network.damageCause(tall) == null && !network.isIced(tall), "Without Reiko's Weather nothing blows down, and ice melts");
+                        check(storms.apply(braced).isEmpty(), "Without Reiko's Weather, no Weathered the Storm");
                     })
                     .thenSucceed();
             return;
@@ -8698,6 +8706,11 @@ public final class SignalTowerGameTests {
                     check("derecho".equals(network.damageCause(tall)), "The tall, unbraced one blew down");
                     check(network.damageCause(braced) == null, "The braced one stands");
                     check(network.damageCause(low) == null, "The short one stands");
+                    var survived = storms.apply(braced);
+                    check(!survived.isEmpty() && survived.get(0).value() == 5 && stormTuner.equals(survived.get(0).tuner())
+                            && survived.get(0).radius() == com.reiko.signaltower.advancement.TowerAdvancements.STORM_RADIUS,
+                            "The braced one: Weathered the Storm, for its tuner and whoever's near: " + survived);
+                    check(storms.apply(tall).isEmpty() && storms.apply(low).isEmpty(), "Not for the one blown down, nor the short one");
                     network.repair(tall);
                     try {
                         reikosCells(level).remove(cell[0]);
@@ -9074,5 +9087,262 @@ public final class SignalTowerGameTests {
         var none = level.getBlockState(mast).useItemOn(more, level, player, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(mast), Direction.SOUTH, mast, false));
         check(none == net.minecraft.world.ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION && more.getCount() == 7, "No room: none (" + none + ")");
         helper.succeed();
+    }
+
+    // ---------------------------------------------------------------- v0.56.0: advancements and Radio Operators
+
+    private static net.minecraft.resources.ResourceLocation modId(String path) {
+        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, path);
+    }
+
+    private static net.minecraft.advancements.Advancement advancement(ServerLevel level, String path) {
+        var holder = level.getServer().getAdvancements().get(modId(path));
+        check(holder != null, "Advancement " + path + " is loaded");
+        return holder.value();
+    }
+
+    private static net.minecraft.world.level.storage.loot.LootContext entityContext(ServerLevel level, net.minecraft.world.entity.Entity entity) {
+        var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(level)
+                .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.THIS_ENTITY, entity)
+                .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN, entity.position())
+                .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.ADVANCEMENT_ENTITY);
+        return new net.minecraft.world.level.storage.loot.LootContext.Builder(params).create(java.util.Optional.empty());
+    }
+
+    private static boolean playerCriterion(net.minecraft.advancements.Advancement advancement, String criterion,
+                                           net.minecraft.world.level.storage.loot.LootContext context) {
+        var instance = (net.minecraft.advancements.critereon.PlayerTrigger.TriggerInstance) advancement.criteria().get(criterion).triggerInstance();
+        return instance.player().orElseThrow().matches(context);
+    }
+
+    /**
+     * The advancement tree is loaded, each under its parent: Reiko's Redstone Signal Tower (the root),
+     * First Broadcast, Over the Horizon (a challenge), Head for Heights, Lost Signal, Finders Keepers
+     * (a goal) and Call Sign; Weathered the Storm (a challenge, under Head for Heights) only with
+     * Reiko's Weather. The tower trigger is registered; Over the Horizon wants a transmitter on the air
+     * that reaches 500 blocks or more. Head for Heights wants you on a Tower Platform (not beside it);
+     * Lost Signal wants you inside an old radio tower (not just near one).
+     */
+    @GameTest(template = PLATFORM)
+    public static void advancementTree(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        String[][] tree = {{"root", null}, {"first_broadcast", "root"}, {"over_the_horizon", "first_broadcast"},
+                {"head_for_heights", "first_broadcast"}, {"lost_signal", "root"}, {"finders_keepers", "lost_signal"}, {"call_sign", "root"}};
+        for (String[] entry : tree) {
+            var advancement = advancement(level, entry[0]);
+            check(entry[1] == null ? advancement.parent().isEmpty() : advancement.parent().equals(java.util.Optional.of(modId(entry[1]))),
+                    entry[0] + " under " + entry[1] + ": " + advancement.parent());
+            check(advancement.display().isPresent(), entry[0] + " is shown");
+        }
+        check(advancement(level, "over_the_horizon").display().orElseThrow().getType() == net.minecraft.advancements.AdvancementType.CHALLENGE
+                && advancement(level, "finders_keepers").display().orElseThrow().getType() == net.minecraft.advancements.AdvancementType.GOAL
+                && advancement(level, "first_broadcast").display().orElseThrow().getType() == net.minecraft.advancements.AdvancementType.TASK,
+                "A challenge, a goal and tasks");
+        var storm = level.getServer().getAdvancements().get(modId("weathered_the_storm"));
+        boolean reikos = com.reiko.signaltower.compat.ReikosWeatherCompat.available();
+        check((storm != null) == reikos, "Weathered the Storm only with Reiko's Weather (" + reikos + "): " + (storm != null));
+        if (storm != null) {
+            check(storm.value().parent().equals(java.util.Optional.of(modId("head_for_heights"))), "Weathered the Storm under Head for Heights");
+        }
+        check(net.minecraft.core.registries.BuiltInRegistries.TRIGGER_TYPES.get(modId("tower")) == com.reiko.signaltower.advancement.TowerAdvancements.TOWER.get(),
+                "The tower trigger");
+        var far = (com.reiko.signaltower.advancement.TowerTrigger.TriggerInstance) advancement(level, "over_the_horizon").criteria().get("far_reach").triggerInstance();
+        check(far.matches("on_air", 500) && far.matches("on_air", 4000) && !far.matches("on_air", 499) && !far.matches("found_tower_revived", 800),
+                "Over the Horizon: on the air, 500 blocks or more");
+        var first = (com.reiko.signaltower.advancement.TowerTrigger.TriggerInstance) advancement(level, "first_broadcast").criteria().get("on_air").triggerInstance();
+        check(first.matches("on_air", 16) && !first.matches("storm_survived", 16), "First Broadcast: any transmitter on the air");
+        var keepers = (com.reiko.signaltower.advancement.TowerTrigger.TriggerInstance) advancement(level, "finders_keepers").criteria().get("brought_back").triggerInstance();
+        check(keepers.matches("found_tower_revived", 40) && !keepers.matches("on_air", 40), "Finders Keepers: an old tower brought back");
+
+        // Head for Heights: on a platform, not beside it.
+        BlockPos deck = new BlockPos(4, 3, 1);
+        helper.setBlock(deck, ModRegistry.TOWER_PLATFORM.get());
+        Player climber = helper.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos absDeck = helper.absolutePos(deck);
+        climber.moveTo(absDeck.getX() + 0.5, absDeck.getY() + 0.125, absDeck.getZ() + 0.5);
+        check(playerCriterion(advancement(level, "head_for_heights"), "on_platform", entityContext(level, climber)), "Head for Heights: on a platform");
+        climber.moveTo(absDeck.getX() + 2.5, absDeck.getY() + 0.125, absDeck.getZ() + 0.5);
+        check(!playerCriterion(advancement(level, "head_for_heights"), "on_platform", entityContext(level, climber)), "Not beside it");
+
+        // Lost Signal: inside an old tower's piece (a structure start put in this chunk for the test).
+        var structure = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE)
+                .get(com.reiko.signaltower.world.ModWorldgen.RADIO_TOWER_STRUCTURE);
+        BlockPos origin = helper.absolutePos(new BlockPos(30, 1, 0));
+        var piece = new com.reiko.signaltower.world.RadioTowerPiece(origin, net.minecraft.world.level.block.Rotation.NONE,
+                new com.reiko.signaltower.world.RadioTowerPiece.Plan(6, true, 4616, com.reiko.signaltower.radio.AntennaTier.NONE, 0, false, false, 0));
+        BlockPos inside = piece.at(2, 1, 4);
+        var chunkPos = new net.minecraft.world.level.ChunkPos(inside);
+        var chunk = level.getChunk(inside);
+        var start = new net.minecraft.world.level.levelgen.structure.StructureStart(structure, chunkPos, 0,
+                new net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer(List.of(piece)));
+        try {
+            chunk.setStartForStructure(structure, start);
+            chunk.addReferenceForStructure(structure, chunkPos.toLong());
+            climber.moveTo(inside.getX() + 0.5, inside.getY(), inside.getZ() + 0.5);
+            check(playerCriterion(advancement(level, "lost_signal"), "found_a_tower", entityContext(level, climber)), "Lost Signal: inside an old tower");
+            BlockPos outside = new BlockPos(piece.getBoundingBox().maxX() + 2, inside.getY(), inside.getZ());
+            climber.moveTo(outside.getX() + 0.5, outside.getY(), outside.getZ() + 0.5);
+            check(!playerCriterion(advancement(level, "lost_signal"), "found_a_tower", entityContext(level, climber)), "Not outside it");
+        } finally {
+            var starts = new java.util.HashMap<>(chunk.getAllStarts());
+            starts.remove(structure);
+            chunk.setAllStarts(starts);
+            var references = new java.util.HashMap<>(chunk.getAllReferences());
+            references.remove(structure);
+            chunk.setAllReferences(references);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The tower events. A transmitter on the air fires "on_air" for whoever tuned it, with its reach
+     * (First Broadcast; Over the Horizon at 500 or more); one off the air doesn't, nor does a jammer. An
+     * old tower off the air (with a lever) is quiet; switched on it fires "found_tower_revived" for
+     * everyone within 24 blocks (Finders Keepers), once; quiet again and back on, again. Saved.
+     */
+    @GameTest(template = TOWER_SITE, timeoutTicks = 300)
+    public static void towerAdvancementEvents(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var fired = com.reiko.signaltower.advancement.TowerAdvancements.recordForTests();
+        var plan = new com.reiko.signaltower.world.RadioTowerPiece.Plan(5, false, 4616,
+                com.reiko.signaltower.radio.AntennaTier.NONE, 0, false, false, 0);
+        var piece = new com.reiko.signaltower.world.RadioTowerPiece(helper.absolutePos(new BlockPos(1, 0, 3)),
+                net.minecraft.world.level.block.Rotation.NONE, plan);
+        piece.buildAll(level, level.getChunkSource().getGenerator(), level.getRandom());
+        BlockPos top = piece.top();
+        BlockPos lever = piece.at(6, 1, 4);
+        var transmitter = (com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) level.getBlockEntity(top);
+        BlockPos plain = new BlockPos(14, 1, 14);
+        place(helper, plain, ModRegistry.RADIO_TRANSMITTER.get(), 4617);
+        UUID owner = UUID.randomUUID();
+        ((RadioBlockEntity) helper.getBlockEntity(plain)).setTunedBy(owner);
+        BlockPos jammer = new BlockPos(14, 1, 1);
+        place(helper, jammer, ModRegistry.RADIO_JAMMER.get(), 4618);
+        ((RadioBlockEntity) helper.getBlockEntity(jammer)).setTunedBy(owner);
+        helper.setBlock(jammer.east(), Blocks.REDSTONE_BLOCK);
+        BlockPos absPlain = helper.absolutePos(plain);
+        BlockPos absJammer = helper.absolutePos(jammer);
+        String onAir = com.reiko.signaltower.advancement.TowerAdvancements.ON_AIR;
+        String revived = com.reiko.signaltower.advancement.TowerAdvancements.FOUND_TOWER_REVIVED;
+        java.util.function.BiFunction<BlockPos, String, List<com.reiko.signaltower.advancement.TowerAdvancements.Fired>> at =
+                (pos, event) -> fired.stream().filter(f -> f.pos().equals(pos) && f.event().equals(event)).toList();
+        helper.startSequence()
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(transmitter.isFoundTower() && transmitter.isFoundQuiet(), "The old tower is quiet");
+                    check(at.apply(top, onAir).isEmpty() && at.apply(top, revived).isEmpty(), "Nothing from it yet");
+                    check(at.apply(absPlain, onAir).isEmpty(), "Nothing from a transmitter off the air");
+                    check(at.apply(absJammer, onAir).isEmpty(), "Nothing from a jammer, jamming");
+                    level.setBlock(lever, level.getBlockState(lever).setValue(net.minecraft.world.level.block.LeverBlock.POWERED, true), Block.UPDATE_ALL);
+                    helper.setBlock(plain.east(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenWaitUntil(() -> check(at.apply(top, revived).size() == 1, "Switched on: Finders Keepers"))
+                .thenWaitUntil(() -> check(!at.apply(absPlain, onAir).isEmpty(), "The other transmitter on the air"))
+                .thenExecute(() -> {
+                    var back = at.apply(top, revived).get(0);
+                    check(back.radius() == com.reiko.signaltower.advancement.TowerAdvancements.REVIVED_RADIUS && back.tuner() == null,
+                            "For everyone near it: " + back);
+                    check(!transmitter.isFoundQuiet() && !at.apply(top, onAir).isEmpty(), "No longer quiet, and on the air");
+                    var first = at.apply(absPlain, onAir).get(0);
+                    int reach = com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachOf(level, absPlain, level.getBlockState(absPlain));
+                    check(owner.equals(first.tuner()) && first.value() == reach && first.radius() == 0, "On the air: for its tuner, with its reach (" + reach + "): " + first);
+                    check(at.apply(absPlain, revived).isEmpty(), "Finders Keepers only for an old tower");
+                    CompoundTag saved = transmitter.saveWithoutMetadata(level.registryAccess());
+                    check(saved.contains("found_quiet") && !saved.getBoolean("found_quiet"), "Saved");
+                    level.setBlock(lever, level.getBlockState(lever).setValue(net.minecraft.world.level.block.LeverBlock.POWERED, false), Block.UPDATE_ALL);
+                })
+                .thenWaitUntil(() -> check(transmitter.isFoundQuiet(), "Switched off: quiet again"))
+                .thenExecute(() -> {
+                    check(at.apply(top, revived).size() == 1, "Still only once");
+                    level.setBlock(lever, level.getBlockState(lever).setValue(net.minecraft.world.level.block.LeverBlock.POWERED, true), Block.UPDATE_ALL);
+                })
+                .thenWaitUntil(() -> check(at.apply(top, revived).size() == 2, "Back on: again"))
+                .thenExecute(() -> check(at.apply(absJammer, onAir).isEmpty(), "Never from the jammer"))
+                .thenSucceed();
+    }
+
+    /** v0.56.0: the Radio Operator test, in a batch of its own (villagers look 48 blocks round for a workstation). */
+    private static final String OPERATORS = "radio_operators";
+
+    /**
+     * Radio Operators: every Radio Telegraph (any facing, keyed or not) is their workstation, one any
+     * villager can take; the profession is registered. Their trades, by level: redstone and copper
+     * for emeralds, masts and a tuner (Novice) ... platforms, an iron antenna and a battery
+     * (Journeyman), a gold antenna and solar panel (Expert), a Diamond Antenna for 24 emeralds and a
+     * diamond (Master); a new one has 2 Novice offers. Call Sign is for trading with one (not a
+     * librarian). A villager with no job beside a Radio Telegraph walks over and becomes one.
+     */
+    @GameTest(template = PLATFORM, batch = OPERATORS, timeoutTicks = 1200)
+    public static void radioOperators(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (BlockState state : ModRegistry.RADIO_TELEGRAPH.get().getStateDefinition().getPossibleStates()) {
+            var poi = net.minecraft.world.entity.ai.village.poi.PoiTypes.forState(state);
+            check(poi.isPresent() && poi.get().is(com.reiko.signaltower.world.ModVillagers.RADIO_OPERATOR_POI_KEY), "A workstation: " + state);
+        }
+        var poi = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.POINT_OF_INTEREST_TYPE)
+                .getHolderOrThrow(com.reiko.signaltower.world.ModVillagers.RADIO_OPERATOR_POI_KEY);
+        check(poi.is(net.minecraft.tags.PoiTypeTags.ACQUIRABLE_JOB_SITE), "One any villager can take");
+        var operator = com.reiko.signaltower.world.ModVillagers.RADIO_OPERATOR.get();
+        check(modId("radio_operator").equals(net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION.getKey(operator))
+                && operator.heldJobSite().test(poi) && operator.acquirableJobSite().test(poi), "The Radio Operator");
+        var trades = net.minecraft.world.entity.npc.VillagerTrades.TRADES.get(operator);
+        check(trades != null, "Its trades");
+        for (int x = 0; x < 24; x++) {
+            for (int z = 0; z < 3; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+            }
+        }
+        var trader = helper.spawn(EntityType.VILLAGER, new BlockPos(20, 1, 1));
+        trader.setNoAi(true);
+        trader.setVillagerData(trader.getVillagerData().setProfession(operator).setLevel(1));
+        java.util.Map<Integer, List<net.minecraft.world.item.trading.MerchantOffer>> byLevel = new java.util.HashMap<>();
+        for (int villagerLevel = 1; villagerLevel <= 5; villagerLevel++) {
+            var listings = trades.get(villagerLevel);
+            check(listings != null && listings.length >= 2, "Trades at level " + villagerLevel);
+            List<net.minecraft.world.item.trading.MerchantOffer> offers = new java.util.ArrayList<>();
+            for (var listing : listings) {
+                offers.add(listing.getOffer(trader, level.getRandom()));
+            }
+            byLevel.put(villagerLevel, offers);
+        }
+        java.util.function.BiPredicate<Integer, java.util.function.Predicate<net.minecraft.world.item.trading.MerchantOffer>> has =
+                (lvl, test) -> byLevel.get(lvl).stream().anyMatch(test);
+        check(has.test(1, o -> o.getCostA().is(Items.REDSTONE) && o.getCostA().getCount() == 12 && o.getResult().is(Items.EMERALD))
+                && has.test(1, o -> o.getCostA().is(Items.COPPER_INGOT) && o.getResult().is(Items.EMERALD)), "Novice: buys redstone and copper");
+        check(has.test(1, o -> o.getResult().is(ModRegistry.RADIO_MAST_ITEM.get()) && o.getResult().getCount() == 4 && o.getCostA().is(Items.EMERALD))
+                && has.test(1, o -> o.getResult().is(ModRegistry.FREQUENCY_TUNER.get())), "Novice: sells masts and a tuner");
+        check(has.test(2, o -> o.getResult().is(ModRegistry.RADIO_TRANSMITTER_ITEM.get())) && has.test(2, o -> o.getResult().is(ModRegistry.RADIO_RECEIVER_ITEM.get())),
+                "Apprentice: transmitters and receivers");
+        check(has.test(3, o -> o.getResult().is(ModRegistry.TOWER_PLATFORM_ITEM.get()) && o.getResult().getCount() == 8)
+                && has.test(3, o -> o.getResult().is(ModRegistry.IRON_ANTENNA.get())) && has.test(3, o -> o.getResult().is(ModRegistry.RADIO_BATTERY_ITEM.get())),
+                "Journeyman: platforms, an iron antenna, a battery");
+        check(has.test(4, o -> o.getResult().is(ModRegistry.GOLD_ANTENNA.get())) && has.test(4, o -> o.getResult().is(ModRegistry.SOLAR_PANEL_ITEM.get())),
+                "Expert: a gold antenna, a solar panel");
+        check(has.test(5, o -> o.getResult().is(ModRegistry.DIAMOND_ANTENNA.get()) && o.getCostA().is(Items.EMERALD) && o.getCostA().getCount() == 24
+                && o.getCostB().is(Items.DIAMOND)), "Master: a Diamond Antenna for 24 emeralds and a diamond");
+        var offers = trader.getOffers();
+        check(offers.size() == 2 && offers.stream().allMatch(o -> has.test(1, n -> ItemStack.isSameItemSameComponents(n.getResult(), o.getResult()))),
+                "A new one: 2 Novice offers: " + offers.size());
+        var callSign = (net.minecraft.advancements.critereon.TradeTrigger.TriggerInstance) advancement(level, "call_sign").criteria().get("traded").triggerInstance();
+        check(callSign.villager().orElseThrow().matches(entityContext(level, trader)), "Call Sign: trading with a Radio Operator");
+        var librarian = helper.spawn(EntityType.VILLAGER, new BlockPos(22, 1, 1));
+        librarian.setNoAi(true);
+        librarian.setVillagerData(librarian.getVillagerData().setProfession(net.minecraft.world.entity.npc.VillagerProfession.LIBRARIAN));
+        check(!callSign.villager().orElseThrow().matches(entityContext(level, librarian)), "Not with a librarian");
+        librarian.discard();
+
+        helper.setBlock(new BlockPos(9, 1, 1), ModRegistry.RADIO_TELEGRAPH.get());
+        var jobless = helper.spawn(EntityType.VILLAGER, new BlockPos(3, 1, 1));
+        check(jobless.getVillagerData().getProfession() == net.minecraft.world.entity.npc.VillagerProfession.NONE, "No job yet");
+        helper.startSequence()
+                .thenWaitUntil(() -> check(jobless.getVillagerData().getProfession() == operator,
+                        "Took the telegraph: " + jobless.getVillagerData().getProfession()))
+                .thenExecute(() -> {
+                    var site = jobless.getBrain().getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.JOB_SITE);
+                    check(site.isPresent() && site.get().pos().equals(helper.absolutePos(new BlockPos(9, 1, 1))), "Its job site: the telegraph");
+                    jobless.discard();
+                    trader.discard();
+                })
+                .thenSucceed();
     }
 }

@@ -1,0 +1,31 @@
+{
+  "parent": "reikos_signal_tower:lost_signal",
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:radio_battery"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.finders_keepers.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.finders_keepers.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "brought_back": {
+      "trigger": "reikos_signal_tower:tower",
+      "conditions": {
+        "event": "found_tower_revived"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "brought_back"
+    ]
+  ]
+}

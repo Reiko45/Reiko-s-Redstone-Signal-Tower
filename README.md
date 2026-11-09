@@ -31,7 +31,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
-| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. |
+| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
@@ -761,6 +761,39 @@ Put a ring round the mast **one below the top**. Standing on that, your head cle
 
 ![An old radio tower found in an old-growth taiga, a stone-and-spruce hut beside a mast 10 tall with a platform near the top, a beacon and guy wires, and Alex's scanner arrow "Frequency 681675: 25 blocks"; Dev climbing the mast by walking into it, past the guy wires, with the battery and solar panel at its foot; Dev standing on the platform under the top, Jade on the transmitter "Frequency: 681675", "Sending: 15", "Reach: 152 blocks", "An old radio tower, found in the world", "Braced by 3 guy wires", "Battery: 70%"; the hut's door with its sign "Radio Station, Frequency 681675", the chest inside and the redstone torch at the mast's foot; Alex's Signal Scanner 89 blocks away "681,675 ON 15 Transmitter, 89 blocks north-west"; and Dev standing on a second ring of platforms he put in halfway up the mast by hand while climbing](docs/images/old-radio-towers-and-climbing.png)
 
+### Advancements
+
+Since 0.56 the mod has its own tab of advancements:
+
+| Advancement | How to get it |
+|---|---|
+| **Reiko's Redstone Signal Tower** (the tab) | Pick up a mast, transmitter, receiver or tuner. |
+| **First Broadcast** | Put a transmitter you placed or tuned on the air: it gets redstone and actually sends (charged, if power cost is on). |
+| **Over the Horizon** (challenge) | The same, with a transmitter that reaches **500 blocks or more**: build high (Y 122 or more without an antenna) or fit a better antenna. |
+| **Head for Heights** | Stand on a Tower Platform. |
+| **Weathered the Storm** (challenge) | With [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod) only: be within 32 blocks of a tall tower braced with three guy wires (or have tuned it) while a tornado, hurricane or derecho goes over it and it stands. |
+| **Lost Signal** | Find an old radio tower out in the world (walk into its hut or up its mast). |
+| **Finders Keepers** (goal) | Be within 24 blocks of an old tower that has gone quiet when it comes back on the air: flip its lever, charge its battery, put its torch back. |
+| **Call Sign** | Trade with a Radio Operator. |
+
+First Broadcast and Over the Horizon go to whoever placed or last tuned the transmitter, wherever they are. A Radio Jammer doesn't count, and nor does a tower knocked out by lightning coming back.
+
+### Radio Operator villagers
+
+Since 0.56 a villager with no job who finds a **Radio Telegraph** takes it as their workstation and becomes a **Radio Operator**, in headphones with a microphone and an olive vest with a little radio on the back. Put a telegraph in a village like any other job block. They level up like other villagers, and offer two trades from each level:
+
+| Level | Buys | Sells |
+|---|---|---|
+| Novice | 12 redstone or 8 copper ingots for an emerald | 4 Radio Masts (1 emerald), a Frequency Tuner (3) |
+| Apprentice | 4 iron ingots for an emerald | a Radio Receiver (4), a Radio Transmitter (5), 3 Guy Wire Anchors (3) |
+| Journeyman | | an Iron Antenna (6), 8 Tower Platforms (3), a Radio Battery (8), a Signal Scanner (7) |
+| Expert | | a Gold Antenna (14), a Solar Panel (10), a Radio Pager (8) |
+| Master | | a Diamond Antenna (24 emeralds and a diamond), a Coverage Map (12) |
+
+Zombie villagers who were Radio Operators keep the look.
+
+![Dev's transmitter at Y 130 with a charged battery, Jade "Sending: 15", "Reach: 568 blocks", and the toasts "Challenge Complete! Over the Horizon" and "Advancement Made! First Broadcast"; Dev on the platform of an old radio tower in a snowy taiga as a derecho comes over, the beacon lit, the toast "Challenge Complete! Weathered the Storm" and in chat "Head for Heights" and "Lost Signal"; from the old tower's hut doorway, Dev flipping the lever (on) at the mast's foot and the toast "Goal Reached! Finders Keepers"; a Radio Operator in headphones and an olive vest standing behind his Radio Telegraph in a fenced yard, Jade "Radio Operator - Novice"; Dev's trade screen "Radio Operator - Novice" with 8 copper for an emerald and an emerald for 4 masts, and the toast "Advancement Made! Call Sign"; and the mod's advancement tab with all eight done](docs/images/advancements-and-radio-operators.png)
+
 ### Radio Jammers
 
 A **Radio Jammer** (since 0.46) is built like a transmitter: it goes on top of a mast, the tuner sets its frequency, and redstone reaching it (or any mast under it) switches it on. It sends nothing itself. Instead:
@@ -1078,6 +1111,9 @@ src/main/java/com/reiko/signaltower/
   world/RadioTowerPiece.java             builds one: hut, chest, sign, mast, transmitter, battery, guy wires, platform
   world/ModWorldgen.java                 registers the structure type and piece, and the keys for its data
   radio/MastClimbing.java                climbing masts like ladders
+  advancement/TowerTrigger.java          the advancement trigger for tower events (on the air, an old tower brought back, a storm stood through)
+  advancement/TowerAdvancements.java     registers it, and fires its events for a tower's tuner and the players near it
+  world/ModVillagers.java                the Radio Operator: its workstation (the Radio Telegraph), the profession and its trades
   block/TowerPlatformBlock.java          the Tower Platform: rails, a deck solid only from above, rings round a mast
   radio/Telegraph.java                   telegraph messages: cleaning, where they go, who reads them, the screen's lines
   block/RadioTelegraphBlock.java         the telegraph desk: opens its screen, pulses when a message arrives
@@ -1171,11 +1207,12 @@ src/main/java/com/reiko/signaltower/
   client/ClientHooks.java, SignalTowerClient.java   client-only setup
   gametest/SignalTowerGameTests.java     automated tests
 src/main/resources/
-  assets/reikos_signal_tower/            blockstates, models, textures, en_us.json
-  data/reikos_signal_tower/              recipes, loot tables, recipe-book unlocks, test structure
+  assets/reikos_signal_tower/            blockstates, models, textures (the Radio Operator's under textures/entity), en_us.json
+  data/reikos_signal_tower/              recipes, loot tables, advancements, recipe-book unlocks, worldgen, test structures
+  data/minecraft/tags/point_of_interest_type/acquirable_job_site.json  lets a villager with no job take a Radio Telegraph
 tools/
   make_textures.py                       draws all textures (needs Pillow)
-  make_data.py                           writes models, blockstates, lang, recipes, loot tables
+  make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen
 docs/
   DESIGN.md                              how it works under the hood, ideas for later
 ```
@@ -1356,7 +1393,7 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 165. Bundled Cable: a line of 9 cables joins up (arms drawn, and to the taps on it); a red input tap fed by a redstone block puts 15 on red, and two blue taps on one run of dust put the stronger (10) on blue; the output taps on red, blue and white give 15, 10 and 0 out, and a lamp by the red one lights; the network is 9 cables and 6 devices; right-clicking a tap switches it to in and back out; a green dye recolors a tap (red off, green on); breaking a cable in the middle cuts the far taps off, mending it brings them back; Jade shows what a cable carries;
 166. the bundled radio pair: a Bundled Radio Transmitter on 4571 with red and lime on its cable sends red on 4585 and lime on 4576; a plain receiver on 4585 picks out red, one on 4571 (white) hears nothing; a Bundled Radio Receiver on 4571 puts red and lime back on its cable (white 0); one on a mast is fed through the mast; its light is on; the log has red's turn-on; the bundle is saved; Jade on both ends; lime off at one end goes off at the other; broken, its colors go;
 167. guy wires and storm damage (no storm needed): a tower 5 masts tall is at risk; three anchors near it each find its foot and brace it (Jade on the tower and on an anchor), one taken away and it's at risk again; blown down, it goes quiet (its receiver dark, Jade says so) and that's saved, a stick doesn't repair it, an Iron Ingot on one of its masts does (one used), and a second ingot does nothing; iced, it reaches 30% less (Jade, saved) until it has thawed 2 minutes' worth; a tower that's gone takes its damage and ice with it;
-168. storm damage with Reiko's Weather (in a batch of its own): without it nothing blows down and ice melts; with it, under a derecho cell a tall unbraced tower blows down and a braced one and a short one stand; an ice storm ices up the tower under it; a tornado touches the tower it's at and not one 30 blocks off; once the ice storm has gone, above freezing, the tower thaws.
+168. storm damage with Reiko's Weather (in a batch of its own): without it nothing blows down and ice melts (and nothing counts toward Weathered the Storm); with it, under a derecho cell a tall unbraced tower blows down and a braced one and a short one stand, and the braced one fires Weathered the Storm for its tuner and anyone within 32 blocks (with its masts, 5) while the others don't; an ice storm ices up the tower under it; a tornado touches the tower it's at and not one 30 blocks off; once the ice storm has gone, above freezing, the tower thaws.
 
 169. an old radio tower on the air, built whole (6 masts): the masts and the transmitter on top (with an Iron Antenna), marked as found, on 4611, and a receiver beside it hears 15; the beacon, the redstone torch, a battery with 50,000 in it and a solar panel, three guy wires that brace it, a platform all round the mast under the top (nothing round the top mast) with rails only on the outside, the chest with the tower loot table, the waxed sign with "4611", Jade's "An old radio tower" line; found and checked, saved;
 170. an old tower off the air, built turned round 180 degrees (in the power batch): the box 12 by 9 where it should be, the mast and transmitter, the chest turned to face west, a lever (off), no beacon or platform, one guy wire, a flat battery; it stays quiet; the lever on, still quiet; the battery charged, on the air;
@@ -1364,8 +1401,11 @@ The `tools/` scripts are how the textures and JSON files were generated. You can
 172. the structure: the structure, its set and biome tag (plains and desert, not ocean) are in the game; in the test world a tower goes at a chunk's middle on the ground, one piece 12 by 9 as tall as its plan, which saves and loads; the chest's loot (20 rolls) is 3 or more stacks, all tower parts and materials;
 173. climbing a mast: walking into it you go up at 0.12 a tick and the fall is forgotten; sneaking you hold still; letting go you slide at no more than 0.15 down (and sideways); standing by it, flying, a block away or above its top, nothing happens;
 174. Tower Platforms: right-clicking a mast with 8 puts in all 8 round it, the stack used up, a rail on the outside only and none against a wall; the deck holds you from above, lets you through from below, and lets you down beside the mast when you sneak; a corner taken away puts rails on the two beside it; with 3 in hand only 3 go in; the gap filled with one; with no room none, and the click goes on to place one normally.
+175. the advancement tree: all seven loaded, each under its parent (root; First Broadcast; Over the Horizon a challenge and Head for Heights under it; Lost Signal; Finders Keepers a goal under it; Call Sign), with Weathered the Storm (under Head for Heights) only with Reiko's Weather; the tower trigger registered; Over the Horizon matches "on_air" at 500 and 4,000 but not 499 or another event; First Broadcast any "on_air"; Finders Keepers "found_tower_revived"; Head for Heights matches a player on a Tower Platform, not one beside it; Lost Signal one inside an old tower's piece (put in the chunk for the test), not one outside it;
+176. the tower events: an old tower off the air (4616) is quiet and fires nothing; a plain transmitter off the air (4617) and a powered jammer (4618) fire nothing; the old tower's lever on fires "found_tower_revived" once, for everyone within 24 blocks, and it's no longer quiet (saved); the plain one powered fires "on_air" for its tuner with its reach, and never "found_tower_revived"; the lever off, quiet again; on again, it fires again; the jammer never;
+177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site.
 
-All 174 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164 and 168 check what's read from it.
+All 177 also pass with `-PnoJade`, so the mod runs the same without Jade, and with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it.
 
 ## License
 

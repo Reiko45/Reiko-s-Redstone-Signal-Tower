@@ -895,6 +895,24 @@ write(ASSETS / "lang" / "en_us.json", {
     f"jade.{MOD}.found_tower": "An old radio tower, found in the world",
     f"sign.{MOD}.radio_tower.station": "Radio Station",
     f"sign.{MOD}.radio_tower.frequency": "Frequency",
+    # v0.56.0: advancements and the Radio Operator
+    f"advancements.{MOD}.root.title": "Reiko's Redstone Signal Tower",
+    f"advancements.{MOD}.root.description": "Send redstone through the air",
+    f"advancements.{MOD}.first_broadcast.title": "First Broadcast",
+    f"advancements.{MOD}.first_broadcast.description": "Put a Radio Transmitter on the air",
+    f"advancements.{MOD}.over_the_horizon.title": "Over the Horizon",
+    f"advancements.{MOD}.over_the_horizon.description": "Put a transmitter on the air that reaches 500 blocks or more",
+    f"advancements.{MOD}.head_for_heights.title": "Head for Heights",
+    f"advancements.{MOD}.head_for_heights.description": "Climb a mast and stand on a Tower Platform",
+    f"advancements.{MOD}.weathered_the_storm.title": "Weathered the Storm",
+    f"advancements.{MOD}.weathered_the_storm.description": "Watch a tall tower braced with guy wires stand through a tornado, hurricane or derecho",
+    f"advancements.{MOD}.lost_signal.title": "Lost Signal",
+    f"advancements.{MOD}.lost_signal.description": "Find an old radio tower out in the world",
+    f"advancements.{MOD}.finders_keepers.title": "Finders Keepers",
+    f"advancements.{MOD}.finders_keepers.description": "Bring an old radio tower back on the air",
+    f"advancements.{MOD}.call_sign.title": "Call Sign",
+    f"advancements.{MOD}.call_sign.description": "Trade with a Radio Operator",
+    f"entity.minecraft.villager.{MOD}.radio_operator": "Radio Operator",
     f"tooltip.{MOD}.bundle_frequencies": "Frequency %1$s (uses %2$s)",
     f"message.{MOD}.cable_status": "Bundled Cable | %1$s cables, %2$s devices | %3$s",
     f"message.{MOD}.tap_in": "Cable Tap: %1$s, in (puts %2$s onto it)",
@@ -2639,6 +2657,67 @@ write(DATA / "loot_table" / "chests" / "radio_tower.json", {
     ],
     "random_sequence": f"{MOD}:chests/radio_tower",
 })
+
+# ---------------------------------------------------------------- v0.56.0: advancements
+
+def advancement(name, parent, icon, criteria, frame="task", hidden=False, xp=0, background=None, toast=True, conditions=None):
+    display = {
+        "icon": {"id": icon if ":" in icon else f"{MOD}:{icon}"},
+        "title": {"translate": f"advancements.{MOD}.{name}.title"},
+        "description": {"translate": f"advancements.{MOD}.{name}.description"},
+        "frame": frame,
+        "show_toast": toast,
+        "announce_to_chat": toast,
+        "hidden": hidden,
+    }
+    if background:
+        display["background"] = background
+    obj = {}
+    if conditions:
+        obj["neoforge:conditions"] = conditions
+    if parent:
+        obj["parent"] = f"{MOD}:{parent}"
+    obj["display"] = display
+    obj["criteria"] = criteria
+    obj["requirements"] = [list(criteria)]
+    if xp:
+        obj["rewards"] = {"experience": xp}
+    write(DATA / "advancement" / f"{name}.json", obj)
+
+
+def tower_event(event, **value):
+    conditions = {"event": event}
+    if value:
+        conditions["value"] = value
+    return {"trigger": f"{MOD}:tower", "conditions": conditions}
+
+
+advancement("root", None, "radio_transmitter", {
+    "has_radio_part": {"trigger": "minecraft:inventory_changed", "conditions": {"items": [{"items": [
+        f"{MOD}:radio_mast", f"{MOD}:radio_transmitter", f"{MOD}:radio_receiver", f"{MOD}:frequency_tuner",
+        f"{MOD}:compact_radio_transmitter", f"{MOD}:compact_radio_receiver"]}]}}},
+    background="minecraft:textures/block/stone_bricks.png", toast=False)
+advancement("first_broadcast", "root", "radio_mast", {"on_air": tower_event("on_air")})
+advancement("over_the_horizon", "first_broadcast", "netherite_antenna", {"far_reach": tower_event("on_air", min=500)},
+            frame="challenge", xp=50)
+advancement("head_for_heights", "first_broadcast", "tower_platform", {"on_platform": {
+    "trigger": "minecraft:location",
+    "conditions": {"player": {"location": {"block": {"blocks": f"{MOD}:tower_platform"}}}}}})
+advancement("weathered_the_storm", "head_for_heights", "guy_anchor", {"stood_through_a_storm": tower_event("storm_survived")},
+            frame="challenge", xp=50, conditions=[{"type": "neoforge:mod_loaded", "modid": "reikos_weather"}])
+advancement("lost_signal", "root", "minecraft:compass", {"found_a_tower": {
+    "trigger": "minecraft:location",
+    "conditions": {"player": {"location": {"structures": f"{MOD}:radio_tower"}}}}})
+advancement("finders_keepers", "lost_signal", "radio_battery", {"brought_back": tower_event("found_tower_revived")}, frame="goal")
+advancement("call_sign", "root", "radio_telegraph", {"traded": {
+    "trigger": "minecraft:villager_trade",
+    "conditions": {"villager": {"nbt": f'{{VillagerData:{{profession:"{MOD}:radio_operator"}}}}'}}}})
+
+# ---------------------------------------------------------------- v0.56.0: Radio Operator villagers
+
+# Any villager with no job may take a Radio Telegraph as their workstation.
+write(RES / "data" / "minecraft" / "tags" / "point_of_interest_type" / "acquirable_job_site.json", {
+    "replace": False, "values": [f"{MOD}:radio_operator"]})
 
 # ---------------------------------------------------------------- game test structure (NBT)
 
