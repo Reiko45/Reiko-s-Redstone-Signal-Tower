@@ -50,6 +50,7 @@ public final class SignalTowerClient {
             event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.AVIATION_BEACON_BE.get(), AviationBeaconRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.GUY_ANCHOR_BE.get(), GuyWireRenderer::new); // v0.54.0
+            event.registerBlockEntityRenderer(ModRegistry.LAUNCH_PAD_BE.get(), LaunchPadRenderer::new); // v0.61.0
         });
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
@@ -59,6 +60,10 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(ReachRing::onClientTick);
         NeoForge.EVENT_BUS.addListener(SignalMeterHud::onClientTick);
         NeoForge.EVENT_BUS.addListener(BroadcastMusic::onClientTick); // v0.60.0
+        NeoForge.EVENT_BUS.addListener(SatelliteSky::onRenderLevel); // v0.61.0
+        if (com.reiko.signaltower.compat.map.MapWaypoints.anyMap()) {
+            NeoForge.EVENT_BUS.addListener(com.reiko.signaltower.compat.map.MapWaypoints::onClientTick);
+        }
     }
 
     /**
@@ -151,6 +156,8 @@ public final class SignalTowerClient {
     /** Leaving a world or server: forget its frequency names (the next one sends its own). */
     private static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         com.reiko.signaltower.radio.FrequencyNames.clientClear();
+        SatelliteSky.clear(); // v0.61.0
+        com.reiko.signaltower.compat.map.MapWaypoints.clear();
         com.reiko.signaltower.radio.FrequencyNotes.clientClear();
         AuditBeams.clear();
         ReachRing.clear();

@@ -35,10 +35,12 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> TOWER_OFF = register("tower.off");
     /** A village station's raid siren. */
     public static final DeferredHolder<SoundEvent, SoundEvent> STATION_SIREN = register("station.siren");
+    /** v0.61.0: a Launch Pad's rocket lifting off. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SATELLITE_LAUNCH = register("satellite.launch");
 
     /** Every one, for the tests. */
     public static final List<DeferredHolder<SoundEvent, SoundEvent>> ALL = List.of(TUNER_TUNE, TUNER_STEP, TELEGRAPH_KEY,
-            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN);
+            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH);
 
     private ModSounds() {
     }

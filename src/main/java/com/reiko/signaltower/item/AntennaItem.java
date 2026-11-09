@@ -79,6 +79,9 @@ public class AntennaItem extends Item {
         if (tier == AntennaTier.ENDER) {
             return fitEnder(player, pos, state, old, name, stack);
         }
+        if (tier == AntennaTier.SATELLITE && !AntennaTier.sendsAcross(state)) {
+            return tell(player, Component.translatable(KEY + "satellite_transmitters_only").withStyle(ChatFormatting.RED)); // v0.61.0
+        }
         int aim = AntennaTier.aimFor(player.getYRot());
         // v0.52.0: a Dish Rotator in the tower's mast decides where a dish points.
         int rotated = tier == AntennaTier.DISH ? com.reiko.signaltower.block.DishRotatorBlock.aimAt(level, pos) : -1;
@@ -114,6 +117,9 @@ public class AntennaItem extends Item {
             giveBack(player, old);
         }
         level.playSound(null, pos, sound(tier), SoundSource.BLOCKS, 1.0F, 1.0F);
+        if (tier == AntennaTier.SATELLITE && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            return tell(player, satelliteMessage(serverLevel, pos, name));
+        }
         if (tier == AntennaTier.DISH) {
             return tell(player, Component.translatable(KEY + "dish_fitted", name, AntennaTier.aimLabel(aim),
                     dishReachShown(level, pos, fitted), reachShown(level, pos, fitted)).withStyle(ChatFormatting.AQUA));
@@ -246,6 +252,20 @@ public class AntennaItem extends Item {
                 com.reiko.signaltower.radio.CrossDimension.coords(arrival)).withStyle(ChatFormatting.LIGHT_PURPLE);
     }
 
+    /** v0.61.0: what a newly fitted Satellite Dish does: uplinked, no satellite yet, or no open sky. */
+    public static Component satelliteMessage(net.minecraft.server.level.ServerLevel level, BlockPos pos, Component name) {
+        com.reiko.signaltower.radio.SignalNetwork network = com.reiko.signaltower.radio.SignalNetwork.get(level);
+        if (!network.hasUplinkDish(pos)) {
+            return Component.translatable(KEY + "satellite_no_sky", name).withStyle(ChatFormatting.GOLD);
+        }
+        if (!network.isUplinked(pos)) {
+            return Component.translatable(KEY + "satellite_no_satellite", name, com.reiko.signaltower.radio.CrossDimension.name(level.dimension()))
+                    .withStyle(ChatFormatting.GOLD);
+        }
+        return Component.translatable(KEY + "satellite_fitted", name, com.reiko.signaltower.radio.CrossDimension.name(level.dimension()))
+                .withStyle(ChatFormatting.AQUA);
+    }
+
     /** Tells the network about the tower's new reach. */
     private static void refresh(Level level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof RadioTransmitterBlockEntity transmitter) {
@@ -272,6 +292,7 @@ public class AntennaItem extends Item {
             case NETHERITE -> SoundEvents.ARMOR_EQUIP_NETHERITE.value();
             case DISH -> SoundEvents.ARMOR_EQUIP_CHAIN.value();
             case ENDER -> SoundEvents.END_PORTAL_FRAME_FILL;
+            case SATELLITE -> SoundEvents.ARMOR_EQUIP_CHAIN.value();
             default -> SoundEvents.ARMOR_EQUIP_IRON.value();
         };
     }
@@ -283,8 +304,9 @@ public class AntennaItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == AntennaTier.DISH ? ".dish_item" : tier == AntennaTier.ENDER ? ".ender_item" : ".antenna_item"),
-                tier.multiplierText()).withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == AntennaTier.DISH ? ".dish_item" : tier == AntennaTier.ENDER ? ".ender_item"
+                        : tier == AntennaTier.SATELLITE ? ".satellite_dish_item" : ".antenna_item"),
+                tier.multiplierText(), com.reiko.signaltower.radio.PowerCost.UPLINK_COST).withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + ".antenna_hint").withStyle(ChatFormatting.DARK_GRAY));
     }
 }

@@ -52,10 +52,17 @@ public final class PowerCost {
         return Math.max(0, reach) / 64.0 * rate;
     }
 
-    /** What the tower at {@code pos} uses a second while it sends: twice as much if it also sends into another dimension (v0.50.0). */
+    /**
+     * What the tower at {@code pos} uses a second while it sends: twice as much if it also sends
+     * into another dimension (v0.50.0), four times as much while it's uplinked to a satellite (v0.61.0).
+     */
     public static double rateFor(SignalNetwork network, BlockPos pos) {
-        return perSecond(network.towerReach(pos)) * (network.linkTarget(pos) != null ? 2 : 1);
+        return perSecond(network.towerReach(pos)) * (network.linkTarget(pos) != null ? 2 : 1)
+                * (network.isUplinked(pos) ? UPLINK_COST : 1);
     }
+
+    /** How many times its charge an uplinked tower uses (v0.61.0). */
+    public static final int UPLINK_COST = 4;
 
     public static int capacity() {
         var setting = Config.BATTERY_CAPACITY;

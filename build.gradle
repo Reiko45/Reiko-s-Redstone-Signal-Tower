@@ -20,6 +20,16 @@ repositories {
         }
         filter { includeGroup 'maven.modrinth' }
     }
+    // v0.61.0: JourneyMap's API (the full JourneyMap jar only carries it nested inside).
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'JourneyMap'
+                url = 'https://jm.gserv.me/repository/maven-public/'
+            }
+        }
+        filter { includeGroup 'info.journeymap' }
+    }
 }
 
 // Dependencies that are only on the classpath of the dev runs (client, server, game tests),
@@ -59,6 +69,17 @@ dependencies {
     compileOnly "maven.modrinth:cc-tweaked:${cct_version}"
     if (project.hasProperty('withCct')) {
         localRuntime "maven.modrinth:cc-tweaked:${cct_version}"
+    }
+    // JourneyMap and Xaero's Minimap (v0.61.0) are optional maps: compat/map adds waypoints (and, in
+    // JourneyMap, reach circles) through them. Add one to a dev run with -PwithJourneyMap or -PwithXaero.
+    // (Both versions are Modrinth version ids, the NeoForge 1.21.1 jars.)
+    compileOnly("info.journeymap:journeymap-api-neoforge:${journeymap_api_version}") { transitive = false }
+    compileOnly "maven.modrinth:xaeros-minimap:${xaero_version}"
+    if (project.hasProperty('withJourneyMap')) {
+        localRuntime "maven.modrinth:journeymap:${journeymap_version}"
+    }
+    if (project.hasProperty('withXaero')) {
+        localRuntime "maven.modrinth:xaeros-minimap:${xaero_version}"
     }
 }
 

@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 47) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 50) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 47, "All the mod's items: " + items.size());
+        check(items.size() == 50, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9817,7 +9817,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * The mod's own sounds: all nine are registered; sounds.json lists each with a subtitle that
+     * The mod's own sounds: all ten are registered; sounds.json lists each with a subtitle that
      * en_us.json has, and each one's file is there, an Ogg Vorbis file, mono (so it's heard from
      * where it's played) at 44.1 kHz. The Speaker's three new sounds are the mod's, the Radio
      * Operator works its telegraph's key. A new Radio Transmitter coming on the air plays its "on"
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 9 && sounds.size() == 9, "Nine sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 10 && sounds.size() == 10, "Ten sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10139,6 +10139,253 @@ public final class SignalTowerGameTests {
         check(network.musicAt(far) == null, "Over: taken off");
         check(network.transmitterAt(far) != null && network.transmitterAt(far).power() == 0, "and the jukebox is quiet, without its chunk");
         check(network.musicAt(loopFar) != null, "The repeating one goes on");
+        helper.succeed();
+    }
+
+
+    // ---------------------------------------------------------------- v0.61.0: satellites, map waypoints
+
+    /**
+     * The satellite uplink, in the network (the tower's chunk not loaded): a Satellite Dish with no
+     * satellite up changes nothing; with one up, the tower is heard at full strength 5,000 blocks
+     * off and across the world, the meter says it's in reach, its music plays there, and it uses
+     * four times the power. Satellites and uplinks are saved with the network; the oldest falls
+     * out past 64. Each satellite's path is a great circle that rises and sets. Dish off, or no
+     * satellites: its own reach again.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void satelliteUplink(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = new SignalNetwork().attachTo(level);
+        network.forceWeather(com.reiko.signaltower.radio.Weather.CLEAR);
+        BlockPos tower = new BlockPos(8_400_000, 100, 8_400_000);
+        BlockPos near = tower.offset(60, 0, 0);
+        BlockPos farAway = tower.offset(5000, 0, 0);
+        BlockPos acrossTheWorld = new BlockPos(-8_400_000, 64, -8_400_000);
+        network.updateTransmitter(tower, 4633, 15, 120, null);
+        check(network.listen(level, 4633, near).power() > 0 && network.listen(level, 4633, farAway).power() == 0,
+                "Without a dish: heard near it, not 5000 blocks off");
+        network.setUplink(tower, true);
+        check(network.hasUplinkDish(tower) && !network.isUplinked(tower) && network.listen(level, 4633, farAway).power() == 0,
+                "A dish with no satellite up: just as before");
+        double rate = com.reiko.signaltower.radio.PowerCost.rateFor(network, tower);
+        network.addSatellite(level.getGameTime(), 42L);
+        check(network.isUplinked(tower) && network.satellites().size() == 1, "A satellite up: uplinked");
+        check(network.listen(level, 4633, farAway).power() == 15 && network.listen(level, 4633, acrossTheWorld).power() == 15,
+                "Heard at full strength 5000 blocks off and across the world");
+        check(network.edgeMargin(level, 4633, acrossTheWorld) > 0, "The meter: in reach there");
+        check(Math.abs(com.reiko.signaltower.radio.PowerCost.rateFor(network, tower) - rate * 4) < 1e-9, "Four times the power: "
+                + com.reiko.signaltower.radio.PowerCost.rateFor(network, tower) + " for " + rate);
+        network.setMusic(tower, new SignalNetwork.Music(4633, net.minecraft.world.item.JukeboxSongs.CAT, level.getGameTime(), 400, false));
+        check(network.musicHeard(level, 4633, acrossTheWorld) != null, "Its music plays across the world too");
+        UUID tuner = UUID.randomUUID();
+        network.updateTransmitter(tower, 4633, 15, 120, tuner);
+        check(network.towersTunedBy(tuner).equals(List.of(new SignalNetwork.OwnTower(tower, 0, 4633, -1))), "On its tuner's map: reach everywhere");
+
+        CompoundTag saved = network.save(new CompoundTag(), level.registryAccess());
+        SignalNetwork loaded = SignalNetwork.load(saved, level.registryAccess()).attachTo(level);
+        check(loaded.satellites().equals(network.satellites()) && loaded.isUplinked(tower), "Saved with the network");
+
+        com.reiko.signaltower.radio.SatelliteOrbit orbit = com.reiko.signaltower.radio.SatelliteOrbit.of(network.satellites().get(0));
+        boolean up = false, down = false;
+        for (int t = 0; t < orbit.period(); t += 50) {
+            org.joml.Vector3f d = orbit.direction(level.getGameTime() + t);
+            check(Math.abs(d.length() - 1) < 1e-3, "A direction: " + d);
+            up |= d.y > 0.2F;
+            down |= d.y < -0.2F;
+        }
+        check(up && down && orbit.period() >= 3600 && orbit.period() <= 8400, "It crosses the sky, and sets, every 3 to 7 minutes: " + orbit.period());
+        var buffer = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
+        var payload = new com.reiko.signaltower.network.SatellitesPayload(level.dimension().location(), network.satellites());
+        com.reiko.signaltower.network.SatellitesPayload.STREAM_CODEC.encode(buffer, payload);
+        check(com.reiko.signaltower.network.SatellitesPayload.STREAM_CODEC.decode(buffer).equals(payload), "Sent to the client as it is");
+
+        network.setUplink(tower, false);
+        check(!network.isUplinked(tower) && network.listen(level, 4633, farAway).power() == 0, "Dish off: just its own reach");
+        network.setUplink(tower, true);
+        network.clearSatellitesForTests();
+        check(!network.isUplinked(tower) && network.listen(level, 4633, farAway).power() == 0, "No satellite: just its own reach");
+        for (int i = 0; i < SignalNetwork.MAX_SATELLITES + 6; i++) {
+            network.addSatellite(level.getGameTime() + i, i);
+        }
+        check(network.satellites().size() == SignalNetwork.MAX_SATELLITES && network.satellites().get(0).seed() == 6, "64 at most: the oldest fall out");
+        network.removeTransmitter(tower);
+        check(!network.hasUplinkDish(tower), "Gone with its tower");
+        helper.succeed();
+    }
+
+    /**
+     * The Satellite Dish on real blocks: a repeater can't take one; a transmitter under open sky
+     * can (Jade says whether it's uplinked), roofed over it can't reach a satellite (under glass it
+     * can), and taken off it's given back.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void satelliteDish(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos tx = new BlockPos(1, 1, 1);
+        BlockPos relay = new BlockPos(10, 1, 1);
+        place(helper, tx, ModRegistry.RADIO_TRANSMITTER.get(), 4634);
+        place(helper, relay, ModRegistry.RADIO_REPEATER.get(), 4635);
+        BlockPos abs = helper.absolutePos(tx);
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack dish = new ItemStack(ModRegistry.SATELLITE_DISH.get(), 2);
+        SignalNetwork network = SignalNetwork.get(level);
+        Component refused = com.reiko.signaltower.item.AntennaItem.fit(dev, helper.absolutePos(relay), com.reiko.signaltower.radio.AntennaTier.SATELLITE, dish);
+        check(refused != null && keyOf(refused).endsWith("satellite_transmitters_only") && dish.getCount() == 2
+                && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(relay)) == com.reiko.signaltower.radio.AntennaTier.NONE,
+                "A repeater can't take one: " + refused);
+        Component fitted = com.reiko.signaltower.item.AntennaItem.fit(dev, abs, com.reiko.signaltower.radio.AntennaTier.SATELLITE, dish);
+        check(fitted != null && (keyOf(fitted).endsWith("satellite_no_satellite") || keyOf(fitted).endsWith("satellite_fitted"))
+                && dish.getCount() == 1 && com.reiko.signaltower.radio.AntennaTier.of(helper.getBlockState(tx)) == com.reiko.signaltower.radio.AntennaTier.SATELLITE
+                && network.hasUplinkDish(abs), "Fitted under open sky: " + fitted);
+        CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, abs);
+        check(info != null && List.of("on", "no_satellite").contains(info.getString("uplink")), "Jade: " + info);
+        check(com.reiko.signaltower.radio.AntennaTier.SATELLITE.label().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents key
+                && key.getKey().equals("item.reikos_signal_tower.satellite_dish"), "Its name");
+        BlockPos roof = tx.above(4);
+        helper.setBlock(roof, Blocks.STONE);
+        helper.startSequence()
+                .thenIdle(3) // the light catches up
+                .thenExecute(() -> {
+                    ((com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) helper.getBlockEntity(tx)).refresh();
+                    check(!network.hasUplinkDish(abs) && "no_sky".equals(com.reiko.signaltower.compat.RadioInfo.read(level, abs).getString("uplink")),
+                            "Roofed over: it can't reach a satellite");
+                    Component again = com.reiko.signaltower.item.AntennaItem.satelliteMessage(level, abs, Component.literal("It"));
+                    check(keyOf(again).endsWith("satellite_no_sky"), "and says so: " + again);
+                    helper.setBlock(roof, Blocks.GLASS);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    ((com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity) helper.getBlockEntity(tx)).refresh();
+                    check(network.hasUplinkDish(abs), "Under glass: it can again");
+                    Component off = com.reiko.signaltower.item.AntennaItem.takeOff(dev, abs);
+                    check(off != null && !network.hasUplinkDish(abs) && dev.getInventory().countItem(ModRegistry.SATELLITE_DISH.get()) == 1,
+                            "Taken off: given back, and no uplink");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Launch Pad: a pulse with nothing on it, or too few rockets, or a block over it, says why
+     * and does nothing; hoppers load it (one satellite, eight rockets; a comparator reads 15 when
+     * it's ready). A pulse then sends it up: the rockets are used, nothing comes out while it
+     * climbs, and 6 seconds later a satellite is in orbit over the dimension (the advancement's
+     * event fires). The Nether and the End have no orbit.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void launchPad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        SignalNetwork network = SignalNetwork.get(level);
+        var fired = com.reiko.signaltower.advancement.TowerAdvancements.recordForTests();
+        BlockPos pad = new BlockPos(4, 1, 1);
+        BlockPos power = new BlockPos(5, 1, 1);
+        helper.setBlock(pad, ModRegistry.LAUNCH_PAD.get());
+        com.reiko.signaltower.blockentity.LaunchPadBlockEntity be = helper.getBlockEntity(pad);
+        var slots = be.items();
+        int[] before = new int[1];
+        check(com.reiko.signaltower.blockentity.LaunchPadBlockEntity.hasOrbit(level)
+                && !com.reiko.signaltower.blockentity.LaunchPadBlockEntity.hasOrbit(level.getServer().getLevel(net.minecraft.world.level.Level.NETHER))
+                && !com.reiko.signaltower.blockentity.LaunchPadBlockEntity.hasOrbit(level.getServer().getLevel(net.minecraft.world.level.Level.END)),
+                "An orbit over the Overworld, none over the Nether or the End");
+        helper.startSequence()
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK))
+                .thenExecute(() -> {
+                    check("no_satellite".equals(be.refusal()) && !be.isLaunching(), "Nothing on it: no launch: " + be.refusal());
+                    helper.setBlock(power, Blocks.AIR);
+                    check(slots.insertItem(0, new ItemStack(ModRegistry.SATELLITE.get()), false).isEmpty()
+                            && !slots.insertItem(0, new ItemStack(ModRegistry.SATELLITE.get()), true).isEmpty()
+                            && slots.insertItem(1, new ItemStack(ModRegistry.SATELLITE.get()), true).getCount() == 1,
+                            "A hopper puts in one satellite, in its slot");
+                    check(slots.insertItem(1, new ItemStack(net.minecraft.world.item.Items.FIREWORK_ROCKET, 5), false).isEmpty()
+                            && be.fireworkCount() == 5 && be.comparatorOutput() == 12, "and rockets: 5, comparator " + be.comparatorOutput());
+                })
+                .thenIdle(2)
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK))
+                .thenExecute(() -> {
+                    check("fireworks".equals(be.refusal()) && !be.isLaunching(), "Too few rockets: no launch: " + be.refusal());
+                    helper.setBlock(power, Blocks.AIR);
+                    ItemStack rest = slots.insertItem(1, new ItemStack(net.minecraft.world.item.Items.FIREWORK_ROCKET, 7), false);
+                    check(rest.getCount() == 4 && be.fireworkCount() == 8 && be.comparatorOutput() == 15
+                            && level.getBlockState(helper.absolutePos(pad)).getAnalogOutputSignal(level, helper.absolutePos(pad)) == 15,
+                            "Eight rockets: ready, comparator 15; the rest stay in the hopper: " + rest.getCount());
+                    helper.setBlock(pad.above(3), Blocks.STONE);
+                })
+                .thenIdle(3) // the light catches up
+                .thenExecute(() -> {
+                    check("no_sky".equals(be.launchProblem(level)), "A block over it: it can't go");
+                    helper.setBlock(pad.above(3), Blocks.AIR);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(be.launchProblem(level) == null, "Clear again: ready");
+                    before[0] = network.satellites().size();
+                })
+                .thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK))
+                .thenExecute(() -> {
+                    check(be.isLaunching() && be.fireworkCount() == 0 && !be.hasSatellite() && be.refusal() == null, "Launched: the rockets used up");
+                    check(slots.extractItem(1, 1, false).isEmpty() && slots.insertItem(1, new ItemStack(net.minecraft.world.item.Items.FIREWORK_ROCKET), true).getCount() == 1,
+                            "Nothing in or out while it climbs");
+                    check(be.height(level.getGameTime(), 0) < 5, "It starts slowly");
+                })
+                .thenIdle(com.reiko.signaltower.blockentity.LaunchPadBlockEntity.FLIGHT_TICKS / 2)
+                .thenExecute(() -> check(be.isLaunching() && be.height(level.getGameTime(), 0) > 30, "Climbing: " + be.height(level.getGameTime(), 0)))
+                .thenIdle(com.reiko.signaltower.blockentity.LaunchPadBlockEntity.FLIGHT_TICKS / 2 + 5)
+                .thenExecute(() -> {
+                    check(!be.isLaunching() && network.satellites().size() == before[0] + 1, "In orbit: " + network.satellites().size());
+                    check(fired.stream().anyMatch(f -> f.event().equals("satellite_in_orbit") && f.pos().equals(helper.absolutePos(pad))),
+                            "Its advancement's event");
+                    network.clearSatellitesForTests(); // so other tests' dishes aren't uplinked
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Map waypoints: a player's own full-size towers (not compact ones, nor anyone else's), with
+     * their reach; an old tower or village station once they've been near it (kept, and updated
+     * rather than doubled), with the frequency the network has for it now. The list goes to the
+     * client as it is.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void mapWaypoints(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID dev = UUID.randomUUID();
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos own = new BlockPos(8_500_000, 90, 8_500_000);
+        BlockPos compact = own.offset(10, 0, 0);
+        BlockPos theirs = own.offset(20, 0, 0);
+        BlockPos old = own.offset(30, 0, 0);
+        network.updateTransmitter(own, 4636, 15, 300, dev);
+        network.updateTransmitter(compact, 4636, 15, 16, dev, true, null);
+        network.updateTransmitter(theirs, 4636, 15, 300, UUID.randomUUID());
+        network.updateTransmitter(old, 4637, 0, 200, null);
+        try {
+            Player player = namedPlayer(helper, new BlockPos(2, 1, 0), dev, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+            var place = new com.reiko.signaltower.radio.MapTowers.Place(level.dimension(), old, com.reiko.signaltower.network.MapWaypointsPayload.OLD_TOWER, 4000);
+            check(com.reiko.signaltower.radio.MapTowers.discover(player, place) && !com.reiko.signaltower.radio.MapTowers.discover(player, place),
+                    "Found once, not twice");
+            check(com.reiko.signaltower.radio.MapTowers.discover(player,
+                    new com.reiko.signaltower.radio.MapTowers.Place(level.dimension(), old, com.reiko.signaltower.network.MapWaypointsPayload.OLD_TOWER, 4001))
+                    && player.getData(com.reiko.signaltower.radio.MapTowers.DISCOVERED).places().size() == 1, "Updated, not doubled");
+            var entries = com.reiko.signaltower.radio.MapTowers.entriesFor(level.getServer(), dev,
+                    player.getData(com.reiko.signaltower.radio.MapTowers.DISCOVERED).places());
+            var ownEntry = new com.reiko.signaltower.network.MapWaypointsPayload.Entry(level.dimension().location(), own,
+                    com.reiko.signaltower.network.MapWaypointsPayload.TRANSMITTER, 4636, 300);
+            var oldEntry = new com.reiko.signaltower.network.MapWaypointsPayload.Entry(level.dimension().location(), old,
+                    com.reiko.signaltower.network.MapWaypointsPayload.OLD_TOWER, 4637, 0);
+            check(entries.contains(ownEntry) && entries.contains(oldEntry) && entries.stream().noneMatch(e -> e.pos().equals(compact) || e.pos().equals(theirs)),
+                    "Their own tower with its reach, and the old tower on its frequency now; not compact ones or anyone else's: " + entries);
+            check(ownEntry.own() && !oldEntry.own(), "Own towers get a reach circle");
+            var buffer = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
+            var payload = new com.reiko.signaltower.network.MapWaypointsPayload(entries);
+            com.reiko.signaltower.network.MapWaypointsPayload.STREAM_CODEC.encode(buffer, payload);
+            check(com.reiko.signaltower.network.MapWaypointsPayload.STREAM_CODEC.decode(buffer).equals(payload), "Sent to the client as it is");
+            var codec = com.reiko.signaltower.radio.MapTowers.Discovered.CODEC;
+            var known = player.getData(com.reiko.signaltower.radio.MapTowers.DISCOVERED);
+            var tag = codec.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, known).getOrThrow();
+            check(codec.parse(net.minecraft.nbt.NbtOps.INSTANCE, tag).getOrThrow().equals(known), "Kept with the player");
+        } finally {
+            for (BlockPos pos : List.of(own, compact, theirs, old)) network.removeTransmitter(pos);
+        }
         helper.succeed();
     }
 }

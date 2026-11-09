@@ -91,6 +91,25 @@ public final class RadioInfo {
         if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return readBeacon(level, pos);
         }
+        if (level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.LaunchPadBlockEntity pad) {
+            // v0.61.0: what's on it, whether it can go, and how many satellites are up already.
+            CompoundTag tag = new CompoundTag();
+            tag.putBoolean("pad_satellite", pad.hasSatellite());
+            tag.putInt("pad_fireworks", pad.fireworkCount());
+            tag.putInt("pad_satellites", SignalNetwork.get(level).satellites().size());
+            tag.putString("pad_dimension", level.dimension().location().toString());
+            if (pad.isLaunching()) {
+                tag.putInt("pad_height", (int) pad.height(level.getGameTime(), 0));
+            } else {
+                String problem = pad.launchProblem(level);
+                if (problem == null) {
+                    tag.putBoolean("pad_ready", true);
+                } else if (!"no_satellite".equals(problem) && !"fireworks".equals(problem)) {
+                    putComponent(tag, "pad_problem", pad.refusalMessage(level, problem));
+                }
+            }
+            return tag;
+        }
         if (level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.BundledCableBlock
                 || level.getBlockState(pos).getBlock() instanceof com.reiko.signaltower.block.CableTapBlock) {
             // v0.54.0: what the cable network carries.
@@ -414,6 +433,14 @@ public final class RadioInfo {
             tag.putString("link_dimension", target.location().toString());
             tag.putLong("link_at", com.reiko.signaltower.radio.CrossDimension.arrival(level, there, pos).asLong());
         }
+        if (com.reiko.signaltower.radio.AntennaTier.of(state) == com.reiko.signaltower.radio.AntennaTier.SATELLITE) {
+            // v0.61.0: whether its Satellite Dish is uplinked, and if not, why.
+            SignalNetwork network = SignalNetwork.get(level);
+            tag.putString("uplink", !com.reiko.signaltower.radio.AntennaTier.sendsAcross(state) ? "transmitters_only"
+                    : !network.hasUplinkDish(pos) ? "no_sky" : !network.isUplinked(pos) ? "no_satellite" : "on");
+            tag.putString("uplink_dimension", level.dimension().location().toString());
+            tag.putInt("uplink_satellites", network.satellites().size());
+        }
         // v0.54.0: storm damage, ice, and how braced a tall tower is.
         SignalNetwork storms = SignalNetwork.get(level);
         String cause = storms.damageCause(pos);
@@ -527,6 +554,14 @@ public final class RadioInfo {
                     : com.reiko.signaltower.radio.CrossDimension.name(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id));
             lines.add(Component.translatable(LANG + "antenna_ender", antenna.label(), dimension,
                     com.reiko.signaltower.radio.CrossDimension.coords(BlockPos.of(data.getLong("link_at")))).withStyle(ChatFormatting.LIGHT_PURPLE));
+        } else if (antenna == com.reiko.signaltower.radio.AntennaTier.SATELLITE && data != null && data.contains("uplink")) {
+            // v0.61.0: uplinked to a satellite (heard everywhere in the dimension), or why not.
+            net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(data.getString("uplink_dimension"));
+            Component dimension = id == null ? Component.literal(data.getString("uplink_dimension"))
+                    : com.reiko.signaltower.radio.CrossDimension.name(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id));
+            String uplink = data.getString("uplink");
+            lines.add(Component.translatable(LANG + "uplink_" + uplink, antenna.label(), dimension, data.getInt("uplink_satellites"))
+                    .withStyle(uplink.equals("on") ? ChatFormatting.LIGHT_PURPLE : ChatFormatting.GOLD));
         } else if (antenna != com.reiko.signaltower.radio.AntennaTier.NONE) {
             // v0.45.0: its antenna, and how much farther that makes it reach.
             lines.add(Component.translatable(LANG + "antenna", antenna.label(), antenna.multiplierText()).withStyle(ChatFormatting.GOLD));
@@ -663,6 +698,33 @@ public final class RadioInfo {
         if (block instanceof com.reiko.signaltower.block.AviationBeaconBlock) {
             return beaconLines(state, data);
         }
+        if (block instanceof com.reiko.signaltower.block.LaunchPadBlock) {
+            // v0.61.0
+            List<Component> lines = new ArrayList<>();
+            if (data != null && data.contains("pad_fireworks")) {
+                if (data.contains("pad_height")) {
+                    lines.add(Component.translatable(LANG + "pad_climbing", data.getInt("pad_height")).withStyle(ChatFormatting.LIGHT_PURPLE));
+                } else {
+                    lines.add(Component.translatable(LANG + (data.getBoolean("pad_satellite") ? "pad_satellite" : "pad_no_satellite"))
+                            .withStyle(data.getBoolean("pad_satellite") ? ChatFormatting.AQUA : ChatFormatting.GRAY));
+                    int rockets = data.getInt("pad_fireworks");
+                    lines.add(Component.translatable(LANG + "pad_fireworks", rockets, com.reiko.signaltower.blockentity.LaunchPadBlockEntity.FIREWORKS_NEEDED)
+                            .withStyle(rockets >= com.reiko.signaltower.blockentity.LaunchPadBlockEntity.FIREWORKS_NEEDED ? ChatFormatting.AQUA : ChatFormatting.GRAY));
+                    if (data.getBoolean("pad_ready")) {
+                        lines.add(Component.translatable(LANG + "pad_ready").withStyle(ChatFormatting.GREEN));
+                    } else if (data.contains("pad_problem")) {
+                        lines.add(getComponent(data, "pad_problem"));
+                    }
+                }
+                net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(data.getString("pad_dimension"));
+                if (id != null) {
+                    lines.add(Component.translatable(LANG + "pad_orbit", com.reiko.signaltower.radio.CrossDimension.name(
+                            net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id)),
+                            data.getInt("pad_satellites")).withStyle(ChatFormatting.GRAY));
+                }
+            }
+            return lines;
+        }
         if (block instanceof com.reiko.signaltower.block.CableTapBlock || block instanceof com.reiko.signaltower.block.BundledCableBlock) {
             // v0.54.0
             List<Component> lines = new ArrayList<>();
@@ -715,8 +777,9 @@ public final class RadioInfo {
             Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
             if (data.contains("top_antenna")) {
-                Component antennaName = Component.translatable("item." + SignalTower.MOD_ID + "." + data.getString("top_antenna") + "_antenna");
-                String multiplier = com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT)).multiplierText();
+                com.reiko.signaltower.radio.AntennaTier topTier = com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT));
+                Component antennaName = topTier.label();
+                String multiplier = topTier.multiplierText();
                 lines.add((data.contains("top_aim")
                         ? Component.translatable(LANG + "antenna_dish", antennaName,
                                 com.reiko.signaltower.radio.AntennaTier.aimLabel(data.getInt("top_aim")), multiplier)

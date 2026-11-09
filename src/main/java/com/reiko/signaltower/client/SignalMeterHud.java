@@ -139,7 +139,9 @@ public final class SignalMeterHud {
             if (current.margin() < 0) {
                 detail = Component.translatable(KEY + "out_of_reach").withStyle(ChatFormatting.DARK_GRAY);
             } else {
-                Component edge = current.margin() == 0 ? Component.translatable(KEY + "edge_at")
+                // v0.61.0: through a satellite there's no edge in the dimension.
+                Component edge = current.margin() >= com.reiko.signaltower.radio.SignalNetwork.UPLINK_REACH / 2 ? Component.translatable(KEY + "edge_satellite")
+                        : current.margin() == 0 ? Component.translatable(KEY + "edge_at")
                         : current.margin() == 1 ? Component.translatable(KEY + "edge_block")
                         : Component.translatable(KEY + "edge_blocks", current.margin());
                 detail = (current.towers() > 0

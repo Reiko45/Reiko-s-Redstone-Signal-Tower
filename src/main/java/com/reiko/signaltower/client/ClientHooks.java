@@ -41,6 +41,17 @@ public final class ClientHooks {
         BroadcastMusic.set(pos, song, start, volume);
     }
 
+    /** v0.61.0: the satellites over the player's dimension (for the night sky). */
+    public static void satellites(net.minecraft.resources.ResourceLocation dimension,
+                                  java.util.List<com.reiko.signaltower.radio.SignalNetwork.Satellite> satellites) {
+        SatelliteSky.set(dimension, satellites);
+    }
+
+    /** v0.61.0: the towers to show on JourneyMap's or Xaero's map. */
+    public static void mapWaypoints(java.util.List<com.reiko.signaltower.network.MapWaypointsPayload.Entry> entries) {
+        com.reiko.signaltower.compat.map.MapWaypoints.setFromServer(entries);
+    }
+
     /** A locator answer arrived: hand it to the open remote screen, if there is one. */
     public static void onRemoteScan(RemoteScanResultPayload result) {
         if (Minecraft.getInstance().screen instanceof RemoteScanListener listener) {

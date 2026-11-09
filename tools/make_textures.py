@@ -1357,6 +1357,98 @@ def scanner_arrow():
     return img
 
 
+def satellite_dish_item():
+    """The Satellite Dish (v0.61.0): a dish facing up at the sky on a stand, purple feed tip (the ender eye in it)."""
+    import math
+    img = blank()
+    px = img.load()
+    dark, mid, light, shine = (90, 94, 100, 255), (170, 174, 180, 255), (215, 218, 222, 255), (245, 246, 248, 255)
+    gold = (226, 180, 52, 255)
+    for y in range(16):
+        for x in range(16):
+            # an ellipse seen from the side and a bit above: a bowl opening upward
+            d = math.hypot((x - 7.5) / 6.6, (y - 6.0) / 3.6)
+            if d <= 1.0 and y >= 3:
+                px[x, y] = dark if d > 0.86 else (light if y < 6 else mid)
+    for (x, y) in [(4, 4), (5, 4), (6, 4)]:
+        px[x, y] = shine
+    for y in range(1, 6):              # the feed rod up from the middle
+        px[7, y] = dark
+    px[7, 0] = (150, 70, 200, 255)
+    px[8, 0] = (200, 120, 240, 255)
+    px[7, 1] = (120, 50, 170, 255)
+    for (x, y) in [(7, 10), (7, 11), (6, 12), (7, 12), (8, 12), (5, 13), (9, 13), (4, 14), (10, 14),
+                   (3, 15), (4, 15), (10, 15), (11, 15)]:   # a tripod
+        px[x, y] = dark
+    px[6, 10] = gold
+    px[8, 10] = gold
+    return img
+
+
+def satellite_panel():
+    """A satellite's solar wing (v0.61.0): dark blue cells, gold rim."""
+    img = blank()
+    px = img.load()
+    rim = (212, 168, 48, 255)
+    cell = [(18, 34, 92, 255), (26, 48, 120, 255), (44, 76, 160, 255)]
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15):
+                px[x, y] = rim
+            elif x % 5 == 0 or y % 5 == 0:
+                px[x, y] = (150, 160, 180, 255)
+            else:
+                px[x, y] = cell[2] if (x % 5 == 1 and y % 5 == 1) else cell[1] if (x * 3 + y) % 4 else cell[0]
+    return img
+
+
+def satellite_foil():
+    """A satellite's body (v0.61.0): crinkled gold foil."""
+    rng = random.Random(6101)
+    img = blank()
+    px = img.load()
+    shades = [(150, 110, 24, 255), (196, 150, 40, 255), (226, 184, 64, 255), (248, 216, 110, 255)]
+    for y in range(16):
+        for x in range(16):
+            px[x, y] = shades[min(3, max(0, int(rng.gauss(1.6, 0.9))))]
+    return img
+
+
+def launch_pad_top():
+    """The Launch Pad's deck (v0.61.0): concrete with yellow and black hazard stripes round a scorched ring."""
+    import math
+    rng = random.Random(6102)
+    img = blank()
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            g = 132 + rng.randint(-8, 8)
+            px[x, y] = (g, g, g + 4, 255)
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15) or x in (1, 14) or y in (1, 14):
+                px[x, y] = (236, 190, 30, 255) if (x + y) // 2 % 2 == 0 else (30, 30, 32, 255)
+    for y in range(16):
+        for x in range(16):
+            d = math.hypot(x - 7.5, y - 7.5)
+            if 3.0 <= d <= 4.2:
+                px[x, y] = (60, 58, 56, 255)
+            elif d < 3.0:
+                g = 46 + rng.randint(-6, 6)
+                px[x, y] = (g, g - 2, g - 4, 255)
+    return img
+
+
+def launch_pad_side():
+    """Its edge: steel with a hazard band."""
+    img = casing(6103, rivets=True)
+    px = img.load()
+    for x in range(16):
+        for y in (12, 13):
+            px[x, y] = (236, 190, 30, 255) if (x + y) // 2 % 2 == 0 else (30, 30, 32, 255)
+    return img
+
+
 blocks = {
     **{f"radio_battery_side_{n}": battery_side(n) for n in range(5)},
     "radio_battery_top": battery_top(),
@@ -1458,6 +1550,10 @@ blocks = {
     "radio_converter_top_on": top(True, receiver=False, palette=TEAL_ON),
     "converter_tip": antenna_tip(False, teal=True),
     "converter_tip_on": antenna_tip(True, teal=True),
+    "launch_pad_top": launch_pad_top(),  # v0.61.0
+    "launch_pad_side": launch_pad_side(),
+    "satellite_panel": satellite_panel(),
+    "satellite_foil": satellite_foil(),
 }
 items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
          "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),
@@ -1467,7 +1563,8 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
          "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
          **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
-         "dish_antenna": dish_item(), "coverage_map": coverage_map_item(), "ender_antenna": antenna_item("ender")}
+         "dish_antenna": dish_item(), "coverage_map": coverage_map_item(), "ender_antenna": antenna_item("ender"),
+         "satellite_dish": satellite_dish_item()}
 
 for folder, textures in ((BLOCK, blocks), (ITEM, items)):
     folder.mkdir(parents=True, exist_ok=True)

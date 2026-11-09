@@ -65,6 +65,7 @@ public class BundledTransmitterBlockEntity extends RadioTransmitterBlockEntity {
         network.setDish(worldPosition, com.reiko.signaltower.radio.AntennaTier.dishAim(state));
         network.setLink(worldPosition, com.reiko.signaltower.radio.AntennaTier.of(state) == com.reiko.signaltower.radio.AntennaTier.ENDER
                 && com.reiko.signaltower.radio.AntennaTier.sendsAcross(state) ? linkTarget(serverLevel) : null);
+        network.setUplink(worldPosition, com.reiko.signaltower.radio.AntennaTier.uplinks(serverLevel, worldPosition, state)); // v0.61.0
         com.reiko.signaltower.radio.PowerCost.check(serverLevel, worldPosition);
         boolean powered = strongest() > 0 && !network.isDown(worldPosition);
         if (state.getValue(RadioTransmitterBlock.POWERED) != powered) {

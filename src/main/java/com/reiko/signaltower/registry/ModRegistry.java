@@ -336,6 +336,15 @@ public final class ModRegistry {
                     .sound(SoundType.METAL)
                     .noOcclusion()));
 
+    /** v0.61.0: sends a Satellite up to orbit on eight Firework Rockets and a redstone pulse. */
+    public static final DeferredBlock<com.reiko.signaltower.block.LaunchPadBlock> LAUNCH_PAD = BLOCKS.register("launch_pad",
+            () -> new com.reiko.signaltower.block.LaunchPadBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.5F, 9.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
     /** v0.51.0: a desk to type short messages onto a frequency. */
     public static final DeferredBlock<com.reiko.signaltower.block.RadioTelegraphBlock> RADIO_TELEGRAPH = BLOCKS.register("radio_telegraph",
             () -> new com.reiko.signaltower.block.RadioTelegraphBlock(BlockBehaviour.Properties.of()
@@ -592,6 +601,13 @@ public final class ModRegistry {
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
+    /** v0.61.0: what goes up from a Launch Pad; and the dish that talks to it. */
+    public static final DeferredItem<BlockItem> LAUNCH_PAD_ITEM =
+            ITEMS.registerSimpleBlockItem("launch_pad", LAUNCH_PAD);
+    public static final DeferredItem<com.reiko.signaltower.item.SatelliteItem> SATELLITE = ITEMS.register("satellite",
+            () -> new com.reiko.signaltower.item.SatelliteItem(new Item.Properties().stacksTo(1).rarity(net.minecraft.world.item.Rarity.UNCOMMON)));
+    public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> SATELLITE_DISH = ITEMS.register("satellite_dish",
+            () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.SATELLITE, new Item.Properties()));
     public static final DeferredItem<BlockItem> RADIO_BATTERY_ITEM =
             ITEMS.registerSimpleBlockItem("radio_battery", RADIO_BATTERY);
     /** v0.49.0: a map that paints where a frequency can be heard. */
@@ -707,6 +723,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SolarPanelBlockEntity>> SOLAR_PANEL_BE =
             BLOCK_ENTITIES.register("solar_panel",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.SolarPanelBlockEntity::new, SOLAR_PANEL.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.LaunchPadBlockEntity>> LAUNCH_PAD_BE =
+            BLOCK_ENTITIES.register("launch_pad",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.LaunchPadBlockEntity::new, LAUNCH_PAD.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TelegraphBlockEntity>> TELEGRAPH_BE =
             BLOCK_ENTITIES.register("radio_telegraph",

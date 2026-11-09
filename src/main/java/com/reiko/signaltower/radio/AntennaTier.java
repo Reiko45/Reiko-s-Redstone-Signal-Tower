@@ -35,7 +35,12 @@ public enum AntennaTier implements StringRepresentable {
     /** v0.48.0: aimed ({@link #AIM}); {@link #dishMultiplier} times the reach inside its beam, normal elsewhere. */
     DISH("dish"),
     /** v0.50.0: on a transmitter, also sends into another dimension ({@link CrossDimension}); reach as with none. */
-    ENDER("ender");
+    ENDER("ender"),
+    /**
+     * v0.61.0: on a transmitter under open sky, with a satellite in orbit over its dimension, it's
+     * heard everywhere in that dimension ({@link SignalNetwork#isUplinked}); reach as with none otherwise.
+     */
+    SATELLITE("satellite");
 
     public static final EnumProperty<AntennaTier> PROPERTY = EnumProperty.create("antenna", AntennaTier.class);
     /**
@@ -66,6 +71,7 @@ public enum AntennaTier implements StringRepresentable {
             case NETHERITE -> value(Config.NETHERITE_ANTENNA_REACH);
             case DISH -> 1.0; // outside its beam; see dishMultiplier()
             case ENDER -> 1.0;
+            case SATELLITE -> 1.0;
         };
     }
 
@@ -143,9 +149,17 @@ public enum AntennaTier implements StringRepresentable {
         return "×" + number;
     }
 
-    /** "Diamond Antenna". */
+    /** "Diamond Antenna" ("Satellite Dish"). */
     public Component label() {
-        return Component.translatable("item." + SignalTower.MOD_ID + "." + name + "_antenna");
+        return Component.translatable("item." + SignalTower.MOD_ID + "." + (this == SATELLITE ? "satellite_dish" : name + "_antenna"));
+    }
+
+    /**
+     * True if the tower top at {@code pos} in {@code state} has a Satellite Dish it can use: a
+     * full-size transmitter (v0.61.0, like the Ender Antenna) with open sky above it.
+     */
+    public static boolean uplinks(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos, BlockState state) {
+        return of(state) == SATELLITE && sendsAcross(state) && level.canSeeSky(pos.above());
     }
 
     /** The antenna item for this tier (none for {@link #NONE}). */
@@ -158,6 +172,7 @@ public enum AntennaTier implements StringRepresentable {
             case NETHERITE -> ModRegistry.NETHERITE_ANTENNA.get();
             case DISH -> ModRegistry.DISH_ANTENNA.get();
             case ENDER -> ModRegistry.ENDER_ANTENNA.get();
+            case SATELLITE -> ModRegistry.SATELLITE_DISH.get();
         };
     }
 
@@ -196,7 +211,8 @@ public enum AntennaTier implements StringRepresentable {
     public static void addTooltipLine(ItemStack stack, List<Component> tooltip) {
         AntennaTier tier = of(stack);
         if (tier != NONE) {
-            tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == DISH ? ".antenna_dish" : tier == ENDER ? ".antenna_ender" : ".antenna"),
+            tooltip.add(Component.translatable("tooltip." + SignalTower.MOD_ID + (tier == DISH ? ".antenna_dish" : tier == ENDER ? ".antenna_ender"
+                            : tier == SATELLITE ? ".antenna_satellite" : ".antenna"),
                     tier.label(), tier.multiplierText()).withStyle(ChatFormatting.GOLD));
         }
     }

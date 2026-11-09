@@ -211,6 +211,14 @@
       "apply": {
         "model": "reikos_signal_tower:block/antenna_dish_ccw22"
       }
+    },
+    {
+      "when": {
+        "antenna": "satellite"
+      },
+      "apply": {
+        "model": "reikos_signal_tower:block/antenna_satellite"
+      }
     }
   ]
 }

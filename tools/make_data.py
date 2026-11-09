@@ -321,6 +321,32 @@ write(items / "solar_panel.json", {"parent": f"{MOD}:block/solar_panel"})  # v0.
 write(items / "radio_telegraph.json", {"parent": f"{MOD}:block/radio_telegraph"})  # v0.51.0
 write(items / "dish_rotator.json", {"parent": f"{MOD}:block/dish_rotator"})  # v0.52.0
 write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
+# v0.61.0: the Satellite Dish (flat), the Launch Pad, and the Satellite (a little model: a foil body, two solar wings, a dish)
+write(items / "satellite_dish.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex("satellite_dish", "item")}})
+write(items / "launch_pad.json", {"parent": f"{MOD}:block/launch_pad"})
+write(items / "satellite.json", {
+    "parent": "minecraft:block/block",
+    "gui_light": "side",
+    "textures": {"particle": tex("satellite_foil"), "foil": tex("satellite_foil"), "panel": tex("satellite_panel"),
+                 "white": "minecraft:block/white_concrete", "metal": "minecraft:block/iron_block"},
+    "elements": [
+        {"from": [5.5, 4, 5.5], "to": [10.5, 11, 10.5], "faces": {f: {"texture": "#foil"} for f in ("north", "south", "east", "west", "up", "down")}},
+        {"from": [0, 6.5, 7.5], "to": [5.5, 9.5, 8.5], "faces": {f: {"texture": "#panel"} for f in ("north", "south", "east", "west", "up", "down")}},
+        {"from": [10.5, 6.5, 7.5], "to": [16, 9.5, 8.5], "faces": {f: {"texture": "#panel"} for f in ("north", "south", "east", "west", "up", "down")}},
+        {"from": [6, 11, 6], "to": [10, 11.8, 10], "faces": {f: {"texture": "#white"} for f in ("north", "south", "east", "west", "up", "down")}},
+        {"from": [7.6, 11.8, 7.6], "to": [8.4, 14.5, 8.4], "faces": {f: {"texture": "#metal"} for f in ("north", "south", "east", "west", "up", "down")}},
+        {"from": [6.5, 3, 6.5], "to": [9.5, 4, 9.5], "faces": {f: {"texture": "#metal"} for f in ("north", "south", "east", "west", "up", "down")}},
+    ],
+    "display": {
+        "gui": {"rotation": [30, 225, 0], "translation": [0, 0, 0], "scale": [0.7, 0.7, 0.7]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.3, 0.3, 0.3]},
+        "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [0.5, 0.5, 0.5]},
+        "head": {"rotation": [0, 0, 0], "translation": [0, 6, 0], "scale": [0.8, 0.8, 0.8]},
+        "thirdperson_righthand": {"rotation": [75, 45, 0], "translation": [0, 2.5, 0], "scale": [0.375, 0.375, 0.375]},
+        "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, 0, 0], "scale": [0.4, 0.4, 0.4]},
+        "firstperson_lefthand": {"rotation": [0, 225, 0], "translation": [0, 0, 0], "scale": [0.4, 0.4, 0.4]},
+    },
+})
 
 for tier in ("iron", "gold", "diamond", "netherite", "dish", "ender"):
     write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
@@ -477,6 +503,32 @@ for key, angle in DISH_ANGLES.items():
     write(models / f"antenna_dish_{key}.json", dish_model(angle))
 
 
+def satellite_dish_model():
+    """The Satellite Dish (v0.61.0): a white dish on the north side of the rod like the Dish Antenna's,
+    tipped back 45 degrees to face the sky, with a purple feed (the eye of ender in it)."""
+    plate, rod = "#plate", "#rod"
+    elements = [
+        solid([3.5, 22, 4.5], [12.5, 28, 5.5], plate),
+        solid([5, 20.5, 4.6], [11, 29.5, 5.6], plate),
+        solid([4.2, 21.2, 4.7], [11.8, 28.8, 5.7], plate),
+        solid([6, 23, 5.7], [10, 27, 6.3], plate),
+        solid([7.2, 24.2, 6.3], [8.8, 25.8, 7.2], rod),
+        solid([7.6, 24.6, 1.8], [8.4, 25.4, 4.5], rod),
+        solid([7, 24, 1], [9, 26, 1.8], "#horn"),
+    ]
+    for element in elements:
+        element["rotation"] = {"origin": [8, 25, 7], "axis": "x", "angle": 45}
+        # Lit as open sky (it only works under one), not by the light inside the tower block it's part of.
+        element["neoforge_data"] = {"sky_light": 15}
+    return {"parent": "minecraft:block/block",
+            "textures": {"particle": "minecraft:block/white_concrete", "plate": "minecraft:block/white_concrete",
+                         "rod": tex("radio_mast_post"), "horn": "minecraft:block/purpur_block"},
+            "elements": elements}
+
+
+write(models / "antenna_satellite.json", satellite_dish_model())
+
+
 def dish_part(aim):
     quarter, rest = divmod(aim, 4)
     key, turns = [("0", quarter), ("cw22", quarter), ("cw45", quarter), ("ccw22", quarter + 1)][rest]
@@ -491,6 +543,7 @@ def tower_states(name, lit_property):
              {"when": {lit_property: "true"}, "apply": {"model": f"{MOD}:block/{name}_on"}}]
     parts += [{"when": {"antenna": tier}, "apply": {"model": f"{MOD}:block/antenna_{tier}"}} for tier in ANTENNAS]
     parts += [dish_part(aim) for aim in range(16)]  # v0.48.0
+    parts += [{"when": {"antenna": "satellite"}, "apply": {"model": f"{MOD}:block/antenna_satellite"}}]  # v0.61.0
     write(states / f"{name}.json", {"multipart": parts})
 
 
@@ -635,6 +688,19 @@ write(models / "solar_panel.json", {
     }}],
 })
 write(states / "solar_panel.json", {"variants": {"": {"model": f"{MOD}:block/solar_panel"}}})
+# v0.61.0: the Launch Pad, a six-pixel concrete deck with hazard stripes and four clamps at the corners
+write(models / "launch_pad.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("launch_pad_side"), "top": tex("launch_pad_top"), "side": tex("launch_pad_side"),
+                 "bottom": tex("radio_bottom"), "clamp": "minecraft:block/yellow_concrete"},
+    "elements": [{"from": [0, 0, 0], "to": [16, 6, 16], "faces": {
+        "up": {"texture": "#top", "uv": [0, 0, 16, 16]},
+        "down": {"texture": "#bottom", "uv": [0, 0, 16, 16], "cullface": "down"},
+        **{face: {"texture": "#side", "uv": [0, 10, 16, 16], "cullface": face} for face in ("north", "south", "east", "west")},
+    }}] + [{"from": [x, 6, z], "to": [x + 2, 8, z + 2], "faces": {f: {"texture": "#clamp"} for f in ("north", "south", "east", "west", "up")}}
+           for x in (0.5, 13.5) for z in (0.5, 13.5)],
+})
+write(states / "launch_pad.json", {"variants": {"": {"model": f"{MOD}:block/launch_pad"}}})
 
 # v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
 # with a lamp at the back; facing north here, turned by the blockstate.
@@ -1346,6 +1412,48 @@ write(ASSETS / "lang" / "en_us.json", {
     f"subtitles.{MOD}.tower.on": "Tower goes on the air",
     f"subtitles.{MOD}.tower.off": "Tower goes off the air",
     f"subtitles.{MOD}.station.siren": "Raid siren wails",
+    # v0.61.0: satellites, the Launch Pad, the Satellite Dish, map waypoints
+    f"subtitles.{MOD}.satellite.launch": "Rocket lifts off",
+    f"item.{MOD}.satellite": "Satellite",
+    f"item.{MOD}.satellite_dish": "Satellite Dish",
+    f"block.{MOD}.launch_pad": "Launch Pad",
+    f"tooltip.{MOD}.satellite_help": "Put it on a Launch Pad with %s Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",
+    f"tooltip.{MOD}.satellite_dish_item": "Fit it to a Radio Transmitter (plain, timer, recorder, weather station, jukebox or bundled) with open sky above: once a satellite is in orbit over its dimension, the tower is heard everywhere in that dimension, at full strength, over any hills. It uses %2$s times the power while it's uplinked.",
+    f"tooltip.{MOD}.antenna_satellite": "Antenna: %s (heard across the dimension through a satellite)",
+    f"tooltip.{MOD}.launch_pad_help": "Load a Satellite and %s Firework Rockets (by hand or with hoppers), then give it a redstone pulse to send the satellite up to orbit. It needs open sky above, in a dimension with a sky (not the Nether or the End). An empty hand takes back what's on it; a comparator reads 15 when it's ready.",
+    f"message.{MOD}.satellite_transmitters_only": "Only a Radio Transmitter (plain, timer, recorder, weather station, jukebox or bundled) can take a Satellite Dish",
+    f"message.{MOD}.satellite_no_sky": "%s has a Satellite Dish, but it needs open sky above to reach a satellite",
+    f"message.{MOD}.satellite_no_satellite": "%s has a Satellite Dish: once a satellite is in orbit over %s, it'll be heard everywhere there",
+    f"message.{MOD}.satellite_fitted": "%s is uplinked: heard everywhere in %s through the satellite",
+    f"message.{MOD}.launch_no_satellite": "The Launch Pad has no satellite on it",
+    f"message.{MOD}.launch_fireworks": "The Launch Pad needs %2$s Firework Rockets (it has %1$s)",
+    f"message.{MOD}.launch_no_space": "No orbit over %s: satellites need a sky",
+    f"message.{MOD}.launch_no_sky": "The Launch Pad needs open sky above it",
+    f"message.{MOD}.launch_launching": "Launch in progress!",
+    f"message.{MOD}.launch_has_satellite": "There's a satellite on the Launch Pad already",
+    f"message.{MOD}.launch_fireworks_full": "The Launch Pad has all the rockets it needs",
+    f"message.{MOD}.launch_fireworks_mixed": "Those rockets don't match the ones on the pad",
+    f"message.{MOD}.launch_unloaded": "You took everything off the Launch Pad",
+    f"message.{MOD}.launch_ready": "Ready for launch: give the Launch Pad a redstone pulse",
+    f"message.{MOD}.satellite_in_orbit": "Satellite in orbit over %s (%s up)",
+    f"jade.{MOD}.uplink_on": "Antenna: %s (uplinked: heard everywhere in %s)",
+    f"jade.{MOD}.uplink_no_satellite": "Antenna: %s (no satellite over %s yet)",
+    f"jade.{MOD}.uplink_no_sky": "Antenna: %s (needs open sky to reach a satellite)",
+    f"jade.{MOD}.uplink_transmitters_only": "Antenna: %s (only works on a transmitter)",
+    f"jade.{MOD}.pad_satellite": "Satellite: loaded",
+    f"jade.{MOD}.pad_no_satellite": "Satellite: none",
+    f"jade.{MOD}.pad_fireworks": "Firework Rockets: %s / %s",
+    f"jade.{MOD}.pad_ready": "Ready for launch",
+    f"jade.{MOD}.pad_climbing": "Climbing to orbit: %s blocks up",
+    f"jade.{MOD}.pad_orbit": "Satellites over %s: %s",
+    f"map.{MOD}.transmitter": "Radio Transmitter %s",
+    f"map.{MOD}.relay": "Radio Repeater %s",
+    f"map.{MOD}.jammer": "Radio Jammer %s",
+    f"map.{MOD}.old_tower": "Old Radio Tower %s",
+    f"map.{MOD}.village_station": "Village Radio Station %s",
+    f"map.{MOD}.tracked": "Tracked: %s",
+    f"advancements.{MOD}.we_have_liftoff.title": "We Have Liftoff",
+    f"advancements.{MOD}.we_have_liftoff.description": "Put a satellite in orbit from a Launch Pad",
     # v0.60.0: the Radio Jukebox, and speakers playing its music
     f"block.{MOD}.radio_jukebox": "Radio Jukebox",
     f"block.{MOD}.radio_jukebox.tooltip": "A transmitter with a record player. Put a music disc in and it broadcasts the song on its frequency: Radio Speakers that hear it play the song. A redstone pulse plays it again; steady redstone repeats it. Empty hand takes the disc out.",
@@ -1581,6 +1689,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"hud.{MOD}.meter_towers_one": "1 tower",
     f"hud.{MOD}.meter_towers": "%s towers",
     f"hud.{MOD}.meter_edge_blocks": "%s blocks to the edge",
+    f"hud.{MOD}.meter_edge_satellite": "no edge: through a satellite",  # v0.61.0
     f"hud.{MOD}.meter_edge_block": "1 block to the edge",
     f"hud.{MOD}.meter_edge_at": "right at the edge",
     f"hud.{MOD}.meter_out_of_reach": "Out of every tower's reach",
@@ -2465,6 +2574,28 @@ recipes["ender_antenna"] = ({  # v0.50.0
     "ingredients": [{"item": f"{MOD}:iron_antenna"}, {"item": "minecraft:ender_eye"}, {"item": "minecraft:obsidian"}],
     "result": {"count": 1, "id": f"{MOD}:ender_antenna"},
 }, f"{MOD}:iron_antenna")
+recipes["satellite"] = ({  # v0.61.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": [" P ", "TBR", " B "],
+    "key": {"P": {"item": f"{MOD}:solar_panel"}, "T": {"item": f"{MOD}:radio_transmitter"},
+            "R": {"item": f"{MOD}:radio_receiver"}, "B": {"item": "minecraft:iron_block"}},
+    "result": {"count": 1, "id": f"{MOD}:satellite"},
+}, f"{MOD}:solar_panel")
+recipes["satellite_dish"] = ({  # v0.61.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:dish_antenna"}, {"item": "minecraft:ender_eye"}, {"item": "minecraft:gold_ingot"},
+                    {"item": "minecraft:gold_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:satellite_dish"},
+}, f"{MOD}:dish_antenna")
+recipes["launch_pad"] = ({  # v0.61.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": ["SSS", "IRI"],
+    "key": {"S": {"item": "minecraft:smooth_stone"}, "I": {"item": "minecraft:iron_ingot"}, "R": {"item": "minecraft:redstone"}},
+    "result": {"count": 1, "id": f"{MOD}:launch_pad"},
+}, "minecraft:firework_rocket")
 recipes["solar_panel"] = ({  # v0.50.0
     "type": "minecraft:crafting_shaped",
     "category": "redstone",
@@ -2615,7 +2746,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_signal_recorder", "radio_jammer", "aviation_beacon", "radio_lamp",
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
-             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox"):
+             "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
+             "launch_pad"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2624,7 +2756,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         # Its settings are in its block state: keep them on the item.
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
-    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor", "tower_platform"):
+    elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor", "tower_platform",
+                      "launch_pad"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -2671,7 +2804,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -2743,6 +2876,9 @@ INFO = {
     "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",
     "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
     "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
+    "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",
+    "satellite_dish": "Fit it on a transmitter's tower with open sky above: once a satellite is in orbit over the dimension, the tower is heard everywhere in it, at full strength and over any hills. It uses 4 times the power while it's uplinked.",
+    "launch_pad": "Load a Satellite and 8 Firework Rockets, by hand or with hoppers, then give it a redstone pulse: the rocket climbs to orbit. It needs open sky above, in a dimension with a sky (not the Nether or the End). A comparator reads 15 when it's ready.",
     "ender_antenna": "Fit it on a transmitter's tower: the tower also sends into another dimension, from the matching place (the Nether from the Overworld, or the Overworld from the others). It doubles the power the tower uses.",
     "radio_battery": "Powers a tower when power cost is on: put it beside the tower's top or one of its masts. Charge it with redstone (dust or blocks), with Forge Energy, or with a Solar Panel on top.",
     "coverage_map": "A map tuned to a frequency: it shows where that frequency can be heard, from strong to weak, with its towers marked.",
@@ -2824,6 +2960,7 @@ advancement("lost_signal", "root", "minecraft:compass", {"found_a_tower": {
     "trigger": "minecraft:location",
     "conditions": {"player": {"location": {"structures": f"{MOD}:radio_tower"}}}}})
 advancement("finders_keepers", "lost_signal", "radio_battery", {"brought_back": tower_event("found_tower_revived")}, frame="goal")
+advancement("we_have_liftoff", "first_broadcast", "satellite", {"in_orbit": tower_event("satellite_in_orbit")}, frame="goal")  # v0.61.0
 advancement("call_sign", "root", "radio_telegraph", {"traded": {
     "trigger": "minecraft:villager_trade",
     "conditions": {"villager": {"nbt": f'{{VillagerData:{{profession:"{MOD}:radio_operator"}}}}'}}}})

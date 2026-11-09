@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " P ",
+    "TBR",
+    " B "
+  ],
+  "key": {
+    "P": {
+      "item": "reikos_signal_tower:solar_panel"
+    },
+    "T": {
+      "item": "reikos_signal_tower:radio_transmitter"
+    },
+    "R": {
+      "item": "reikos_signal_tower:radio_receiver"
+    },
+    "B": {
+      "item": "minecraft:iron_block"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:satellite"
+  }
+}

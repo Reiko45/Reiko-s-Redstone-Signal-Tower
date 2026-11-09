@@ -215,6 +215,23 @@ def station_siren():
     return normalize(x * envelope(len(x), 0.05, 0.2), 0.8)
 
 
+def satellite_launch():
+    """v0.61.0: a rocket lifting off: an ignition bang, then a deep roar with crackle that fades as it climbs."""
+    d = 6.0
+    tt = t(d)
+    roar = lowpass(rng.standard_normal(len(tt)), 180) * 3.2
+    rumble = lowpass(rng.standard_normal(len(tt)), 60) * 5.0
+    crackle = highpass(rng.standard_normal(len(tt)) * (rng.random(len(tt)) < 0.004), 1500) * 1.4
+    hiss = bandpass(rng.standard_normal(len(tt)), 900, 3500) * 0.35
+    # Loudest as it clears the pad, then it climbs away (quieter, and duller).
+    swell = np.minimum(1.0, tt / 0.6) * np.exp(-np.maximum(0, tt - 1.2) / 2.2)
+    dull = np.exp(-np.maximum(0, tt - 1.5) / 1.2)
+    x = (roar + rumble) * swell + (crackle + hiss) * swell * dull
+    bang = lowpass(rng.standard_normal(int(RATE * 0.25)), 400) * decay(int(RATE * 0.25), 0.07) * 4.0
+    x = place(x, bang, 0.0)
+    return normalize(x * envelope(len(x), 0.01, 0.5), 0.9)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -226,6 +243,7 @@ SOUND_LIST = {
     "tower.on": ("tower_on", tower_on),
     "tower.off": ("tower_off", tower_off),
     "station.siren": ("station_siren", station_siren),
+    "satellite.launch": ("satellite_launch", satellite_launch),
 }
 
 

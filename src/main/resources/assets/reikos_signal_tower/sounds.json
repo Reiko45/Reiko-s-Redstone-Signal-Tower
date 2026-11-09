@@ -52,5 +52,11 @@
     "sounds": [
       "reikos_signal_tower:station_siren"
     ]
+  },
+  "satellite.launch": {
+    "subtitle": "subtitles.reikos_signal_tower.satellite.launch",
+    "sounds": [
+      "reikos_signal_tower:satellite_launch"
+    ]
   }
 }

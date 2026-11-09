@@ -41,6 +41,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.BundledCableBlock.class); // v0.54.0
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.CableTapBlock.class);
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.GuyAnchorBlock.class);
+        registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.LaunchPadBlock.class); // v0.61.0
     }
 
     @Override
@@ -54,6 +55,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.BundledCableBlock.class); // v0.54.0
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.CableTapBlock.class);
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.GuyAnchorBlock.class);
+        registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.LaunchPadBlock.class); // v0.61.0
     }
 
     /** Sends the server's data along, and draws the lines on the client. */

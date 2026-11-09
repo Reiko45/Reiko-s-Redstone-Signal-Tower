@@ -71,6 +71,7 @@ public final class SignalTower {
         com.reiko.signaltower.advancement.TowerAdvancements.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.ModVillagers.register(modEventBus); // v0.56.0
         com.reiko.signaltower.world.VillageRadioShacks.register(); // v0.57.0
+        com.reiko.signaltower.radio.MapTowers.register(modEventBus); // v0.61.0
         if (net.neoforged.fml.ModList.get().isLoaded("computercraft")) {
             com.reiko.signaltower.compat.cct.CctCompat.register(modEventBus); // v0.58.0: only with CC: Tweaked
         }
@@ -80,6 +81,13 @@ public final class SignalTower {
         NeoForge.EVENT_BUS.addListener(SignalTower::onLevelTick);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedOut);
         NeoForge.EVENT_BUS.addListener(SignalTower::onLoggedIn);
+        // v0.61.0: a player in another dimension (or back from death) sees that dimension's satellites.
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerChangedDimensionEvent event) -> {
+            if (event.getEntity() instanceof ServerPlayer player) com.reiko.signaltower.network.SatellitesPayload.sendTo(player);
+        });
+        NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerRespawnEvent event) -> {
+            if (event.getEntity() instanceof ServerPlayer player) com.reiko.signaltower.network.SatellitesPayload.sendTo(player);
+        });
         NeoForge.EVENT_BUS.addListener(SignalTower::onServerTick);
         NeoForge.EVENT_BUS.addListener(SignalTower::onEntityJoin);
         NeoForge.EVENT_BUS.addListener(com.reiko.signaltower.radio.MastClimbing::onPlayerTick); // v0.55.0
@@ -97,6 +105,9 @@ public final class SignalTower {
         // v0.60.0: hoppers and pipes can feed a Radio Jukebox discs, and take them out once a song is over.
         event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.RADIO_JUKEBOX_BE.get(),
                 (jukebox, side) -> jukebox.items());
+        // v0.61.0: hoppers can load a Launch Pad.
+        event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.LAUNCH_PAD_BE.get(),
+                (pad, side) -> pad.items());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -226,6 +237,10 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenLogicScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenLogicScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureLogicPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureLogicPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureLogicPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.SatellitesPayload.TYPE, // v0.61.0
+                com.reiko.signaltower.network.SatellitesPayload.STREAM_CODEC, com.reiko.signaltower.network.SatellitesPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.MapWaypointsPayload.TYPE,
+                com.reiko.signaltower.network.MapWaypointsPayload.STREAM_CODEC, com.reiko.signaltower.network.MapWaypointsPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.MeterReadingPayload.TYPE,
                 com.reiko.signaltower.network.MeterReadingPayload.STREAM_CODEC, com.reiko.signaltower.network.MeterReadingPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
@@ -252,6 +267,8 @@ public final class SignalTower {
             // A singleplayer world is paused while its owner is away, so there's nothing to report then.
             boolean worldRan = !player.server.isSingleplayerOwner(player.getGameProfile());
             PagerItem.catchUp(player.serverLevel(), player, worldRan);
+            com.reiko.signaltower.network.SatellitesPayload.sendTo(player); // v0.61.0
+            com.reiko.signaltower.radio.MapTowers.forget(player); // the waypoints go out again soon
             // Anyone who tried to use their private frequencies while they were away (v0.36.0).
             for (net.minecraft.network.chat.Component line : com.reiko.signaltower.radio.IntruderAlerts.missedLines(player.server, player.getUUID())) {
                 player.displayClientMessage(line, false);
@@ -264,6 +281,7 @@ public final class SignalTower {
         if (event.getServer().getTickCount() % 20 == 0) {
             com.reiko.signaltower.network.GuestPayload.expire(event.getServer(), System.currentTimeMillis());
         }
+        com.reiko.signaltower.radio.MapTowers.tick(event.getServer()); // v0.61.0
     }
 
     /** Ends Remote Control pulses on time. */
@@ -327,6 +345,9 @@ public final class SignalTower {
             event.accept(ModRegistry.NETHERITE_ANTENNA.get());
             event.accept(ModRegistry.DISH_ANTENNA.get());
             event.accept(ModRegistry.ENDER_ANTENNA.get());
+            event.accept(ModRegistry.SATELLITE_DISH.get()); // v0.61.0
+            event.accept(ModRegistry.SATELLITE.get());
+            event.accept(ModRegistry.LAUNCH_PAD_ITEM.get());
             event.accept(ModRegistry.WALL_REDSTONE_ITEM.get());
             event.accept(ModRegistry.FREQUENCY_TUNER.get());
             event.accept(ModRegistry.REMOTE_CONTROL.get());

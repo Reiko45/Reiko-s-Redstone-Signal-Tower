@@ -1,0 +1,31 @@
+{
+  "parent": "reikos_signal_tower:first_broadcast",
+  "display": {
+    "icon": {
+      "id": "reikos_signal_tower:satellite"
+    },
+    "title": {
+      "translate": "advancements.reikos_signal_tower.we_have_liftoff.title"
+    },
+    "description": {
+      "translate": "advancements.reikos_signal_tower.we_have_liftoff.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "in_orbit": {
+      "trigger": "reikos_signal_tower:tower",
+      "conditions": {
+        "event": "satellite_in_orbit"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "in_orbit"
+    ]
+  ]
+}

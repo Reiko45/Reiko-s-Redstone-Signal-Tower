@@ -315,6 +315,7 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
         SignalNetwork.get(serverLevel).setLink(worldPosition, // v0.50.0: an Ender Antenna sends into another dimension too
                 com.reiko.signaltower.radio.AntennaTier.of(state) == com.reiko.signaltower.radio.AntennaTier.ENDER
                         && com.reiko.signaltower.radio.AntennaTier.sendsAcross(state) ? linkTarget(serverLevel) : null);
+        SignalNetwork.get(serverLevel).setUplink(worldPosition, com.reiko.signaltower.radio.AntennaTier.uplinks(serverLevel, worldPosition, state)); // v0.61.0
         com.reiko.signaltower.radio.PowerCost.check(serverLevel, worldPosition); // v0.49.0: a charged battery, or quiet
         // Its light goes out while lightning has it knocked out (v0.47.0) or it's out of power (v0.49.0);
         // the network keeps what it would send.
@@ -464,10 +465,17 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             be.raidTimer = com.reiko.signaltower.radio.RaidAlerts.CHECK_TICKS; // v0.58.0
             be.updateRaid(serverLevel, com.reiko.signaltower.radio.RaidAlerts.near(serverLevel, pos));
         }
+        if (be.foundTower && level instanceof ServerLevel serverLevel && --be.mapTimer <= 0) {
+            be.mapTimer = 40; // v0.61.0: players nearby get it on their map
+            com.reiko.signaltower.radio.MapTowers.nearFoundTower(serverLevel, pos, be.villageStation, be.getFrequency());
+        }
         if (be.timer-- > 0) {
             return;
         }
         be.timer = RECHECK_INTERVAL;
         be.refresh();
     }
+
+    /** Ticks until an old tower or village station next checks for players nearby, for their maps (v0.61.0; not saved). */
+    private int mapTimer;
 }

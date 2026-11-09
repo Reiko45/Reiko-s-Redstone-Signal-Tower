@@ -426,6 +426,7 @@ public final class SignalNetwork extends SavedData {
 
     public void removeTransmitter(BlockPos pos) {
         dishes.remove(pos);
+        if (uplinks.remove(pos)) setDirty(); // v0.61.0
         forgetPower(pos);
         Transmitter linked = transmitters.get(pos);
         ResourceKey<Level> target = links.remove(pos);
@@ -1164,6 +1165,14 @@ public final class SignalNetwork extends SavedData {
             }
             Transmitter tx = transmitters.get(from);
             if (tx == null || tx.frequency() != frequency || tx.power() <= 0 || isDown(from) || blocked(level, frequency, tx.tunedBy())) {
+                continue;
+            }
+            if (isUplinked(from)) {
+                long distSq = horizontalDistSq(from, pos); // v0.61.0: through a satellite, everywhere
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    best = new MusicHeard(from, song, song.startAt(gameTime));
+                }
                 continue;
             }
             CachedCoverage cached = musicCoverage.get(from);
@@ -2041,6 +2050,10 @@ public final class SignalNetwork extends SavedData {
                 continue;
             }
             heard++;
+            if (isUplinked(pos)) {
+                best.offerFar(isDown(pos) ? 0 : tx.power(), -1); // v0.61.0: from the satellite: full strength, no hills
+                continue;
+            }
             // v0.48.0: it fades toward the edge, unless a relay is listening (or it's a compact one).
             best.offer(level, isDown(pos) ? 0 : tx.power(), pos, receiverPos, distSq > own * own,
                     fades && !tx.compact() ? fadeFraction(distSq, reach) : -1);
@@ -2179,6 +2192,9 @@ public final class SignalNetwork extends SavedData {
      * is farther; in the weather where the tower stands. (Not for compact transmitters.)
      */
     public long linkReach(@Nullable ServerLevel level, BlockPos towerPos, int reach, BlockPos listener, int ear) {
+        if (isUplinked(towerPos)) {
+            return UPLINK_REACH; // v0.61.0: through a satellite, the whole dimension
+        }
         int base = dishReachToward(towerPos, reach, listener);
         return reachNow(level, towerPos, listener.getY() > towerPos.getY() ? Math.max(base, ear) : base);
     }
@@ -2390,6 +2406,74 @@ public final class SignalNetwork extends SavedData {
             }
         }
         return result == null ? List.of() : result;
+    }
+
+    // ---- Satellites and uplinks (v0.61.0) ----
+
+    /** A satellite in orbit over this dimension: the game time it went up, and the seed its path across the sky comes from. */
+    public record Satellite(long launchedAt, long seed) {}
+
+    /** The most satellites one dimension keeps (more launches still work: the oldest falls out of orbit). */
+    public static final int MAX_SATELLITES = 64;
+    /** How far a tower reaches through a satellite: the whole dimension. */
+    public static final long UPLINK_REACH = 60_000_000L;
+
+    /** Satellites in orbit over this dimension, oldest first (saved). */
+    private final List<Satellite> satellites = new ArrayList<>();
+    /** Transmitters with a Satellite Dish under open sky (saved, so unloaded ones stay uplinked). */
+    private final Set<BlockPos> uplinks = new HashSet<>();
+
+    /** The transmitter at {@code pos} has a Satellite Dish with open sky above it, or not. Called by its block entity. */
+    public void setUplink(BlockPos pos, boolean dishUnderSky) {
+        boolean changed = dishUnderSky ? uplinks.add(pos.immutable()) : uplinks.remove(pos);
+        if (changed) {
+            musicCoverage.remove(pos);
+            relayEpoch++;
+            bumpTower(pos);
+            setDirty();
+        }
+    }
+
+    /** True if the transmitter at {@code pos} has a Satellite Dish under open sky (whether or not a satellite is up). */
+    public boolean hasUplinkDish(BlockPos pos) {
+        return uplinks.contains(pos);
+    }
+
+    /** True if the transmitter at {@code pos} is heard across the whole dimension now: its dish sees the sky and a satellite is up. */
+    public boolean isUplinked(BlockPos pos) {
+        return !satellites.isEmpty() && uplinks.contains(pos);
+    }
+
+    public List<Satellite> satellites() {
+        return List.copyOf(satellites);
+    }
+
+    /** A satellite reaches orbit over this dimension (from a Launch Pad); uplinked towers come on through it if it's the first. */
+    public void addSatellite(long gameTime, long seed) {
+        satellites.add(new Satellite(gameTime, seed));
+        while (satellites.size() > MAX_SATELLITES) {
+            satellites.remove(0);
+        }
+        if (satellites.size() == 1) {
+            relayEpoch++;
+            musicCoverage.clear();
+            List.copyOf(uplinks).forEach(this::bumpTower);
+        }
+        setDirty();
+        if (world != null) {
+            com.reiko.signaltower.network.SatellitesPayload.sendToDimension(world);
+        }
+    }
+
+    /** For the GameTests: no satellites over this dimension. */
+    public void clearSatellitesForTests() {
+        if (!satellites.isEmpty()) {
+            satellites.clear();
+            relayEpoch++;
+            musicCoverage.clear();
+            List.copyOf(uplinks).forEach(this::bumpTower);
+            setDirty();
+        }
     }
 
     // ---- Power cost (v0.49.0) ----
@@ -2611,6 +2695,33 @@ public final class SignalNetwork extends SavedData {
         return result;
     }
 
+    /** A full-size tower someone tuned (v0.61.0, for map waypoints): 0 transmitter, 1 repeater or converter, 2 jammer; reach -1 if uplinked. */
+    public record OwnTower(BlockPos pos, int kind, int frequency, int reach) {}
+
+    /** The full-size towers {@code tuner} tuned (placed), for their map's waypoints (v0.61.0). */
+    public List<OwnTower> towersTunedBy(UUID tuner) {
+        List<OwnTower> result = new ArrayList<>();
+        transmitters.forEach((pos, tx) -> {
+            if (!tx.compact() && tuner.equals(tx.tunedBy())) {
+                result.add(new OwnTower(pos, 0, tx.frequency(), isUplinked(pos) ? -1 : tx.reach()));
+            }
+        });
+        repeaters.forEach((pos, repeater) -> {
+            if (tuner.equals(repeater.tunedBy())) result.add(new OwnTower(pos, 1, repeater.output(), repeater.reach()));
+        });
+        jammers.forEach((pos, jammer) -> {
+            if (tuner.equals(jammer.tunedBy())) result.add(new OwnTower(pos, 2, jammer.frequency(), jammer.reach()));
+        });
+        result.sort(Comparator.comparingLong(tower -> tower.pos().asLong()));
+        return result;
+    }
+
+    /** The frequency the transmitter at {@code pos} sends on, if one is known there (v0.61.0). */
+    public OptionalInt transmitterFrequency(BlockPos pos) {
+        Transmitter tx = transmitters.get(pos);
+        return tx == null ? OptionalInt.empty() : OptionalInt.of(tx.frequency());
+    }
+
     /** Bumps the frequency the tower at {@code pos} sends (or jams) on. */
     private void bumpTower(BlockPos pos) {
         Transmitter tx = transmitters.get(pos);
@@ -2786,6 +2897,9 @@ public final class SignalNetwork extends SavedData {
      * loaded count as clear (nothing is loaded to check).
      */
     public int hillLoss(@Nullable ServerLevel level, BlockPos from, BlockPos to) {
+        if (isUplinked(from)) {
+            return 0; // v0.61.0: it comes down from the sky
+        }
         int per = terrainBlocksPerStrength();
         ServerLevel at = level != null ? level : world;
         if (per <= 0 || at == null) {
@@ -2961,6 +3075,19 @@ public final class SignalNetwork extends SavedData {
                 musicList.add(entry);
             });
             tag.put("music", musicList);
+        }
+        if (!satellites.isEmpty()) { // v0.61.0
+            ListTag satelliteList = new ListTag();
+            for (Satellite satellite : satellites) {
+                CompoundTag entry = new CompoundTag();
+                entry.putLong("launched", satellite.launchedAt());
+                entry.putLong("seed", satellite.seed());
+                satelliteList.add(entry);
+            }
+            tag.put("satellites", satelliteList);
+        }
+        if (!uplinks.isEmpty()) {
+            tag.putLongArray("uplinks", uplinks.stream().mapToLong(BlockPos::asLong).toArray());
         }
         if (!links.isEmpty()) {
             ListTag linkList = new ListTag();
@@ -3155,6 +3282,14 @@ public final class SignalNetwork extends SavedData {
                         ResourceKey.create(net.minecraft.core.registries.Registries.JUKEBOX_SONG, id), entry.getLong("start"),
                         entry.getInt("length"), entry.getBoolean("loop")));
             }
+        }
+        ListTag satelliteList = tag.getList("satellites", Tag.TAG_COMPOUND);
+        for (int i = 0; i < satelliteList.size(); i++) {
+            CompoundTag entry = satelliteList.getCompound(i);
+            network.satellites.add(new Satellite(entry.getLong("launched"), entry.getLong("seed")));
+        }
+        for (long packed : tag.getLongArray("uplinks")) {
+            network.uplinks.add(BlockPos.of(packed));
         }
         ListTag linkList = tag.getList("links", Tag.TAG_COMPOUND);
         for (int i = 0; i < linkList.size(); i++) {

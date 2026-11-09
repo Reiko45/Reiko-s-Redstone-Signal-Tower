@@ -31,6 +31,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Iron, Gold, Diamond and Netherite Antennas** | Upgrades for a tower: fit one to a transmitter (plain, timer, recorder or weather station), repeater, converter or jammer and it reaches 1.5, 2, 3 or 4 times as far. You can see it on the tower, in the tooltip and in Jade. |
 | **Radio Battery** | Powers the towers next to it (or next to their mast) while they send. Charge it with redstone (by hand or with a hopper) or with FE from other mods. Towers without a charged battery go quiet (see Power cost). |
 | **Ender Antenna** | A transmitter upgrade that also sends its frequency into another dimension, from the matching spot there: into the Nether from the Overworld (at 1/8 of the coordinates) and back. A lever in one dimension can open a door in the other. |
+| **Satellite** and **Launch Pad** | Put a Satellite and eight Firework Rockets on a Launch Pad and give it a redstone pulse: a rocket climbs out of sight, and the satellite is in orbit over the dimension, crossing the night sky. |
+| **Satellite Dish** | A transmitter upgrade for open sky: with a satellite in orbit over its dimension, the tower is heard everywhere in that dimension, at full strength, at four times the power. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
 | **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
@@ -624,6 +626,27 @@ An **Ender Antenna** (since 0.50) lets a Radio Transmitter (plain, timer, record
 - Only transmitters can take one (not repeaters, converters or jammers, so nothing can loop between dimensions). It replaces any other antenna (and gives it back); its reach stays as with no antenna. With power cost on, the tower uses twice as much charge.
 - The tower keeps sending into the other dimension while its own chunk isn't loaded, like any tower; take the antenna off or break the tower and it stops.
 
+### Satellites
+
+Since 0.61 you can put a **Satellite** in orbit and reach a whole dimension through it.
+
+- **Launch Pad:** load it with a Satellite and **8 Firework Rockets** (right-click with them, or with hoppers: the satellite goes in its own slot), then give it a **redstone pulse** (off to on). The rockets are used up and the rocket climbs for 6 seconds, faster and faster, trailing flames and smoke, until it's out of sight; then chat says "Satellite in orbit over the Overworld (1 up)" to players near it, and the **We Have Liftoff** advancement goes to those within 64 blocks. It needs **open sky** above it, in a dimension with a sky: not the Nether or the End. A pulse that can't launch it says why ("The Launch Pad needs 8 Firework Rockets (it has 5)", "needs open sky above it"). An empty hand takes back what's on it; nothing comes out while it climbs. A comparator next to it reads the rockets on it, plus 7 for a satellite: 15 means ready. Jade: "Satellite: loaded", "Firework Rockets: 8 / 8", "Ready for launch", "Satellites over the Overworld: 3".
+- **In the sky:** every satellite has its own path, a great circle round the sky that takes 3 to 7 minutes, so it crosses the sky in a couple of minutes and sets. At night (as the stars do, and dimmed by rain) it's a steady point of warm light gliding past the stars. Each dimension keeps up to 64.
+- **Satellite Dish:** a tower upgrade for a Radio Transmitter (plain, timer, recorder, weather station, jukebox or bundled). Fitted under **open sky** (glass is fine, a roof isn't), once a satellite is in orbit over its dimension the tower is **heard everywhere in that dimension**: at full strength, with no fading and no hills in the way, by receivers, lamps, pagers, repeaters, meters ("no edge: through a satellite"), scanners and Radio Speakers (a Radio Jukebox's music too). Its own dimension only: an Ender Antenna is still the way into another. While it's uplinked the tower uses **4 times the power**. "Radio Transmitter is uplinked: heard everywhere in the Overworld through the satellite"; with no satellite up yet, or no open sky, the message and Jade say so, and the tower reaches as far as with no antenna. It stays uplinked while its chunk isn't loaded.
+
+![Jade on a loaded Launch Pad: "Satellite: loaded", "Firework Rockets: 8 / 8", "Ready for launch", "Satellites over the Overworld: 3", the rocket with its satellite standing on it; the rocket climbing from Alex's base trailing flames and smoke, "Rocket lifts off"; Jade on Alex's transmitter on 5000 with a Satellite Dish, "Antenna: Satellite Dish (uplinked: heard everywhere in the Overworld)" and the battery going four times as fast; Dev 4000 blocks east with a Signal Meter on 5000, "15", "1 tower, no edge: through a satellite"; a satellite at two moments 8 seconds apart among the stars, and JourneyMap's full map with Dev's transmitter's reach circle and the village stations he'd passed; Xaero's Minimap with Alex's towers (TX), the village stations (VS) and the one his Signal Scanner tracks (SC), and their names in the world](docs/images/satellite-uplink.png)
+
+### Map waypoints
+
+Since 0.61, with [JourneyMap](https://modrinth.com/mod/journeymap) or [Xaero's Minimap](https://modrinth.com/mod/xaeros-minimap) on the client, the radio towers show on your map, in a **Radio towers** group:
+
+- **Your own towers** (the full-size ones you placed or tuned: transmitters red, repeaters and converters amber, jammers pink), from every dimension, named by frequency: "Radio Transmitter 6100".
+- **Old radio towers** (grey) and **village radio stations** (green) once you've been within 96 blocks of one. They stay on your map (through death too), with the frequency they're on now.
+- **The tower your Signal Scanner tracks** (aqua), while it's in your inventory.
+- **JourneyMap** also draws each of your own towers' reach as a faint circle in its color, on the full map and the minimap.
+
+The waypoints come from the server each time you join, so they aren't saved into your map's own waypoints, and they keep up as you build.
+
 ### Solar Panel
 
 A **Solar Panel** (since 0.50) is a flat panel you put on top of a Radio Battery. Once a second it charges the battery under it by how much sunlight it gets, measured like a Daylight Detector: up to **3 charge a second** at noon in clear weather (`solarChargePerSecond` in the server config), less in the morning and evening and in rain or thunder, nothing at night, under a roof or in the Nether and the End. Over a whole day that's about what a transmitter with a reach of 56 uses, so one panel keeps a small tower on the air for free.
@@ -794,6 +817,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A relay's clunk and a rising hum | "Tower goes on the air" | A Radio Transmitter starts sending |
 | A falling hum, static and a clunk | "Tower goes off the air" | It stops |
 | A two-tone siren | "Raid siren wails" | A village station when a raid starts, heard 48 blocks away |
+| A bang and a roar | "Rocket lifts off" | A Launch Pad launches, heard 64 blocks away (since 0.61) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play three of them too: Pager, Static (the tuning sound) and Siren.
@@ -813,6 +837,7 @@ Since 0.56 the mod has its own tab of advancements:
 | **Lost Signal** | Find an old radio tower out in the world (walk into its hut or up its mast). |
 | **Finders Keepers** (goal) | Be within 24 blocks of an old tower that has gone quiet when it comes back on the air: flip its lever, charge its battery, put its torch back. |
 | **Call Sign** | Trade with a Radio Operator. |
+| **We Have Liftoff** (goal) | Be within 64 blocks of a Launch Pad when its satellite reaches orbit (since 0.61). |
 
 First Broadcast and Over the Horizon go to whoever placed or last tuned the transmitter, wherever they are. A Radio Jammer doesn't count, and nor does a tower knocked out by lightning coming back.
 
@@ -1067,6 +1092,27 @@ I = Iron Ingot   C = Copper Ingot   B = Block of Redstone
 
 **Ender Antenna:** an Iron Antenna, an Eye of Ender and an Obsidian, in any arrangement in the crafting grid.
 
+**Satellite Dish:** a Dish Antenna, an Eye of Ender and 2 Gold Ingots, in any arrangement in the crafting grid.
+
+**Satellite:**
+
+```
+        P
+     T  B  R
+        B
+
+P = Solar Panel   T = Radio Transmitter   R = Radio Receiver   B = Block of Iron
+```
+
+**Launch Pad:**
+
+```
+     S  S  S
+     I  R  I
+
+S = Smooth Stone   I = Iron Ingot   R = Redstone Dust
+```
+
 **Solar Panel:**
 
 ```
@@ -1178,7 +1224,7 @@ The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optio
 
 To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod), build that mod's jar (`./gradlew jar` in its folder) and pass its path: `./gradlew runClient -PwithWeather=/path/to/reikos_weather-1.7.0.jar`. Nothing is compiled against it.
 
-To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, and `-PwithCct` for CC: Tweaked. Otherwise they're only compiled against.
+To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, `-PwithCct` for CC: Tweaked, and `-PwithJourneyMap` or `-PwithXaero` for the map waypoints. Otherwise they're only compiled against (JourneyMap through its API from JourneyMap's maven).
 
 The sounds' `.ogg` files are checked in. To change one, edit `tools/make_sounds.py` and run `python3 tools/make_sounds.py` (it needs numpy and ffmpeg).
 
@@ -1230,6 +1276,17 @@ src/main/java/com/reiko/signaltower/
   blockentity/RadioBatteryBlockEntity.java  its charge, hoppers and FE, the item keeping its charge
   item/CoverageMapItem.java              a map that paints where a frequency is heard (colors, zoom, markers)
   radio/CrossDimension.java              Ender Antenna links: where a tower arrives in another dimension, which one
+  block/LaunchPadBlock.java              the Launch Pad: loading by hand, taking back, the redstone pulse, the comparator
+  blockentity/LaunchPadBlockEntity.java  what's on it, what stops a launch, the climb, reaching orbit, the hopper slots, the exhaust
+  client/LaunchPadRenderer.java          draws the rocket on the pad and climbing
+  item/SatelliteItem.java                the Satellite
+  radio/SatelliteOrbit.java              a satellite's path across the sky, from its seed
+  client/SatelliteSky.java               draws the satellites in the night sky
+  network/SatellitesPayload.java         server -> client: the satellites over the player's dimension
+  radio/MapTowers.java                   map waypoints, the server's half: own towers, places found (a player attachment), sending the list
+  network/MapWaypointsPayload.java       server -> client: the towers for the map
+  compat/map/MapWaypoints.java           the client's list (plus the scanner's target), names and colors (works without either map)
+  compat/map/JourneyMapCompat.java, XaeroCompat.java  JourneyMap's plugin (waypoints, reach circles; only loaded by JourneyMap) and Xaero's Minimap's third-party waypoints
   block/SolarPanelBlock.java             the flat panel on a battery
   blockentity/SolarPanelBlockEntity.java  sunlight (like a Daylight Detector) into charge for the battery under it
   radio/MastBuilder.java                 a mast used on a tower goes in under its top (lifting the top and what's on it)
@@ -1559,13 +1616,17 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 182. with CC: Tweaked loaded: transmitters, receivers (plain, toggle, lamp) and telegraphs are its peripherals, and a mast isn't (without it there's nothing to check);
 183. raid alerts step by step: a raid puts a station whose torch is gone on the air at 15, and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each wave once; a won raid "the village held", and it goes quiet; a raid that goes away "The raid has ended"; one already over when it's first seen, nothing; a lost one "the village fell"; Jade shows the raid, and it's saved;
 184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended";
-185. sounds: all nine are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static and Siren are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
+185. sounds: all ten are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static and Siren are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
 186. a radio on the move (without CC: Tweaked's classes): it hears a tower where it is and scans it; its pulse reaches a receiver (heard by 1) and ends; its message, signed "Turtle 3", reaches a telegraph and is listed, but not back to itself; empty is refused, and so is someone else's private frequency; a telegraph's message reaches it, but not once it has moved 5,000 blocks away;
 187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check);
 188. the Radio Jukebox: quiet with no disc; stone doesn't go in (by hand or hopper); a disc does and it goes on the air with its song in the network, and a comparator reads the song's level; one disc at a time, and no taking it out while it plays; a receiver on its frequency hears it; a speaker on it plays the song (not its own sound) and tells clients, one on another frequency doesn't; Jade shows the song on both; a redstone pulse plays it again from the start and the speaker starts again, steady redstone repeats it (the network agrees on when this repeat began), and without the redstone the play going on is the last; at the end it goes quiet and the speaker and receiver stop; a hopper takes the disc out and another goes in and plays; taken out by hand, it's quiet; broken, it's off the air and drops its disc;
 189. music broadcasts with a jukebox far away (not loaded): a spot in its reach hears its song, from when it started, one outside it or on another frequency doesn't, nor while it sends nothing; a repeating song gives its latest start; broadcasts are saved with the network; each repeat tells the speakers; a song that's over is taken off and the jukebox goes quiet without its chunk, while the repeating one goes on.
+190. the satellite uplink, with the tower far away (not loaded): a Satellite Dish with no satellite up changes nothing; with one up the tower is heard at full strength 5,000 blocks off and across the world, the meter says it's in reach there, its music plays there, and it uses four times the power; its tuner's map gets it with reach "everywhere"; satellites and uplinks are saved with the network; each satellite's path rises and sets once every 3 to 7 minutes, and the satellites go to the client as they are; with the dish off, or no satellites, just its own reach; 64 at most (the oldest fall out); gone with its tower;
+191. the Satellite Dish on real blocks: a repeater can't take one; a transmitter under open sky can (Jade says whether it's uplinked); roofed over it can't reach a satellite and says so, under glass it can; taken off, it's given back and the uplink goes;
+192. the Launch Pad: an orbit over the Overworld and none over the Nether or the End; a pulse with nothing on it says why and does nothing; a hopper puts in one satellite, in its slot, and rockets (comparator 12 with 5); with too few rockets a pulse does nothing; eight make it ready (comparator 15, the rest stay in the hopper); a block over it stops it; a pulse launches it, using the rockets; nothing goes in or out while it climbs, slowly at first and faster; 6 seconds later the satellite is in orbit and the advancement's event fires;
+193. map waypoints: a player's own full-size towers with their reach, not compact ones or anyone else's; an old tower once they've been near it, found once, updated rather than doubled, with the frequency the network has for it now; the list goes to the client as it is, and what they've found is kept with the player.
 
-All 189 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
+All 193 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
 
 ## License
 
