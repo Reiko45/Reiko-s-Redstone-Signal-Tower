@@ -92,7 +92,7 @@ dependencies {
 }
 
 base {
-    archivesName = mod_id
+    archivesName = 'reikos_wireless_redstone' // v0.68.1: the mod's new name (its mod id stays reikos_signal_tower)
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)

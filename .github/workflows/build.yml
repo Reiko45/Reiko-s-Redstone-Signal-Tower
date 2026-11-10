@@ -28,5 +28,5 @@ jobs:
       - name: Upload the jar
         uses: actions/upload-artifact@v4
         with:
-          name: reikos_signal_tower
+          name: reikos_wireless_redstone
           path: build/libs/*.jar

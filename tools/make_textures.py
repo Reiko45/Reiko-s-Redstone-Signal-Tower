@@ -1,4 +1,4 @@
-"""Draws the 16x16 block textures for Reiko's Redstone Signal Tower (the items' textures come from make_item_models.py).
+"""Draws the 16x16 block textures for Reiko's Wireless Redstone (the items' textures come from make_item_models.py).
 
 Usage: python3 tools/make_textures.py
 Writes into src/main/resources/assets/reikos_signal_tower/textures/. Needs Pillow (pip install pillow).

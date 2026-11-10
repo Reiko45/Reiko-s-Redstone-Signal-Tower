@@ -1,5 +1,5 @@
 """Writes models, blockstates, lang, recipes, loot tables, tags, advancements and the test structure
-for Reiko's Redstone Signal Tower.
+for Reiko's Wireless Redstone.
 
 Usage: python3 tools/make_data.py
 Writes into src/main/resources. Re-running overwrites those files, so either keep editing this
@@ -1311,7 +1311,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"sign.{MOD}.radio_tower.station": "Radio Station",
     f"sign.{MOD}.radio_tower.frequency": "Frequency",
     # v0.56.0: advancements and the Radio Operator
-    f"advancements.{MOD}.root.title": "Reiko's Redstone Signal Tower",
+    f"advancements.{MOD}.root.title": "Reiko's Wireless Redstone",
     f"advancements.{MOD}.root.description": "Send redstone through the air",
     f"advancements.{MOD}.first_broadcast.title": "First Broadcast",
     f"advancements.{MOD}.first_broadcast.description": "Put a Radio Transmitter on the air",
@@ -1814,7 +1814,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.log.tip_walkie": "Said by %s",
     f"screen.{MOD}.log.tip_other_walkie": "Said by %s (not a member)",
     f"key.{MOD}.talk": "Talk (Walkie-Talkie)",
-    f"key.categories.{MOD}": "Reiko's Redstone Signal Tower",
+    f"key.categories.{MOD}": "Reiko's Wireless Redstone",
     f"subtitles.{MOD}.walkie.squelch": "Walkie-talkie crackles",
     # v0.65.0: the Radar Dish and the Radar Screen
     f"block.{MOD}.radar_dish": "Radar Dish",
@@ -2936,7 +2936,7 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.tuner.input": "Frequency",
     f"screen.{MOD}.tuner.range": "Any whole number from %s to %s",
 
-    f"{MOD}.configuration.title": "Reiko's Redstone Signal Tower",
+    f"{MOD}.configuration.title": "Reiko's Wireless Redstone",
     f"{MOD}.configuration.section.{MOD}.server.toml": "Server settings",
     f"{MOD}.configuration.section.{MOD}.server.toml.title": "Server settings",
     f"{MOD}.configuration.baseReach": "Base reach",

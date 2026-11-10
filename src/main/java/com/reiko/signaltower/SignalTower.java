@@ -52,7 +52,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 
 /**
- * Reiko's Redstone Signal Tower.
+ * Reiko's Wireless Redstone (called Reiko's Redstone Signal Tower before v0.68.1; its mod id is still
+ * {@value #MOD_ID}, so worlds made before keep their blocks).
  * <p>
  * Radio Transmitters broadcast the redstone signal they receive on a numbered frequency. The higher
  * a transmitter sits above sea level, the farther it reaches. Radio Receivers tuned to the same

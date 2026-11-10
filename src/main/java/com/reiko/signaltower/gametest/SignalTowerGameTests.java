@@ -9117,7 +9117,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * The advancement tree is loaded, each under its parent: Reiko's Redstone Signal Tower (the root),
+     * The advancement tree is loaded, each under its parent: Reiko's Wireless Redstone (the root),
      * First Broadcast, Over the Horizon (a challenge), Head for Heights, Lost Signal, Finders Keepers
      * (a goal) and Call Sign; Weathered the Storm (a challenge, under Head for Heights) only with
      * Reiko's Weather. The tower trigger is registered; Over the Horizon wants a transmitter on the air

@@ -13,8 +13,8 @@ import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * v0.64.0: the Talk key (V by default; Options → Controls → Key Binds, under Reiko's Redstone
- * Signal Tower). While a Walkie-Talkie is in either hand it opens the talk box.
+ * v0.64.0: the Talk key (V by default; Options → Controls → Key Binds, under Reiko's Wireless
+ * Redstone). While a Walkie-Talkie is in either hand it opens the talk box.
  */
 public final class TalkKey {
     public static final KeyMapping TALK = new KeyMapping("key." + SignalTower.MOD_ID + ".talk", KeyConflictContext.IN_GAME,

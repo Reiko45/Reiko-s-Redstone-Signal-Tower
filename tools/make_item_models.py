@@ -1,4 +1,4 @@
-"""Builds the 3D item models (v0.65.0) for Reiko's Redstone Signal Tower: the hand-held radios, the
+"""Builds the 3D item models (v0.65.0) for Reiko's Wireless Redstone: the hand-held radios, the
 antennas, the Coverage Map and Wall Redstone, each a small model of boxes with its own painted texture.
 
 Usage: python3 tools/make_item_models.py

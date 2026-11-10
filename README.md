@@ -1,8 +1,8 @@
-# Reiko's Redstone Signal Tower
+# Reiko's Wireless Redstone
 
 <img src="docs/images/icon.png" width="128" align="right" alt="The mod's icon: a pixel-art radio tower with a red light on top and signal arcs, against a starry night sky">
 
-A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a transmitter high up on a tower and it sends your redstone signal to receivers far away. The higher the tower, the farther it reaches.
+A Minecraft **1.21.1 NeoForge** mod for wireless redstone over radio towers (it was called Reiko's Redstone Signal Tower before 0.68.1). Put a transmitter high up on a tower and it sends your redstone signal to receivers far away. The higher the tower, the farther it reaches.
 
 ![Two radio towers](docs/images/towers.png)
 
@@ -310,7 +310,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
   - **Radio Mast:** what's on top of its column and how far up ("Top: Radio Repeater, 3 blocks up"), and that tower's frequency. Handy at the foot of a tall tower.
   - On a private frequency, any of them also shows "Private to Dev", or "Silent: private to Dev" for a transmitter, repeater or converter kept quiet.
 - Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
-- Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Redstone Signal Tower).
+- Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Wireless Redstone).
 - The mod doesn't need Jade. Without it, everything works the same, and an empty-hand right-click still shows the status readout.
 - **WTHIT:** since 0.63, [WTHIT](https://modrinth.com/mod/wthit) shows the same lines as Jade, for every block above and the rest of the mod's (telegraphs, the Morse Key, the Ticker Tape Printer, batteries, beacons ...). Like Jade, it needs to be on the server too for what's only known there; a mast shows what its block state says (WTHIT only asks the server about blocks with a block entity). Use one or the other.
 
@@ -761,7 +761,7 @@ Since 0.63 a **Ticker Tape Printer** keeps a written record of a frequency's mes
 
 Since 0.64 a **Walkie-Talkie** lets players talk over the radio.
 
-- **Talk:** hold it and press the **Talk** key (**V**; change it in Options → Controls → Key Binds, under Reiko's Redstone Signal Tower), or right-click it. A line opens at the bottom of the screen like chat ("Walkie-Talkie on 2026: press Enter to talk"); type up to 64 characters and press Enter. You see your own line in chat ("[2026] Dev (you): Meet me at the printer"), and above the hotbar where it went and who heard it: "Said on 2026 (648 blocks + 10 towers) | Heard by 1 walkie-talkie and 2 telegraphs". One line a second.
+- **Talk:** hold it and press the **Talk** key (**V**; change it in Options → Controls → Key Binds, under Reiko's Wireless Redstone), or right-click it. A line opens at the bottom of the screen like chat ("Walkie-Talkie on 2026: press Enter to talk"); type up to 64 characters and press Enter. You see your own line in chat ("[2026] Dev (you): Meet me at the printer"), and above the hotbar where it went and who heard it: "Said on 2026 (648 blocks + 10 towers) | Heard by 1 walkie-talkie and 2 telegraphs". One line a second.
 - **How far:** like a Remote Control press: your reach by your height, every tower in that reach passing it on with its own reach, and repeaters on the frequency.
 - **Hearing:** everyone carrying a Walkie-Talkie on that frequency (anywhere in their inventory) where it reaches gets the line in chat, with signal bars for how far out they are: "[2026] ▮▮▮▮ Dev: Meet me at the printer", and a "Walkie-talkie crackles" squelch (off in its screen's Sound button). Up to 70% of the way to the edge it's clear; past that, words get cut off, more and more toward the edge: "[2026] ▮▯▯▯ Dev: B... the logbook to the o... dusk".
 - **It's a message:** what's said is a message on the frequency, so pagers, telegraphs (their screen, click and pulse), Status Boards, computers and Ticker Tape Printers get it too, and the other way round, a Walkie-Talkie hears telegraph messages, Morse and announcements on its frequency.
@@ -876,7 +876,7 @@ Since 0.53 this mod works with [Reiko's Weather](https://github.com/Reiko45/Reik
 - **Recipe:** a Radio Transmitter and Reiko's Weather's own Weather Station also make a Radio Weather Station.
 - **Storms damage towers** (since 0.54): tornadoes, hurricanes and derechos can blow a tall tower down unless it's braced with guy wires, and an ice storm ices up its antenna. See Guy wires and storm damage.
 
-There's no hard dependency either way. Signal Tower reads Reiko's Weather by reflection when it's installed, and if a version changes what it reads it logs that once and falls back to vanilla weather. Reiko's Weather needs no changes. Its own redstone blocks (Weather Station, Tornado Siren, Weather Radar, Weather Vane, Windmill, Seismograph) can also feed any Radio Transmitter like other redstone does.
+There's no hard dependency either way. Reiko's Wireless Redstone reads Reiko's Weather by reflection when it's installed, and if a version changes what it reads it logs that once and falls back to vanilla weather. Reiko's Weather needs no changes. Its own redstone blocks (Weather Station, Tornado Siren, Weather Radar, Weather Vane, Windmill, Seismograph) can also feed any Radio Transmitter like other redstone does.
 
 ![Four Radio Weather Stations in a Reiko's Weather thunderstorm, all lit, with Alex next to them; the Status Board behind them showing 4610: 15 (weather), "Weather Station: Now: Thunderstorm", 4611: 6 (weather code), 4612: 8 (temperature) and 4613: 15 (nearest storm); Jade on the weather-code station "Weather code: Thunderstorm (6)", its scale, "Reach: 45 blocks", "Thunderstorm: reach -30%"; Alex's station screen "Reading: Temperature", "Now: 13 °C (55 °F) → 8", "Sending 8 on 4612"; Alex's pager after the storm was cleared, "Radio Pager: message on 4610 from Weather Station: “Now: Clear”"; and Jade on the nearest-storm station with a hailstorm far to the east, "Nearest storm: Hailstorm, 502 blocks away (10)", "Reach: 64 blocks"](docs/images/weather-station-and-reikos-weather.png)
 
@@ -967,7 +967,7 @@ Since 0.56 the mod has its own tab of advancements:
 
 | Advancement | How to get it |
 |---|---|
-| **Reiko's Redstone Signal Tower** (the tab) | Pick up a mast, transmitter, receiver or tuner. |
+| **Reiko's Wireless Redstone** (the tab) | Pick up a mast, transmitter, receiver or tuner. |
 | **First Broadcast** | Put a transmitter you placed or tuned on the air: it gets redstone and actually sends (charged, if power cost is on). |
 | **Over the Horizon** (challenge) | The same, with a transmitter that reaches **500 blocks or more**: build high (Y 122 or more without an antenna) or fit a better antenna. |
 | **Head for Heights** | Stand on a Tower Platform. |
@@ -1164,7 +1164,7 @@ reach = 32 + 8 × (blocks above sea level)
 
 Sea level is the dimension's own: Y=63 in the Overworld, Y=32 in the Nether, Y=−63 in a default superflat world. Building on a mountain counts too.
 
-An antenna multiplies a tower's reach (see Antennas; a Dish Antenna only in one direction), rain shortens it (see Weather and terrain), and the signal fades toward the edge of it (see Signal fade). A tower needs a charged Radio Battery to send at all (see Power cost). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Redstone Signal Tower → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
+An antenna multiplies a tower's reach (see Antennas; a Dish Antenna only in one direction), rain shortens it (see Weather and terrain), and the signal fades toward the edge of it (see Signal fade). A tower needs a charged Radio Battery to send at all (see Power cost). All three numbers (base reach, reach per block of height, and an optional maximum) are in the server config: `<world>/serverconfig/reikos_signal_tower-server.toml`, or Mods → Reiko's Wireless Redstone → Config. The same file has `towersRelayRemotes` (on by default), which lets transmitters and repeaters relay remote presses on any frequency, and `privateFrequenciesPerPlayer` (32 by default; 0 means nobody can make a frequency private).
 
 ### Recipes
 
@@ -1382,7 +1382,7 @@ B = Iron Bars   I = Iron Ingot
 You need **Java 21**. If Gradle can't find it, it downloads one automatically.
 
 ```bash
-./gradlew build              # builds build/libs/reikos_signal_tower-<version>.jar
+./gradlew build              # builds build/libs/reikos_wireless_redstone-<version>.jar
 ./gradlew runClient          # starts Minecraft with the mod
 ./gradlew runServer          # starts a dedicated server with the mod
 ./gradlew runGameTestServer  # runs the automated in-game tests, then exits
