@@ -320,9 +320,7 @@ write(items / "radio_battery.json", {"parent": f"{MOD}:block/radio_battery_4"}) 
 write(items / "solar_panel.json", {"parent": f"{MOD}:block/solar_panel"})  # v0.50.0
 write(items / "radio_telegraph.json", {"parent": f"{MOD}:block/radio_telegraph"})  # v0.51.0
 write(items / "dish_rotator.json", {"parent": f"{MOD}:block/dish_rotator"})  # v0.52.0
-write(items / "coverage_map.json", {"parent": "minecraft:item/generated", "textures": {"layer0": tex("coverage_map", "item")}})
-# v0.61.0: the Satellite Dish (flat), the Launch Pad, and the Satellite (a little model: a foil body, two solar wings, a dish)
-write(items / "satellite_dish.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex("satellite_dish", "item")}})
+# v0.61.0: the Launch Pad, and the Satellite (a little model: a foil body, two solar wings, a dish)
 write(items / "launch_pad.json", {"parent": f"{MOD}:block/launch_pad"})
 write(items / "satellite.json", {
     "parent": "minecraft:block/block",
@@ -348,86 +346,12 @@ write(items / "satellite.json", {
     },
 })
 
-for tier in ("iron", "gold", "diamond", "netherite", "dish", "ender"):
-    write(items / f"{tier}_antenna.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex(f"{tier}_antenna", "item")}})
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
 write(items / "radio_motion_sensor.json", {"parent": f"{MOD}:block/radio_motion_sensor_inventory"})
 write(items / "code_keypad.json", {"parent": f"{MOD}:block/code_keypad_inventory"})
-write(items / "wall_redstone.json", {
-    "parent": "minecraft:item/generated",
-    "textures": {"layer0": tex("wall_redstone", "item")},
-})
-def remote_models(name):
-    """Base model plus green/red versions, picked by the remote's "light" property after a press."""
-    for variant in ("heard", "missed"):
-        write(items / f"{name}_{variant}.json", {
-            "parent": "minecraft:item/handheld",
-            "textures": {"layer0": tex(f"{name}_{variant}", "item")},
-        })
-    write(items / f"{name}.json", {
-        "parent": "minecraft:item/handheld",
-        "textures": {"layer0": tex(name, "item")},
-        "overrides": [
-            {"predicate": {f"{MOD}:light": 0.5}, "model": f"{MOD}:item/{name}_heard"},
-            {"predicate": {f"{MOD}:light": 1.0}, "model": f"{MOD}:item/{name}_missed"},
-        ],
-    })
-
-
-remote_models("remote_control")
-
-
-def multi_remote_models():
-    """Like remote_models, but the four buttons are separate white layers (1-4) that the game tints
-    with each button's color. (Item models allow 5 layers at most: layer0 to layer4.)"""
-    buttons = {f"layer{i}": tex(f"multi_remote_button_{i}", "item") for i in range(1, 5)}
-    for variant in ("heard", "missed"):
-        write(items / f"multi_remote_{variant}.json", {
-            "parent": "minecraft:item/handheld",
-            "textures": {"layer0": tex(f"multi_remote_{variant}", "item"), **buttons},
-        })
-    write(items / "multi_remote.json", {
-        "parent": "minecraft:item/handheld",
-        "textures": {"layer0": tex("multi_remote", "item"), **buttons},
-        "overrides": [
-            {"predicate": {f"{MOD}:light": 0.5}, "model": f"{MOD}:item/multi_remote_heard"},
-            {"predicate": {f"{MOD}:light": 1.0}, "model": f"{MOD}:item/multi_remote_missed"},
-        ],
-    })
-
-
-multi_remote_models()
-write(items / "signal_scanner.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("signal_scanner", "item")},
-})
-# v0.40.0: the Signal Meter's needle follows the meter_level property (0, 0.33, 0.66, 1).
-for i in range(1, 4):
-    write(items / f"signal_meter_{i}.json", {
-        "parent": "minecraft:item/handheld",
-        "textures": {"layer0": tex(f"signal_meter_{i}", "item")},
-    })
-write(items / "signal_meter.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("signal_meter", "item")},
-    "overrides": [{"predicate": {f"{MOD}:meter_level": v}, "model": f"{MOD}:item/signal_meter_{i}"}
-                  for i, v in ((1, 0.3), (2, 0.6), (3, 0.9))],
-})
-write(items / "pager_on.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("pager_on", "item")},
-})
-write(items / "walkie_talkie.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex("walkie_talkie", "item")}})  # v0.64.0
-write(items / "pager.json", {
-    "parent": "minecraft:item/handheld",
-    "textures": {"layer0": tex("pager", "item")},
-    "overrides": [{"predicate": {f"{MOD}:pager_on": 1.0}, "model": f"{MOD}:item/pager_on"}],
-})
-write(items / "frequency_tuner.json", {
-    "parent": "minecraft:item/generated",
-    "textures": {"layer0": tex("frequency_tuner", "item")},
-})
+# v0.65.0: the hand-held radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are
+# 3D models now, with their own textures: tools/make_item_models.py writes them.
 
 # ---------------------------------------------------------------- blockstates
 
@@ -787,6 +711,136 @@ write(states / "ticker_printer.json", {"variants": {
     for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for book in ("false", "true") for printing in ("false", "true")
 }})
 write(items / "ticker_printer.json", {"parent": f"{MOD}:block/ticker_printer_book"})
+
+
+# v0.65.0: the Radar Dish: an equipment cabinet with a turntable on top (the block), and the dish on its
+# yoke (the rotor, a model of its own that the block entity renderer spins): a wide curved reflector
+# facing north with a feed horn on an arm in front of it. The item shows both together.
+def radar_dish_base(lit):
+    suffix = "_on" if lit else ""
+    def box(frm, to, texture, faces=("north", "south", "east", "west", "up", "down")):
+        return {"from": frm, "to": to, "faces": {f: {"texture": texture} for f in faces}}
+    return [
+        {"from": [1, 0, 1], "to": [15, 9, 15], "faces": {
+            **{f: {"texture": "#side"} for f in SIDES},
+            "up": {"texture": "#top"}, "down": {"texture": "#bottom", "cullface": "down"}}},
+        box([3, 9, 3], [13, 10.5, 13], "#dark"),      # the turntable's ring
+        box([4, 10.5, 4], [12, 11, 12], "#steel"),    # the turntable
+        box([6.5, 11, 6.5], [9.5, 13, 9.5], "#dark"), # the bearing column
+    ]
+
+
+def sized_uv(frm, to, face):
+    """A UV the size of {face} of a box (from the texture's corner, at most 16): parts that stick out of
+    the block would otherwise get UVs outside the texture."""
+    w = {"north": to[0] - frm[0], "south": to[0] - frm[0], "east": to[2] - frm[2], "west": to[2] - frm[2],
+         "up": to[0] - frm[0], "down": to[0] - frm[0]}[face]
+    h = {"north": to[1] - frm[1], "south": to[1] - frm[1], "east": to[1] - frm[1], "west": to[1] - frm[1],
+         "up": to[2] - frm[2], "down": to[2] - frm[2]}[face]
+    return [0, 0, min(16, w), min(16, h)]
+
+
+def radar_dish_rotor():
+    def box(frm, to, texture, faces=("north", "south", "east", "west", "up", "down")):
+        return {"from": frm, "to": to, "faces": {f: {"texture": texture, "uv": sized_uv(frm, to, f)} for f in faces}}
+    reflector = []
+    # The reflector in five upright strips, curving back (south) towards the middle.
+    for x1, x2, z in ((-3, 1, 4.0), (1, 5, 5.0), (5, 11, 5.6), (11, 15, 5.0), (15, 19, 4.0)):
+        u1, u2 = (x1 + 3) * 16 / 22, (x2 + 3) * 16 / 22
+        reflector.append({"from": [x1, 15, z], "to": [x2, 23, z + 1], "faces": {
+            "north": {"texture": "#mesh", "uv": [u1, 4, u2, 12]},
+            "south": {"texture": "#back", "uv": [u1, 4, u2, 12]},
+            **{f: {"texture": "#back", "uv": sized_uv([x1, 15, z], [x2, 23, z + 1], f)} for f in ("up", "down", "east", "west")}}})
+    return [
+        box([5.5, 13, 5.5], [10.5, 14, 10.5], "#steel"),       # the hub on the bearing
+        box([4, 14, 7], [5, 19, 9], "#steel"),                 # the yoke's arms
+        box([11, 14, 7], [12, 19, 9], "#steel"),
+        box([4, 14, 6], [12, 15, 10], "#steel"),               # the yoke's foot
+        box([6, 17, 6.6], [10, 21, 7.4], "#dark"),             # the back frame, behind the reflector
+        *reflector,
+        box([7.5, 15, -2], [8.5, 16, 4], "#dark"),             # the feed arm
+        box([6.8, 14.5, -3.5], [9.2, 16.9, -2], "#feed"),      # the feed horn
+        box([7, 23, 7], [9, 24, 9], "#tip"),                   # a little light on top
+    ]
+
+
+def facing_south(element):
+    """{element} turned to face south (mirrored front to back), for the item: its dish faces the viewer."""
+    out = dict(element)
+    out["from"] = [element["from"][0], element["from"][1], 16 - element["to"][2]]
+    out["to"] = [element["to"][0], element["to"][1], 16 - element["from"][2]]
+    faces = dict(element["faces"])
+    if "north" in faces or "south" in faces:
+        north, south = faces.pop("north", None), faces.pop("south", None)
+        if north:
+            faces["south"] = north
+        if south:
+            faces["north"] = south
+    out["faces"] = faces
+    return out
+
+
+RADAR_TEXTURES = {"particle": tex("radar_dish_side"), "top": tex("radar_dish_top"), "bottom": tex("radio_bottom"),
+                  "dark": "minecraft:block/gray_concrete", "steel": "minecraft:block/iron_block",
+                  "mesh": tex("radar_reflector"), "back": tex("radar_reflector_back"),
+                  "feed": "minecraft:block/black_concrete", "tip": tex("antenna_tip_on")}
+for lit in (False, True):
+    write(models / ("radar_dish" + ("_on" if lit else "") + ".json"), {
+        "parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+        "textures": {**RADAR_TEXTURES, "side": tex("radar_dish_side" + ("_on" if lit else ""))},
+        "elements": radar_dish_base(lit),
+    })
+write(models / "radar_dish_rotor.json", {
+    "parent": "minecraft:block/block", "render_type": "minecraft:cutout", "ambientocclusion": False,
+    "textures": RADAR_TEXTURES, "elements": radar_dish_rotor(),
+})
+write(states / "radar_dish.json", {"variants": {
+    f"active={active},powered={powered}": {"model": f"{MOD}:block/radar_dish" + ("_on" if powered == "true" else "")}
+    for active in ("false", "true") for powered in ("false", "true")
+}})
+write(items / "radar_dish.json", {
+    "parent": "minecraft:block/block",
+    "textures": {**RADAR_TEXTURES, "side": tex("radar_dish_side")},
+    "elements": radar_dish_base(False) + [facing_south(e) for e in radar_dish_rotor()],
+    "display": {
+        "gui": {"rotation": [30, 225, 0], "translation": [0, -2.5, 0], "scale": [0.46, 0.46, 0.46]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.22, 0.22, 0.22]},
+        "fixed": {"rotation": [0, 0, 0], "translation": [0, -2, 0], "scale": [0.42, 0.42, 0.42]},
+        "thirdperson_righthand": {"rotation": [75, 45, 0], "translation": [0, 1.5, 0], "scale": [0.3, 0.3, 0.3]},
+        "firstperson_righthand": {"rotation": [0, 45, 0], "translation": [0, -1, 0], "scale": [0.32, 0.32, 0.32]},
+        "firstperson_lefthand": {"rotation": [0, 225, 0], "translation": [0, -1, 0], "scale": [0.32, 0.32, 0.32]},
+    },
+})
+
+# v0.65.0: the Radar Screen: a panel 3 pixels deep on a wall, facing north here; the picture is drawn on its face.
+write(models / "radar_screen.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("radio_status_board_side"), "front": tex("radar_screen_front"), "side": tex("radio_status_board_side")},
+    "elements": [
+        {"from": [1, 1, 13], "to": [15, 15, 16], "faces": {
+            "north": {"uv": [1, 1, 15, 15], "texture": "#front"},
+            "south": {"uv": [1, 1, 15, 15], "texture": "#side", "cullface": "south"},
+            "east": {"uv": [13, 1, 16, 15], "texture": "#side"},
+            "west": {"uv": [0, 1, 3, 15], "texture": "#side"},
+            "up": {"uv": [1, 13, 15, 16], "texture": "#side"},
+            "down": {"uv": [1, 0, 15, 3], "texture": "#side"}}},
+        {"from": [6, 14.2, 12.5], "to": [10, 14.8, 13], "faces": {
+            f: {"texture": "#side"} for f in ("north", "east", "west", "up", "down")}},
+    ],
+})
+write(states / "radar_screen.json", {"variants": {
+    f"active={active},facing={facing}": {"model": f"{MOD}:block/radar_screen", **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for active in ("false", "true")
+}})
+write(items / "radar_screen.json", {"parent": f"{MOD}:block/radar_screen", "textures": {"front": tex("radar_screen_front_item")}, "display": {
+    # its face (north) to the front, and out of the back of the block
+    "gui": {"rotation": [15, 200, 0], "translation": [0, 0, 0], "scale": [0.8, 0.8, 0.8]},
+    "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, -6.5], "scale": [0.85, 0.85, 0.85]},
+    "ground": {"rotation": [0, 0, 0], "translation": [0, 3, -3], "scale": [0.4, 0.4, 0.4]},
+    "thirdperson_righthand": {"rotation": [75, 225, 0], "translation": [0, 2.5, -2], "scale": [0.375, 0.375, 0.375]},
+    "firstperson_righthand": {"rotation": [0, 200, 0], "translation": [0, 1, -3], "scale": [0.4, 0.4, 0.4]},
+    "firstperson_lefthand": {"rotation": [0, 200, 0], "translation": [0, 1, -3], "scale": [0.4, 0.4, 0.4]},
+}})
 
 
 # v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
@@ -1573,6 +1627,87 @@ write(ASSETS / "lang" / "en_us.json", {
     f"key.{MOD}.talk": "Talk (Walkie-Talkie)",
     f"key.categories.{MOD}": "Reiko's Redstone Signal Tower",
     f"subtitles.{MOD}.walkie.squelch": "Walkie-talkie crackles",
+    # v0.65.0: the Radar Dish and the Radar Screen
+    f"block.{MOD}.radar_dish": "Radar Dish",
+    f"block.{MOD}.radar_dish.tooltip": "A tower top that sweeps its reach for players, mobs and vehicles (not in caves), and sends how many it sees on its frequency.",
+    f"block.{MOD}.radar_screen": "Radar Screen",
+    f"block.{MOD}.radar_screen.tooltip": "Hang it on a wall: it shows what a Radar Dish on its frequency sees, if the dish reaches it. North is up.",
+    f"tooltip.{MOD}.radar_tracks": "Tracks: %s",
+    f"tooltip.{MOD}.radar_send_off": "Send: off (it only counts and shows)",
+    f"tooltip.{MOD}.radar_zoom": "Shows: %s",
+    f"message.{MOD}.radar_status": "Radar Dish | Frequency %s | Sees %s | Sends %s | Reach %s blocks",
+    f"message.{MOD}.radar_kind_players": "players",
+    f"message.{MOD}.radar_kind_hostiles": "hostile mobs",
+    f"message.{MOD}.radar_kind_peacefuls": "peaceful mobs",
+    f"message.{MOD}.radar_kind_vehicles": "vehicles",
+    f"message.{MOD}.radar_kind_nothing": "nothing",
+    f"message.{MOD}.radar_strangers": "%s (strangers only)",
+    f"message.{MOD}.radar_count_player": "%s player",
+    f"message.{MOD}.radar_count_players": "%s players",
+    f"message.{MOD}.radar_count_hostile": "%s hostile mob",
+    f"message.{MOD}.radar_count_hostiles": "%s hostile mobs",
+    f"message.{MOD}.radar_count_peaceful": "%s peaceful mob",
+    f"message.{MOD}.radar_count_peacefuls": "%s peaceful mobs",
+    f"message.{MOD}.radar_count_vehicle": "%s vehicle",
+    f"message.{MOD}.radar_count_vehicles": "%s vehicles",
+    f"message.{MOD}.radar_not_yours": "Frequency is private to %s: only its members change this Radar Dish",
+    f"message.{MOD}.radar_set": "Radar Dish tracks %s, %s",
+    f"message.{MOD}.radar_sends": "and sends what it sees",
+    f"message.{MOD}.radar_quiet": "and doesn't send",
+    f"message.{MOD}.radar_screen_status": "Radar Screen | Frequency %s | %s",
+    f"message.{MOD}.radar_screen_locked": "Frequency is private to %s: this screen shows nothing",
+    f"message.{MOD}.radar_screen_none": "No Radar Dish on this frequency reaches here",
+    f"message.{MOD}.radar_screen_here": "a dish right here",
+    f"message.{MOD}.radar_screen_away": "a dish %s blocks %s",
+    f"message.{MOD}.radar_screen_shows": "Shows %s (reach %s): %s contacts",
+    f"message.{MOD}.radar_screen_set": "Radar Screen shows %s, %s",
+    f"message.{MOD}.radar_ping_on": "pings for new contacts",
+    f"message.{MOD}.radar_ping_off": "doesn't ping",
+    f"screen.{MOD}.radar.frequency": "Frequency %s",
+    f"screen.{MOD}.radar.track_player": "Players",
+    f"screen.{MOD}.radar.track_player_tip": "Players who aren't spectators.",
+    f"screen.{MOD}.radar.track_hostile": "Hostile mobs",
+    f"screen.{MOD}.radar.track_hostile_tip": "Zombies, skeletons, creepers, phantoms, slimes and the rest.",
+    f"screen.{MOD}.radar.track_peaceful": "Peaceful mobs",
+    f"screen.{MOD}.radar.track_peaceful_tip": "Animals, villagers, golems, fish and bats.",
+    f"screen.{MOD}.radar.track_vehicle": "Vehicles",
+    f"screen.{MOD}.radar.track_vehicle_tip": "Boats and minecarts.",
+    f"screen.{MOD}.radar.strangers": "Strangers only",
+    f"screen.{MOD}.radar.strangers_tip": "On: ignores whoever tuned it and, on a private frequency, its owner and members (friends, groups and guests).",
+    f"screen.{MOD}.radar.send": "Send",
+    f"screen.{MOD}.radar.send_tip": "On: turns its frequency on with how many things it sees (at most 15), like a transmitter. Off: it only counts them (for comparators) and shows them on screens.",
+    f"screen.{MOD}.radar.zoom": "Shows",
+    f"screen.{MOD}.radar.zoom_0": "The dish's whole reach",
+    f"screen.{MOD}.radar.zoom_1": "256 blocks",
+    f"screen.{MOD}.radar.zoom_2": "128 blocks",
+    f"screen.{MOD}.radar.zoom_3": "64 blocks",
+    f"screen.{MOD}.radar.zoom_4": "32 blocks",
+    f"screen.{MOD}.radar.zoom_tip": "How far round the dish the screen shows (never more than the dish's reach): things further out aren't drawn.",
+    f"screen.{MOD}.radar.ping": "Ping",
+    f"screen.{MOD}.radar.ping_tip": "On: a soft ping when something new shows up.",
+    f"screen.{MOD}.radar.towers": "Show towers",
+    f"screen.{MOD}.radar.towers_tip": "On: radio towers in the dish's reach show as small amber squares.",
+    f"screen.{MOD}.radar.sees": "Sees %s (reach %s blocks)",
+    f"screen.{MOD}.radar.locked": "Private frequency: this screen shows nothing",
+    f"screen.{MOD}.radar.no_dish": "No Radar Dish on %s reaches here",
+    f"screen.{MOD}.radar.shows": "Shows %s blocks round the dish (the dish sees %s things)",
+    f"screen.{MOD}.radar.footer": "%s blocks · %s",
+    f"screen.{MOD}.radar.face_none": "NO RADAR",
+    f"screen.{MOD}.radar.face_locked": "PRIVATE (%s)",
+    f"jade.{MOD}.radar_sees": "Sees: %s",
+    f"jade.{MOD}.radar_still": "Not sweeping (no power, knocked out or blown down)",
+    f"jade.{MOD}.radar_tracks": "Tracks: %s",
+    f"jade.{MOD}.radar_send_off": "Send: off",
+    f"jade.{MOD}.radar_screen_locked": "Private to %s: shows nothing",
+    f"jade.{MOD}.radar_screen_none": "No Radar Dish on this frequency reaches here",
+    f"jade.{MOD}.radar_screen_dish": "Shows a dish %s blocks %s (reach %s)",
+    f"jade.{MOD}.radar_screen_dish_here": "Shows the dish right here (reach %s)",
+    f"jade.{MOD}.radar_screen_contact": "%s contact",
+    f"jade.{MOD}.radar_screen_contacts": "%s contacts",
+    f"jade.{MOD}.radar_screen_zoom": "Shows: %s",
+    f"screen.{MOD}.log.kind_radar": "Radar Dish",
+    f"screen.{MOD}.log.tip_radar": "Saw: %s",
+    f"subtitles.{MOD}.radar.ping": "Radar pings",
     # v0.63.0: the Ticker Tape Printer
     f"block.{MOD}.ticker_printer": "Ticker Tape Printer",
     f"block.{MOD}.ticker_printer.tooltip": "Prints every message that reaches its frequency into a Book and Quill: the day and time, the sender and the text. A full book is signed as a logbook.",
@@ -2787,6 +2922,18 @@ recipes["radio_telegraph"] = ({  # v0.51.0
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:writable_book"}],
     "result": {"count": 1, "id": f"{MOD}:radio_telegraph"},
 }, f"{MOD}:radio_transmitter")
+recipes["radar_dish"] = ({  # v0.65.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:dish_antenna"}, {"item": "minecraft:observer"}],
+    "result": {"count": 1, "id": f"{MOD}:radar_dish"},
+}, f"{MOD}:dish_antenna")
+recipes["radar_screen"] = ({  # v0.65.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_status_board"}, {"item": "minecraft:compass"}, {"item": "minecraft:lime_dye"}],
+    "result": {"count": 1, "id": f"{MOD}:radar_screen"},
+}, f"{MOD}:radio_status_board")
 recipes["walkie_talkie"] = ({  # v0.64.0
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -2937,7 +3084,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad", "morse_key", "ticker_printer"):
+             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2960,6 +3107,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                           if name == "radio_timer_transmitter" else [])
                        + ([f"{MOD}:station_mode", f"{MOD}:station_announce"] if name == "radio_weather_station" else [])
                        + ([f"{MOD}:speaker"] if name == "radio_speaker" else [])
+                       + ([f"{MOD}:radar_settings"] if name in ("radar_dish", "radar_screen") else [])
                        + ([f"{MOD}:recorder_tape"] if name == "radio_signal_recorder" else [])
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
@@ -2994,7 +3142,8 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer",
+               f"{MOD}:radar_dish", f"{MOD}:radar_screen"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -3067,6 +3216,8 @@ INFO = {
     "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
     "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
     "walkie_talkie": "A two-way radio: right-click it (or press the Talk key, V, holding it) and type a line. Everyone carrying a Walkie-Talkie on its frequency where it reaches hears it in chat, broken up near the edge; pagers, telegraphs and printers get it as a message. Sneak and right-click the air to set its frequency.",
+    "radar_dish": "Put it on top of a mast like a transmitter. Once a second it sweeps its reach for players, hostile mobs, peaceful mobs and vehicles (not under 8 or more solid blocks, as in a cave), and with Send on it turns its frequency on with how many it sees (at most 15). A comparator reads the count. Right-click it to choose what it tracks.",
+    "radar_screen": "Hang it on a wall and tune it like a receiver: it shows the nearest Radar Dish on its frequency that reaches it, with a sweep line, colored blips and towers, north up. On a private frequency only members' screens show anything. Right-click it to choose how far round the dish it shows (128 blocks at first) or turn the ping off.",
     "ticker_printer": "Tune it to a frequency and give it a Book and Quill (by hand or hopper): every message that reaches it is printed in the book, with the day and time and who sent it, even ones that came while it wasn't loaded. A full book is signed as a logbook, which a hopper can take out. A comparator reads how full the book is.",
     "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",
     "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",

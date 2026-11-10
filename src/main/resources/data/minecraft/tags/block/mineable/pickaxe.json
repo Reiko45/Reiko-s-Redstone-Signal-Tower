@@ -34,6 +34,8 @@
     "reikos_signal_tower:radio_jukebox",
     "reikos_signal_tower:launch_pad",
     "reikos_signal_tower:morse_key",
-    "reikos_signal_tower:ticker_printer"
+    "reikos_signal_tower:ticker_printer",
+    "reikos_signal_tower:radar_dish",
+    "reikos_signal_tower:radar_screen"
   ]
 }

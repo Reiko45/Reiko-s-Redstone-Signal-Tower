@@ -76,5 +76,11 @@
     "sounds": [
       "reikos_signal_tower:walkie_squelch"
     ]
+  },
+  "radar.ping": {
+    "subtitle": "subtitles.reikos_signal_tower.radar.ping",
+    "sounds": [
+      "reikos_signal_tower:radar_ping"
+    ]
   }
 }

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "active=false,powered=false": {
+      "model": "reikos_signal_tower:block/radar_dish"
+    },
+    "active=false,powered=true": {
+      "model": "reikos_signal_tower:block/radar_dish_on"
+    },
+    "active=true,powered=false": {
+      "model": "reikos_signal_tower:block/radar_dish"
+    },
+    "active=true,powered=true": {
+      "model": "reikos_signal_tower:block/radar_dish_on"
+    }
+  }
+}

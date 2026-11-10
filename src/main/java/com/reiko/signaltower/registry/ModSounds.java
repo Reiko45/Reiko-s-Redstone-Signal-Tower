@@ -44,9 +44,12 @@ public final class ModSounds {
     /** v0.64.0: a Walkie-Talkie's squelch, when someone talks on it. */
     public static final DeferredHolder<SoundEvent, SoundEvent> WALKIE_SQUELCH = register("walkie.squelch");
 
+    /** v0.65.0: a Radar Screen's ping when something new shows up. */
+    public static final DeferredHolder<SoundEvent, SoundEvent> RADAR_PING = register("radar.ping");
+
     /** Every one, for the tests. */
     public static final List<DeferredHolder<SoundEvent, SoundEvent>> ALL = List.of(TUNER_TUNE, TUNER_STEP, TELEGRAPH_KEY,
-            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH);
+            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH, RADAR_PING);
 
     private ModSounds() {
     }

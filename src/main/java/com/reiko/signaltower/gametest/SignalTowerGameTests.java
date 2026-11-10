@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 53) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 55) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 53, "All the mod's items: " + items.size());
+        check(items.size() == 55, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 13 && sounds.size() == 13, "Thirteen sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 14 && sounds.size() == 14, "Fourteen sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10960,6 +10960,292 @@ public final class SignalTowerGameTests {
                     } finally {
                         claims.remove(4643);
                         network.invalidate(4643);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * What a radar makes of things: players (not spectators), hostile and peaceful mobs, boats and
+     * minecarts, but not items or armor stands; bearings clockwise from north; the sweep's angle by
+     * game time; the range a screen shows and the settings' trimming.
+     */
+    @GameTest(template = PLATFORM)
+    public static void radarKinds(GameTestHelper helper) {
+        var zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(2, 1, 1));
+        zombie.setNoAi(true);
+        var pig = helper.spawn(EntityType.PIG, new BlockPos(4, 1, 1));
+        pig.setNoAi(true);
+        var villager = helper.spawn(EntityType.VILLAGER, new BlockPos(6, 1, 1));
+        villager.setNoAi(true);
+        var boat = helper.spawn(EntityType.BOAT, new BlockPos(8, 1, 1));
+        var cart = helper.spawn(EntityType.MINECART, new BlockPos(10, 1, 1));
+        var stand = helper.spawn(EntityType.ARMOR_STAND, new BlockPos(12, 1, 1));
+        var item = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(), 0, 0, 0, new ItemStack(Items.STONE));
+        Player alex = namedPlayer(helper, new BlockPos(14, 1, 1), UUID.randomUUID(), "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player ghost = new Player(helper.getLevel(), BlockPos.ZERO, 0.0F, new GameProfile(UUID.randomUUID(), "Ghost")) {
+            @Override
+            public boolean isSpectator() {
+                return true;
+            }
+
+            @Override
+            public boolean isCreative() {
+                return false;
+            }
+        };
+        var kinds = com.reiko.signaltower.radio.Radar.Kind.class;
+        check(com.reiko.signaltower.radio.Radar.kindOf(zombie) == com.reiko.signaltower.radio.Radar.Kind.HOSTILE
+                && com.reiko.signaltower.radio.Radar.kindOf(pig) == com.reiko.signaltower.radio.Radar.Kind.PEACEFUL
+                && com.reiko.signaltower.radio.Radar.kindOf(villager) == com.reiko.signaltower.radio.Radar.Kind.PEACEFUL
+                && com.reiko.signaltower.radio.Radar.kindOf(boat) == com.reiko.signaltower.radio.Radar.Kind.VEHICLE
+                && com.reiko.signaltower.radio.Radar.kindOf(cart) == com.reiko.signaltower.radio.Radar.Kind.VEHICLE
+                && com.reiko.signaltower.radio.Radar.kindOf(alex) == com.reiko.signaltower.radio.Radar.Kind.PLAYER, "What it sees, by kind");
+        check(com.reiko.signaltower.radio.Radar.kindOf(stand) == null && com.reiko.signaltower.radio.Radar.kindOf(item) == null
+                && com.reiko.signaltower.radio.Radar.kindOf(ghost) == null, "Not armor stands, items or spectators");
+        check(kinds.getEnumConstants().length == 5, "Five kinds (towers too)");
+        check(Math.abs(com.reiko.signaltower.radio.Radar.bearing(0, -10)) < 1e-9
+                && Math.abs(com.reiko.signaltower.radio.Radar.bearing(10, 0) - Math.PI / 2) < 1e-9
+                && Math.abs(com.reiko.signaltower.radio.Radar.bearing(0, 10) - Math.PI) < 1e-9
+                && Math.abs(com.reiko.signaltower.radio.Radar.bearing(-10, 0) - Math.PI * 1.5) < 1e-9, "Bearings: north 0, east a quarter, clockwise");
+        check(com.reiko.signaltower.radio.Radar.sweepAngle(0, 0) == 0
+                && Math.abs(com.reiko.signaltower.radio.Radar.sweepAngle(com.reiko.signaltower.radio.Radar.SWEEP_TICKS / 4, 0) - Math.PI / 2) < 1e-9
+                && com.reiko.signaltower.radio.Radar.sweepAngle(com.reiko.signaltower.radio.Radar.SWEEP_TICKS * 3L, 0) == 0, "One turn every 4 seconds");
+        check(com.reiko.signaltower.radio.Radar.shownRange(0, 500) == 500 && com.reiko.signaltower.radio.Radar.shownRange(1, 500) == 256
+                && com.reiko.signaltower.radio.Radar.shownRange(2, 500) == 128 && com.reiko.signaltower.radio.Radar.shownRange(4, 500) == 32
+                && com.reiko.signaltower.radio.Radar.shownRange(2, 100) == 100 && com.reiko.signaltower.radio.Radar.screenSettings(7 | 8) == (4 | 8)
+                && com.reiko.signaltower.radio.Radar.dishSettings(0xFF) == 63, "Ranges shown and settings");
+        for (var entity : List.of(zombie, pig, villager, boat, cart, stand)) {
+            entity.discard();
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The Radar Dish (on 4644, tuned by Dev): it sees what's in its reach (a zombie, a pig, a boat,
+     * Dev and Alex) but not someone too far or more than 8 blocks underground, nearest first; it
+     * sends how many (5), which a receiver hears and a comparator reads, and the log names a Radar
+     * Dish with what it saw first. Switched to players and hostile mobs it counts 3; strangers only
+     * leaves out Dev (its tuner); Send off sends nothing (the comparator still counts). The status
+     * line, Jade, the settings packet and the item keep up; someone who isn't a member can't change
+     * it on a private frequency.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radarDish(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var server = level.getServer();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(server);
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> rexBar = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(2, 1, 1);
+        helper.setBlock(at, ModRegistry.RADAR_DISH.get());
+        BlockPos absolute = helper.absolutePos(at);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 1), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player alex = namedPlayer(helper, new BlockPos(9, 1, 1), UUID.randomUUID(), "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(4, 1, 0), rexId, "Rex", false, rexBar, new java.util.ArrayList<>());
+        Player mole = namedPlayer(helper, new BlockPos(20, 1, 1), UUID.randomUUID(), "Mole", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        for (int y = 2; y <= 12; y++) {
+            helper.setBlock(new BlockPos(20, y, 1), Blocks.STONE); // Mole is 11 blocks under the top of this pillar
+        }
+        ModRegistry.RADAR_DISH.get().setPlacedBy(level, absolute, helper.getBlockState(at), dev, new ItemStack(ModRegistry.RADAR_DISH_ITEM.get()));
+        com.reiko.signaltower.blockentity.RadarDishBlockEntity dish = helper.getBlockEntity(at);
+        dish.setFrequency(4644);
+        SignalNetwork network = SignalNetwork.get(level);
+        int reach = com.reiko.signaltower.blockentity.RadioTransmitterBlockEntity.reachNow(level, absolute, helper.getBlockState(at));
+        Player far = namedPlayer(helper, new BlockPos(2 + reach + 6, 1, 1), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos listener = absolute.offset(1, 0, 0);
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    var zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(6, 1, 1));
+                    zombie.setNoAi(true);
+                    var pig = helper.spawn(EntityType.PIG, new BlockPos(12, 1, 1));
+                    pig.setNoAi(true);
+                    var boat = helper.spawn(EntityType.BOAT, new BlockPos(15, 1, 0));
+                    try {
+                        check(devId.equals(dish.getTunedBy()) && dish.getSettings() == com.reiko.signaltower.radio.Radar.DISH_DEFAULT,
+                                "Placed by Dev, tracking everything and sending");
+                        var seen = dish.sweep(level, List.of(zombie, pig, boat, dev, alex, mole, far));
+                        check(seen.size() == 5 && seen.get(0).kind() == com.reiko.signaltower.radio.Radar.Kind.PLAYER && seen.get(0).dx() == 1
+                                && seen.get(1).kind() == com.reiko.signaltower.radio.Radar.Kind.HOSTILE && seen.get(1).dx() == 4,
+                                "Five things, nearest first; not Mole underground or Far: " + seen);
+                        check(java.util.Arrays.equals(dish.counts(), new int[]{2, 1, 1, 1}) && dish.isWorking(), "Counts: " + java.util.Arrays.toString(dish.counts()));
+                        check(dish.output() == 5 && network.listen(level, 4644, listener, null).power() == 5, "It sends 5");
+                        check(helper.getBlockState(at).getValue(com.reiko.signaltower.block.RadarDishBlock.ACTIVE)
+                                && helper.getBlockState(at).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Sweeping, and lit");
+                        check(ModRegistry.RADAR_DISH.get().getAnalogOutputSignal(helper.getBlockState(at), level, absolute) == 5, "A comparator reads 5");
+                        var sweep = network.radarAt(absolute);
+                        check(sweep != null && sweep.frequency() == 4644 && sweep.reach() == reach && sweep.contacts().size() == 5
+                                && devId.equals(sweep.tunedBy()), "Its sweep is in the network for screens");
+
+                        dish.setSettings(com.reiko.signaltower.radio.Radar.TRACK_PLAYERS | com.reiko.signaltower.radio.Radar.TRACK_HOSTILE
+                                | com.reiko.signaltower.radio.Radar.SEND);
+                        check(dish.sweep(level, List.of(zombie, pig, boat, dev, alex)).size() == 3 && dish.output() == 3, "Players and hostile mobs: 3");
+                        dish.setSettings(dish.getSettings() | com.reiko.signaltower.radio.Radar.STRANGERS_ONLY);
+                        var strangers = dish.sweep(level, List.of(zombie, pig, boat, dev, alex));
+                        check(strangers.size() == 2 && strangers.stream().noneMatch(c -> c.id() == dev.getId()), "Strangers only: not Dev");
+                        dish.setSettings(dish.getSettings() & ~com.reiko.signaltower.radio.Radar.SEND);
+                        dish.sweep(level, List.of(zombie, dev, alex));
+                        check(dish.output() == 0 && network.listen(level, 4644, listener, null).power() == 0
+                                && dish.comparatorOutput() == 2, "Send off: nothing sent, still counted");
+                        String status = keyOf(ModRegistry.RADAR_DISH.get().describe(level, absolute, helper.getBlockState(at)));
+                        check(status.endsWith("radar_status"), "Status line: " + status);
+                        List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at),
+                                com.reiko.signaltower.compat.RadioInfo.read(level, absolute, dev)));
+                        check(jade.contains("radar_sees") && jade.contains("radar_tracks") && jade.contains("radar_send_off"), "Jade: " + jade);
+                        var open = com.reiko.signaltower.network.OpenRadarScreenPayload.of(level, dish);
+                        var buffer = Unpooled.buffer();
+                        com.reiko.signaltower.network.OpenRadarScreenPayload.STREAM_CODEC.encode(buffer, open);
+                        check(open.dish() && open.seen().equals(List.of(1, 1, 0, 0)) && open.reach() == reach
+                                && com.reiko.signaltower.network.OpenRadarScreenPayload.STREAM_CODEC.decode(buffer).equals(open), "Settings packet: " + open);
+                        Component set = com.reiko.signaltower.network.ConfigureRadarPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureRadarPayload(absolute, com.reiko.signaltower.radio.Radar.DISH_DEFAULT));
+                        check(set != null && keyOf(set).endsWith("radar_set") && dish.getSettings() == com.reiko.signaltower.radio.Radar.DISH_DEFAULT,
+                                "Dev sets it back");
+                        check(Integer.valueOf(com.reiko.signaltower.radio.Radar.DISH_DEFAULT).equals(dish.collectComponents().get(ModRegistry.RADAR_SETTINGS.get())),
+                                "The item keeps its settings");
+                        claims.put(4644, devId, "Dev", java.util.Map.of());
+                        network.invalidate(4644);
+                        var log = com.reiko.signaltower.radio.FrequencyLog.log(server, 4644);
+                        check(log.stream().anyMatch(entry -> entry.kind() == SignalNetwork.CauseKind.RADAR && !entry.detail().isEmpty()
+                                && entry.pos().equals(java.util.Optional.of(absolute))), "The log: a Radar Dish and what it saw: " + log);
+                        Component refused = com.reiko.signaltower.network.ConfigureRadarPayload.apply(rex,
+                                new com.reiko.signaltower.network.ConfigureRadarPayload(absolute, 0));
+                        check(refused != null && keyOf(refused).endsWith("radar_not_yours") && dish.getSettings() == com.reiko.signaltower.radio.Radar.DISH_DEFAULT,
+                                "Rex can't change it on Dev's private frequency");
+                    } finally {
+                        claims.remove(4644);
+                        network.invalidate(4644);
+                        zombie.discard();
+                        pig.discard();
+                        boat.discard();
+                    }
+                })
+                .thenExecute(() -> {
+                    helper.setBlock(at, Blocks.AIR);
+                    check(network.radarAt(absolute) == null, "Broken: gone from the network");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Radar Screen (on 4645, on a wall): it shows the dish on 4645 (8 blocks west), with its
+     * reach, its contacts and the tower on 4646 east of it; clients get the picture (not who tuned
+     * it); it pings once for a new contact, not again for the same ones, and not with Ping off. A
+     * dish too far away (a sweep 20 blocks off reaching 10) isn't shown, one reaching 30 is. On
+     * Dev's private 4645 a screen tuned by Rex shows nothing (it says whose it is), Alex's (a
+     * friend's) shows the dish, but not once the dish is tuned by Rex. The settings packet sets
+     * the zoom; Jade and the status line keep up.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radarScreen(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        BlockPos dishAt = new BlockPos(2, 1, 1);
+        BlockPos screenAt = new BlockPos(10, 2, 1);
+        BlockPos towerAt = new BlockPos(14, 1, 1);
+        helper.setBlock(dishAt, ModRegistry.RADAR_DISH.get());
+        helper.setBlock(screenAt.south(), Blocks.STONE);
+        helper.setBlock(screenAt, ModRegistry.RADAR_SCREEN.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.RadarScreenBlock.FACING, Direction.NORTH));
+        place(helper, towerAt, ModRegistry.RADIO_TRANSMITTER.get(), 4646);
+        BlockPos dishAbs = helper.absolutePos(dishAt);
+        BlockPos screenAbs = helper.absolutePos(screenAt);
+        Player dev = namedPlayer(helper, new BlockPos(9, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player alex = namedPlayer(helper, new BlockPos(5, 1, 1), alexId, "Alex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        com.reiko.signaltower.blockentity.RadarDishBlockEntity dish = helper.getBlockEntity(dishAt);
+        com.reiko.signaltower.blockentity.RadarScreenBlockEntity screen = helper.getBlockEntity(screenAt);
+        dish.setTunedBy(devId);
+        dish.setFrequency(4645);
+        screen.setTunedBy(devId);
+        screen.setFrequency(4645);
+        SignalNetwork network = SignalNetwork.get(level);
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    var zombie = helper.spawn(EntityType.ZOMBIE, new BlockPos(4, 1, 0));
+                    zombie.setNoAi(true);
+                    var pig = helper.spawn(EntityType.PIG, new BlockPos(7, 1, 0));
+                    pig.setNoAi(true);
+                    try {
+                        check(helper.getBlockState(screenAt).canSurvive(level, screenAbs), "It hangs on the wall");
+                        dish.sweep(level, List.of(zombie, alex));
+                        screen.update(level);
+                        check(screen.isShowing() && screen.dishDx() == -8 && screen.dishDz() == 0 && screen.dishReach() == network.radarAt(dishAbs).reach()
+                                && screen.contactCount() == 2, "It shows the dish, 8 blocks west, with 2 contacts");
+                        check(helper.getBlockState(screenAt).getValue(com.reiko.signaltower.block.RadarScreenBlock.ACTIVE), "Lit");
+                        int[] towers = screen.towers();
+                        boolean tower = false;
+                        for (int i = 0; i + 1 < towers.length; i += 2) {
+                            tower |= towers[i] == 12 && towers[i + 1] == 0;
+                        }
+                        check(tower, "The tower on 4646 shows, 12 blocks east of the dish: " + java.util.Arrays.toString(towers));
+                        int pings = screen.pingsForTests();
+                        screen.update(level);
+                        check(screen.pingsForTests() == pings, "No ping for the same contacts");
+                        dish.sweep(level, List.of(zombie, alex, pig));
+                        screen.update(level);
+                        check(screen.pingsForTests() == pings + 1 && screen.contactCount() == 3, "A ping for the pig");
+                        screen.setSettings(com.reiko.signaltower.radio.Radar.SHOW_TOWERS);
+                        dish.sweep(level, List.of(zombie, alex, pig, dev));
+                        screen.update(level);
+                        check(screen.pingsForTests() == pings + 1 && screen.contactCount() == 4, "Ping off: none for Dev");
+
+                        CompoundTag update = screen.getUpdateTag(level.registryAccess());
+                        var client = new com.reiko.signaltower.blockentity.RadarScreenBlockEntity(screenAbs, helper.getBlockState(screenAt));
+                        client.loadWithComponents(update, level.registryAccess());
+                        check(client.isShowing() && client.dishDx() == -8 && java.util.Arrays.equals(client.contacts(), screen.contacts())
+                                && client.getFrequency() == 4645 && client.getTunedBy() == null
+                                && client.getSettings() == com.reiko.signaltower.radio.Radar.SHOW_TOWERS, "Clients get the picture (not who tuned it)");
+                        List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(screenAt),
+                                com.reiko.signaltower.compat.RadioInfo.read(level, screenAbs, dev)));
+                        check(jade.equals(List.of("frequency", "radar_screen_dish", "radar_screen_contacts", "radar_screen_zoom")), "Jade: " + jade);
+                        check(keyOf(ModRegistry.RADAR_SCREEN.get().describe(level, screenAbs, helper.getBlockState(screenAt))).endsWith("radar_screen_status"),
+                                "Status line");
+                        Component set = com.reiko.signaltower.network.ConfigureRadarPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureRadarPayload(screenAbs, 1 | com.reiko.signaltower.radio.Radar.PING));
+                        check(set != null && keyOf(set).endsWith("radar_screen_set") && screen.getSettings() == (1 | com.reiko.signaltower.radio.Radar.PING),
+                                "Dev zooms in to half");
+                        var open = com.reiko.signaltower.network.OpenRadarScreenPayload.of(level, screen);
+                        check(!open.dish() && open.seen().equals(List.of(4)) && open.reach() == screen.dishReach(), "Settings packet: " + open);
+
+                        // Reach: a dish 20 blocks east reaching 10 isn't shown; one reaching 30 is.
+                        BlockPos fake = screenAbs.offset(20, 0, 0);
+                        network.updateRadar(fake, new com.reiko.signaltower.radio.Radar.Sweep(4646, 10, null, level.getGameTime(), true, List.of(), List.of()));
+                        screen.setFrequency(4646);
+                        screen.update(level);
+                        check(!screen.isShowing() && keyOf(screen.statusText()).endsWith("radar_screen_none"), "Out of the dish's reach");
+                        network.updateRadar(fake, new com.reiko.signaltower.radio.Radar.Sweep(4646, 30, null, level.getGameTime(), true, List.of(), List.of()));
+                        screen.update(level);
+                        check(screen.isShowing() && screen.dishDx() == 20, "In reach");
+                        network.removeRadar(fake);
+                        screen.setFrequency(4645);
+
+                        claims.put(4645, devId, "Dev", java.util.Map.of(alexId, "Alex"));
+                        network.invalidate(4645);
+                        screen.setTunedBy(rexId);
+                        screen.update(level);
+                        check(!screen.isShowing() && screen.lockedBy().equals("Dev") && keyOf(screen.statusText()).endsWith("radar_screen_locked"),
+                                "Rex's screen shows nothing on Dev's private frequency");
+                        check(keyOf(com.reiko.signaltower.block.RadioBlock.deafNotice(level, screenAbs)).endsWith("radar_screen_locked"), "And says so");
+                        screen.setTunedBy(alexId);
+                        dish.sweep(level, List.of(zombie));
+                        screen.update(level);
+                        check(screen.isShowing() && screen.lockedBy().isEmpty() && screen.contactCount() == 1, "Alex's (a friend's) shows it");
+                        dish.setTunedBy(rexId);
+                        screen.update(level);
+                        check(!screen.isShowing(), "Not a dish Rex tuned (it may not send there)");
+                        dish.setTunedBy(devId);
+                    } finally {
+                        claims.remove(4645);
+                        network.invalidate(4645);
+                        zombie.discard();
+                        pig.discard();
                     }
                 })
                 .thenSucceed();

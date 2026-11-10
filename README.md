@@ -37,6 +37,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Satellite Dish** | A transmitter upgrade for open sky: with a satellite in orbit over its dimension, the tower is heard everywhere in that dimension, at full strength, at four times the power. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
 | **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. With **Morse** on, it keys its messages out in Morse code first. |
+| **Radar Dish** | A tower top with a spinning radar dish. It sweeps its reach for players, hostile mobs, peaceful mobs, and boats and minecarts (not ones in caves), and turns its frequency on with how many it sees, so receivers, lamps and pagers react when something comes near. A comparator reads the count. |
+| **Radar Screen** | A panel for a wall that shows what a Radar Dish on its frequency sees: a green sweep line turning with the dish, a blip for each thing (colored by kind), radio towers as small squares and where the screen itself is, north up. It pings when something new shows up. |
 | **Ticker Tape Printer** | A stock ticker under a glass dome. Tune it to a frequency and give it a Book and Quill: every message that reaches it is printed in the book, with the day and time and who sent it. A full book is signed as a logbook, and a hopper can take it away. |
 | **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
@@ -761,6 +763,27 @@ Since 0.64 a **Walkie-Talkie** lets players talk over the radio.
 
 ![Dev holding a Walkie-Talkie on 2026, the talk line open at the bottom of the screen: "Walkie-Talkie on 2026: press Enter to talk", "Meet me at the printer"; Alex 11 blocks away hearing it, "[2026] ▮▮▮▮ Dev: Meet me at the printer", with "Walkie-talkie crackles", "Ticker tape prints" and "Telegraph clacks" in the subtitles and Jade on his telegraph "Last message (just now): “Meet me at the printer” from Dev"; Dev's own line "Dev (you)" and "Said on 2026 (648 blocks + 10 towers) | Heard by 1 walkie-talkie and 2 telegraphs"; Alex in a forest 513 blocks off with two bars: "Brin... the logbook to the old tower at dusk"; Alex in a snowy village 605 blocks off with one bar: "B... the logbook to the o... dusk"; and the Walkie-Talkie's screen: frequency, favorites and "Sound: ON"](docs/images/walkie-talkie.png)
 
+### Radar
+
+Since 0.65 a **Radar Dish** on a tower shows on a **Radar Screen** what's moving around it.
+
+- **The dish** goes on top of a mast column like a Radio Transmitter: it reaches as far as one at its height would, needs a charged battery when towers need power, minds the weather, and the mast builder can lift it. While it works its dish spins, once every 4 seconds.
+- **What it sees:** once a second it sweeps its reach for **players**, **hostile mobs**, **peaceful mobs** (animals, villagers, golems, fish and bats) and **vehicles** (boats and minecarts), up to 64 of them, the nearest first. Only loaded ones, and not anything with 8 or more solid blocks above it, so things in caves or deep in the ground don't show; a roof, a tree or a floor or two above doesn't hide them. In the Nether and the End it sees everything in its reach. Spectators never show.
+- **Its settings** (right-click it; sneak + right-click for its status line): which of the four kinds it tracks; **Strangers only**, which leaves out whoever tuned it and, on a private frequency, the owner and members; and **Send**. On a private frequency only the owner and members (and operators) change them.
+- **Send:** it turns its frequency on with how many things it sees, at most 15, so a Radio Receiver lights a lamp when someone's coming, a pager beeps, and a Logic Receiver can arm it at night. The frequency log lists it as "Radar Dish", with what it saw first. A comparator next to it reads the same count, Send or not.
+- **The screen** hangs on a wall, tuned like a receiver. It shows the nearest working Radar Dish on its frequency whose reach covers the screen: the dish in the middle, north up, a green sweep line turning with the dish and fading behind it, blips that light up as the line passes and fade over the turn (players pale yellow, hostile mobs red, peaceful mobs cyan, vehicles violet), radio towers in the dish's reach as amber squares, and the screen itself as a white cross. Underneath: the range shown and how many blips are on it.
+- **Its settings:** how far round the dish it shows (the dish's whole reach, 256, 128, 64 or 32 blocks; 128 at first), **Ping** (a soft ping when something new shows up: higher for a player, lower for a hostile mob) and **Show towers**.
+- **Private frequencies:** a screen placed or tuned by someone who isn't the owner or a member shows nothing ("PRIVATE (Dev)"), and a dish tuned by someone who isn't a member isn't shown.
+- **Jade and WTHIT** show what a dish sees and tracks, and which dish a screen shows, how far off, with how many contacts and at what range.
+
+![A Radar Screen on a wall on 6500: the green scope with range rings, the sweep line and its trail, red, cyan and pale yellow blips, amber tower squares and a white cross, "128 blocks · 27", and Jade "Shows a dish 23 blocks north-east (reach 672)", "38 contacts", "Shows: 128 blocks"; the Radar Dish on its mast with its curved reflector turning above the cabinet; Jade on the dish: "Sending: 15", "Sees: 2 players, 9 hostile mobs, 23 peaceful mobs, 2 vehicles", "Reach: 672 blocks", its battery; the dish's settings: Players, Hostile mobs, Peaceful mobs, Vehicles, Strangers only: OFF, Send: ON and what it sees; Alex's Radar Screen settings: "Shows: 64 blocks", "Ping: ON", "Show towers: ON"; and the screen at 64 blocks, "64 blocks · 12"](docs/images/radar.png)
+
+### 3D item models
+
+Since 0.65 the handheld radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are small 3D models instead of flat pictures: the Frequency Tuner with its display, tuning dial and aerial; the Remote Control with its red button and the light that turns green or red after a press; the Multi-Button Remote with its four buttons in their own colors; the Radio Pager with its screen lighting up; the Signal Scanner's scope; the Signal Meter, whose needle swings with the strength; the yellow Walkie-Talkie with its rubber aerial; each antenna with its crossed dipoles (a loading coil on the gold one, diamond and netherite knobs, an ender tip); the Dish Antenna and Satellite Dish with round, stepped bowls; the Coverage Map rolled at both sides like a scroll; and Wall Redstone as dust running across a piece of wall. The Radar Dish and Radar Screen items show their dish and a lit scope. The radios are held upright, their face to you in first person and outwards in third person.
+
+![The mod's items in a survival inventory, all in 3D; the same items in item frames on a wall; first person holding the Walkie-Talkie in front of a Radar Screen; Dev in third person holding the Frequency Tuner, the Walkie-Talkie and the Signal Meter upright; the items lying on the ground; first person holding the Signal Scanner](docs/images/item-models.png)
+
 ### Radio Weather Station
 
 A **Radio Weather Station** (since 0.53) is a full-size transmitter with a sun and a rain cloud on its sides. Instead of the redstone it gets, it broadcasts one **reading** of the conditions where it stands. Right-click it with an empty hand to pick which:
@@ -872,6 +895,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A steady beep | "Speaker beeps" | A Radio Speaker set to Tone, for as long as its frequency is on (since 0.62) |
 | A type wheel's chatter and a clunk | "Ticker tape prints" | A Ticker Tape Printer prints a message (since 0.63) |
 | A burst of hiss and a chirp | "Walkie-talkie crackles" | Someone talks on a Walkie-Talkie you carry, or you talk (since 0.64) |
+| A soft ping with a ring | "Radar pings" | A Radar Screen when something new shows up on it (since 0.65) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
@@ -1230,6 +1254,10 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **Walkie-Talkie:** a Radio Pager and a Remote Control, in any arrangement in the crafting grid.
 
+**Radar Dish:** a Radio Transmitter, a Dish Antenna and an Observer, in any arrangement in the crafting grid.
+
+**Radar Screen:** a Radio Status Board, a Compass and Lime Dye, in any arrangement in the crafting grid.
+
 **Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
@@ -1287,6 +1315,8 @@ To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod)
 To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, `-PwithCct` for CC: Tweaked, `-PwithJourneyMap` or `-PwithXaero` for the map waypoints, and `-PwithWthit` for WTHIT (with Bad Packets, which it needs; add `-PnoJade` too to see WTHIT's tooltip on its own). Otherwise they're only compiled against (JourneyMap through its API from JourneyMap's maven).
 
 The sounds' `.ogg` files are checked in. To change one, edit `tools/make_sounds.py` and run `python3 tools/make_sounds.py` (it needs numpy and ffmpeg).
+
+The items' 3D models and their textures are written by `tools/make_item_models.py` (run `python3 tools/make_item_models.py`; it needs Pillow). Each model is a list of boxes, and each box's faces are painted into one texture per item, two pixels to a model pixel.
 
 On Windows use `gradlew.bat` instead of `./gradlew`.
 
@@ -1426,6 +1456,15 @@ src/main/java/com/reiko/signaltower/
   item/WalkieTalkieItem.java             the Walkie-Talkie: talk box, its screen, copying a frequency
   radio/WalkieTalkie.java                talking: where it goes, the message, who hears it, signal bars and static near the edge
   client/TalkScreen.java, TalkKey.java   the talk line at the bottom of the screen, and the Talk key (V)
+  radio/Radar.java                       radar: what a dish sees (kinds, caves), its settings, the sweep for screens, the sweep's angle
+  block/RadarDishBlock.java              the Radar Dish: a tower top; opens its settings; comparator
+  blockentity/RadarDishBlockEntity.java  sweeps once a second, sends the count, puts the sweep in the network
+  block/RadarScreenBlock.java            the Radar Screen: a wall panel; opens its settings
+  blockentity/RadarScreenBlockEntity.java  picks the dish it shows, copies its sweep for clients, pings
+  client/RadarScreenRenderer.java        draws the scope: rings, sweep line and trail, blips, towers
+  client/RadarDishRenderer.java          spins the dish (the block/radar_dish_rotor model)
+  client/RadarSettingsScreen.java        the dish's and the screen's settings
+  network/OpenRadarScreenPayload.java, ConfigureRadarPayload.java  radar settings screen <-> server
   network/WalkieTalkPayload.java         talk line -> server
   item/SignalScannerItem.java            handheld that lists every frequency heard where you stand, and tracks one
   item/ScannerTarget.java                the transmitter a scanner is tracking (data component), arrow angle
@@ -1488,7 +1527,8 @@ src/main/resources/
   data/reikos_signal_tower/computercraft/  the radio turtle and pocket upgrades (read by CC: Tweaked)
   waila_plugins.json                     names the WTHIT plugin's classes (read by WTHIT)
 tools/
-  make_textures.py                       draws all textures (needs Pillow)
+  make_textures.py                       draws the block textures (needs Pillow)
+  make_item_models.py                    builds the items' 3D models and paints their textures (needs Pillow)
   make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen, the village shacks' templates
   make_sounds.py                         synthesizes the sounds and writes sounds.json (needs numpy and ffmpeg)
   make_logo.py                           draws the mod's icon (the mod list's logo and docs/images/icon.png)
@@ -1705,9 +1745,12 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 197. the Ticker Tape Printer: a message sent before it was placed isn't printed; its slot takes one Book and Quill and nothing else, and doesn't give up a book being printed in; a message is printed as "Day 1, 12:00, Dev:" and the text, the tape runs, the comparator reads 1 and Jade shows it, and a second goes on the same page; with no book a message waits (Jade: 1 waiting); a message that doesn't fit in a 50-page book signs it ("4640 log" by the Ticker Tape Printer, comparator 15), a hopper's pull takes the logbook out, and the message is printed in the next book; on someone else's encrypted frequency it prints "(encrypted)" and says why; broken, it drops its book;
 198. WTHIT: waila_plugins.json names the common and client plugins, which are in the jar; with WTHIT loaded (`-PwithWthit`) the plugin has registered every covered block, and WTHIT finds its data provider for a Ticker Tape Printer and a Radio Transmitter;
 199. Walkie-Talkie lines: clear up to 70% of the way to the edge, then words cut off ("g..."), more farther out, the same way for the same seed, cut words running together; the signal bars; how far out a spot is in the best area that reaches it; "Heard by 2 walkie-talkies, 1 pager and 1 telegraph";
-200. the Walkie-Talkie: one only in the inventory can't talk, nothing said is refused; Dev's line goes out (his own line in chat, "Said on 4642 ... | Heard by ..."), is kept as a handheld message from Dev, and a second at once is too fast; Alex, carrying one nearby, hears it in full with four bars, while Dev, someone on another frequency and someone 5,000 blocks away don't; a telegraph's message reaches Alex's too; a Ticker Tape Printer prints Dev's line and a telegraph shows it; on Dev's encrypted frequency Alex hears "(encrypted)", someone who isn't a member is refused, and the log has a Walkie-Talkie entry with no position.
+200. the Walkie-Talkie: one only in the inventory can't talk, nothing said is refused; Dev's line goes out (his own line in chat, "Said on 4642 ... | Heard by ..."), is kept as a handheld message from Dev, and a second at once is too fast; Alex, carrying one nearby, hears it in full with four bars, while Dev, someone on another frequency and someone 5,000 blocks away don't; a telegraph's message reaches Alex's too; a Ticker Tape Printer prints Dev's line and a telegraph shows it; on Dev's encrypted frequency Alex hears "(encrypted)", someone who isn't a member is refused, and the log has a Walkie-Talkie entry with no position;
+201. what a radar makes of things: zombies are hostile, pigs and villagers peaceful, boats and minecarts vehicles, players players, but not armor stands, items or spectators; bearings clockwise from north; one turn every 4 seconds; the ranges a screen shows (never more than the dish's reach) and the settings kept to their bits;
+202. the Radar Dish: in its reach it sees a zombie, a pig, a boat, Dev and Alex, nearest first, but not someone 11 blocks under a pillar or past its reach; it sends 5, which a receiver hears and a comparator reads, it's lit and sweeping, and its sweep is in the network; tracking players and hostile mobs it counts 3, strangers only leaves Dev (its tuner) out, Send off sends nothing but the comparator still counts; the status line, Jade, the settings packet and the item keep up; on Dev's private frequency the log lists a Radar Dish with what it saw, and Rex can't change it; broken, it's gone from the network;
+203. the Radar Screen: it shows the dish 8 blocks west with its reach and contacts, and the tower 12 blocks east of the dish; no ping for the same contacts, a ping for a new one, none with Ping off; clients get the picture but not who tuned it; Jade, the status line and the settings packet; Dev sets it to 256 blocks with the packet; a dish 20 blocks off reaching 10 isn't shown, one reaching 30 is; on Dev's private frequency Rex's screen shows nothing and says whose it is, Alex's (a friend's) shows the dish, but not once the dish is tuned by Rex.
 
-All 200 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
+All 203 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
 
 ## License
 

@@ -415,6 +415,10 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             // v0.44.0: what its recording sends now (redstone only starts and stops it).
             return level.getBlockEntity(pos) instanceof SignalRecorderBlockEntity recorder ? recorder.getOutput() : 0;
         }
+        if (state.getBlock() instanceof com.reiko.signaltower.block.RadarDishBlock) {
+            // v0.65.0: how many things it sees (at most 15) while Send is on; redstone does nothing.
+            return level.getBlockEntity(pos) instanceof RadarDishBlockEntity dish ? dish.output() : 0;
+        }
         if (state.getBlock() instanceof RadioMotionSensorBlock) {
             return level.getBlockEntity(pos) instanceof MotionSensorBlockEntity sensor && sensor.isSensing() ? 15 : 0;
         }

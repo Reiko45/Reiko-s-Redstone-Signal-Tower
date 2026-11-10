@@ -119,6 +119,10 @@ public abstract class RadioBlock extends BaseEntityBlock {
             // v0.51.0: it can't read messages on someone else's encrypted frequency.
             return FrequencyClaims.deafness(level, telegraph.getFrequency(), telegraph.getTunedBy(), "encrypted_deaf");
         }
+        if (entity instanceof com.reiko.signaltower.blockentity.RadarScreenBlockEntity screen) {
+            // v0.65.0: on someone else's private frequency it shows nothing.
+            return screen.lockNotice(level);
+        }
         if (entity instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer) {
             // v0.63.0: it prints "(encrypted)" for messages on someone else's encrypted frequency.
             return FrequencyClaims.deafness(level, printer.getFrequency(), printer.getTunedBy(), "encrypted_deaf");

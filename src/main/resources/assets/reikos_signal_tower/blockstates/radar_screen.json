@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "active=false,facing=north": {
+      "model": "reikos_signal_tower:block/radar_screen"
+    },
+    "active=true,facing=north": {
+      "model": "reikos_signal_tower:block/radar_screen"
+    },
+    "active=false,facing=east": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 90
+    },
+    "active=true,facing=east": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 90
+    },
+    "active=false,facing=south": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 180
+    },
+    "active=true,facing=south": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 180
+    },
+    "active=false,facing=west": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 270
+    },
+    "active=true,facing=west": {
+      "model": "reikos_signal_tower:block/radar_screen",
+      "y": 270
+    }
+  }
+}

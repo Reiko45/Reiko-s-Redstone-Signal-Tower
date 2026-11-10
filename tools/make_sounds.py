@@ -269,6 +269,20 @@ def walkie_squelch():
     return normalize(out * envelope(len(out), 0.001, 0.02), 0.75)
 
 
+def radar_ping():
+    """v0.65.0: a Radar Screen's ping: a soft, clear sine blip with a long, dying ring (sonar-like)."""
+    d = 0.9
+    n = int(d * RATE)
+    t = np.arange(n) / RATE
+    tone = np.sin(2 * np.pi * 1180 * t) + 0.25 * np.sin(2 * np.pi * 2360 * t) + 0.08 * np.sin(2 * np.pi * 3540 * t)
+    decay = np.exp(-t * 6.0)
+    attack = np.minimum(1.0, t / 0.004)
+    echo = np.zeros(n)
+    lag = int(0.18 * RATE)
+    echo[lag:] = (tone * decay * attack)[:n - lag] * 0.25
+    return normalize((tone * decay * attack + echo) * envelope(n, 0.001, 0.08), 0.6)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -284,6 +298,7 @@ SOUND_LIST = {
     "speaker.tone": ("speaker_tone", speaker_tone),
     "printer.print": ("printer_print", printer_print),
     "walkie.squelch": ("walkie_squelch", walkie_squelch),
+    "radar.ping": ("radar_ping", radar_ping),
 }
 
 

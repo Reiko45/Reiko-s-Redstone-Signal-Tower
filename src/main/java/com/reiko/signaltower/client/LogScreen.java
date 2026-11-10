@@ -196,6 +196,7 @@ public class LogScreen extends Screen {
             return (entry.kind() == SignalNetwork.CauseKind.TRANSMITTER || entry.kind() == SignalNetwork.CauseKind.GATE
                     || entry.kind() == SignalNetwork.CauseKind.TIMER || entry.kind() == SignalNetwork.CauseKind.RECORDER
                     || entry.kind() == SignalNetwork.CauseKind.WEATHER_STATION || entry.kind() == SignalNetwork.CauseKind.JUKEBOX
+                    || entry.kind() == SignalNetwork.CauseKind.RADAR
                     ? Component.translatable(AUDIT_KEY + "hidden") : Component.literal("-")).withStyle(ChatFormatting.DARK_GRAY);
         }
         BlockPos pos = entry.pos().get();
@@ -245,9 +246,12 @@ public class LogScreen extends Screen {
         }
         switch (entry.kind()) {
             case UNKNOWN -> lines.add(Component.translatable(KEY + "tip_unknown").withStyle(ChatFormatting.DARK_GRAY));
-            case TRANSMITTER, GATE, TIMER, WEATHER_STATION, JUKEBOX -> {
+            case TRANSMITTER, GATE, TIMER, WEATHER_STATION, JUKEBOX, RADAR -> {
                 if (entry.kind() == SignalNetwork.CauseKind.JUKEBOX && !entry.detail().isEmpty()) {
                     lines.add(Component.translatable(KEY + "tip_jukebox", entry.detail()).withStyle(ChatFormatting.AQUA)); // v0.60.0
+                }
+                if (entry.kind() == SignalNetwork.CauseKind.RADAR && !entry.detail().isEmpty()) {
+                    lines.add(Component.translatable(KEY + "tip_radar", Component.translatable(entry.detail())).withStyle(ChatFormatting.AQUA)); // v0.65.0
                 }
                 lines.add(switch (entry.whoKind()) {
                     case OWNER -> Component.translatable(AUDIT_KEY + "tip_owner", entry.who()).withStyle(ChatFormatting.GOLD);

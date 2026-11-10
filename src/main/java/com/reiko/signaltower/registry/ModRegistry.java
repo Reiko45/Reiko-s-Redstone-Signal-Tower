@@ -71,6 +71,12 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(0, Integer.MAX_VALUE))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** v0.65.0: a Radar Dish's or Radar Screen's settings (see {@code radio.Radar}), kept on the item when it's broken. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> RADAR_SETTINGS =
+            DATA_COMPONENTS.registerComponentType("radar_settings", builder -> builder
+                    .persistent(Codec.intRange(0, 255))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
     /** v0.49.0: a Coverage Map's zoom, 0 (1:1) to 4 (1:16), like a vanilla map's scale. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COVERAGE_ZOOM =
             DATA_COMPONENTS.registerComponentType("coverage_zoom", builder -> builder
@@ -354,6 +360,27 @@ public final class ModRegistry {
                     .noOcclusion()
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED) ? 7 : 0)));
 
+    /** v0.65.0: a tower top that sweeps its reach for players, mobs and vehicles. */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadarDishBlock> RADAR_DISH = BLOCKS.register("radar_dish",
+            () -> new com.reiko.signaltower.block.RadarDishBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(3.5F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .lightLevel(state -> state.getValue(RadioTransmitterBlock.POWERED) ? 5 : 0)));
+
+    /** v0.65.0: a wall panel showing what a Radar Dish on its frequency sees. */
+    public static final DeferredBlock<com.reiko.signaltower.block.RadarScreenBlock> RADAR_SCREEN = BLOCKS.register("radar_screen",
+            () -> new com.reiko.signaltower.block.RadarScreenBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .strength(1.0F, 3.0F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadarScreenBlock.ACTIVE) ? 5 : 0)));
+
     /** v0.63.0: prints the messages on its frequency into a Book and Quill. */
     public static final DeferredBlock<com.reiko.signaltower.block.TickerPrinterBlock> TICKER_PRINTER = BLOCKS.register("ticker_printer",
             () -> new com.reiko.signaltower.block.TickerPrinterBlock(BlockBehaviour.Properties.of()
@@ -619,6 +646,10 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("morse_key", MORSE_KEY); // v0.62.0
     public static final DeferredItem<BlockItem> TICKER_PRINTER_ITEM =
             ITEMS.registerSimpleBlockItem("ticker_printer", TICKER_PRINTER); // v0.63.0
+    public static final DeferredItem<BlockItem> RADAR_DISH_ITEM =
+            ITEMS.registerSimpleBlockItem("radar_dish", RADAR_DISH); // v0.65.0
+    public static final DeferredItem<BlockItem> RADAR_SCREEN_ITEM =
+            ITEMS.registerSimpleBlockItem("radar_screen", RADAR_SCREEN); // v0.65.0
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
@@ -751,6 +782,14 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.LaunchPadBlockEntity>> LAUNCH_PAD_BE =
             BLOCK_ENTITIES.register("launch_pad",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.LaunchPadBlockEntity::new, LAUNCH_PAD.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadarDishBlockEntity>> RADAR_DISH_BE =
+            BLOCK_ENTITIES.register("radar_dish",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadarDishBlockEntity::new, RADAR_DISH.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadarScreenBlockEntity>> RADAR_SCREEN_BE =
+            BLOCK_ENTITIES.register("radar_screen",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadarScreenBlockEntity::new, RADAR_SCREEN.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TickerPrinterBlockEntity>> TICKER_PRINTER_BE =
             BLOCK_ENTITIES.register("ticker_printer",

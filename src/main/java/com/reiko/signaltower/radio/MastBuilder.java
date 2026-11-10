@@ -54,7 +54,8 @@ public final class MastBuilder {
 
     /** True if right-clicking a block in {@code state} with a mast builds: a mast, or a full-size tower top. */
     public static boolean builds(BlockState state) {
-        return state.getBlock() instanceof RadioMastBlock || AntennaTier.fits(state);
+        return state.getBlock() instanceof RadioMastBlock || AntennaTier.fits(state)
+                || state.getBlock() instanceof com.reiko.signaltower.block.RadarDishBlock; // v0.65.0
     }
 
     /** True if a block in {@code state} goes up with the tower top under it: a beacon standing on it, or a lightning rod. */
@@ -80,7 +81,7 @@ public final class MastBuilder {
         }
         BlockPos base = cursor.immutable(); // where the new mast goes
         BlockState topState = level.getBlockState(base);
-        boolean tower = AntennaTier.fits(topState);
+        boolean tower = AntennaTier.fits(topState) || topState.getBlock() instanceof com.reiko.signaltower.block.RadarDishBlock;
         List<BlockPos> lifted = new ArrayList<>();
         if (tower) {
             lifted.add(base);

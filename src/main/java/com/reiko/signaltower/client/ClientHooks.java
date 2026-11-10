@@ -135,6 +135,11 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new SensorScreen(state));
     }
 
+    /** Opens a Radar Dish's or Radar Screen's settings (v0.65.0). */
+    public static void openRadarScreen(com.reiko.signaltower.network.OpenRadarScreenPayload state) {
+        Minecraft.getInstance().setScreen(new RadarSettingsScreen(state));
+    }
+
     /** Opens a Radio Speaker's screen (v0.43.0). */
     public static void openSpeakerScreen(com.reiko.signaltower.network.OpenSpeakerScreenPayload state) {
         Minecraft.getInstance().setScreen(new SpeakerScreen(state));

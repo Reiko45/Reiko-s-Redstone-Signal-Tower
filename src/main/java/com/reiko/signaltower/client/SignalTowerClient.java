@@ -52,7 +52,12 @@ public final class SignalTowerClient {
             event.registerBlockEntityRenderer(ModRegistry.AVIATION_BEACON_BE.get(), AviationBeaconRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.GUY_ANCHOR_BE.get(), GuyWireRenderer::new); // v0.54.0
             event.registerBlockEntityRenderer(ModRegistry.LAUNCH_PAD_BE.get(), LaunchPadRenderer::new); // v0.61.0
+            event.registerBlockEntityRenderer(ModRegistry.RADAR_DISH_BE.get(), RadarDishRenderer::new); // v0.65.0
+            event.registerBlockEntityRenderer(ModRegistry.RADAR_SCREEN_BE.get(), RadarScreenRenderer::new);
         });
+        // v0.65.0: the Radar Dish's spinning dish, a model of its own.
+        modEventBus.addListener((net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional event) ->
+                event.register(RadarDishRenderer.ROTOR));
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onRenderLevel);

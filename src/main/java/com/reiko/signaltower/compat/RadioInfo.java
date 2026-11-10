@@ -186,6 +186,8 @@ public final class RadioInfo {
         return tag;
     }
 
+    private static final String[] RADAR_DIRECTIONS = {"n", "ne", "e", "se", "s", "sw", "w", "nw"};
+
     private static void addName(ServerLevel level, CompoundTag tag, String frequencyKey, String nameKey) {
         if (tag.contains(frequencyKey)) {
             String name = FrequencyNames.nameOf(level, tag.getInt(frequencyKey));
@@ -214,6 +216,7 @@ public final class RadioInfo {
                         : top instanceof com.reiko.signaltower.block.RadioWeatherStationBlock ? "weather_station"
                         : top instanceof com.reiko.signaltower.block.RadioSignalRecorderBlock ? "signal_recorder"
                         : top instanceof com.reiko.signaltower.block.RadioJukeboxBlock ? "jukebox"
+                        : top instanceof com.reiko.signaltower.block.RadarDishBlock ? "radar_dish"
                         : top instanceof com.reiko.signaltower.block.RadioJammerBlock ? "jammer" : "transmitter");
                 tag.putInt("above", cursor.getY() - pos.getY());
                 com.reiko.signaltower.radio.AntennaTier antenna = com.reiko.signaltower.radio.AntennaTier.of(level.getBlockState(cursor));
@@ -268,6 +271,13 @@ public final class RadioInfo {
             if (block instanceof com.reiko.signaltower.block.RadioJammerBlock) {
                 // v0.46.0: how strongly it jams (its redstone), unless it's kept quiet.
                 tag.putBoolean("jammer", true);
+            }
+            if (radio instanceof com.reiko.signaltower.blockentity.RadarDishBlockEntity dish) {
+                // v0.65.0: what it saw at its last sweep, what it tracks, and whether it works.
+                tag.putBoolean("radar", true);
+                tag.putIntArray("radar_counts", dish.counts());
+                tag.putInt("radar_settings", dish.getSettings());
+                tag.putBoolean("radar_working", dish.isWorking());
             }
             if (radio instanceof com.reiko.signaltower.blockentity.TimerTransmitterBlockEntity timer) {
                 // v0.42.0: its schedule, whether redstone pauses it, and its interval's next change.
@@ -339,6 +349,16 @@ public final class RadioInfo {
             tag.putString("morse_letter", key.pendingCode(now));
             tag.putString("morse_last", key.lastSent());
             tag.putBoolean("morse_down", key.isDown());
+        } else if (radio instanceof com.reiko.signaltower.blockentity.RadarScreenBlockEntity screen) {
+            // v0.65.0: the dish it shows (where, its reach), how many contacts, its zoom, or who it's locked out by.
+            tag.putBoolean("radar_screen", true);
+            tag.putBoolean("radar_shown", screen.isShowing());
+            tag.putInt("radar_dish_dx", screen.dishDx());
+            tag.putInt("radar_dish_dz", screen.dishDz());
+            tag.putInt("radar_reach", screen.dishReach());
+            tag.putInt("radar_contacts", screen.contactCount());
+            tag.putInt("radar_settings", screen.getSettings());
+            tag.putString("radar_locked", screen.lockedBy());
         } else if (radio instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer) {
             // v0.63.0: its book, how many messages it printed and the last, and how many are waiting for a book.
             tag.putString("printer_book", !printer.hasBook() ? "none" : printer.isFull() ? "full" : "writing");
@@ -797,7 +817,8 @@ public final class RadioInfo {
                 lines.add(Component.translatable(LANG + "mast_no_top").withStyle(ChatFormatting.GRAY));
                 return lines;
             }
-            Component top = Component.translatable("block." + SignalTower.MOD_ID + ".radio_" + data.getString("top"));
+            String topKind = data.getString("top");
+            Component top = Component.translatable("block." + SignalTower.MOD_ID + (topKind.startsWith("radar") ? "." : ".radio_") + topKind);
             lines.add(Component.translatable(LANG + "mast_top", top, data.getInt("above")));
             if (data.contains("top_antenna")) {
                 com.reiko.signaltower.radio.AntennaTier topTier = com.reiko.signaltower.radio.AntennaTier.valueOf(data.getString("top_antenna").toUpperCase(java.util.Locale.ROOT));
@@ -839,6 +860,34 @@ public final class RadioInfo {
                     lines.add(Component.translatable(LANG + "morse_last", Component.literal(data.getString("morse_last"))).withStyle(ChatFormatting.AQUA));
                 }
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.RadarScreenBlock) {
+            // v0.65.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                if (!data.getString("radar_locked").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "radar_screen_locked", Component.literal(data.getString("radar_locked")))
+                            .withStyle(ChatFormatting.RED));
+                } else if (!data.getBoolean("radar_shown")) {
+                    lines.add(Component.translatable(LANG + "radar_screen_none").withStyle(ChatFormatting.GOLD));
+                } else {
+                    int dx = data.getInt("radar_dish_dx");
+                    int dz = data.getInt("radar_dish_dz");
+                    int distance = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
+                    int direction = SignalNetwork.compassDirection(dx, dz);
+                    lines.add((direction < 0 ? Component.translatable(LANG + "radar_screen_dish_here", data.getInt("radar_reach"))
+                            : Component.translatable(LANG + "radar_screen_dish", distance,
+                            Component.translatable("screen." + SignalTower.MOD_ID + ".locator.dir_" + RADAR_DIRECTIONS[direction]),
+                            data.getInt("radar_reach"))).withStyle(ChatFormatting.AQUA));
+                    int contacts = data.getInt("radar_contacts");
+                    lines.add(Component.translatable(LANG + (contacts == 1 ? "radar_screen_contact" : "radar_screen_contacts"), contacts)
+                            .withStyle(ChatFormatting.GREEN));
+                }
+                lines.add(Component.translatable(LANG + "radar_screen_zoom",
+                        com.reiko.signaltower.block.RadarScreenBlock.zoomLabel(data.getInt("radar_settings"))).withStyle(ChatFormatting.GRAY));
             }
             return lines;
         }
@@ -1053,6 +1102,19 @@ public final class RadioInfo {
                     : Component.translatable(LANG + "broadcasting").withStyle(ChatFormatting.GREEN));
             if (hasData && data.contains("recorder_phase")) {
                 recorderLines(lines, data);
+            }
+            if (hasData && data.getBoolean("radar")) {
+                // v0.65.0: what a Radar Dish sees and tracks.
+                int settings = data.getInt("radar_settings");
+                lines.add(data.getBoolean("radar_working")
+                        ? Component.translatable(LANG + "radar_sees", com.reiko.signaltower.blockentity.RadarDishBlockEntity.seenText(data.getIntArray("radar_counts")))
+                                .withStyle(ChatFormatting.GREEN)
+                        : Component.translatable(LANG + "radar_still").withStyle(ChatFormatting.GOLD));
+                lines.add(Component.translatable(LANG + "radar_tracks", com.reiko.signaltower.block.RadarDishBlock.tracksText(settings))
+                        .withStyle(ChatFormatting.GRAY));
+                if ((settings & com.reiko.signaltower.radio.Radar.SEND) == 0) {
+                    lines.add(Component.translatable(LANG + "radar_send_off").withStyle(ChatFormatting.GRAY));
+                }
             }
             if (hasData && data.getBoolean("jukebox")) {
                 // v0.60.0: what it plays.

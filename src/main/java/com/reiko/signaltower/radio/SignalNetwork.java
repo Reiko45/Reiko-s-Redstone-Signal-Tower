@@ -285,6 +285,60 @@ public final class SignalNetwork extends SavedData {
     /** The dimension this network belongs to, for checking private frequencies where no level is passed in. Not saved. */
     private @Nullable ServerLevel world;
 
+    // ---- v0.65.0: radar dishes (not saved: each loaded dish puts its latest sweep here) ----
+
+    private final Map<BlockPos, com.reiko.signaltower.radio.Radar.Sweep> radars = new HashMap<>();
+
+    /** A Radar Dish's latest sweep (or a new frequency, reach or tuner), for the Radar Screens. */
+    public void updateRadar(BlockPos pos, com.reiko.signaltower.radio.Radar.Sweep sweep) {
+        radars.put(pos.immutable(), sweep);
+    }
+
+    /** A Radar Dish was broken or unloaded. */
+    public void removeRadar(BlockPos pos) {
+        radars.remove(pos);
+    }
+
+    /** The loaded Radar Dishes on {@code frequency}, and their latest sweeps. */
+    public List<Map.Entry<BlockPos, com.reiko.signaltower.radio.Radar.Sweep>> radarsOn(int frequency) {
+        List<Map.Entry<BlockPos, com.reiko.signaltower.radio.Radar.Sweep>> result = new ArrayList<>();
+        radars.forEach((pos, sweep) -> {
+            if (sweep.frequency() == frequency) result.add(Map.entry(pos, sweep));
+        });
+        return result;
+    }
+
+    /** {@code pos}'s latest sweep, or null if it isn't a loaded Radar Dish. */
+    public com.reiko.signaltower.radio.Radar.@Nullable Sweep radarAt(BlockPos pos) {
+        return radars.get(pos);
+    }
+
+    /**
+     * The full-size towers (transmitters, repeaters, converters and jammers, on any frequency) within
+     * {@code reach} of {@code center} (measured flat), nearest first, at most {@code limit}; not
+     * {@code center} itself. For a radar's screen.
+     */
+    public List<BlockPos> towersNear(BlockPos center, int reach, int limit) {
+        List<BlockPos> found = new ArrayList<>();
+        long reach2 = (long) reach * reach;
+        java.util.function.Consumer<BlockPos> add = pos -> {
+            long dx = pos.getX() - center.getX();
+            long dz = pos.getZ() - center.getZ();
+            if (!pos.equals(center) && dx * dx + dz * dz <= reach2 && !found.contains(pos)) found.add(pos);
+        };
+        transmitters.forEach((pos, tx) -> {
+            if (!tx.compact()) add.accept(pos);
+        });
+        repeaters.keySet().forEach(add);
+        jammers.keySet().forEach(add);
+        found.sort(java.util.Comparator.comparingLong(pos -> {
+            long dx = pos.getX() - center.getX();
+            long dz = pos.getZ() - center.getZ();
+            return dx * dx + dz * dz;
+        }));
+        return found.size() > limit ? new ArrayList<>(found.subList(0, limit)) : found;
+    }
+
     public static SignalNetwork get(ServerLevel level) {
         SignalNetwork network = level.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
         network.world = level;
@@ -1295,7 +1349,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.62.0: a Morse message starting, from a Morse Key (keyed by a player, or redstone) or a telegraph keying it. */
         MORSE,
         /** v0.64.0: something said into a Walkie-Talkie (in the log only, like a telegraph message; no position). */
-        WALKIE;
+        WALKIE,
+        /** v0.65.0: a Radar Dish seeing something (the detail is what it saw first: an entity type's description id). */
+        RADAR;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1356,6 +1412,11 @@ public final class SignalNetwork extends SavedData {
         /** A Radio Weather Station's reading (v0.53.0): where it is and who tuned it. */
         public static Cause station(BlockPos pos, @Nullable UUID tunedBy) {
             return new Cause(CauseKind.WEATHER_STATION, pos.immutable(), tunedBy, "");
+        }
+
+        /** A Radar Dish seeing something (v0.65.0): where it is, who tuned it, and what it saw first (a description id). */
+        public static Cause radar(BlockPos pos, @Nullable UUID tunedBy, String saw) {
+            return new Cause(CauseKind.RADAR, pos.immutable(), tunedBy, "", saw == null ? "" : saw);
         }
 
         /** A Radio Jukebox playing {@code song} (v0.60.0): where it is and who tuned it. */

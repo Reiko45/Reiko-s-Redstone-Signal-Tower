@@ -1,4 +1,4 @@
-"""Draws the 16x16 textures for Reiko's Redstone Signal Tower.
+"""Draws the 16x16 block textures for Reiko's Redstone Signal Tower (the items' textures come from make_item_models.py).
 
 Usage: python3 tools/make_textures.py
 Writes into src/main/resources/assets/reikos_signal_tower/textures/. Needs Pillow (pip install pillow).
@@ -531,56 +531,6 @@ def lamp_glass():
     return img
 
 
-def antenna_item(tier):
-    """An antenna upgrade (v0.45.0): a rod with a dipole crossbar and a red tip, in the tier's metal."""
-    metal = {"iron": [(110, 110, 110, 255), (200, 200, 200, 255), (240, 240, 240, 255)],
-             "gold": [(150, 100, 10, 255), (240, 190, 40, 255), (255, 240, 140, 255)],
-             "diamond": [(20, 120, 120, 255), (80, 220, 210, 255), (200, 255, 250, 255)],
-             "netherite": [(40, 30, 32, 255), (90, 76, 78, 255), (140, 124, 126, 255)],
-             "ender": [(40, 14, 70, 255), (120, 50, 190, 255), (90, 230, 200, 255)]}[tier]
-    img = blank()
-    px = img.load()
-    for y in range(4, 15):           # the rod
-        px[7, y] = metal[1]
-        px[8, y] = metal[0]
-    for x in range(3, 13):           # the dipole
-        px[x, 8] = metal[1]
-        px[x, 9] = metal[0]
-    for x in (3, 12):
-        px[x, 7] = metal[2]
-    for (x, y) in [(6, 14), (7, 14), (8, 14), (9, 14), (6, 15), (9, 15)]:   # the foot
-        px[x, y] = metal[0]
-    for (x, y) in [(7, 2), (8, 2), (7, 3), (8, 3)]:   # the red tip
-        px[x, y] = ON[1]
-    px[7, 2] = ON[2]
-    px[7, 5] = metal[2]
-    return img
-
-
-def dish_item():
-    """The Dish Antenna (v0.48.0): a round light-grey dish on a short arm, with a feed horn in front."""
-    import math
-    img = blank()
-    px = img.load()
-    dark, mid, light, shine = (90, 94, 100, 255), (170, 174, 180, 255), (215, 218, 222, 255), (245, 246, 248, 255)
-    for y in range(16):
-        for x in range(16):
-            d = math.hypot(x - 6.5, y - 6.5)
-            if d <= 5.6:
-                px[x, y] = dark if d > 4.8 else (light if (x + y) < 12 else mid)
-    px[4, 4] = shine
-    px[5, 4] = shine
-    px[4, 5] = shine
-    for i in range(3):                 # the feed arm and horn, out of the middle toward the corner
-        px[7 + i, 7 + i] = dark
-    px[10, 10] = ON[1]
-    px[11, 10] = ON[1]
-    px[10, 11] = ON[2]
-    for (x, y) in [(6, 12), (6, 13), (5, 14), (6, 14), (7, 14), (4, 15), (5, 15), (6, 15), (7, 15), (8, 15)]:   # the stand
-        px[x, y] = dark
-    return img
-
-
 def battery_side(bars):
     """The Radio Battery's side (v0.49.0): a steel cell with a window of four bars, lit from the bottom up."""
     img = casing(4900 + bars, rivets=True)
@@ -747,30 +697,6 @@ def rotator_top():
     """Its top: an arrow towards the front."""
     img = casing(5202, rivets=False)
     _arrow(img.load(), 4)
-    return img
-
-
-def coverage_map_item():
-    """The Coverage Map (v0.49.0): a paper map with coverage rings in green, yellow and red around a tower dot."""
-    import math
-    img = blank()
-    px = img.load()
-    paper, edge = (222, 210, 170, 255), (150, 128, 84, 255)
-    for y in range(1, 15):
-        for x in range(1, 15):
-            px[x, y] = edge if x in (1, 14) or y in (1, 14) else paper
-    for y in range(2, 14):
-        for x in range(2, 14):
-            d = math.hypot(x - 6.5, y - 7.5)
-            if d < 2.2:
-                px[x, y] = (40, 200, 70, 255)
-            elif d < 4.0:
-                px[x, y] = (120, 210, 60, 255)
-            elif d < 5.4:
-                px[x, y] = (230, 200, 40, 255)
-            elif d < 6.4:
-                px[x, y] = (220, 90, 40, 255)
-    px[6, 7] = px[7, 7] = px[6, 8] = px[7, 8] = (150, 20, 20, 255)
     return img
 
 
@@ -961,71 +887,6 @@ def antenna_tip(lit, amber=False, teal=False, magenta=False):
     return img
 
 
-def tuner_item():
-    """A handheld radio with a stubby antenna, green display and a red tuning knob."""
-    img = blank()
-    px = img.load()
-    body_o, body, body_l = (30, 32, 38, 255), (70, 74, 84, 255), (104, 110, 122, 255)
-    # Antenna
-    for y in range(0, 5):
-        px[4, y] = (150, 156, 168, 255)
-        px[5, y] = (90, 94, 104, 255)
-    px[4, 0] = px[5, 0] = (220, 50, 40, 255)
-    # Body outline and fill
-    for y in range(4, 16):
-        for x in range(3, 13):
-            edge = x in (3, 12) or y in (4, 15)
-            px[x, y] = body_o if edge else body
-    for y in range(5, 15):
-        px[4, y] = body_l
-    for x in range(4, 12):
-        px[x, 5] = body_l
-    # Display
-    for y in range(6, 10):
-        for x in range(5, 12):
-            px[x, y] = (40, 70, 44, 255) if y in (6, 9) or x in (5, 11) else (120, 220, 110, 255)
-    for x in (6, 8, 10):
-        px[x, 8] = (40, 110, 44, 255)
-    # Speaker grille and tuning knob
-    for x in (5, 7):
-        px[x, 11] = body_o
-        px[x, 13] = body_o
-    for (x, y) in [(9, 11), (10, 11), (9, 12), (10, 12)]:
-        px[x, y] = (210, 40, 30, 255)
-    px[9, 11] = (255, 130, 110, 255)
-    px[10, 13] = (40, 42, 48, 255)
-    return img
-
-
-def walkie_item():
-    """v0.64.0: a Walkie-Talkie: a tall yellow handset with a black aerial, a small screen, a speaker
-    grille, a red LED and a push-to-talk button on its side."""
-    img = blank()
-    px = img.load()
-    outline, body, light, shade = (40, 34, 20, 255), (226, 176, 36, 255), (250, 212, 90, 255), (180, 134, 24, 255)
-    for y in range(0, 5):  # the aerial
-        px[9, y] = (34, 34, 38, 255)
-        px[10, y] = (60, 60, 66, 255)
-    px[9, 0] = px[10, 0] = (90, 90, 98, 255)
-    for y in range(4, 16):
-        for x in range(4, 12):
-            edge = x in (4, 11) or y in (4, 15)
-            px[x, y] = outline if edge else body
-    for y in range(5, 15):
-        px[5, y] = light
-        px[10, y] = shade
-    for x in range(6, 10):  # the screen
-        for y in (6, 7):
-            px[x, y] = (40, 60, 44, 255) if x in (6, 9) else (120, 210, 120, 255)
-    px[6, 5] = (230, 40, 30, 255)  # the LED
-    for y in (10, 12, 14):  # the speaker grille
-        for x in range(6, 10):
-            px[x, y] = (60, 48, 24, 255)
-    for y in (7, 8, 9):  # push to talk
-        px[3, y] = (34, 34, 38, 255)
-    return img
-
-
 def compact_receiver(lit):
     """Button-sized receiver. The model reads the front from uv 5..11 x 6..10 and the edges from
     rows 14-15, the same layout as vanilla button textures."""
@@ -1134,27 +995,6 @@ def motion_sensor(lit):
     return img
 
 
-def wall_redstone_item():
-    """A strip of wall with redstone dust running up it and branching sideways."""
-    img = blank()
-    px = img.load()
-    stone_l, stone, stone_d = (150, 150, 150, 255), (120, 120, 120, 255), (90, 90, 90, 255)
-    for y in range(1, 15):
-        for x in range(2, 6):
-            px[x, y] = stone if (x + y) % 3 else stone_l
-        px[5, y] = stone_d
-    dust = [(170, 12, 8, 255), (230, 30, 20, 255), (255, 90, 70, 255)]
-    for y in range(2, 14):
-        px[9, y] = dust[1]
-        px[10, y] = dust[0]
-    for x in range(7, 14):
-        px[x, 7] = dust[1]
-        px[x, 8] = dust[0]
-    px[9, 2] = px[12, 7] = dust[2]
-    px[9, 7] = px[10, 7] = dust[2]
-    return img
-
-
 LIGHTS = {
     "idle": ((34, 52, 38, 255), (50, 74, 54, 255)),       # unlit
     "heard": ((70, 210, 70, 255), (190, 255, 170, 255)),  # green: a receiver heard the press
@@ -1162,198 +1002,7 @@ LIGHTS = {
 }
 
 
-def remote_item(light="idle"):
-    """A garage-door style remote: dark fob, one big red button, a status light and a key ring."""
-    img = blank()
-    px = img.load()
-    o, body, body_l = (26, 28, 34, 255), (58, 62, 72, 255), (92, 98, 112, 255)
-    # Key ring loop at the top
-    for (x, y) in [(7, 0), (8, 0), (6, 1), (9, 1), (6, 2), (9, 2)]:
-        px[x, y] = (170, 176, 188, 255)
-    # Body with rounded corners
-    for y in range(3, 16):
-        for x in range(4, 12):
-            corner = (y in (3, 15)) and x in (4, 11)
-            if corner:
-                continue
-            edge = x in (4, 11) or y in (3, 15)
-            px[x, y] = o if edge else body
-    for y in range(4, 15):
-        px[5, y] = body_l
-    for x in range(5, 11):
-        px[x, 4] = body_l
-    # Status light (2x2, top right)
-    base, shine = LIGHTS[light]
-    for (x, y) in [(9, 4), (10, 4), (9, 5), (10, 5)]:
-        px[x, y] = base
-    px[9, 4] = shine
-    # Big round red button
-    red_d, red, red_l = (140, 18, 14, 255), (220, 36, 26, 255), (255, 120, 100, 255)
-    for (x, y) in [(7, 6), (8, 6), (6, 7), (7, 7), (8, 7), (9, 7), (6, 8), (7, 8), (8, 8), (9, 8), (7, 9), (8, 9)]:
-        px[x, y] = red
-    px[7, 7] = red_l
-    px[7, 6] = red_l
-    px[9, 8] = red_d
-    px[8, 9] = red_d
-    # Two small grey buttons
-    for (x, y) in [(6, 12), (7, 12), (9, 12), (10, 12)]:
-        px[x, y] = (140, 146, 158, 255)
-    for (x, y) in [(6, 13), (7, 13), (9, 13), (10, 13)]:
-        px[x, y] = (90, 94, 104, 255)
-    return img
-
-
 MULTI_BUTTONS = [(6, 7), (9, 7), (6, 10), (9, 10)]  # top-left pixel of each 2x2 button
-
-
-def multi_remote_item(light="idle"):
-    """Like the remote, but with room for four buttons in a 2x2 grid. The buttons themselves are
-    separate layers (see multi_remote_button) so the game can color each one."""
-    img = remote_item(light)
-    px = img.load()
-    body, socket = (58, 62, 72, 255), (36, 38, 46, 255)
-    for y in range(6, 14):
-        for x in range(6, 11):
-            px[x, y] = body
-    # A dark socket under each button, showing at its bottom-right edge
-    for (x, y) in MULTI_BUTTONS:
-        for (dx, dy) in [(2, 1), (1, 2), (2, 2)]:
-            px[x + dx, y + dy] = socket
-    return img
-
-
-def multi_remote_button(index):
-    """Button `index` (1-4) in white and greys: the game multiplies it by the button's dye color,
-    so the top-left pixel shows the full color and the rest is shaded a little darker."""
-    img = blank()
-    px = img.load()
-    x, y = MULTI_BUTTONS[index - 1]
-    shades = {(0, 0): 255, (1, 0): 225, (0, 1): 225, (1, 1): 180}
-    for (dx, dy), v in shades.items():
-        px[x + dx, y + dy] = (v, v, v, 255)
-    return img
-
-
-def pager_item(on=False):
-    """A pocket pager: black body, a stubby antenna, a belt-clip ridge, a small LCD (lit green with
-    a message while its frequency is on) and three keys."""
-    img = blank()
-    px = img.load()
-    o, body, body_l = (20, 22, 26, 255), (44, 47, 54, 255), (74, 79, 90, 255)
-    # Antenna stub, top left
-    for y in (2, 3, 4):
-        px[3, y] = (110, 114, 124, 255)
-    px[3, 2] = (150, 154, 164, 255)
-    # Body with rounded corners
-    for y in range(5, 14):
-        for x in range(2, 14):
-            if (y in (5, 13)) and x in (2, 13):
-                continue
-            px[x, y] = o if (x in (2, 13) or y in (5, 13)) else body
-    for x in range(3, 13):
-        px[x, 6] = body_l
-    # LCD, 8x3
-    lcd_bg = (130, 225, 115, 255) if on else (46, 64, 48, 255)
-    lcd_px = (24, 60, 26, 255) if on else (40, 54, 42, 255)
-    for y in range(7, 10):
-        for x in range(4, 12):
-            px[x, y] = lcd_bg
-    if on:
-        # One short line of "text" across the middle of the screen
-        for x in (5, 6, 8, 9, 10):
-            px[x, 8] = lcd_px
-    # Status LED, right of the LCD
-    px[12, 7] = (255, 90, 60, 255) if on else (70, 40, 38, 255)
-    # Three keys
-    for x in (4, 5, 7, 8, 10, 11):
-        px[x, 11] = (150, 156, 168, 255)
-        px[x, 12] = (96, 100, 110, 255)
-    return img
-
-
-def scanner_item():
-    """A yellow handheld direction-finder: a round radar screen with a sweep line and blips, an
-    antenna with a red tip, and a grip."""
-    img = blank()
-    px = img.load()
-    o = (52, 38, 8, 255)
-    body, body_d, body_l = (226, 178, 40, 255), (178, 132, 22, 255), (248, 214, 96, 255)
-    grip, grip_l = (46, 48, 54, 255), (78, 82, 92, 255)
-    # Antenna, top right, with a red tip
-    for y in (1, 2, 3):
-        px[12, y] = (128, 132, 142, 255)
-    px[12, 0] = (230, 50, 40, 255)
-    # Grip
-    for y in range(11, 16):
-        for x in range(6, 10):
-            px[x, y] = o if x in (6, 9) or y == 15 else (grip_l if x == 7 else grip)
-    # Body
-    for y in range(3, 12):
-        for x in range(2, 14):
-            if (y in (3, 11)) and x in (2, 13):
-                continue
-            edge = x in (2, 13) or y in (3, 11)
-            px[x, y] = o if edge else (body_l if y == 4 else body_d if y == 10 else body)
-    # Round radar screen
-    screen, ring, sweep, blip = (18, 46, 26, 255), (40, 86, 48, 255), (110, 240, 120, 255), (200, 255, 190, 255)
-    cx, cy = 7.5, 6.5
-    for y in range(4, 10):
-        for x in range(4, 12):
-            d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
-            if d <= 3.2:
-                px[x, y] = ring if d > 2.4 else screen
-    for (x, y) in [(8, 6), (9, 5), (10, 4)]:
-        px[x, y] = sweep
-    px[5, 7] = blip
-    px[9, 8] = blip
-    px[7, 6] = (60, 160, 70, 255)
-    return img
-
-
-def meter_item(level=0):
-    """The Signal Meter (v0.40.0): a teal handheld with a white dial (a red-to-green scale) whose
-    needle swings right with the strength (level 0 resting at the left, 3 at full), a probe
-    antenna and two knobs."""
-    import math
-    img = blank()
-    px = img.load()
-    o = (16, 40, 44, 255)
-    body, body_d, body_l = (48, 140, 150, 255), (32, 104, 112, 255), (110, 200, 206, 255)
-    # Probe antenna, top left
-    for y in (0, 1, 2):
-        px[3, y] = (150, 154, 164, 255)
-    px[3, 0] = (230, 50, 40, 255)
-    # Body
-    for y in range(3, 15):
-        for x in range(2, 14):
-            if (y in (3, 14)) and x in (2, 13):
-                continue
-            edge = x in (2, 13) or y in (3, 14)
-            px[x, y] = o if edge else (body_l if y == 4 else body_d if y == 13 else body)
-    # Dial window: rows 5-10, columns 4-11
-    dial, dial_edge = (236, 236, 228, 255), (170, 170, 160, 255)
-    for y in range(5, 11):
-        for x in range(4, 12):
-            px[x, y] = dial_edge if y == 10 or x in (4, 11) else dial
-    # Scale along the top of the dial: red, yellow, green
-    for x, c in [(5, (210, 60, 50, 255)), (6, (220, 140, 50, 255)), (7, (220, 200, 60, 255)),
-                 (8, (170, 210, 60, 255)), (9, (90, 200, 70, 255)), (10, (40, 190, 80, 255))]:
-        px[x, 6] = c
-    # Needle from the pivot (bottom middle of the dial)
-    angle = math.radians([160, 125, 80, 30][level])
-    cx, cy = 7.5, 9.6
-    for step in range(1, 9):
-        t = step / 2.2
-        x = int(round(cx + math.cos(angle) * t - 0.5))
-        y = int(round(cy - math.sin(angle) * t))
-        if 5 <= x <= 10 and 6 <= y <= 9:
-            px[x, y] = (30, 30, 34, 255)
-    px[7, 9] = px[8, 9] = (60, 60, 66, 255)
-    # Two knobs
-    for x in (5, 10):
-        px[x, 12] = (210, 214, 220, 255)
-        px[x, 11] = (150, 154, 164, 255)
-    return img
 
 
 def scanner_arrow():
@@ -1383,34 +1032,6 @@ def scanner_arrow():
                 continue
             if any((x + dx, y + dy) in shape for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
                 px[x, y] = edge
-    return img
-
-
-def satellite_dish_item():
-    """The Satellite Dish (v0.61.0): a dish facing up at the sky on a stand, purple feed tip (the ender eye in it)."""
-    import math
-    img = blank()
-    px = img.load()
-    dark, mid, light, shine = (90, 94, 100, 255), (170, 174, 180, 255), (215, 218, 222, 255), (245, 246, 248, 255)
-    gold = (226, 180, 52, 255)
-    for y in range(16):
-        for x in range(16):
-            # an ellipse seen from the side and a bit above: a bowl opening upward
-            d = math.hypot((x - 7.5) / 6.6, (y - 6.0) / 3.6)
-            if d <= 1.0 and y >= 3:
-                px[x, y] = dark if d > 0.86 else (light if y < 6 else mid)
-    for (x, y) in [(4, 4), (5, 4), (6, 4)]:
-        px[x, y] = shine
-    for y in range(1, 6):              # the feed rod up from the middle
-        px[7, y] = dark
-    px[7, 0] = (150, 70, 200, 255)
-    px[8, 0] = (200, 120, 240, 255)
-    px[7, 1] = (120, 50, 170, 255)
-    for (x, y) in [(7, 10), (7, 11), (6, 12), (7, 12), (8, 12), (5, 13), (9, 13), (4, 14), (10, 14),
-                   (3, 15), (4, 15), (10, 15), (11, 15)]:   # a tripod
-        px[x, y] = dark
-    px[6, 10] = gold
-    px[8, 10] = gold
     return img
 
 
@@ -1520,6 +1141,117 @@ def ticker_book_pages():
     return img
 
 
+
+# v0.65.0: the Radar Dish and the Radar Screen
+GREEN_OFF = [(14, 52, 26, 255), (24, 84, 40, 255), (40, 120, 60, 255)]
+GREEN_ON = [(40, 170, 80, 255), (90, 240, 130, 255), (190, 255, 210, 255)]
+
+
+def radar_dish_side(lit):
+    """The cabinet's side (only rows 7-15 show, it's 9 pixels high): a round green scope with its sweep line
+    and a blip, a lamp that glows red while it sends, and vents."""
+    img = casing(31, rivets=False)
+    px = img.load()
+    for x in range(16):
+        px[x, 7] = O
+    for x in range(1, 15):
+        px[x, 8] = H
+    g = GREEN_ON if lit else GREEN_OFF
+    cx, cy = 6.0, 11.5
+    for y in range(9, 15):
+        for x in range(1, 12):
+            d = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
+            if d <= 2.4:
+                px[x, y] = (10, 30, 16, 255)
+            elif d <= 3.2:
+                px[x, y] = O
+    px[6, 11] = px[7, 10] = g[1]
+    px[8, 10] = g[2]
+    px[5, 12] = g[2]  # a blip
+    r = ON if lit else OFF
+    px[12, 10] = px[13, 10] = r[2] if lit else r[1]
+    px[12, 11] = px[13, 11] = r[1] if lit else r[0]
+    for x in range(11, 15):
+        px[x, 13] = O
+    return img
+
+
+def radar_dish_top():
+    """The turntable's footprint: a ring of bolts round a dark bearing."""
+    img = casing(32, rivets=False)
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x - 7.5, y - 7.5
+            d = (dx * dx + dy * dy) ** 0.5
+            if 5.2 <= d <= 6.2:
+                px[x, y] = O
+            elif d < 2.2:
+                px[x, y] = D
+    for (x, y) in [(7, 2), (12, 7), (8, 13), (3, 8), (4, 4), (11, 4), (11, 11), (4, 11)]:
+        px[x, y] = H
+    return img
+
+
+def radar_reflector():
+    """The dish's reflector: a light grey perforated mesh (dark holes on a grid), lighter in the middle."""
+    rnd = random.Random(33)
+    img = blank((176, 182, 190, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            base = 168 + int(14 * (1 - abs(x - 7.5) / 8)) + rnd.randint(-4, 4)
+            px[x, y] = (base, base + 4, base + 10, 255)
+            if x % 2 == 1 and y % 2 == 1:
+                px[x, y] = (96, 102, 112, 255)
+    for i in range(16):
+        px[i, 0] = px[i, 15] = (120, 126, 136, 255)
+    return img
+
+
+def radar_reflector_back():
+    """The reflector's back: dark ribs."""
+    img = blank((70, 74, 82, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            if x % 4 == 0 or y % 5 == 0:
+                px[x, y] = (46, 49, 56, 255)
+    return img
+
+
+def radar_screen_front(lit=False):
+    """The Radar Screen's face: a round black glass scope in a steel bezel (the picture is drawn on it).
+    {lit}: for the item, the scope already showing rings, a sweep and blips."""
+    img = casing(34, rivets=True)
+    px = img.load()
+    for y in range(1, 15):
+        for x in range(1, 15):
+            if 1 < x < 14 and 1 < y < 14:
+                px[x, y] = (20, 24, 22, 255)
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x - 7.5, y - 7.0
+            d = (dx * dx + dy * dy) ** 0.5
+            if 1 < x < 14 and 1 < y < 14 and d <= 5.9:
+                px[x, y] = (6, 18, 10, 255)
+                if lit:
+                    px[x, y] = (6, 32, 14, 255)
+                    if 5.0 <= d <= 5.9:
+                        px[x, y] = (50, 190, 90, 255)
+                    elif 2.6 <= d <= 3.3:
+                        px[x, y] = (24, 96, 46, 255)
+    if lit:
+        for (x, y) in [(8, 6), (9, 5), (10, 4), (11, 3)]:  # the sweep line, up and right
+            px[x, y] = (150, 255, 170, 255)
+        for (x, y) in [(9, 6), (10, 5), (10, 6), (11, 5)]:  # its trail
+            px[x, y] = (30, 110, 50, 255)
+        px[7, 7] = (180, 255, 190, 255)  # the dish in the middle
+        px[5, 4] = (255, 80, 60, 255)    # blips: hostile, peaceful, a player
+        px[10, 9] = (90, 220, 255, 255)
+        px[5, 9] = (255, 240, 140, 255)
+    return img
+
 blocks = {
     "ticker_tape": ticker_tape(),
     "ticker_book_cover": ticker_book_cover(),
@@ -1628,20 +1360,17 @@ blocks = {
     "launch_pad_side": launch_pad_side(),
     "satellite_panel": satellite_panel(),
     "satellite_foil": satellite_foil(),
+    "radar_dish_side": radar_dish_side(False),  # v0.65.0
+    "radar_dish_side_on": radar_dish_side(True),
+    "radar_dish_top": radar_dish_top(),
+    "radar_reflector": radar_reflector(),
+    "radar_reflector_back": radar_reflector_back(),
+    "radar_screen_front": radar_screen_front(),
+    "radar_screen_front_item": radar_screen_front(lit=True),
 }
-items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(), "remote_control": remote_item(),
-         "remote_control_heard": remote_item("heard"), "remote_control_missed": remote_item("missed"),
-         "multi_remote": multi_remote_item(),
-         "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
-         **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
-         "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
-         "walkie_talkie": walkie_item(),
-         "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
-         **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
-         "dish_antenna": dish_item(), "coverage_map": coverage_map_item(), "ender_antenna": antenna_item("ender"),
-         "satellite_dish": satellite_dish_item()}
+# v0.65.0: the items' textures are painted by tools/make_item_models.py (3D models), not here.
 
-for folder, textures in ((BLOCK, blocks), (ITEM, items)):
+for folder, textures in ((BLOCK, blocks),):
     folder.mkdir(parents=True, exist_ok=True)
     for name, img in textures.items():
         img.save(folder / f"{name}.png")
@@ -1729,4 +1458,4 @@ ZOMBIE_VILLAGER = ROOT / "entity" / "zombie_villager" / "profession"
 for folder in (VILLAGER, ZOMBIE_VILLAGER):
     folder.mkdir(parents=True, exist_ok=True)
     radio_operator().save(folder / "radio_operator.png")
-print(f"wrote {len(blocks)} block and {len(items)} item textures to {ROOT}")
+print(f"wrote {len(blocks)} block textures to {ROOT}")
