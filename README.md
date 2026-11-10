@@ -44,6 +44,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Drone** | A little quadcopter with a camera under its nose, on a frequency. Fly it with a Drone Controller and see through its camera; TV Monitors on its frequency show its picture. It can grab and drop an item, turn its frequency on wherever it is (Beacon) and repeat its frequency while it hovers (Relay). |
 | **Drone Controller** | A two-stick transmitter paired with one drone. Right-click to take control and again to let go; while you fly, a panel shows the battery, signal, height, how far away it is and what it carries. |
 | **Landing Pad** | A thin pad with an "H" on it. A drone sitting on it charges from a Radio Battery beside it (or a Solar Panel beside it, slowly, in daylight). |
+| **Security Console** | A wall panel that watches up to 8 zones, each a frequency. Armed, anything turning a zone on sounds the alarm: its alarm frequency goes on for 2 minutes, pagers and walkie-talkies get "ALARM: Vault (Rex)", and TV Monitors on the alarm frequency show the camera on that zone. A keypad or remote on its own frequency arms and disarms it. |
+| **Door Sensor** | A small sensor for beside a door, trapdoor, fence gate, barrel or chest. It turns its frequency on while that's open (and for a second after), naming whoever opened it. |
 | **Ticker Tape Printer** | A stock ticker under a glass dome. Tune it to a frequency and give it a Book and Quill: every message that reaches it is printed in the book, with the day and time and who sent it. A full book is signed as a logbook, and a hopper can take it away. |
 | **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
@@ -817,6 +819,22 @@ Since 0.67 a **Radio Drone** is a camera that flies.
 
 ![Alex's view of the deck: the drone "Scout" hovering over the grass with four Hay Bales hanging under it, and the 3 × 2 monitor wall behind it showing the drone's own picture; Dev's view through the drone's camera, the panel in the corner reading "Radio Drone "Scout"  Hovering", "Battery 76%", the signal bars, "Height 144, 11 blocks east", "Carrying Hay Bale ×4" and "B: view   G: grab / drop", the monitor wall in the picture showing the picture again; the wall up close, "CH 1 · Scout" over the deck with Alex as a figure, Jade "Channel 1 of 2: 6600", "Shows "Scout", a drone 12 blocks north", "Wall: 3 × 2"; the drone landed on a Landing Pad with a Radio Battery beside it, Jade "Frequency: 6600", "Battery: 53%" (going up) and "Landed"; its settings: the name Scout, "Beacon: ON", "Relay: ON", "Night vision: OFF", with "Frequency 6600 · Battery 100%"; and the drone hovering on its own over the oak, Jade "Hovering", "Beacon: its frequency is on within 16 blocks" and "Relay: repeating its frequency"](docs/images/drone.png)
 
+### Security System
+
+Since 0.68 a **Security Console** watches up to 8 zones, and a **Door Sensor** tells it when a door opens.
+
+- **Putting it up:** hang the console on a wall and tune it. Its own frequency is its **control frequency**: each time that turns on (a Code Keypad's right code, a remote) it arms or disarms. Right-click it with an empty hand for its screen; sneak + right-click for its status line.
+- **Zones:** each has a name, a frequency and a mode. Anything that turns a zone's frequency on where the console hangs trips it: a Door Sensor, a Motion Sensor, a Radar Dish, a transmitter on a tripwire. **Instant** zones sound the alarm at once while it's armed; **Delayed** zones start the entry delay first (fast beeps) so you can get to it and disarm; **Always** zones sound it even while it's disarmed (a vault, a panic button).
+- **Arming:** with the control frequency or the Arm button. You get the exit delay (5, 10, 20 or 30 seconds, beeping, higher in the last three) to leave. **Arm at night** arms it by itself at dusk and disarms it at dawn (unless someone armed it by hand).
+- **The alarm:** its alarm frequency goes on at full strength for 2 minutes, from the console like a remote held there (reaching as far as a walkie-talkie would there, and through towers), so Radio Speakers set to Siren wail and lamps on receivers light; the console sounds a siren too. Pagers, walkie-talkies, telegraphs and Status Boards on the alarm frequency get "ALARM: Front Door (Alex)": the zone, and who tripped it if it can tell. TV Monitors on the alarm frequency switch to the TV Camera on the tripped zone's frequency. It stays in alarm until someone disarms it, which turns everything off at once and sends "Alarm off: disarmed by Dev".
+- **Its face** shows its state (DISARMED, ARMING with the seconds left, ARMED, ENTRY, ALARM blinking red) and a light per zone, lit while that zone is on. The **Log** tab keeps the last 32 events, newest first, with the day and time and who; the frequency log shows the alarm as the console's, with the zone.
+- **Door Sensor:** put it on any block next to the door (or trapdoor, fence gate, barrel or chest), on the floor, a wall or the ceiling. While it's open, and a second after, it sends full strength over a compact transmitter's reach (16 blocks); the frequency log and the console name the player nearest it when it opened. Redstone around it does nothing.
+- **Private frequencies:** on a private control frequency only its members (and operators) can set the console up, arm or disarm it, or re-tune it. Its alarm can't go on someone else's private frequency.
+- **What it can't do:** a sensor's signal has to reach the console, so a sensor far away needs a repeater or tower on its frequency. Breaking an armed console doesn't stop the alarm: it sends 10 seconds on the alarm frequency and "ALARM: Security Console broken while armed".
+- **Picked up**, the console keeps its zones and settings. **Jade and WTHIT** show its state, zones (and how many are on), the alarm frequency and delay, and Arm at night; for a Door Sensor what it watches, whether it's open and who opened it.
+
+![Dev's view during the alarm: the Security Console blinking "ALARM" on the wall, Jade "ALARM: Front Door (Alex)", "Zones: 4 (1 heard now)", "Alarm on 6600, delay 10 s", "Arms at night", the lamp on a receiver beside it lit, and the 3 × 2 monitor wall showing "CH 1 · Deck East" with Alex standing in the open doorway; Alex under the doorway, Jade on the Door Sensor hanging over it "Frequency: 6610", "Oak Door: open", "Opened by Alex", his walkie-talkie "[6600] Security Console: ALARM: Front Door (Alex)" and the subtitles "TV changes channel", "Raid siren wails", "Security console beeps"; the console's Zones tab in alarm: Front Door 6610 Delayed (its light yellow, on now), Garden 6611 Instant, Vault 6612 Always, Garage 6613 Delayed; Dev's chat after disarming: his pager's "message on 6600 from Security Console: "ALARM: Front Door (Alex)"", "frequency 6600 is ON (strength 15)" and "Alarm off: disarmed by Dev", the console's face back to DISARMED; the Log tab: Arming (Dev), Armed, Entry: Front Door (Alex), ALARM: Front Door (Alex), Disarmed by Dev, Arming (night schedule), Armed, Disarmed by morning schedule; and the Settings tab: control frequency 6605, alarm frequency 6600, "Delay: 10 s", "Arm at night: ON", Arm and Disarm](docs/images/security.png)
+
 ### 3D item models
 
 Since 0.65 the handheld radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are small 3D models instead of flat pictures: the Frequency Tuner with its display, tuning dial and aerial; the Remote Control with its red button and the light that turns green or red after a press; the Multi-Button Remote with its four buttons in their own colors; the Radio Pager with its screen lighting up; the Signal Scanner's scope; the Signal Meter, whose needle swings with the strength; the yellow Walkie-Talkie with its rubber aerial; each antenna with its crossed dipoles (a loading coil on the gold one, diamond and netherite knobs, an ender tip); the Dish Antenna and Satellite Dish with round, stepped bowls; the Coverage Map rolled at both sides like a scroll; and Wall Redstone as dust running across a piece of wall. The Radar Dish and Radar Screen items show their dish and a lit scope. The radios are held upright, their face to you in first person and outwards in third person.
@@ -937,6 +955,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A soft ping with a ring | "Radar pings" | A Radar Screen when something new shows up on it (since 0.65) |
 | A click and a burst of TV snow | "TV changes channel" | A TV Monitor changes channel (since 0.66) |
 | A rotor's whine | "Drone buzzes" | A Radio Drone in the air, higher as it goes faster (since 0.67) |
+| A short beep | "Security console beeps" | A Security Console counting down its exit or entry delay, and when it's armed (since 0.68) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
@@ -1315,6 +1334,10 @@ P = Phantom Membrane, C = TV Camera, B = Radio Battery.
 
 **Landing Pad:** a Launch Pad and an Iron Trapdoor, in any arrangement in the crafting grid.
 
+**Security Console:** a Radio Status Board, a Code Keypad and a Redstone Lamp, in any arrangement in the crafting grid.
+
+**Door Sensor:** a Compact Radio Transmitter and a Tripwire Hook, in any arrangement in the crafting grid.
+
 **Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
@@ -1545,6 +1568,13 @@ src/main/java/com/reiko/signaltower/
   client/DroneBuzz.java                  the rotors' buzz, looped while it's in the air
   client/DroneScreen.java                the drone's settings
   network/DroneControlPayload.java, DroneInputPayload.java, DroneGrabPayload.java, DroneStatusPayload.java, OpenDronePayload.java, ConfigureDronePayload.java  flying and settings <-> server
+  blockentity/SecurityConsoleBlockEntity.java  the Security Console: zones, arming, the entry delay, the alarm and what it sends, the night schedule, its log
+  radio/SecuritySetup.java               its zones, alarm frequency and settings (data component)
+  block/SecurityConsoleBlock.java        the console on its wall (broken while armed: one last alarm)
+  block/RadioDoorSensorBlock.java, blockentity/DoorSensorBlockEntity.java  the Door Sensor: what's open next to it, and who opened it
+  client/SecurityConsoleScreen.java      the console's screen: Zones, Settings, Log
+  client/SecurityConsoleRenderer.java    its face: the state and a light per zone
+  network/OpenSecurityPayload.java, ConfigureSecurityPayload.java, SecurityCommandPayload.java  the console's screen <-> server
   network/WalkieTalkPayload.java         talk line -> server
   item/SignalScannerItem.java            handheld that lists every frequency heard where you stand, and tracks one
   item/ScannerTarget.java                the transmitter a scanner is tracking (data component), arrow angle
@@ -1840,8 +1870,13 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 212. grab and Beacon: a drone in the air holds itself up, grabs a stack under it (Jade says so), drops it again, finds nothing to grab; Jade's Beacon line in the air and landed; its Beacon turns its frequency on within 16 blocks of it and not 36 away, the log says the drone did it, and off it goes off;
 213. Relay: a drone hovering on its own repeats its frequency with the reach of its height, shows in the frequency audit and isn't saved with the towers; flown, it doesn't; let go, it does again; Relay off, it doesn't;
 214. a TV Monitor shows a drone on its frequency (its entity, where it is, its name; no camera is watched), clients get which drone, the status line and Jade say it's a drone; a camera nearer than the drone wins, then the drone again; a drone that's gone isn't shown.
+215. a Security Console: Dev's settings packet sets its zones (names trimmed and cut short, a frequency past the top brought down, unused rows empty), alarm frequency, delay and Arm at night; the item keeps them; clients get the setup and state but not the log or who tuned it; Jade and the status line; on Dev's private control frequency Rex can't set it, arm it or re-tune it, and Dev can't put its alarm on Rex's private frequency (the rest is still set); Dev arms it, not from 20 blocks away;
+216. arming and the alarm: Dev's remote on the control frequency starts arming, armed 5 seconds later; a Delayed zone (a sensor seeing Rex) starts the entry delay and Dev's remote disarms it in time, with no alarm; armed again, an Instant zone sounds the alarm at once: the alarm frequency is on near it and not far away, the frequency log names the zone and Rex, "ALARM: Hall (Rex)" goes out, and it stays on; Disarm turns it off at once and "Alarm off: disarmed by Dev" goes out; the console's log has all eight events;
+217. an Always zone sounds the alarm while disarmed; a TV Monitor on the alarm frequency shows the TV Camera on the zone's frequency during the alarm and nothing before or after; Jade in alarm;
+218. the Door Sensor on the floor by an oak door, a barrel and a chest: quiet while they're closed, and redstone does nothing; the door open, it sends, naming who's nearest (Rex) in the log and Jade; just closed, still on for a moment, then off; an open barrel; a chest someone has open;
+219. Arm at night: dusk arms it, dawn disarms it; armed by Dev, dawn leaves it armed; broken while armed, its alarm frequency goes on and "ALARM: Security Console broken while armed" goes out.
 
-All 214 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
+All 219 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
 
 ## License
 

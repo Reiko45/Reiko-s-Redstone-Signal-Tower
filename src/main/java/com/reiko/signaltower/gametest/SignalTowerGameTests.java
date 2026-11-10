@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 60, "All the mod's items: " + items.size());
+        check(items.size() == 62, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 16 && sounds.size() == 16, "Sixteen sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 17 && sounds.size() == 17, "Seventeen sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -11849,7 +11849,7 @@ public final class SignalTowerGameTests {
         double startY = drone.getY();
         double[] at = new double[3];
         int[] charge = new int[1];
-        com.reiko.signaltower.radio.DronePilots.resetForTests();
+        // (Not DronePilots.resetForTests(): other drone tests run alongside this one.)
         helper.startSequence()
                 .thenExecute(() -> {
                     Player nobody = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Nobody", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
@@ -11887,7 +11887,8 @@ public final class SignalTowerGameTests {
                     // Out of reach: lost.
                     dev.moveTo(dev.getX() + 3000, dev.getY(), dev.getZ());
                 })
-                .thenIdle(11)
+                // (Checked as soon as it's lost: within 10 ticks; a low drone can land, and stop being "lost", soon after.)
+                .thenWaitUntil(() -> check(drone.getPilot() == null, "Lost within 10 ticks: " + drone.getState()))
                 .thenExecute(() -> {
                     check(drone.getPilot() == null && drone.hasLostSignal() && com.reiko.signaltower.radio.DronePilots.droneOf(dev) == null
                             && lastKey(devBar).endsWith("drone_lost"), "Too far: lost: " + lastKey(devBar));
@@ -12044,7 +12045,7 @@ public final class SignalTowerGameTests {
         UUID devId = UUID.randomUUID();
         Player dev = namedPlayer(helper, new BlockPos(2, 1, 1), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
         dev.setItemInHand(InteractionHand.MAIN_HAND, pairedController(drone));
-        com.reiko.signaltower.radio.DronePilots.resetForTests();
+        // (Not DronePilots.resetForTests(): other drone tests run alongside this one.)
         BlockPos[] at = new BlockPos[1];
         helper.startSequence()
                 .thenIdle(22)
@@ -12132,6 +12133,374 @@ public final class SignalTowerGameTests {
                     camera.publish(level);
                     monitor.update(level);
                     check(!monitor.isShowing() && monitor.droneId() == -1, "Gone: nothing");
+                })
+                .thenSucceed();
+    }
+
+    // ---- v0.68.0: the Security System ----
+
+    private static com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity placeConsole(GameTestHelper helper, BlockPos at, int control, UUID tunedBy) {
+        helper.setBlock(at.south(), Blocks.STONE);
+        helper.setBlock(at, ModRegistry.SECURITY_CONSOLE.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.SecurityConsoleBlock.FACING, Direction.NORTH));
+        com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity console = helper.getBlockEntity(at);
+        console.setTunedBy(tunedBy);
+        console.setFrequency(control);
+        return console;
+    }
+
+    private static com.reiko.signaltower.radio.SecuritySetup securitySetup(int alarm, int flags, Object... zones) {
+        List<String> names = new java.util.ArrayList<>();
+        List<Integer> frequencies = new java.util.ArrayList<>();
+        List<Integer> modes = new java.util.ArrayList<>();
+        for (int i = 0; i + 2 < zones.length + 1 && i < zones.length; i += 3) {
+            names.add((String) zones[i]);
+            frequencies.add((Integer) zones[i + 1]);
+            modes.add(((com.reiko.signaltower.radio.SecuritySetup.Mode) zones[i + 2]).ordinal());
+        }
+        return new com.reiko.signaltower.radio.SecuritySetup(names, frequencies, modes, alarm, flags).normalized();
+    }
+
+    private static List<String> securityEvents(com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity console) {
+        return console.getLog().stream().map(e -> e.event().key() + (e.zone() >= 0 ? ":" + e.zone() : "") + (e.who().isEmpty() ? "" : "/" + e.who())).toList();
+    }
+
+    /**
+     * A Security Console (control 4665): Dev's settings packet sets its zones (names trimmed and cut
+     * short, a frequency past the top brought down, unset rows empty), alarm frequency, delay and
+     * schedule; the item keeps them; clients get the setup and state but not the log or who tuned
+     * it. Jade and the status line. On Dev's private 4665 Rex can't set it, arm it or re-tune it;
+     * Dev can't put its alarm on Rex's private 4676 (the rest is still set); Dev arms it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void securityConsoleSetup(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> rexBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(4, 0, 1), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(6, 0, 1), rexId, "Rex", false, rexBar, new java.util.ArrayList<>());
+        BlockPos at = new BlockPos(5, 1, 1);
+        var console = placeConsole(helper, at, 4665, devId);
+        BlockPos abs = helper.absolutePos(at);
+        var Mode = com.reiko.signaltower.radio.SecuritySetup.Mode.class;
+        try {
+            var wanted = securitySetup(4677, 2 | com.reiko.signaltower.radio.SecuritySetup.NIGHT,
+                    "  Front Door  ", 4678, com.reiko.signaltower.radio.SecuritySetup.Mode.DELAYED,
+                    "A very long zone name indeed", 1_500_000_000, com.reiko.signaltower.radio.SecuritySetup.Mode.ALWAYS);
+            Component set = com.reiko.signaltower.network.ConfigureSecurityPayload.apply(dev, new com.reiko.signaltower.network.ConfigureSecurityPayload(abs, wanted));
+            var setup = console.getSetup();
+            check(set != null && keyOf(set).endsWith("security_set") && setup.name(0).equals("Front Door") && setup.frequency(0) == 4678
+                    && setup.mode(0) == com.reiko.signaltower.radio.SecuritySetup.Mode.DELAYED && setup.name(1).equals("A very long zone")
+                    && setup.frequency(1) == com.reiko.signaltower.radio.Frequency.MAX && setup.mode(1) == com.reiko.signaltower.radio.SecuritySetup.Mode.ALWAYS
+                    && setup.frequency(2) == 0 && setup.name(7).isEmpty() && setup.alarmFrequency() == 4677 && setup.delaySeconds() == 20
+                    && setup.night() && setup.zonesInUse() == 2, "Set: " + setup);
+            ItemStack item = new ItemStack(ModRegistry.SECURITY_CONSOLE_ITEM.get());
+            item.applyComponents(console.collectComponents());
+            check(setup.equals(item.get(ModRegistry.SECURITY_SETUP.get())) && Integer.valueOf(4665).equals(item.get(ModRegistry.FREQUENCY.get())),
+                    "The item keeps it");
+            CompoundTag update = console.getUpdateTag(level.registryAccess());
+            var client = new com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity(abs, helper.getBlockState(at));
+            client.loadWithComponents(update, level.registryAccess());
+            check(client.getSetup().equals(setup) && client.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED
+                    && client.getTunedBy() == null && !update.contains("security_log") && client.getFrequency() == 4665, "Clients get the setup, not the log or tuner");
+            List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at),
+                    com.reiko.signaltower.compat.RadioInfo.read(level, abs, dev)));
+            check(jade.equals(List.of("frequency", "security_state_disarmed", "security_zones", "security_alarm", "security_night")), "Jade: " + jade);
+            check(keyOf(ModRegistry.SECURITY_CONSOLE.get().describe(level, abs, helper.getBlockState(at))).endsWith("security_status"), "Status line");
+
+            // Private.
+            claims.put(4665, devId, "Dev", java.util.Map.of());
+            claims.put(4676, rexId, "Rex", java.util.Map.of());
+            SignalNetwork.get(level).invalidate(4665);
+            Component refused = com.reiko.signaltower.network.ConfigureSecurityPayload.apply(rex,
+                    new com.reiko.signaltower.network.ConfigureSecurityPayload(abs, com.reiko.signaltower.radio.SecuritySetup.EMPTY));
+            check(refused != null && keyOf(refused).endsWith("private_refused_security") && console.getSetup().equals(setup), "Rex can't set it");
+            Component noArm = com.reiko.signaltower.network.SecurityCommandPayload.apply(rex,
+                    new com.reiko.signaltower.network.SecurityCommandPayload(abs, com.reiko.signaltower.network.SecurityCommandPayload.ARM));
+            check(noArm != null && keyOf(noArm).endsWith("private_refused_security")
+                    && console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED, "Nor arm it");
+            ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+            FrequencyTunerItem.setFrequency(tuner, 31);
+            rex.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+            tuner.useOn(new UseOnContext(rex, InteractionHand.MAIN_HAND, new BlockHitResult(Vec3.atCenterOf(abs), Direction.NORTH, abs, false)));
+            check(console.getFrequency() == 4665 && lastKey(rexBar).endsWith("private_refused_security"), "Nor re-tune it: " + lastKey(rexBar));
+            var onRex = new com.reiko.signaltower.radio.SecuritySetup(setup.names(), setup.frequencies(), setup.modes(), 4676, setup.flags());
+            Component partly = com.reiko.signaltower.network.ConfigureSecurityPayload.apply(dev, new com.reiko.signaltower.network.ConfigureSecurityPayload(abs,
+                    new com.reiko.signaltower.radio.SecuritySetup(List.of("Gate"), List.of(4679), List.of(0), 4676, 0)));
+            check(partly != null && keyOf(partly).endsWith("private_refused_block") && console.getSetup().alarmFrequency() == 4677
+                    && console.getSetup().name(0).equals("Gate") && console.getSetup().delaySeconds() == 5, "Not on Rex's private frequency (the rest is set)");
+            Component armed = com.reiko.signaltower.network.SecurityCommandPayload.apply(dev,
+                    new com.reiko.signaltower.network.SecurityCommandPayload(abs, com.reiko.signaltower.network.SecurityCommandPayload.ARM));
+            check(armed != null && keyOf(armed).endsWith("security_arming")
+                    && console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMING
+                    && securityEvents(console).equals(List.of("arming/Dev")), "Dev arms it: " + securityEvents(console));
+            dev.moveTo(dev.getX() + 20, dev.getY(), dev.getZ());
+            check(com.reiko.signaltower.network.SecurityCommandPayload.apply(dev,
+                    new com.reiko.signaltower.network.SecurityCommandPayload(abs, com.reiko.signaltower.network.SecurityCommandPayload.DISARM)) == null,
+                    "Not from 20 blocks away");
+        } finally {
+            claims.remove(4665);
+            claims.remove(4676);
+            SignalNetwork.get(level).invalidate(4665);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Arming and the alarm (control 4666, alarm 4667, "Hall" 4668 Instant, "Front Door" 4669
+     * Delayed, delay 5 s): Dev's remote on 4666 starts arming, and 5 s later it's armed. The front
+     * door (a sensor seeing Rex) starts the entry delay; Dev's remote disarms it in time: no alarm.
+     * Armed again with the Arm button, the hall trips the alarm at once: 4667 is on near it (not far
+     * away), the log names the hall and Rex, and "ALARM: Hall (Rex)" goes out; Disarm turns it off at
+     * once, and "Alarm off: disarmed by Dev" goes out. The console's log has it all.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 600)
+    public static void securityArmAndAlarm(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        Player dev = namedPlayer(helper, new BlockPos(4, 0, 1), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos at = new BlockPos(5, 1, 1);
+        var console = placeConsole(helper, at, 4666, devId);
+        BlockPos abs = helper.absolutePos(at);
+        console.setSetup(securitySetup(4667, 0, "Hall", 4668, com.reiko.signaltower.radio.SecuritySetup.Mode.INSTANT,
+                "Front Door", 4669, com.reiko.signaltower.radio.SecuritySetup.Mode.DELAYED));
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos near = abs.east(6);
+        BlockPos far = abs.east(400);
+        var State = com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.class;
+        Runnable devPress = () -> network.pulse(4666, SignalNetwork.ownCoverage(abs, 10), level.getGameTime() + 6,
+                SignalNetwork.Cause.remote(false, devId, "Dev"));
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(devPress)
+                .thenIdle(2)
+                .thenExecute(() -> check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMING,
+                        "Dev's remote: arming: " + console.getState()))
+                .thenIdle(102)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMED, "5 s later: armed: " + console.getState());
+                    network.pulse(4669, SignalNetwork.ownCoverage(abs, 10), level.getGameTime() + 6,
+                            SignalNetwork.Cause.sensor(abs.west(3), rexId, "Rex"));
+                })
+                .thenIdle(2)
+                .thenExecute(() -> check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ENTRY
+                        && console.getAlarmZone() == 1, "The front door: the entry delay: " + console.getState()))
+                .thenIdle(30)
+                .thenExecute(devPress)
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED, "Disarmed in time");
+                    check(network.listen(level, 4667, near).power() == 0 && network.messagesAt(4667, near).isEmpty(), "No alarm");
+                    com.reiko.signaltower.network.SecurityCommandPayload.apply(dev,
+                            new com.reiko.signaltower.network.SecurityCommandPayload(abs, com.reiko.signaltower.network.SecurityCommandPayload.ARM));
+                })
+                .thenIdle(105)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMED, "Armed again");
+                    network.pulse(4668, SignalNetwork.ownCoverage(abs, 10), level.getGameTime() + 6,
+                            SignalNetwork.Cause.sensor(abs.west(4), rexId, "Rex"));
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ALARM && console.getAlarmZone() == 0,
+                            "The hall: the alarm at once: " + console.getState());
+                    check(network.listen(level, 4667, near).power() == 15 && network.listen(level, 4667, far).power() == 0, "4667 on near it, not far away");
+                    var history = network.history(4667);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.SECURITY
+                            && history.get(history.size() - 1).cause().detail().equals("Hall (Rex)"), "The log: " + history);
+                    var messages = network.messagesAt(4667, near);
+                    check(!messages.isEmpty() && messages.get(messages.size() - 1).text().equals("ALARM: Hall (Rex)"), "The message: " + messages);
+                    check(keyOf(console.stateText(level.getGameTime())).endsWith("security_state_alarm"), "Its status");
+                })
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(network.listen(level, 4667, near).power() == 15, "Still on (it keeps it on)");
+                    com.reiko.signaltower.network.SecurityCommandPayload.apply(dev,
+                            new com.reiko.signaltower.network.SecurityCommandPayload(abs, com.reiko.signaltower.network.SecurityCommandPayload.DISARM));
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED
+                            && network.listen(level, 4667, near).power() == 0, "Disarmed: off at once");
+                    var messages = network.messagesAt(4667, near);
+                    check(messages.get(messages.size() - 1).text().equals("Alarm off: disarmed by Dev"), "And says so: " + messages);
+                    check(securityEvents(console).equals(List.of("arming/Dev", "armed", "entry:1/Rex", "disarmed/Dev", "arming/Dev", "armed",
+                            "alarm:0/Rex", "disarmed/Dev")), "Its log: " + securityEvents(console));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * An Always zone ("Vault" 4672) sounds the alarm while disarmed. A TV Monitor on the alarm
+     * frequency (4671) shows nothing before; during the alarm it shows the TV Camera on the vault's
+     * frequency; disarmed, nothing again. Jade on the console in alarm.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void securityAlwaysZoneAndFeed(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        Player dev = namedPlayer(helper, new BlockPos(4, 0, 1), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos at = new BlockPos(5, 1, 1);
+        var console = placeConsole(helper, at, 4670, devId);
+        BlockPos abs = helper.absolutePos(at);
+        console.setSetup(securitySetup(4671, 0, "Vault", 4672, com.reiko.signaltower.radio.SecuritySetup.Mode.ALWAYS));
+        BlockPos monitorAt = new BlockPos(12, 1, 1);
+        helper.setBlock(monitorAt.south(), Blocks.STONE);
+        helper.setBlock(monitorAt, ModRegistry.TV_MONITOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.TvMonitorBlock.FACING, Direction.NORTH));
+        com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor = helper.getBlockEntity(monitorAt);
+        monitor.setTunedBy(devId);
+        monitor.setFrequency(4671);
+        BlockPos cameraAt = new BlockPos(8, 0, 1);
+        helper.setBlock(cameraAt, ModRegistry.TV_CAMERA.get().defaultBlockState());
+        com.reiko.signaltower.blockentity.TvCameraBlockEntity camera = helper.getBlockEntity(cameraAt);
+        camera.setTunedBy(devId);
+        camera.setFrequency(4672);
+        camera.setName("Vault Cam");
+        SignalNetwork network = SignalNetwork.get(level);
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    camera.publish(level);
+                    monitor.update(level);
+                    check(!monitor.isShowing(), "No camera on the alarm frequency");
+                    network.pulse(4672, SignalNetwork.ownCoverage(abs, 10), level.getGameTime() + 6);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ALARM && console.getAlarmZone() == 0,
+                            "The vault, disarmed: the alarm: " + console.getState());
+                    monitor.update(level);
+                    check(monitor.isShowing() && monitor.cameraName().equals("Vault Cam") && monitor.cameraPos().equals(helper.absolutePos(cameraAt)),
+                            "The monitor shows the vault's camera");
+                    List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, abs, dev)));
+                    check(jade.equals(List.of("frequency", "security_state_alarm", "security_zones_open", "security_alarm")), "Jade (the vault still open): " + jade);
+                    console.disarm(level, "Dev");
+                    monitor.update(level);
+                    check(!monitor.isShowing(), "Disarmed: nothing again");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * The Door Sensor (4673) on the floor by an oak door, a barrel and a chest: it sends while the
+     * door is open (naming who's nearest, Rex) and for a second after it closes; the barrel too; a
+     * chest someone has open counts as open. Jade and the status line; redstone does nothing.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void doorSensor(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID rexId = UUID.randomUUID();
+        Player rex = namedPlayer(helper, new BlockPos(4, 0, 3), rexId, "Rex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        BlockPos doorAt = new BlockPos(3, 0, 1);
+        BlockState door = Blocks.OAK_DOOR.defaultBlockState();
+        helper.setBlock(doorAt, door.setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER));
+        helper.setBlock(doorAt.above(), door.setValue(net.minecraft.world.level.block.DoorBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
+        BlockPos sensorAt = new BlockPos(3, 0, 2);
+        helper.setBlock(sensorAt, ModRegistry.DOOR_SENSOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.CompactRadioTransmitterBlock.FACE, AttachFace.FLOOR));
+        helper.setBlock(sensorAt.east(), Blocks.BARREL);
+        helper.setBlock(sensorAt.west(), Blocks.CHEST);
+        com.reiko.signaltower.blockentity.DoorSensorBlockEntity sensor = helper.getBlockEntity(sensorAt);
+        sensor.setFrequency(4673);
+        BlockPos abs = helper.absolutePos(sensorAt);
+        SignalNetwork network = SignalNetwork.get(level);
+        java.util.function.Consumer<Boolean> setDoor = open -> {
+            helper.setBlock(doorAt, helper.getBlockState(doorAt).setValue(net.minecraft.world.level.block.DoorBlock.OPEN, open));
+            helper.setBlock(doorAt.above(), helper.getBlockState(doorAt.above()).setValue(net.minecraft.world.level.block.DoorBlock.OPEN, open));
+        };
+        helper.startSequence()
+                .thenIdle(6)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(sensorAt).canSurvive(level, abs), "It sits on the floor");
+                    check(!sensor.isSending() && network.listen(level, 4673, abs.north(4)).power() == 0, "Closed: quiet");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(sensorAt),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, abs, null))).equals(List.of("frequency", "door_closed", "sensor_idle", "reach")),
+                            "Jade: " + lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(sensorAt),
+                                    com.reiko.signaltower.compat.RadioInfo.read(level, abs, null))));
+                    helper.setBlock(sensorAt.south(), Blocks.REDSTONE_BLOCK);
+                })
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    check(!sensor.isSending(), "Redstone does nothing");
+                    helper.setBlock(sensorAt.south(), Blocks.AIR);
+                    setDoor.accept(true);
+                    sensor.look(level, level.getGameTime(), List.of(rex));
+                })
+                .thenIdle(5)
+                .thenExecute(() -> {
+                    check(sensor.isSending() && network.listen(level, 4673, abs.north(4)).power() == 15
+                            && helper.getBlockState(sensorAt).getValue(com.reiko.signaltower.block.RadioTransmitterBlock.POWERED), "Open: it sends");
+                    var history = network.history(4673);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.SENSOR
+                            && "Rex".equals(history.get(history.size() - 1).cause().name()), "Naming who opened it: " + history);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(sensorAt),
+                            com.reiko.signaltower.compat.RadioInfo.read(level, abs, null))).contains("door_opened_by"), "Jade: opened by Rex");
+                    check(keyOf(ModRegistry.DOOR_SENSOR.get().describe(level, abs, helper.getBlockState(sensorAt))).endsWith("door_sensor_status"), "Status line");
+                    setDoor.accept(false);
+                })
+                .thenIdle(8)
+                .thenExecute(() -> check(sensor.isSending(), "Just closed: still on for a moment"))
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(!sensor.isSending() && network.listen(level, 4673, abs.north(4)).power() == 0, "Then off");
+                    helper.setBlock(sensorAt.east(), helper.getBlockState(sensorAt.east()).setValue(net.minecraft.world.level.block.BarrelBlock.OPEN, true));
+                })
+                .thenIdle(6)
+                .thenExecute(() -> {
+                    check(sensor.isSending(), "An open barrel");
+                    helper.setBlock(sensorAt.east(), helper.getBlockState(sensorAt.east()).setValue(net.minecraft.world.level.block.BarrelBlock.OPEN, false));
+                    net.minecraft.world.level.block.entity.ChestBlockEntity chest = helper.getBlockEntity(sensorAt.west());
+                    check(!com.reiko.signaltower.blockentity.DoorSensorBlockEntity.isOpen(level, helper.absolutePos(sensorAt.west())), "A shut chest");
+                    chest.startOpen(rex);
+                    check(com.reiko.signaltower.blockentity.DoorSensorBlockEntity.isOpen(level, helper.absolutePos(sensorAt.west())), "A chest someone has open");
+                    chest.stopOpen(rex);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Arm at night (control 4674, alarm 4675): at dusk it arms itself (the night schedule), at dawn
+     * it disarms; armed by Dev at night, dawn leaves it armed. Broken while armed: one last alarm on
+     * 4675 and "ALARM: Security Console broken while armed".
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void securityNightAndTamper(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        BlockPos at = new BlockPos(5, 1, 1);
+        var console = placeConsole(helper, at, 4674, devId);
+        BlockPos abs = helper.absolutePos(at);
+        console.setSetup(securitySetup(4675, com.reiko.signaltower.radio.SecuritySetup.NIGHT, "Hall", 4680,
+                com.reiko.signaltower.radio.SecuritySetup.Mode.INSTANT));
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos near = abs.east(5);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    console.checkNight(level, 12000);
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED, "Day: disarmed");
+                    console.checkNight(level, 13500);
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMING
+                            && securityEvents(console).equals(List.of("arming/#night")), "Dusk: it arms itself: " + securityEvents(console));
+                    console.checkNight(level, 23500);
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.DISARMED
+                            && securityEvents(console).get(1).equals("disarmed/#morning"), "Dawn: disarmed: " + securityEvents(console));
+                    console.checkNight(level, 14000);
+                    console.disarm(level, "Dev");
+                    console.arm(level, "Dev");
+                    console.checkNight(level, 23500);
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMING, "Armed by Dev: dawn leaves it");
+                })
+                .thenIdle(105)
+                .thenExecute(() -> {
+                    check(console.getState() == com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.ARMED, "Armed");
+                    helper.setBlock(at, Blocks.AIR);
+                    check(network.listen(level, 4675, near).power() == 15, "Broken while armed: its alarm goes off");
+                    var messages = network.messagesAt(4675, near);
+                    check(!messages.isEmpty() && messages.get(messages.size() - 1).text().equals("ALARM: Security Console broken while armed"),
+                            "And says so: " + messages);
                 })
                 .thenSucceed();
     }

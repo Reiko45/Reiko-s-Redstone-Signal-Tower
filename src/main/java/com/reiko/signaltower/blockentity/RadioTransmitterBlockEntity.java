@@ -419,6 +419,10 @@ public class RadioTransmitterBlockEntity extends RadioBlockEntity {
             // v0.65.0: how many things it sees (at most 15) while Send is on; redstone does nothing.
             return level.getBlockEntity(pos) instanceof RadarDishBlockEntity dish ? dish.output() : 0;
         }
+        if (state.getBlock() instanceof com.reiko.signaltower.block.RadioDoorSensorBlock) {
+            // v0.68.0: full strength while a door (or chest ...) touching it is open.
+            return level.getBlockEntity(pos) instanceof DoorSensorBlockEntity sensor && sensor.isSending() ? 15 : 0;
+        }
         if (state.getBlock() instanceof RadioMotionSensorBlock) {
             return level.getBlockEntity(pos) instanceof MotionSensorBlockEntity sensor && sensor.isSensing() ? 15 : 0;
         }

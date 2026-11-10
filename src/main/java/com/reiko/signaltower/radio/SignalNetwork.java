@@ -423,24 +423,83 @@ public final class SignalNetwork extends SavedData {
      * drone. {@code cause} goes in the log (null while it's still on from before).
      */
     public void beacon(int frequency, @Nullable Coverage previous, Coverage area, long untilGameTime, @Nullable Cause cause) {
+        beacon(frequency, previous == null ? List.of() : List.of(previous), List.of(area), untilGameTime, cause);
+    }
+
+    /**
+     * {@link #beacon} with several areas (v0.68.0: a Security Console's alarm, which reaches like a
+     * walkie-talkie and through the towers in reach): {@code areas} replace {@code previous}.
+     */
+    public void beacon(int frequency, List<Coverage> previous, List<Coverage> area, long untilGameTime, @Nullable Cause cause) {
         RemoteSignal current = pulses.get(frequency);
         List<Coverage> areas = new ArrayList<>();
         long until = untilGameTime;
         if (current != null && current.expiresAtGameTime() > now) {
             areas.addAll(current.coverage());
             until = Math.max(until, current.expiresAtGameTime());
-            if (previous != null && !previous.equals(area)) {
-                areas.remove(previous);
+            for (Coverage old : previous) {
+                if (!area.contains(old)) {
+                    areas.remove(old);
+                }
             }
         }
-        if (!areas.contains(area)) {
-            areas.add(area);
+        for (Coverage one : area) {
+            if (!areas.contains(one)) {
+                areas.add(one);
+            }
         }
         pulses.put(frequency, new RemoteSignal(areas, until));
         if (cause != null) {
-            recordTurnOn(frequency, List.of(area), cause);
+            recordTurnOn(frequency, area, cause);
         }
         bump(frequency);
+    }
+
+    /**
+     * Takes {@code areas} out of {@code frequency}'s pulse at once (v0.68.0: an alarm disarmed), so it
+     * goes off now rather than when the pulse runs out. Other areas in it stay.
+     */
+    public void endBeacon(int frequency, List<Coverage> areas) {
+        RemoteSignal current = pulses.get(frequency);
+        if (current == null || areas.isEmpty()) {
+            return;
+        }
+        List<Coverage> left = new ArrayList<>(current.coverage());
+        left.removeAll(areas);
+        if (left.isEmpty()) {
+            pulses.remove(frequency);
+        } else {
+            pulses.put(frequency, new RemoteSignal(left, current.expiresAtGameTime()));
+        }
+        bump(frequency);
+    }
+
+    // ---- v0.68.0: alarm feeds (TV Monitors on an alarm frequency show the tripped zone's camera) ----
+
+    private record Feed(int source, long until) {}
+
+    private final Map<Integer, Feed> feeds = new HashMap<>();
+
+    /** Until {@code untilGameTime}, monitors on {@code frequency} show cameras on {@code source} instead. Not saved. */
+    public void setFeed(int frequency, int source, long untilGameTime) {
+        feeds.put(frequency, new Feed(source, untilGameTime));
+    }
+
+    public void clearFeed(int frequency) {
+        feeds.remove(frequency);
+    }
+
+    /** The frequency whose cameras monitors on {@code frequency} show now, or 0 for their own. */
+    public int feedFor(int frequency, long gameTime) {
+        Feed feed = feeds.get(frequency);
+        if (feed == null) {
+            return 0;
+        }
+        if (gameTime >= feed.until()) {
+            feeds.remove(frequency);
+            return 0;
+        }
+        return feed.source();
     }
 
     /** How many monitors (walls) showed {@code camera} within the last {@link #WATCH_TICKS}. */
@@ -1493,7 +1552,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.65.0: a Radar Dish seeing something (the detail is what it saw first: an entity type's description id). */
         RADAR,
         /** v0.67.0: a Radio Drone's beacon (where it was, who tuned it, and its name as the detail). */
-        DRONE;
+        DRONE,
+        /** v0.68.0: a Security Console's alarm (where it is, who tuned it; the detail is the zone and who tripped it). */
+        SECURITY;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1559,6 +1620,11 @@ public final class SignalNetwork extends SavedData {
         /** A Radar Dish seeing something (v0.65.0): where it is, who tuned it, and what it saw first (a description id). */
         public static Cause radar(BlockPos pos, @Nullable UUID tunedBy, String saw) {
             return new Cause(CauseKind.RADAR, pos.immutable(), tunedBy, "", saw == null ? "" : saw);
+        }
+
+        /** A Security Console's alarm going off (v0.68.0): the console, its tuner, and "Vault (Rex)". */
+        public static Cause security(BlockPos pos, @Nullable UUID tunedBy, String detail) {
+            return new Cause(CauseKind.SECURITY, pos.immutable(), tunedBy, "", detail == null ? "" : detail);
         }
 
         /** A Radio Drone's beacon turning on (v0.67.0): where the drone was, who tuned it, and its name. */

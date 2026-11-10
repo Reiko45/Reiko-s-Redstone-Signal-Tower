@@ -133,6 +133,31 @@ public final class RadioInfo {
             return tag;
         }
         CompoundTag tag = gather(level, pos);
+        if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity console) {
+            // v0.68.0: its state (who set off the alarm only for those who may use it), zones, alarm frequency and schedule.
+            com.reiko.signaltower.radio.SecuritySetup setup = console.getSetup();
+            tag.putInt("security_state", console.getState().ordinal());
+            tag.putLong("security_left", Math.max(0, (console.getUntil() - level.getGameTime() + 19) / 20));
+            int zone = console.getAlarmZone();
+            boolean may = viewer != null && console.mayConfigure(viewer);
+            tag.putString("security_zone", zone >= 0 ? (may ? console.alarmText(zone, console.getAlarmWho()) : setup.label(zone)) : "");
+            tag.putInt("security_zones", setup.zonesInUse());
+            tag.putInt("security_open", Integer.bitCount(console.getOpenMask()));
+            tag.putInt("security_alarm", setup.alarmFrequency());
+            tag.putInt("security_delay", setup.delaySeconds());
+            tag.putBoolean("security_night", setup.night());
+        }
+        if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.DoorSensorBlockEntity door) {
+            // v0.68.0: what it watches, whether it's open, and who opened it.
+            if (com.reiko.signaltower.blockentity.DoorSensorBlockEntity.watchable(level, door.watched())) {
+                tag.putString("door_watching", level.getBlockState(door.watched()).getBlock().getDescriptionId());
+            }
+            tag.putBoolean("door_open", door.isOpen());
+            tag.putBoolean("door_sending", door.isSending());
+            if (door.isSending() && !door.getOpenerName().isEmpty()) {
+                tag.putString("door_opener", door.getOpenerName());
+            }
+        }
         if (tag != null && level.getBlockEntity(pos) instanceof com.reiko.signaltower.blockentity.MotionSensorBlockEntity sensor) {
             // v0.39.0: whose it is and whether it sees someone; its range, mode and who it saw only for its owner.
             tag.putString("sensor_owner", sensor.getOwnerName());
@@ -1010,6 +1035,35 @@ public final class RadioInfo {
             }
             return lines;
         }
+        if (block instanceof com.reiko.signaltower.block.SecurityConsoleBlock) {
+            // v0.68.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                String key = "message." + SignalTower.MOD_ID + ".security_state_";
+                long left = data.getLong("security_left");
+                String zone = data.getString("security_zone");
+                lines.add(switch (com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity.State.of(data.getInt("security_state"))) {
+                    case DISARMED -> Component.translatable(key + "disarmed").withStyle(ChatFormatting.GREEN);
+                    case ARMING -> Component.translatable(key + "arming", left).withStyle(ChatFormatting.GOLD);
+                    case ARMED -> Component.translatable(key + "armed").withStyle(ChatFormatting.RED);
+                    case ENTRY -> Component.translatable(key + "entry", left, zone).withStyle(ChatFormatting.GOLD);
+                    case ALARM -> Component.translatable(key + "alarm", zone).withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD);
+                });
+                int zones = data.getInt("security_zones");
+                int open = data.getInt("security_open");
+                lines.add((open > 0 ? Component.translatable(LANG + "security_zones_open", zones, open)
+                        : Component.translatable(LANG + "security_zones", zones)).withStyle(ChatFormatting.YELLOW));
+                int alarm = data.getInt("security_alarm");
+                lines.add(alarm > 0 ? Component.translatable(LANG + "security_alarm",
+                                com.reiko.signaltower.radio.FrequencyNames.label(null, alarm), data.getInt("security_delay")).withStyle(ChatFormatting.AQUA)
+                        : Component.translatable(LANG + "security_no_alarm").withStyle(ChatFormatting.GRAY));
+                if (data.getBoolean("security_night")) {
+                    lines.add(Component.translatable(LANG + "security_night").withStyle(ChatFormatting.DARK_AQUA));
+                }
+            }
+            return lines;
+        }
         if (block instanceof com.reiko.signaltower.block.TvMonitorBlock) {
             // v0.66.0
             if (hasData) {
@@ -1224,7 +1278,25 @@ public final class RadioInfo {
             lines.add(frequencyLine(data));
             addNoteLine(lines, data, "note");
         }
-        if (block instanceof com.reiko.signaltower.block.RadioMotionSensorBlock) {
+        if (block instanceof com.reiko.signaltower.block.RadioDoorSensorBlock) {
+            // v0.68.0
+            boolean on = state.getValue(RadioTransmitterBlock.POWERED);
+            if (hasData) {
+                if (data.contains("door_watching")) {
+                    lines.add(Component.translatable(LANG + (data.getBoolean("door_open") ? "door_open" : "door_closed"),
+                            Component.translatable(data.getString("door_watching"))).withStyle(data.getBoolean("door_open") ? ChatFormatting.GOLD : ChatFormatting.GRAY));
+                } else {
+                    lines.add(Component.translatable(LANG + "door_nothing").withStyle(ChatFormatting.RED));
+                }
+            }
+            String opener = hasData ? data.getString("door_opener") : "";
+            lines.add(!on ? Component.translatable(LANG + "sensor_idle").withStyle(ChatFormatting.GRAY)
+                    : !opener.isEmpty() ? Component.translatable(LANG + "door_opened_by", Component.literal(opener)).withStyle(ChatFormatting.GREEN)
+                    : Component.translatable(LANG + "sensor_on").withStyle(ChatFormatting.GREEN));
+            if (hasData) {
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+        } else if (block instanceof com.reiko.signaltower.block.RadioMotionSensorBlock) {
             boolean on = state.getValue(RadioTransmitterBlock.POWERED);
             if (hasData) {
                 String owner = data.getString("sensor_owner");

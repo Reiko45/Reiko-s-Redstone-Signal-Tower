@@ -321,6 +321,14 @@ def drone_buzz():
     return x / np.max(np.abs(x)) * 0.5
 
 
+def security_beep():
+    """v0.68.0: a Security Console's keypad beep: a short, clean 2.2 kHz square-ish tone with soft edges
+    (the console plays it higher or lower for arming, counting down and disarming)."""
+    n = int(0.09 * RATE)
+    tone = soft_square(2200, 0.09, 3.0) * envelope(n, 0.003, 0.02) * 0.5
+    return normalize(np.concatenate([tone, silence(0.03)]), 0.6)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -339,6 +347,7 @@ SOUND_LIST = {
     "radar.ping": ("radar_ping", radar_ping),
     "tv.switch": ("tv_switch", tv_switch),
     "drone.buzz": ("drone_buzz", drone_buzz),
+    "security.beep": ("security_beep", security_beep),
 }
 
 

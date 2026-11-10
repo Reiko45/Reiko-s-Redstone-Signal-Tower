@@ -58,6 +58,7 @@ public final class SignalTowerClient {
             event.registerBlockEntityRenderer(ModRegistry.TV_CAMERA_BE.get(), TvCameraRenderer::new); // v0.66.0
             event.registerBlockEntityRenderer(ModRegistry.TV_MONITOR_BE.get(), TvMonitorRenderer::new);
             event.registerEntityRenderer(ModRegistry.RADIO_DRONE_ENTITY.get(), DroneRenderer::new); // v0.67.0
+            event.registerBlockEntityRenderer(ModRegistry.SECURITY_CONSOLE_BE.get(), SecurityConsoleRenderer::new); // v0.68.0
         });
         // v0.65.0: the Radar Dish's spinning dish, a model of its own.
         // v0.66.0: the TV Camera's turning head (and with its REC light on).

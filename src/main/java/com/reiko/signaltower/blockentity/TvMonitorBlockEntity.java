@@ -321,13 +321,16 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
             int frequency = channelFrequency();
             FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(frequency);
             locked = claim != null && getTunedBy() != null && !claim.allows(getTunedBy()) ? claim.ownerName() : "";
+            // v0.68.0: while a Security Console's alarm on this frequency is on, the tripped zone's cameras.
+            int feed = network.feedFor(frequency, level.getGameTime());
+            int cameras = feed != 0 ? feed : frequency;
             Map.Entry<BlockPos, SignalNetwork.CameraSpot> best = null;
             double bestFraction = 0;
             double bestDistance = Double.MAX_VALUE;
             if (locked.isEmpty()) {
-                for (Map.Entry<BlockPos, SignalNetwork.CameraSpot> entry : network.camerasOn(frequency)) {
+                for (Map.Entry<BlockPos, SignalNetwork.CameraSpot> entry : network.camerasOn(cameras)) {
                     SignalNetwork.CameraSpot spot = entry.getValue();
-                    if (!FrequencyClaims.maySend(level, frequency, spot.tunedBy())) {
+                    if (!FrequencyClaims.maySend(level, cameras, spot.tunedBy())) {
                         continue;
                     }
                     double edge = WalkieTalkie.edgeFraction(spot.coverage(), worldPosition);
@@ -342,9 +345,9 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
             // v0.67.0: Radio Drones on the frequency count as cameras too (where they are now).
             SignalNetwork.DroneSpot bestDrone = null;
             if (locked.isEmpty()) {
-                for (Map.Entry<java.util.UUID, SignalNetwork.DroneSpot> entry : network.dronesOn(frequency)) {
+                for (Map.Entry<java.util.UUID, SignalNetwork.DroneSpot> entry : network.dronesOn(cameras)) {
                     SignalNetwork.DroneSpot spot = entry.getValue();
-                    if (!FrequencyClaims.maySend(level, frequency, spot.tunedBy())) {
+                    if (!FrequencyClaims.maySend(level, cameras, spot.tunedBy())) {
                         continue;
                     }
                     double edge = WalkieTalkie.edgeFraction(spot.coverage(), worldPosition);

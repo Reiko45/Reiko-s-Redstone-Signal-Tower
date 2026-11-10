@@ -88,6 +88,11 @@ public class FrequencyTunerItem extends Item {
                     message = Component.translatable("message." + SignalTower.MOD_ID + ".sensor_not_yours_tune",
                             sensor.ownerLabel()).withStyle(ChatFormatting.RED);
                     level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
+                } else if (radio instanceof com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity console && player != null
+                        && !console.mayConfigure(player)) {
+                    // v0.68.0: on a private control frequency only members re-tune a Security Console.
+                    message = FrequencyClaims.refusal(level, console.getFrequency(), player.getUUID(), "private_refused_security");
+                    level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_HIT, SoundSource.BLOCKS, 1.0F, 0.6F);
                 } else if (refused != null) {
                     // Someone else's private frequency: this block would send on it, so it's not tuned.
                     message = refused;

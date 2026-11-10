@@ -94,5 +94,11 @@
     "sounds": [
       "reikos_signal_tower:drone_buzz"
     ]
+  },
+  "security.beep": {
+    "subtitle": "subtitles.reikos_signal_tower.security.beep",
+    "sounds": [
+      "reikos_signal_tower:security_beep"
+    ]
   }
 }

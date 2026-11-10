@@ -273,6 +273,13 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenDronePayload.STREAM_CODEC, com.reiko.signaltower.network.OpenDronePayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureDronePayload.TYPE,
                 com.reiko.signaltower.network.ConfigureDronePayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureDronePayload::handle);
+        // v0.68.0: the Security Console
+        registrar.playToClient(com.reiko.signaltower.network.OpenSecurityPayload.TYPE,
+                com.reiko.signaltower.network.OpenSecurityPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSecurityPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureSecurityPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureSecurityPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureSecurityPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.SecurityCommandPayload.TYPE,
+                com.reiko.signaltower.network.SecurityCommandPayload.STREAM_CODEC, com.reiko.signaltower.network.SecurityCommandPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSensorScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureSensorPayload.TYPE,
@@ -378,6 +385,8 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_DRONE.get()); // v0.67.0
             event.accept(ModRegistry.DRONE_CONTROLLER.get());
             event.accept(ModRegistry.LANDING_PAD_ITEM.get());
+            event.accept(ModRegistry.SECURITY_CONSOLE_ITEM.get()); // v0.68.0
+            event.accept(ModRegistry.DOOR_SENSOR_ITEM.get());
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

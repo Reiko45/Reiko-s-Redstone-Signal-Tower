@@ -1,0 +1,6 @@
+{
+  "parent": "reikos_signal_tower:block/security_console",
+  "textures": {
+    "front": "reikos_signal_tower:block/security_console_front_item"
+  }
+}

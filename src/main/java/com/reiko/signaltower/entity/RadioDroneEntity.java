@@ -393,7 +393,9 @@ public class RadioDroneEntity extends Entity {
             return;
         }
         if (pilot.isRemoved() || pilot.level() != level || !DroneControllerItem.holdsLinked(pilot, getUUID())) {
-            DronePilots.stop(pilot, null);
+            Player was = pilot;
+            DronePilots.stop(was, null);
+            dropPilot(was);
             return;
         }
         if (now % 10 == 0 || signal < 0) {
@@ -402,7 +404,15 @@ public class RadioDroneEntity extends Entity {
                 lostSignal = true;
                 Player was = pilot;
                 DronePilots.stop(was, Component.translatable(KEY + "drone_lost").withStyle(ChatFormatting.RED));
+                dropPilot(was);
             }
+        }
+    }
+
+    /** v0.68.0: lets go of {@code was} even if the pilots' list had lost track of the flight. */
+    private void dropPilot(Player was) {
+        if (pilot == was) {
+            setPilot(null);
         }
     }
 

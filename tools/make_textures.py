@@ -995,6 +995,55 @@ def motion_sensor(lit):
     return img
 
 
+def door_sensor(lit):
+    """The Door Sensor (v0.68.0), button-sized like the compact receiver: a door contact, two white
+    magnet blocks with a gap between them on a grey plate, and an LED that's red while it sends."""
+    img = blank(M)
+    px = img.load()
+    for x in range(5, 11):
+        px[x, 6] = H
+        px[x, 9] = D
+    for y in range(6, 10):
+        px[5, y] = L
+        px[10, y] = O
+    white = (226, 226, 220, 255)
+    shade = (176, 176, 170, 255)
+    for x in (6, 7):
+        px[x, 7] = white
+        px[x, 8] = shade
+    for x in (9,):
+        px[x, 7] = white
+        px[x, 8] = shade
+    px[8, 7] = O
+    px[8, 8] = (255, 60, 40, 255) if lit else (70, 20, 18, 255)
+    for x in range(0, 16):
+        px[x, 14] = L
+        px[x, 15] = D
+    return img
+
+
+def security_front(item=False):
+    """The Security Console's face (v0.68.0): a dark screen in a steel frame with a red stripe along
+    the bottom (the state and zone lights are drawn on it). The item's shows them painted on."""
+    img = casing(6801, rivets=False)
+    px = img.load()
+    for y in range(1, 15):
+        for x in range(1, 15):
+            px[x, y] = (20, 22, 26, 255) if 1 < x < 14 and 1 < y < 14 else O
+    for x in range(2, 14):
+        px[x, 13] = (150, 30, 26, 255)
+    if item:
+        for x in range(4, 12):
+            px[x, 3] = (80, 230, 90, 255)
+        for i in range(4):
+            for col, x0 in enumerate((3, 9)):
+                color = (80, 230, 90, 255) if (i + col) % 3 else (255, 190, 60, 255)
+                px[x0, 6 + i * 2] = color
+                px[x0 + 1, 6 + i * 2] = (130, 130, 130, 255)
+                px[x0 + 2, 6 + i * 2] = (130, 130, 130, 255)
+    return img
+
+
 LIGHTS = {
     "idle": ((34, 52, 38, 255), (50, 74, 54, 255)),       # unlit
     "heard": ((70, 210, 70, 255), (190, 255, 170, 255)),  # green: a receiver heard the press
@@ -1520,6 +1569,11 @@ blocks = {
     "tv_monitor_side": tv_monitor_side(),
     "landing_pad_top": landing_pad_top(),  # v0.67.0
     "landing_pad_side": landing_pad_side(),
+    "door_sensor": door_sensor(False),  # v0.68.0
+    "door_sensor_on": door_sensor(True),
+    "security_console_front": security_front(),
+    "security_console_front_item": security_front(item=True),
+    "security_console_side": casing(6802, rivets=False),
 }
 # v0.65.0: the items' textures are painted by tools/make_item_models.py (3D models), not here.
 

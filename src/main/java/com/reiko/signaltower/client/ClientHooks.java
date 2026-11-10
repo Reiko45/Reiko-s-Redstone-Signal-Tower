@@ -159,6 +159,11 @@ public final class ClientHooks {
         return DronePilot.pilots(entityId);
     }
 
+    /** Opens a Security Console's screen (v0.68.0). */
+    public static void openSecurity(com.reiko.signaltower.network.OpenSecurityPayload state) {
+        Minecraft.getInstance().setScreen(new SecurityConsoleScreen(state));
+    }
+
     /** Opens a Radio Drone's settings (v0.67.0). */
     public static void openDrone(com.reiko.signaltower.network.OpenDronePayload state) {
         Minecraft.getInstance().setScreen(new DroneScreen(state));

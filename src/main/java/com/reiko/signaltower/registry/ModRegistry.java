@@ -110,6 +110,12 @@ public final class ModRegistry {
                     .persistent(com.reiko.signaltower.item.DroneLink.CODEC)
                     .networkSynchronized(com.reiko.signaltower.item.DroneLink.STREAM_CODEC));
 
+    /** v0.68.0: a Security Console's zones, alarm frequency, delay and schedule, kept on the item. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.reiko.signaltower.radio.SecuritySetup>> SECURITY_SETUP =
+            DATA_COMPONENTS.registerComponentType("security_setup", builder -> builder
+                    .persistent(com.reiko.signaltower.radio.SecuritySetup.CODEC)
+                    .networkSynchronized(com.reiko.signaltower.radio.SecuritySetup.STREAM_CODEC));
+
     /** v0.49.0: a Coverage Map's zoom, 0 (1:1) to 4 (1:16), like a vanilla map's scale. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COVERAGE_ZOOM =
             DATA_COMPONENTS.registerComponentType("coverage_zoom", builder -> builder
@@ -431,6 +437,25 @@ public final class ModRegistry {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.TvMonitorBlock.ACTIVE) ? 6 : 0)));
 
+    /** v0.68.0: the Security Console (a wall panel) and the Door Sensor (button-sized, knocked off by pistons). */
+    public static final DeferredBlock<com.reiko.signaltower.block.SecurityConsoleBlock> SECURITY_CONSOLE = BLOCKS.register("security_console",
+            () -> new com.reiko.signaltower.block.SecurityConsoleBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(1.5F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> 3)));
+    public static final DeferredBlock<com.reiko.signaltower.block.RadioDoorSensorBlock> DOOR_SENSOR = BLOCKS.register("door_sensor",
+            () -> new com.reiko.signaltower.block.RadioDoorSensorBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(0.5F)
+                    .sound(SoundType.METAL)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(CompactRadioTransmitterBlock.POWERED) ? 3 : 0)));
+
     /** v0.67.0: where a Radio Drone lands to charge. */
     public static final DeferredBlock<com.reiko.signaltower.block.LandingPadBlock> LANDING_PAD = BLOCKS.register("landing_pad",
             () -> new com.reiko.signaltower.block.LandingPadBlock(BlockBehaviour.Properties.of()
@@ -720,6 +745,10 @@ public final class ModRegistry {
             () -> new com.reiko.signaltower.item.DroneControllerItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<BlockItem> LANDING_PAD_ITEM =
             ITEMS.registerSimpleBlockItem("landing_pad", LANDING_PAD);
+    public static final DeferredItem<BlockItem> SECURITY_CONSOLE_ITEM =
+            ITEMS.registerSimpleBlockItem("security_console", SECURITY_CONSOLE); // v0.68.0
+    public static final DeferredItem<BlockItem> DOOR_SENSOR_ITEM =
+            ITEMS.registerSimpleBlockItem("door_sensor", DOOR_SENSOR);
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
@@ -872,6 +901,13 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TvCameraBlockEntity>> TV_CAMERA_BE =
             BLOCK_ENTITIES.register("tv_camera",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TvCameraBlockEntity::new, TV_CAMERA.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity>> SECURITY_CONSOLE_BE =
+            BLOCK_ENTITIES.register("security_console", // v0.68.0
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.SecurityConsoleBlockEntity::new, SECURITY_CONSOLE.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.DoorSensorBlockEntity>> DOOR_SENSOR_BE =
+            BLOCK_ENTITIES.register("door_sensor",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.DoorSensorBlockEntity::new, DOOR_SENSOR.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TvMonitorBlockEntity>> TV_MONITOR_BE =
             BLOCK_ENTITIES.register("tv_monitor",

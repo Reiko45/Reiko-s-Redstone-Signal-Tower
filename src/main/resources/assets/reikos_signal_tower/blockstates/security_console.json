@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "reikos_signal_tower:block/security_console"
+    },
+    "facing=east": {
+      "model": "reikos_signal_tower:block/security_console",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "reikos_signal_tower:block/security_console",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "reikos_signal_tower:block/security_console",
+      "y": 270
+    }
+  }
+}

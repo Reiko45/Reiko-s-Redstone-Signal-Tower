@@ -39,6 +39,8 @@
     "reikos_signal_tower:radar_screen",
     "reikos_signal_tower:tv_camera",
     "reikos_signal_tower:tv_monitor",
-    "reikos_signal_tower:landing_pad"
+    "reikos_signal_tower:landing_pad",
+    "reikos_signal_tower:security_console",
+    "reikos_signal_tower:door_sensor"
   ]
 }

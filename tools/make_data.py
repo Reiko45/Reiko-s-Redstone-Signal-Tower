@@ -154,6 +154,9 @@ for lit in (False, True):
     # v0.39.0: the Radio Motion Sensor, same shape again.
     write(models / ("radio_motion_sensor" + ("_on" if lit else "") + ".json"),
           compact_receiver_model(lit, "radio_motion_sensor", "radio_transmitter_side"))
+    # v0.68.0: the Door Sensor, and again.
+    write(models / ("door_sensor" + ("_on" if lit else "") + ".json"),
+          compact_receiver_model(lit, "door_sensor", "radio_transmitter_side"))
 
 def keypad_model(lit):
     """An 8 x 10 plate, 1 pixel thick, lying on the floor with its front up (rotated like a button)."""
@@ -224,6 +227,7 @@ write(models / "compact_radio_transmitter_inventory.json",
       compact_inventory_model("compact_radio_transmitter", "radio_transmitter_side"))
 write(models / "radio_motion_sensor_inventory.json",
       compact_inventory_model("radio_motion_sensor", "radio_transmitter_side"))
+write(models / "door_sensor_inventory.json", compact_inventory_model("door_sensor", "radio_transmitter_side"))  # v0.68.0
 write(models / "compact_radio_receiver_inventory.json", {
     "parent": "minecraft:block/block",
     "display": {
@@ -349,6 +353,7 @@ write(items / "satellite.json", {
 write(items / "compact_radio_receiver.json", {"parent": f"{MOD}:block/compact_radio_receiver_inventory"})
 write(items / "compact_radio_transmitter.json", {"parent": f"{MOD}:block/compact_radio_transmitter_inventory"})
 write(items / "radio_motion_sensor.json", {"parent": f"{MOD}:block/radio_motion_sensor_inventory"})
+write(items / "door_sensor.json", {"parent": f"{MOD}:block/door_sensor_inventory"})  # v0.68.0
 write(items / "code_keypad.json", {"parent": f"{MOD}:block/code_keypad_inventory"})
 # v0.65.0: the hand-held radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are
 # 3D models now, with their own textures: tools/make_item_models.py writes them.
@@ -601,6 +606,32 @@ write(states / "radio_status_board.json", {"variants": {
     "facing=south": {"model": f"{MOD}:block/radio_status_board", "y": 180},
     "facing=west": {"model": f"{MOD}:block/radio_status_board", "y": 270},
 }})
+# v0.68.0: the Security Console, a panel like the status board (its face is drawn by its renderer)
+write(models / "security_console.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("security_console_side"), "front": tex("security_console_front"), "side": tex("security_console_side")},
+    "elements": [{"from": [1, 1, 14], "to": [15, 15, 16], "faces": {
+        "north": {"uv": [1, 1, 15, 15], "texture": "#front"},
+        "south": {"uv": [1, 1, 15, 15], "texture": "#side", "cullface": "south"},
+        "east": {"uv": [0, 1, 2, 15], "texture": "#side"},
+        "west": {"uv": [14, 1, 16, 15], "texture": "#side"},
+        "up": {"uv": [1, 14, 15, 16], "texture": "#side"},
+        "down": {"uv": [1, 0, 15, 2], "texture": "#side"}}}],
+    "display": {
+        "gui": {"rotation": [0, 180, 0], "translation": [0, 0, -3], "scale": [0.8, 0.8, 0.8]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
+        "fixed": {"rotation": [0, 180, 0], "translation": [0, 0, -6], "scale": [0.8, 0.8, 0.8]},
+        "firstperson_righthand": {"rotation": [0, 135, 0], "translation": [0, 0, 0], "scale": [0.4, 0.4, 0.4]},
+        "thirdperson_righthand": {"rotation": [75, 180, 0], "translation": [0, 2.5, 0], "scale": [0.375, 0.375, 0.375]},
+    },
+})
+write(states / "security_console.json", {"variants": {
+    "facing=north": {"model": f"{MOD}:block/security_console"},
+    "facing=east": {"model": f"{MOD}:block/security_console", "y": 90},
+    "facing=south": {"model": f"{MOD}:block/security_console", "y": 180},
+    "facing=west": {"model": f"{MOD}:block/security_console", "y": 270},
+}})
+write(items / "security_console.json", {"parent": f"{MOD}:block/security_console", "textures": {"front": tex("security_console_front_item")}})
 # v0.50.0: the Solar Panel, a three-pixel slab with cells on top
 write(models / "solar_panel.json", {
     "parent": "minecraft:block/block",
@@ -1111,6 +1142,10 @@ for (face, facing), rot in BUTTON_ROTATIONS.items():
 write(states / "compact_radio_transmitter.json", {"variants": compact_tx_variants})
 write(states / "radio_motion_sensor.json", {"variants": {
     key: {**variant, "model": variant["model"].replace("compact_radio_transmitter", "radio_motion_sensor")}
+    for key, variant in compact_tx_variants.items()
+}})
+write(states / "door_sensor.json", {"variants": {  # v0.68.0
+    key: {**variant, "model": variant["model"].replace("compact_radio_transmitter", "door_sensor")}
     for key, variant in compact_tx_variants.items()
 }})
 keypad_variants = {}
@@ -1862,6 +1897,96 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.log.kind_radar": "Radar Dish",
     f"screen.{MOD}.log.tip_radar": "Saw: %s",
     f"subtitles.{MOD}.radar.ping": "Radar pings",
+    # v0.68.0: the Security Console and the Door Sensor
+    f"block.{MOD}.security_console": "Security Console",
+    f"block.{MOD}.security_console.tooltip": "A wall panel that watches up to 8 zones (frequencies) and sounds the alarm on its alarm frequency. Its own frequency arms and disarms it: put a Code Keypad or a remote on it.",
+    f"block.{MOD}.door_sensor": "Door Sensor",
+    f"block.{MOD}.door_sensor.tooltip": "Put it against a door, trapdoor, fence gate, barrel or chest: it sends on its frequency while that's open, over a compact transmitter's short reach.",
+    f"tooltip.{MOD}.security_zones": "Zones: %s",
+    f"tooltip.{MOD}.security_alarm": "Alarm frequency: %s",
+    f"message.{MOD}.private_refused_security": "Frequency %s is private to %s: only members can use this Security Console",
+    f"message.{MOD}.security_status": "Security Console | Frequency %s | %s",
+    f"message.{MOD}.security_set": "Security Console: %s zones, alarm on %s",
+    f"message.{MOD}.security_no_alarm": "no alarm frequency",
+    f"message.{MOD}.security_alarm": "ALARM: %s",
+    f"message.{MOD}.security_cleared": "Alarm off: disarmed by %s",
+    f"message.{MOD}.security_tamper": "Security Console broken while armed",
+    f"message.{MOD}.security_who_unknown": "someone",
+    f"message.{MOD}.security_who_night": "the night schedule",
+    f"message.{MOD}.security_who_morning": "the morning schedule",
+    f"message.{MOD}.security_state_disarmed": "Disarmed",
+    f"message.{MOD}.security_state_arming": "Arming: %s s",
+    f"message.{MOD}.security_state_armed": "Armed",
+    f"message.{MOD}.security_state_entry": "Entry: %s s (%s)",
+    f"message.{MOD}.security_state_alarm": "ALARM: %s",
+    f"message.{MOD}.security_not_yours": "You can't use this Security Console",
+    f"message.{MOD}.security_arming": "Arming: %s seconds to leave",
+    f"message.{MOD}.security_already_armed": "It's armed already",
+    f"message.{MOD}.security_disarmed": "Disarmed",
+    f"message.{MOD}.security_already_disarmed": "It's disarmed already",
+    f"message.{MOD}.door_sensor_status": "Door Sensor | Frequency %s | %s | Reach %s blocks",
+    f"message.{MOD}.door_sensor_nothing": "nothing to watch",
+    f"message.{MOD}.door_sensor_open": "%s: open",
+    f"message.{MOD}.door_sensor_closed": "%s: closed",
+    f"screen.{MOD}.security.tab_zones": "Zones",
+    f"screen.{MOD}.security.tab_settings": "Settings",
+    f"screen.{MOD}.security.tab_log": "Log",
+    f"screen.{MOD}.security.head_name": "Name",
+    f"screen.{MOD}.security.head_frequency": "Frequency",
+    f"screen.{MOD}.security.head_mode": "Mode",
+    f"screen.{MOD}.security.zone_name": "Zone %s name",
+    f"screen.{MOD}.security.zone_hint": "Zone %s",
+    f"screen.{MOD}.security.zone_frequency": "Zone %s frequency",
+    f"screen.{MOD}.security.zone_mode": "Mode",
+    f"screen.{MOD}.security.frequency_hint": "none",
+    f"screen.{MOD}.security.mode_instant": "Instant",
+    f"screen.{MOD}.security.mode_delayed": "Delayed",
+    f"screen.{MOD}.security.mode_always": "Always",
+    f"screen.{MOD}.security.mode_instant_tip": "While armed, this zone sounds the alarm at once.",
+    f"screen.{MOD}.security.mode_delayed_tip": "While armed, this zone starts the entry delay: disarm before it runs out (a door you come in by).",
+    f"screen.{MOD}.security.mode_always_tip": "This zone sounds the alarm even while it's disarmed (a vault).",
+    f"screen.{MOD}.security.alarm": "Alarm frequency",
+    f"screen.{MOD}.security.alarm_tip": "Full strength on this frequency while the alarm sounds, and messages to pagers and walkie-talkies on it. TV Monitors on it show the tripped zone's camera.",
+    f"screen.{MOD}.security.seconds": "%s s",
+    f"screen.{MOD}.security.delay": "Delay",
+    f"screen.{MOD}.security.delay_tip": "How long you have to leave after arming, and to disarm after a Delayed zone trips.",
+    f"screen.{MOD}.security.night": "Arm at night",
+    f"screen.{MOD}.security.night_tip": "On: it arms itself at dusk and disarms at dawn (if it armed itself).",
+    f"screen.{MOD}.security.arm": "Arm",
+    f"screen.{MOD}.security.arm_tip": "Saves, then starts arming: you have the delay to leave.",
+    f"screen.{MOD}.security.disarm": "Disarm",
+    f"screen.{MOD}.security.control": "Control frequency: %s",
+    f"screen.{MOD}.security.control_hint": "A keypad or remote on the control frequency arms and disarms it.",
+    f"screen.{MOD}.security.alarm_hint": "Set Radio Speakers on the alarm frequency to Siren.",
+    f"screen.{MOD}.security.log_empty": "Nothing has happened yet",
+    f"screen.{MOD}.security.log_line": "Day %s %s  %s",
+    f"screen.{MOD}.security.who_unknown": "someone",
+    f"screen.{MOD}.security.who_night": "night schedule",
+    f"screen.{MOD}.security.who_morning": "morning schedule",
+    f"screen.{MOD}.security.event_arming": "Arming (%s)",
+    f"screen.{MOD}.security.event_armed": "Armed",
+    f"screen.{MOD}.security.event_disarmed": "Disarmed by %s",
+    f"screen.{MOD}.security.event_entry": "Entry: %s (%s)",
+    f"screen.{MOD}.security.event_alarm": "ALARM: %s (%s)",
+    f"screen.{MOD}.security.event_tamper": "Broken while armed",
+    f"screen.{MOD}.security.face_title": "SECURITY",
+    f"screen.{MOD}.security.face_disarmed": "DISARMED",
+    f"screen.{MOD}.security.face_arming": "ARMING %s",
+    f"screen.{MOD}.security.face_armed": "ARMED",
+    f"screen.{MOD}.security.face_entry": "ENTRY %s",
+    f"screen.{MOD}.security.face_alarm": "ALARM",
+    f"screen.{MOD}.log.kind_security": "Security Console",
+    f"screen.{MOD}.log.tip_security": "Alarm: %s",
+    f"jade.{MOD}.security_zones": "Zones: %s",
+    f"jade.{MOD}.security_zones_open": "Zones: %s (%s heard now)",
+    f"jade.{MOD}.security_alarm": "Alarm on %s, delay %s s",
+    f"jade.{MOD}.security_no_alarm": "No alarm frequency set",
+    f"jade.{MOD}.security_night": "Arms at night",
+    f"jade.{MOD}.door_open": "%s: open",
+    f"jade.{MOD}.door_closed": "%s: closed",
+    f"jade.{MOD}.door_nothing": "Nothing to watch: put it against a door, trapdoor, fence gate, barrel or chest",
+    f"jade.{MOD}.door_opened_by": "Opened by %s",
+    f"subtitles.{MOD}.security.beep": "Security console beeps",
     # v0.67.0: the Radio Drone, its controller and the Landing Pad
     f"entity.{MOD}.radio_drone": "Radio Drone",
     f"item.{MOD}.radio_drone": "Radio Drone",
@@ -3252,6 +3377,18 @@ recipes["tv_monitor"] = ({  # v0.66.0: two, so walls of them don't cost too much
     "ingredients": [{"item": f"{MOD}:radar_screen"}, {"item": "minecraft:glass_pane"}],
     "result": {"count": 2, "id": f"{MOD}:tv_monitor"},
 }, f"{MOD}:radar_screen")
+recipes["security_console"] = ({  # v0.68.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_status_board"}, {"item": f"{MOD}:code_keypad"}, {"item": "minecraft:redstone_lamp"}],
+    "result": {"count": 1, "id": f"{MOD}:security_console"},
+}, f"{MOD}:code_keypad")
+recipes["door_sensor"] = ({  # v0.68.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:compact_radio_transmitter"}, {"item": "minecraft:tripwire_hook"}],
+    "result": {"count": 1, "id": f"{MOD}:door_sensor"},
+}, f"{MOD}:compact_radio_transmitter")
 recipes["radio_drone"] = ({  # v0.67.0
     "type": "minecraft:crafting_shaped",
     "category": "redstone",
@@ -3421,7 +3558,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen", "tv_camera", "tv_monitor", "landing_pad"):
+             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen", "tv_camera", "tv_monitor", "landing_pad", "security_console", "door_sensor"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -3447,6 +3584,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:radar_settings"] if name in ("radar_dish", "radar_screen") else [])
                        + ([f"{MOD}:camera_settings", "minecraft:custom_name"] if name == "tv_camera" else [])
                        + ([f"{MOD}:tv_channels"] if name == "tv_monitor" else [])
+                       + ([f"{MOD}:security_setup"] if name == "security_console" else [])
                        + ([f"{MOD}:recorder_tape"] if name == "radio_signal_recorder" else [])
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
@@ -3482,7 +3620,8 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
                f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer",
-               f"{MOD}:radar_dish", f"{MOD}:radar_screen", f"{MOD}:tv_camera", f"{MOD}:tv_monitor", f"{MOD}:landing_pad"]
+               f"{MOD}:radar_dish", f"{MOD}:radar_screen", f"{MOD}:tv_camera", f"{MOD}:tv_monitor", f"{MOD}:landing_pad",
+               f"{MOD}:security_console", f"{MOD}:door_sensor"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -3558,6 +3697,8 @@ INFO = {
     "radar_dish": "Put it on top of a mast like a transmitter. Once a second it sweeps its reach for players, hostile mobs, peaceful mobs and vehicles (not under 8 or more solid blocks, as in a cave), and with Send on it turns its frequency on with how many it sees (at most 15). A comparator reads the count. Right-click it to choose what it tracks.",
     "radar_screen": "Hang it on a wall and tune it like a receiver: it shows the nearest Radar Dish on its frequency that reaches it, with a sweep line, colored blips and towers, north up. On a private frequency only members' screens show anything. Right-click it to choose how far round the dish it shows (128 blocks at first) or turn the ping off.",
     "tv_camera": "Put it on a floor (a stand), a wall (a bracket) or a ceiling and tune it: it looks the way it faces (on a floor or ceiling, the way you looked as you placed it), and TV Monitors on its frequency that it reaches show what it sees, live. It reaches like a walkie-talkie: farther the higher it is, and farther with towers and repeaters on its frequency; near the edge the picture gets snowy. Right-click it to name it and set its tilt, lens, pan and night vision. Its red light is on while a monitor shows it; a comparator reads how many do. On a private frequency only members can tune one.",
+    "security_console": "Hang it on a wall and tune it: its own frequency is its control frequency, and each time that turns on (a Code Keypad's right code, a remote) it arms or disarms. Right-click it to set up to 8 zones, each a name, a frequency and a mode: anything turning a zone's frequency on where the console hangs trips it (a Door Sensor, a Motion Sensor, a receiver's tower). Instant zones sound the alarm at once while it's armed, Delayed zones give you the delay to disarm, Always zones sound it even while disarmed. After arming you have the delay (5 to 30 seconds) to leave. The alarm sends full strength on its alarm frequency for 2 minutes (Radio Speakers set to Siren, lamps), sounds its own siren, sends \"ALARM: Vault (Rex)\" to pagers and walkie-talkies, and makes TV Monitors on the alarm frequency show the TV Camera on the tripped zone's frequency; it stays in alarm until it's disarmed. Arm at night arms it at dusk and disarms it at dawn. Its face shows its state and a light per zone, and it keeps a log of the last 32 events. On a private control frequency only members can use it.",
+    "door_sensor": "Put it against a door, trapdoor, fence gate, barrel or chest (on any block next to it): while that's open, and a second after, it sends full strength on its frequency over a compact transmitter's reach (16 blocks). The frequency log, and a Security Console, name the player nearest it when it opened. Redstone around it does nothing.",
     "radio_drone": "Right-click a block to put it down, and tune it with a Frequency Tuner. Pair a Drone Controller with it and fly it: WASD, Space and Shift move it while you stand still, the mouse turns it, B switches between your eyes and its camera (only while it's within your render distance), and G grabs the nearest dropped item under it or drops what it carries. It reaches like a walkie-talkie: farther the higher it is, and farther with towers and repeaters on its frequency; past the edge it loses control and drifts down. TV Monitors on its frequency show its camera. A full battery flies it about 4 minutes (hovering uses less); nearly empty, it lands itself. Charge it on a Landing Pad or with Redstone Dust. Right-click it with an empty hand to name it and set Beacon (its frequency is on within 16 blocks of it), Relay (hovering on its own, it repeats its frequency, farther the higher it is) and night vision; sneak and right-click to pick it up, keeping its frequency, name and charge.",
     "drone_controller": "Right-click a Radio Drone to pair with it, then right-click anywhere to fly it, and again (or put the controller away) to let go: it hovers where it is. While you fly it a panel shows its battery, signal, height, how far away it is and what it carries. On a private frequency only members can pair or fly one.",
     "landing_pad": "A Radio Drone that lands on it charges, from a Radio Battery beside the pad, or from a Solar Panel beside it in daylight.",
