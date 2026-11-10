@@ -739,6 +739,55 @@ write(states / "morse_key.json", {"variants": {
 write(items / "morse_key.json", {"parent": f"{MOD}:block/morse_key"})
 
 
+# v0.63.0: the Ticker Tape Printer: a stock ticker under a glass dome on a dark stone base, its tape
+# running out at the front (north here, turned by the blockstate). Printing, the tape runs out over
+# the edge; with a book in it, a logbook lies on the base beside it.
+def ticker_printer_model(printing, book):
+    def box(frm, to, texture, faces=("north", "south", "east", "west", "up", "down")):
+        return {"from": frm, "to": to, "faces": {f: {"texture": texture} for f in faces}}
+    elements = [
+        box([1, 0, 1], [15, 2, 15], "#base"),
+        box([3.5, 2, 3.5], [12.5, 2.5, 12.5], "#brass"),
+        box([6.5, 2.5, 6.5], [9.5, 5, 9.5], "#steel"),        # the pedestal
+        box([6, 5, 6], [10, 7.5, 9.5], "#brass"),             # the type wheel's housing
+        box([6.5, 7.5, 6], [9.5, 8.5, 7], "#knob"),           # the inking roller
+        box([5.5, 7.5, 8], [10.5, 10, 10.5], "#pages"),       # the paper spool
+        {"from": [6.5, 5.6, -2.5 if printing else 1], "to": [9.5, 5.6, 6],
+         "faces": {"up": {"texture": "#tape"}, "down": {"texture": "#tape"}}},   # the tape
+        box([4.5, 2.5, 4.5], [11.5, 10.5, 11.5], "#glass"),   # the dome
+        box([5.5, 10.5, 5.5], [10.5, 11, 10.5], "#glass"),
+        box([7.5, 11, 7.5], [8.5, 12, 8.5], "#brass"),        # the knob on top
+    ]
+    if printing:
+        elements.append({"from": [6.5, 0.3, -2.5], "to": [9.5, 5.6, -2.5],
+                         "faces": {"north": {"texture": "#tape"}, "south": {"texture": "#tape"}}})
+    if book:
+        elements.append({"from": [10, 2, 1], "to": [14.5, 3.5, 4], "faces": {
+            "up": {"texture": "#cover"}, "down": {"texture": "#cover"}, "west": {"texture": "#cover"},
+            "north": {"texture": "#pages"}, "south": {"texture": "#pages"}, "east": {"texture": "#pages"}}})
+    return {
+        "parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+        "textures": {"particle": "minecraft:block/polished_deepslate", "base": "minecraft:block/polished_deepslate",
+                     "brass": tex("radio_telegraph_brass"), "steel": "minecraft:block/iron_block", "knob": tex("radio_telegraph_knob"),
+                     "tape": tex("ticker_tape"), "glass": "minecraft:block/glass",
+                     "cover": tex("ticker_book_cover"), "pages": tex("ticker_book_pages")},
+        "elements": elements,
+    }
+
+
+for printing in (False, True):
+    for book in (False, True):
+        write(models / ("ticker_printer" + ("_printing" if printing else "") + ("_book" if book else "") + ".json"),
+              ticker_printer_model(printing, book))
+write(states / "ticker_printer.json", {"variants": {
+    f"book={book},facing={facing},printing={printing}": {
+        "model": f"{MOD}:block/ticker_printer" + ("_printing" if printing == "true" else "") + ("_book" if book == "true" else ""),
+        **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for book in ("false", "true") for printing in ("false", "true")
+}})
+write(items / "ticker_printer.json", {"parent": f"{MOD}:block/ticker_printer_book"})
+
+
 # v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
 # with a lamp at the back; facing north here, turned by the blockstate.
 def telegraph_model(lit):
@@ -1491,6 +1540,32 @@ write(ASSETS / "lang" / "en_us.json", {
     f"map.{MOD}.tracked": "Tracked: %s",
     f"advancements.{MOD}.we_have_liftoff.title": "We Have Liftoff",
     f"advancements.{MOD}.we_have_liftoff.description": "Put a satellite in orbit from a Launch Pad",
+    # v0.63.0: the Ticker Tape Printer
+    f"block.{MOD}.ticker_printer": "Ticker Tape Printer",
+    f"block.{MOD}.ticker_printer.tooltip": "Prints every message that reaches its frequency into a Book and Quill: the day and time, the sender and the text. A full book is signed as a logbook.",
+    f"tooltip.{MOD}.ticker_printer_use": "Right-click with a Book and Quill to load it; an empty hand takes the book out. Sneak + right-click for its status.",
+    f"message.{MOD}.printer_status": "Ticker Tape Printer | Frequency %s | %s | Printed: %s",
+    f"message.{MOD}.printer_pages": "Book: %s / %s pages",
+    f"message.{MOD}.printer_no_book": "No book",
+    f"message.{MOD}.printer_full": "Logbook full: take it out",
+    f"message.{MOD}.printer_loaded": "Book loaded: messages on %s are printed in it",
+    f"message.{MOD}.printer_has_book": "It has a book already: take it out first",
+    f"message.{MOD}.printer_took": "Took the book out (%s pages printed)",
+    f"message.{MOD}.printer_took_one": "Took the book out (%s page printed)",
+    f"message.{MOD}.printer_took_logbook": "Took the logbook out",
+    f"message.{MOD}.printer_entry": "Day %s, %s, %s:",
+    f"message.{MOD}.printer_encrypted": "(encrypted)",
+    f"message.{MOD}.printer_title": "%s log",
+    f"subtitles.{MOD}.printer.print": "Ticker tape prints",
+    f"jade.{MOD}.printer_book": "Book: %s / %s pages",
+    f"jade.{MOD}.printer_no_book": "No book: messages wait for one",
+    f"jade.{MOD}.printer_has_book": "Has a book",
+    f"jade.{MOD}.printer_full": "Logbook full: take it out",
+    f"jade.{MOD}.printer_waiting": "Waiting to print: %s",
+    f"jade.{MOD}.printer_last": "Last printed: “%s” from %s",
+    f"jade.{MOD}.printer_count": "Printed: %s messages",
+    f"jade.{MOD}.printer_count_one": "Printed: %s message",
+    f"jade.{MOD}.printer_printing": "Printing",
     # v0.62.0: Morse code
     f"block.{MOD}.morse_key": "Morse Key",
     f"block.{MOD}.morse_key.tooltip": "Key Morse code onto a frequency: receivers on it pulse the dots and dashes, and what you spell reaches telegraphs, pagers and Status Boards as text.",
@@ -2679,6 +2754,12 @@ recipes["radio_telegraph"] = ({  # v0.51.0
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:writable_book"}],
     "result": {"count": 1, "id": f"{MOD}:radio_telegraph"},
 }, f"{MOD}:radio_transmitter")
+recipes["ticker_printer"] = ({  # v0.63.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:ink_sac"}, {"item": "minecraft:paper"}, {"item": "minecraft:glass"}],
+    "result": {"count": 1, "id": f"{MOD}:ticker_printer"},
+}, f"{MOD}:radio_receiver")
 recipes["morse_key"] = ({  # v0.62.0
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -2817,7 +2898,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad", "morse_key"):
+             "launch_pad", "morse_key", "ticker_printer"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2874,7 +2955,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -2946,6 +3027,7 @@ INFO = {
     "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",
     "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
     "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
+    "ticker_printer": "Tune it to a frequency and give it a Book and Quill (by hand or hopper): every message that reaches it is printed in the book, with the day and time and who sent it, even ones that came while it wasn't loaded. A full book is signed as a logbook, which a hopper can take out. A comparator reads how full the book is.",
     "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",
     "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",
     "satellite_dish": "Fit it on a transmitter's tower with open sky above: once a satellite is in orbit over the dimension, the tower is heard everywhere in it, at full strength and over any hills. It uses 4 times the power while it's uplinked.",

@@ -37,6 +37,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Satellite Dish** | A transmitter upgrade for open sky: with a satellite in orbit over its dimension, the tower is heard everywhere in that dimension, at full strength, at four times the power. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
 | **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. With **Morse** on, it keys its messages out in Morse code first. |
+| **Ticker Tape Printer** | A stock ticker under a glass dome. Tune it to a frequency and give it a Book and Quill: every message that reaches it is printed in the book, with the day and time and who sent it. A full book is signed as a logbook, and a hopper can take it away. |
 | **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
@@ -301,6 +302,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 - Jade needs to be on the server too for the frequency, reach and tower count (they're only known there). With Jade only on your side, it still shows what the block itself shows: on or off, and a receiver's output.
 - Switch it off in Jade's settings (numpad 0 → Plugin Settings → Reiko's Redstone Signal Tower).
 - The mod doesn't need Jade. Without it, everything works the same, and an empty-hand right-click still shows the status readout.
+- **WTHIT:** since 0.63, [WTHIT](https://modrinth.com/mod/wthit) shows the same lines as Jade, for every block above and the rest of the mod's (telegraphs, the Morse Key, the Ticker Tape Printer, batteries, beacons ...). Like Jade, it needs to be on the server too for what's only known there; a mast shows what its block state says (WTHIT only asks the server about blocks with a block entity). Use one or the other.
 
 ![Jade showing a transmitter, a repeater, a mast with the repeater on top, and a receiver](docs/images/jade-tooltips.png)
 
@@ -730,6 +732,21 @@ Since 0.62 you can send messages in **Morse code**, and hear them.
 
 ![The mod list with the mod's new pixel-art icon; Dev holding right-click on a Morse Key, its lever down, Jade "Key down", "Keying: SO", "Letter: ."; Alex 17 blocks away as a dash comes in: his receiver and the redstone lamp on it lit, "Speaker beeps" in the subtitles from his Radio Speaker set to Tone, and his pager's screen lit; three seconds after the last dot, his pager's message "Radio Pager: message on 2026 from Dev: “SOS”", with "Telegraph clacks" and "Pager beeps"; Dev's Radio Telegraph screen with "Morse: On", Send showing "Keying..." and "Keying it in Morse on 2026 (656 blocks + 9 towers): about 8 seconds"; and Alex's telegraph afterwards with both messages, "SOS" and "CQ DE DEV"](docs/images/morse-code.png)
 
+### Ticker Tape Printer
+
+Since 0.63 a **Ticker Tape Printer** keeps a written record of a frequency's messages.
+
+- **Set it up:** place it, tune it with a Frequency Tuner, and right-click it with a **Book and Quill** ("Book loaded: messages on 2026 are printed in it"). A hopper above or beside it can put a Book and Quill in too, one at a time.
+- **Printing:** every message that reaches its frequency where it stands is printed in the book: telegraph messages, Morse, a weather station's announcements, raid alerts, computers' messages. Each entry is the day and time, who sent it and the text ("Day 1, 12:00, Alex:" / "Dinner at the base at six"), packed onto pages as they fit. Its tape runs out over the edge for a moment, with a "Ticker tape prints" clatter.
+- **Nothing is missed:** it prints from what the network remembers on its frequency (the last 16 messages), so messages that came while its chunk wasn't loaded, or while it had no book, are printed when it can. A new printer, or one re-tuned, starts with the next message.
+- **The logbook:** a book holds 50 pages. When a message doesn't fit any more, the book is signed as a logbook, titled with the frequency ("2026 log", with its name if it has one) and written by the Ticker Tape Printer, and the message waits for the next book. A **hopper under it** takes out finished logbooks only (never a book still being printed in).
+- **By hand:** an empty hand takes the book out whenever you like ("Took the book out (2 pages printed)"); you can read it, sign it yourself or put it back. Sneak + right-click shows its status: "Ticker Tape Printer | Frequency 2026 | Book: 12 / 50 pages | Printed: 37". Broken, it drops its book.
+- **A comparator** next to it reads 0 with no book, 1 to 14 as the book fills, and 15 for a logbook waiting to be taken out.
+- **Jade (and WTHIT)** show "Book: 1 / 50 pages" (or "No book: messages wait for one", "Logbook full: take it out"), "Waiting to print: 1", "Last printed: “OK” from Dev", "Printed: 2 messages", and "Printing" while its tape runs.
+- **Encrypted frequencies:** a printer tuned by someone who isn't a member prints who sent each message but "(encrypted)" for the text, and says so like a telegraph.
+
+![WTHIT on a Radio Transmitter on 2026: "Frequency: 2026", "Sending: 15", "Reach: 1344 blocks", "Antenna: Gold Antenna (×2 reach)", "Battery: 80%"; Dev loading a Book and Quill into a Ticker Tape Printer on a hopper beside a chest, "Book loaded: messages on 2026 are printed in it", WTHIT "Book: 0 / 50 pages"; the printer after Dev keyed OK on the Morse Key, its tape running out over the edge, "Ticker tape prints" in the subtitles, WTHIT "Last printed: “OK” from Dev", "Printed: 2 messages", "Printing"; the book taken out and opened: "Day 1, 12:00, Alex: Dinner at the base at six" and "Day 1, 12:00, Dev: OK"; after a 50-page book overflowed and the hopper took the logbook, WTHIT "No book: messages wait for one", "Waiting to print: 1"; and the logbook in the chest, "2026 log", "by Ticker Tape Printer"](docs/images/ticker-printer.png)
+
 ### Radio Weather Station
 
 A **Radio Weather Station** (since 0.53) is a full-size transmitter with a sun and a rain cloud on its sides. Instead of the redstone it gets, it broadcasts one **reading** of the conditions where it stands. Right-click it with an empty hand to pick which:
@@ -839,6 +856,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A two-tone siren | "Raid siren wails" | A village station when a raid starts, heard 48 blocks away |
 | A bang and a roar | "Rocket lifts off" | A Launch Pad launches, heard 64 blocks away (since 0.61) |
 | A steady beep | "Speaker beeps" | A Radio Speaker set to Tone, for as long as its frequency is on (since 0.62) |
+| A type wheel's chatter and a clunk | "Ticker tape prints" | A Ticker Tape Printer prints a message (since 0.63) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
@@ -1147,6 +1165,8 @@ G = Glass Pane   C = Copper Ingot   D = Daylight Detector
 
 **Morse Key:** a Compact Radio Transmitter, a Stone Button and a Gold Ingot, in any arrangement in the crafting grid.
 
+**Ticker Tape Printer:** a Radio Receiver, an Ink Sac, a Paper and a Glass, in any arrangement in the crafting grid.
+
 **Dish Rotator:** a Radio Mast, a Redstone Comparator and a Copper Ingot, in any arrangement in the crafting grid.
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
@@ -1247,7 +1267,7 @@ The dev runs include [Jade](https://modrinth.com/mod/jade) for testing the optio
 
 To try it with [Reiko's Weather](https://github.com/Reiko45/Reiko-s-weather-mod), build that mod's jar (`./gradlew jar` in its folder) and pass its path: `./gradlew runClient -PwithWeather=/path/to/reikos_weather-1.7.0.jar`. Nothing is compiled against it.
 
-To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, `-PwithCct` for CC: Tweaked, and `-PwithJourneyMap` or `-PwithXaero` for the map waypoints. Otherwise they're only compiled against (JourneyMap through its API from JourneyMap's maven).
+To look at the JEI or EMI pages, add `-PwithJei` or `-PwithEmi` to a run, `-PwithCct` for CC: Tweaked, `-PwithJourneyMap` or `-PwithXaero` for the map waypoints, and `-PwithWthit` for WTHIT (with Bad Packets, which it needs; add `-PnoJade` too to see WTHIT's tooltip on its own). Otherwise they're only compiled against (JourneyMap through its API from JourneyMap's maven).
 
 The sounds' `.ogg` files are checked in. To change one, edit `tools/make_sounds.py` and run `python3 tools/make_sounds.py` (it needs numpy and ffmpeg).
 
@@ -1343,6 +1363,8 @@ src/main/java/com/reiko/signaltower/
   block/MorseKeyBlock.java               the Morse Key: a click or held click keys it, redstone too, sneak for its status
   blockentity/MorseKeyBlockEntity.java   times the presses and gaps, holds the frequency on while down, sends the message
   client/SpeakerTone.java                a Radio Speaker's Tone: a looping sound for as long as the speaker is on
+  block/TickerPrinterBlock.java          the Ticker Tape Printer: loading and taking out its book, its status, comparator
+  blockentity/TickerPrinterBlockEntity.java  prints new messages from the network's memory into its book, signs a full one, its hopper slot
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -1408,6 +1430,8 @@ src/main/java/com/reiko/signaltower/
   compat/RadioInfo.java                  what Jade shows for each radio block (works without Jade)
   compat/ReikosWeatherCompat.java        reads Reiko's Weather by reflection (local weather, storm cells, season, temperature)
   compat/jade/SignalTowerJadePlugin.java the Jade plugin (only loaded by Jade)
+  compat/wthit/SignalTowerWthitCommon.java, SignalTowerWthitClient.java  the WTHIT plugin's server data and tooltip lines (only loaded by WTHIT, through waila_plugins.json)
+  compat/wthit/WthitBlocks.java          the blocks the WTHIT plugin covers, and what it registered (no WTHIT classes)
   compat/RecipeViewerInfo.java           what JEI and EMI show: every item's info text and the Radio Operator's trades (works without either)
   compat/jei/SignalTowerJeiPlugin.java, RadioOperatorCategory.java  the JEI plugin and its trades page (only loaded by JEI)
   compat/emi/SignalTowerEmiPlugin.java, RadioOperatorEmiRecipe.java  the EMI plugin and its trades page (only loaded by EMI)
@@ -1441,6 +1465,7 @@ src/main/resources/
   data/reikos_signal_tower/              recipes, loot tables, advancements, recipe-book unlocks, worldgen, village radio shacks (structure/village), test structures
   data/minecraft/tags/point_of_interest_type/acquirable_job_site.json  lets a villager with no job take a Radio Telegraph
   data/reikos_signal_tower/computercraft/  the radio turtle and pocket upgrades (read by CC: Tweaked)
+  waila_plugins.json                     names the WTHIT plugin's classes (read by WTHIT)
 tools/
   make_textures.py                       draws all textures (needs Pillow)
   make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen, the village shacks' templates
@@ -1637,14 +1662,14 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 175. the advancement tree: all seven loaded, each under its parent (root; First Broadcast; Over the Horizon a challenge and Head for Heights under it; Lost Signal; Finders Keepers a goal under it; Call Sign), with Weathered the Storm (under Head for Heights) only with Reiko's Weather; the tower trigger registered; Over the Horizon matches "on_air" at 500 and 4,000 but not 499 or another event; First Broadcast any "on_air"; Finders Keepers "found_tower_revived"; Head for Heights matches a player on a Tower Platform, not one beside it; Lost Signal one inside an old tower's piece (put in the chunk for the test), not one outside it;
 176. the tower events: an old tower off the air (4616) is quiet and fires nothing; a plain transmitter off the air (4617) and a powered jammer (4618) fire nothing; the old tower's lever on fires "found_tower_revived" once, for everyone within 24 blocks, and it's no longer quiet (saved); the plain one powered fires "on_air" for its tuner with its reach, and never "found_tower_revived"; the lever off, quiet again; on again, it fires again; the jammer never;
 177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site;
-178. JEI and EMI: all 51 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
+178. JEI and EMI: all 52 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
 179. village radio shacks: at the default weight of 3, each of the five villages' house pools (plains, desert, savanna, snowy, taiga) holds the shack 3 times, and adding it again changes nothing; each shack is 8 by 7 by 7, with a telegraph, a 2-block bed, 4 masts, a transmitter marked as a village station, a battery charged to 80,000, a "Radio Station" sign, and its two jigsaws (onto the street, and for its villager);
 180. two plains shacks placed as a village would (one turned a quarter): both go on the air, each on its own free frequency between 100,000 and 999,999 written on its sign; Jade calls each a village's radio station; taking its torch away and putting it back doesn't count as an old tower going quiet and coming back (no Finders Keepers);
 181. computers (without CC: Tweaked's classes): a transmitter sends what a computer sets, and stops when the last computer goes; a receiver's computers get `radio_signal` as what it hears changes, and it can listen on any frequency and scan; a transmitter can't be tuned onto someone else's private frequency or out of range (a receiver can listen to it); a telegraph sends as "Computer 7", the other one's computers get `radio_message`, and its messages are listed; too fast and empty are refused; Jade shows what the computer sends;
 182. with CC: Tweaked loaded: transmitters, receivers (plain, toggle, lamp) and telegraphs are its peripherals, and a mast isn't (without it there's nothing to check);
 183. raid alerts step by step: a raid puts a station whose torch is gone on the air at 15, and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each wave once; a won raid "the village held", and it goes quiet; a raid that goes away "The raid has ended"; one already over when it's first seen, nothing; a lost one "the village fell"; Jade shows the raid, and it's saved;
 184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended";
-185. sounds: all eleven are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static, Siren and Tone are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
+185. sounds: all twelve are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static, Siren and Tone are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
 186. a radio on the move (without CC: Tweaked's classes): it hears a tower where it is and scans it; its pulse reaches a receiver (heard by 1) and ends; its message, signed "Turtle 3", reaches a telegraph and is listed, but not back to itself; empty is refused, and so is someone else's private frequency; a telegraph's message reaches it, but not once it has moved 5,000 blocks away;
 187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check);
 188. the Radio Jukebox: quiet with no disc; stone doesn't go in (by hand or hopper); a disc does and it goes on the air with its song in the network, and a comparator reads the song's level; one disc at a time, and no taking it out while it plays; a receiver on its frequency hears it; a speaker on it plays the song (not its own sound) and tells clients, one on another frequency doesn't; Jade shows the song on both; a redstone pulse plays it again from the start and the speaker starts again, steady redstone repeats it (the network agrees on when this repeat began), and without the redstone the play going on is the last; at the end it goes quiet and the speaker and receiver stop; a hopper takes the disc out and another goes in and plays; taken out by hand, it's quiet; broken, it's off the air and drops its disc;
@@ -1655,9 +1680,11 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 193. map waypoints: a player's own full-size towers with their reach, not compact ones or anyone else's; an old tower once they've been near it, found once, updated rather than doubled, with the frequency the network has for it now; the list goes to the client as it is, and what they've found is kept with the player;
 194. Morse code: the table and what can be sent; messages keyed at a telegraph's speed come back as they went (SOS, HELLO WORLD, CQ CQ DE DEV 73, TEST 123?, EEE, MOM, OM OM, E), and so do ones keyed by hand with uneven timing (clicks of 6 ticks or 10, holds of 13 to 25, gaps inside a letter of 1 to 5), all-dot and all-dash ones too; a letter being keyed shows its dots and dashes; the mod's logo is declared, kept sharp, and is a 512 by 512 PNG;
 195. the Morse Key: keyed by redstone, S O S, a receiver on its frequency pulses with it, a pager hears it but doesn't alert, and the frequency carries Morse; Jade shows what's keyed; one log entry for the message; 3 seconds after the last press the message "SOS" from "Morse Key" is in the network and on a telegraph, and the key is ready again; a click puts it down for a moment (heard) and up again; a hold whose repeats come late (7 ticks apart) is one long press, so a click and a hold are ".-"; on someone else's private frequency a click is refused;
-196. a telegraph with Morse on: a speaker set to Tone doesn't ring; the message is keyed out (a receiver pulses), a second one while keying is refused, the screen and Jade say it's keying, and the text arrives only when it's done, in capitals, from "Dev", on the other telegraph too, with one log entry.
+196. a telegraph with Morse on: a speaker set to Tone doesn't ring; the message is keyed out (a receiver pulses), a second one while keying is refused, the screen and Jade say it's keying, and the text arrives only when it's done, in capitals, from "Dev", on the other telegraph too, with one log entry;
+197. the Ticker Tape Printer: a message sent before it was placed isn't printed; its slot takes one Book and Quill and nothing else, and doesn't give up a book being printed in; a message is printed as "Day 1, 12:00, Dev:" and the text, the tape runs, the comparator reads 1 and Jade shows it, and a second goes on the same page; with no book a message waits (Jade: 1 waiting); a message that doesn't fit in a 50-page book signs it ("4640 log" by the Ticker Tape Printer, comparator 15), a hopper's pull takes the logbook out, and the message is printed in the next book; on someone else's encrypted frequency it prints "(encrypted)" and says why; broken, it drops its book;
+198. WTHIT: waila_plugins.json names the common and client plugins, which are in the jar; with WTHIT loaded (`-PwithWthit`) the plugin has registered every covered block, and WTHIT finds its data provider for a Ticker Tape Printer and a Radio Transmitter.
 
-All 196 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
+All 198 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
 
 ## License
 

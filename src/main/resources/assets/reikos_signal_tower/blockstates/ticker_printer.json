@@ -1,0 +1,64 @@
+{
+  "variants": {
+    "book=false,facing=north,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer"
+    },
+    "book=false,facing=north,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing"
+    },
+    "book=true,facing=north,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer_book"
+    },
+    "book=true,facing=north,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing_book"
+    },
+    "book=false,facing=east,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer",
+      "y": 90
+    },
+    "book=false,facing=east,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing",
+      "y": 90
+    },
+    "book=true,facing=east,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer_book",
+      "y": 90
+    },
+    "book=true,facing=east,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing_book",
+      "y": 90
+    },
+    "book=false,facing=south,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer",
+      "y": 180
+    },
+    "book=false,facing=south,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing",
+      "y": 180
+    },
+    "book=true,facing=south,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer_book",
+      "y": 180
+    },
+    "book=true,facing=south,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing_book",
+      "y": 180
+    },
+    "book=false,facing=west,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer",
+      "y": 270
+    },
+    "book=false,facing=west,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing",
+      "y": 270
+    },
+    "book=true,facing=west,printing=false": {
+      "model": "reikos_signal_tower:block/ticker_printer_book",
+      "y": 270
+    },
+    "book=true,facing=west,printing=true": {
+      "model": "reikos_signal_tower:block/ticker_printer_printing_book",
+      "y": 270
+    }
+  }
+}

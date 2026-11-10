@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 51) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 52) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 51, "All the mod's items: " + items.size());
+        check(items.size() == 52, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9817,7 +9817,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * The mod's own sounds: all eleven are registered; sounds.json lists each with a subtitle that
+     * The mod's own sounds: all twelve are registered; sounds.json lists each with a subtitle that
      * en_us.json has, and each one's file is there, an Ogg Vorbis file, mono (so it's heard from
      * where it's played) at 44.1 kHz. The Speaker's three new sounds are the mod's, the Radio
      * Operator works its telegraph's key. A new Radio Transmitter coming on the air plays its "on"
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 11 && sounds.size() == 11, "Eleven sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 12 && sounds.size() == 12, "Twelve sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10633,5 +10633,188 @@ public final class SignalTowerGameTests {
                     check(ticks[0] > 40, "It took " + ticks[0] + " ticks");
                 })
                 .thenSucceed();
+    }
+
+    // ---- v0.63.0: the Ticker Tape Printer, WTHIT ----
+
+    /** The text of page {@code page} (0-based) of the book in the printer at {@code pos}, or "" (works for a logbook too). */
+    private static String printedPage(GameTestHelper helper, BlockPos pos, int page) {
+        com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(pos);
+        ItemStack book = printer.getBook();
+        var writable = book.get(net.minecraft.core.component.DataComponents.WRITABLE_BOOK_CONTENT);
+        if (writable != null) {
+            return page < writable.pages().size() ? writable.pages().get(page).raw() : "";
+        }
+        var written = book.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+        return written != null && page < written.pages().size() ? written.pages().get(page).raw().getString() : "";
+    }
+
+    /**
+     * The Ticker Tape Printer: a message sent before it was placed isn't printed; its slot takes one
+     * Book and Quill and nothing else, and won't give up a book still being printed in; a telegraph's
+     * message is printed (the day and time, "Dev:", the text), the tape runs, the comparator reads 1 and
+     * Jade shows it; with no book a message waits (Jade: 1 waiting) and is printed in the next book; a
+     * message that doesn't fit in a full book signs it (a written book "4640 log" by the Ticker Tape
+     * Printer, 50 pages, comparator 15), a hopper's pull takes the logbook out, and the message goes
+     * in the next book; on someone else's encrypted frequency it prints "(encrypted)" and says why;
+     * broken, it drops its book.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void tickerPrinter(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos printerPos = new BlockPos(2, 1, 2);
+        BlockPos telegraphPos = new BlockPos(6, 1, 2);
+        BlockPos secretPos = new BlockPos(2, 1, 5);
+        int ticks = com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.CHECK_TICKS + 1;
+        place(helper, telegraphPos, ModRegistry.RADIO_TELEGRAPH.get(), 4640);
+        BlockPos absTelegraph = helper.absolutePos(telegraphPos);
+        check(com.reiko.signaltower.radio.Telegraph.sendAs(level, absTelegraph, null, "Dev", "Before the printer").sent(), "Sent before");
+        java.util.function.Consumer<String> broadcast = text -> com.reiko.signaltower.radio.Telegraph.broadcast(level, absTelegraph, 4640,
+                com.reiko.signaltower.radio.Telegraph.coverage(level, absTelegraph, 4640), "Dev", text);
+        place(helper, printerPos, ModRegistry.TICKER_PRINTER.get(), 4640);
+        com.reiko.signaltower.radio.FrequencyClaims claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    var slot = printer.items();
+                    check(slot.insertItem(0, new ItemStack(net.minecraft.world.item.Items.PAPER), false).getCount() == 1, "Paper doesn't go in");
+                    check(slot.insertItem(0, new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK, 3), false).getCount() == 2, "One Book and Quill goes in");
+                    check(slot.insertItem(0, new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK), false).getCount() == 1, "Not a second");
+                    check(slot.extractItem(0, 1, false).isEmpty(), "A book being printed in doesn't come out");
+                    check(helper.getBlockState(printerPos).getValue(com.reiko.signaltower.block.TickerPrinterBlock.BOOK), "The book shows");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    check(printer.printedCount() == 0 && printedPage(helper, printerPos, 0).isEmpty(), "What was sent before isn't printed");
+                    broadcast.accept("Front gate is open");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    String page = printedPage(helper, printerPos, 0);
+                    check(printer.printedCount() == 1 && page.matches("Day \\d+, \\d\\d:\\d\\d, Dev:\nFront gate is open"), "Printed: " + page);
+                    check(helper.getBlockState(printerPos).getValue(com.reiko.signaltower.block.TickerPrinterBlock.PRINTING), "The tape runs");
+                    check(printer.comparatorOutput() == 1, "Comparator 1: " + printer.comparatorOutput());
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(printerPos));
+                    check(info != null && info.getString("printer_book").equals("writing") && info.getInt("printer_pages") == 1
+                            && info.getInt("printer_count") == 1 && info.getString("printer_last_text").equals("Front gate is open"), "Jade: " + info);
+                    List<String> keys = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(printerPos), info));
+                    check(keys.contains("printer_book") && keys.contains("printer_last") && keys.contains("printer_count_one"), "Jade's lines: " + keys);
+                    broadcast.accept("Lights on in the hall");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    String page = printedPage(helper, printerPos, 0);
+                    check(page.contains("Front gate is open\n\nDay ") && page.endsWith("Dev:\nLights on in the hall"), "Two on a page: " + page);
+                    // Taken out (by hand): the next message waits for a book.
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    ItemStack out = printer.unload();
+                    check(out.is(net.minecraft.world.item.Items.WRITABLE_BOOK) && printer.comparatorOutput() == 0, "Taken out");
+                    broadcast.accept("Back in 5 minutes");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    check(!helper.getBlockState(printerPos).getValue(com.reiko.signaltower.block.TickerPrinterBlock.BOOK), "No book shows");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, helper.absolutePos(printerPos));
+                    check(info.getString("printer_book").equals("none") && info.getInt("printer_waiting") == 1, "Waiting: " + info);
+                    // A full book: 50 pages with no room left.
+                    ItemStack full = new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK);
+                    List<net.minecraft.server.network.Filterable<String>> pages = new java.util.ArrayList<>();
+                    for (int i = 0; i < com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.PAGES; i++) {
+                        pages.add(net.minecraft.server.network.Filterable.passThrough("x".repeat(
+                                com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.CHARS_PER_LINE
+                                        * com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.LINES_PER_PAGE)));
+                    }
+                    full.set(net.minecraft.core.component.DataComponents.WRITABLE_BOOK_CONTENT, new net.minecraft.world.item.component.WritableBookContent(pages));
+                    check(printer.items().insertItem(0, full, false).isEmpty(), "A full book goes in");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    ItemStack book = printer.getBook();
+                    var written = book.get(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT);
+                    check(printer.isFull() && book.is(net.minecraft.world.item.Items.WRITTEN_BOOK) && written != null
+                            && written.title().raw().equals("4640 log") && written.author().equals("Ticker Tape Printer")
+                            && written.pages().size() == com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.PAGES,
+                            "Signed as a logbook: " + written);
+                    check(printer.comparatorOutput() == 15 && printer.waiting(level) == 1, "Comparator 15, the message waits");
+                    ItemStack pulled = printer.items().extractItem(0, 1, false);
+                    check(pulled.is(net.minecraft.world.item.Items.WRITTEN_BOOK) && !printer.hasBook(), "A hopper takes the logbook out");
+                    check(printer.items().insertItem(0, new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK), false).isEmpty(), "A new book");
+                })
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    String page = printedPage(helper, printerPos, 0);
+                    check(page.endsWith("Dev:\nBack in 5 minutes"), "What waited is printed in the new book: " + page);
+                    // Someone else's encrypted frequency.
+                    claims.put(4641, UUID.randomUUID(), "Owner", java.util.Map.of(), List.of(), true);
+                    SignalNetwork.get(level).invalidate(4641);
+                    place(helper, secretPos, ModRegistry.TICKER_PRINTER.get(), 4641);
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity secret = helper.getBlockEntity(secretPos);
+                    secret.setTunedBy(UUID.randomUUID());
+                    secret.load(new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK));
+                })
+                .thenIdle(2)
+                .thenExecute(() -> com.reiko.signaltower.radio.Telegraph.broadcast(level, absTelegraph, 4641,
+                        com.reiko.signaltower.radio.Telegraph.coverage(level, absTelegraph, 4641), "Owner", "The secret plan"))
+                .thenIdle(ticks)
+                .thenExecute(() -> {
+                    try {
+                        String page = printedPage(helper, secretPos, 0);
+                        check(page.endsWith("Owner:\n(encrypted)"), "Encrypted: " + page);
+                        Component deaf = com.reiko.signaltower.block.RadioBlock.quietNotice(level, helper.absolutePos(secretPos));
+                        check(deaf != null && keyOf(deaf).endsWith("encrypted_deaf"), "It says why: " + deaf);
+                    } finally {
+                        claims.remove(4641);
+                        SignalNetwork.get(level).invalidate(4641);
+                    }
+                    helper.destroyBlock(printerPos);
+                })
+                .thenIdle(1)
+                .thenExecute(() -> helper.assertItemEntityPresent(net.minecraft.world.item.Items.WRITABLE_BOOK, printerPos, 2.0))
+                .thenSucceed();
+    }
+
+    /**
+     * WTHIT: waila_plugins.json names the common and client plugins, which are in the jar. With WTHIT
+     * loaded (-PwithWthit), the common plugin has registered its data provider for every covered
+     * block, and WTHIT finds it for a Ticker Tape Printer and a transmitter (without it, nothing more
+     * to check).
+     */
+    @GameTest(template = PLATFORM)
+    public static void wthitPlugin(GameTestHelper helper) {
+        com.google.gson.JsonObject plugins = com.google.gson.JsonParser.parseString(new String(
+                modResource("waila_plugins.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        com.google.gson.JsonObject entry = plugins.getAsJsonObject("reikos_signal_tower:radio");
+        check(entry != null, "The plugin is declared: " + plugins);
+        for (String side : List.of("common", "client")) {
+            String name = entry.getAsJsonObject("entrypoints").get(side).getAsString();
+            check(com.reiko.signaltower.SignalTower.class.getResource("/" + name.replace('.', '/') + ".class") != null, "Its " + side + " class: " + name);
+        }
+        if (net.neoforged.fml.ModList.get().isLoaded("wthit")) {
+            List<String> registered = com.reiko.signaltower.compat.wthit.WthitBlocks.registered();
+            for (Class<?> block : com.reiko.signaltower.compat.wthit.WthitBlocks.COVERED) {
+                check(registered.contains("common:" + block.getSimpleName()), "Registered with WTHIT: " + block.getSimpleName() + " in " + registered);
+            }
+            try {
+                Object registrar = Class.forName("mcp.mobius.waila.registry.Registrar").getMethod("get").invoke(null);
+                Object blockData = registrar.getClass().getField("blockData").get(registrar);
+                for (Block block : List.of(ModRegistry.TICKER_PRINTER.get(), ModRegistry.RADIO_TRANSMITTER.get())) {
+                    List<?> found = (List<?>) blockData.getClass().getMethod("get", Object.class).invoke(blockData, block);
+                    boolean ours = false;
+                    for (Object e : found) {
+                        Object instance = e.getClass().getMethod("instance").invoke(e);
+                        ours |= instance.getClass().getName().startsWith("com.reiko.signaltower.compat.wthit.");
+                    }
+                    check(ours, "WTHIT has our data for " + block + ": " + found);
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new net.minecraft.gametest.framework.GameTestAssertException("Couldn't look into WTHIT: " + e);
+            }
+        }
+        helper.succeed();
     }
 }

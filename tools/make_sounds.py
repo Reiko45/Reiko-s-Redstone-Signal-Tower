@@ -241,6 +241,22 @@ def speaker_tone():
     return x / np.max(np.abs(x)) * 0.55
 
 
+def printer_print():
+    """v0.63.0: a Ticker Tape Printer printing: the type wheel's quick uneven chatter over a motor's
+    hum, then the clunk of the tape moving on."""
+    d = 0.7
+    out = silence(d)
+    at = 0.02
+    while at < 0.5:
+        out = place(out, click(body=700, ring=3400, length=0.018, bright=0.7) * rng.uniform(0.35, 0.7), at)
+        at += rng.uniform(0.022, 0.045)
+    hum_t = t(0.55)
+    hum = (np.sin(2 * np.pi * 110 * hum_t) + 0.4 * np.sin(2 * np.pi * 220 * hum_t)) * 0.12 * envelope(len(hum_t), 0.03, 0.08)
+    out = place(out, hum, 0.0)
+    out = place(out, click(body=260, ring=1500, length=0.05) * 0.9, 0.56)
+    return normalize(out * envelope(len(out), 0.002, 0.03), 0.8)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -254,6 +270,7 @@ SOUND_LIST = {
     "station.siren": ("station_siren", station_siren),
     "satellite.launch": ("satellite_launch", satellite_launch),
     "speaker.tone": ("speaker_tone", speaker_tone),
+    "printer.print": ("printer_print", printer_print),
 }
 
 

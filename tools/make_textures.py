@@ -1449,7 +1449,52 @@ def launch_pad_side():
     return img
 
 
+def ticker_tape():
+    """v0.63.0: the Ticker Tape Printer's paper: off-white, with a row of printed marks down the middle."""
+    rnd = random.Random(6301)
+    img = blank((236, 232, 214, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            if rnd.random() < 0.12:
+                px[x, y] = (222, 216, 196, 255)
+    for y in range(1, 16, 2):
+        for x in range(4, 12):
+            if rnd.random() < 0.55:
+                px[x, y] = (40, 40, 46, 255)
+    return img
+
+
+def ticker_book_cover():
+    """v0.63.0: the logbook lying on the printer: brown leather with a gold band."""
+    rnd = random.Random(6302)
+    img = blank()
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            base = (98, 58, 30) if rnd.random() < 0.8 else (84, 48, 24)
+            px[x, y] = base + (255,)
+    for x in range(16):
+        px[x, 0] = (60, 34, 16, 255)
+        px[x, 15] = (60, 34, 16, 255)
+        px[x, 11] = (214, 172, 64, 255)
+    return img
+
+
+def ticker_book_pages():
+    """v0.63.0: the logbook's page edges."""
+    img = blank((232, 226, 206, 255))
+    px = img.load()
+    for y in range(0, 16, 2):
+        for x in range(16):
+            px[x, y] = (206, 198, 176, 255)
+    return img
+
+
 blocks = {
+    "ticker_tape": ticker_tape(),
+    "ticker_book_cover": ticker_book_cover(),
+    "ticker_book_pages": ticker_book_pages(),
     **{f"radio_battery_side_{n}": battery_side(n) for n in range(5)},
     "radio_battery_top": battery_top(),
     "solar_panel_top": solar_top(),

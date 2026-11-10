@@ -81,6 +81,14 @@ dependencies {
     if (project.hasProperty('withXaero')) {
         localRuntime "maven.modrinth:xaeros-minimap:${xaero_version}"
     }
+    // WTHIT (v0.63.0) is optional: compat/wthit is compiled against it and only loaded by WTHIT itself
+    // (through waila_plugins.json). Add it (with Bad Packets, which it needs) to a dev run with -PwithWthit;
+    // add -PnoJade too to see WTHIT's tooltip alone.
+    compileOnly "maven.modrinth:wthit:${wthit_version}"
+    if (project.hasProperty('withWthit')) {
+        localRuntime "maven.modrinth:wthit:${wthit_version}"
+        localRuntime "maven.modrinth:badpackets:${badpackets_version}"
+    }
 }
 
 base {

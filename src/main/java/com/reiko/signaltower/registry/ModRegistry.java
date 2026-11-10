@@ -354,6 +354,14 @@ public final class ModRegistry {
                     .noOcclusion()
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadioTelegraphBlock.POWERED) ? 7 : 0)));
 
+    /** v0.63.0: prints the messages on its frequency into a Book and Quill. */
+    public static final DeferredBlock<com.reiko.signaltower.block.TickerPrinterBlock> TICKER_PRINTER = BLOCKS.register("ticker_printer",
+            () -> new com.reiko.signaltower.block.TickerPrinterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(1.5F, 6.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
     /** v0.62.0: a straight key that sends Morse on its frequency. */
     public static final DeferredBlock<com.reiko.signaltower.block.MorseKeyBlock> MORSE_KEY = BLOCKS.register("morse_key",
             () -> new com.reiko.signaltower.block.MorseKeyBlock(BlockBehaviour.Properties.of()
@@ -609,6 +617,8 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radio_telegraph", RADIO_TELEGRAPH);
     public static final DeferredItem<BlockItem> MORSE_KEY_ITEM =
             ITEMS.registerSimpleBlockItem("morse_key", MORSE_KEY); // v0.62.0
+    public static final DeferredItem<BlockItem> TICKER_PRINTER_ITEM =
+            ITEMS.registerSimpleBlockItem("ticker_printer", TICKER_PRINTER); // v0.63.0
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
@@ -738,6 +748,10 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.LaunchPadBlockEntity>> LAUNCH_PAD_BE =
             BLOCK_ENTITIES.register("launch_pad",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.LaunchPadBlockEntity::new, LAUNCH_PAD.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TickerPrinterBlockEntity>> TICKER_PRINTER_BE =
+            BLOCK_ENTITIES.register("ticker_printer",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TickerPrinterBlockEntity::new, TICKER_PRINTER.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.MorseKeyBlockEntity>> MORSE_KEY_BE =
             BLOCK_ENTITIES.register("morse_key",

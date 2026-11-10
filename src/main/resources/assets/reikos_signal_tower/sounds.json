@@ -64,5 +64,11 @@
     "sounds": [
       "reikos_signal_tower:speaker_tone"
     ]
+  },
+  "printer.print": {
+    "subtitle": "subtitles.reikos_signal_tower.printer.print",
+    "sounds": [
+      "reikos_signal_tower:printer_print"
+    ]
   }
 }

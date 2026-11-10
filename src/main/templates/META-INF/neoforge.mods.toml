@@ -34,6 +34,14 @@ logoBlur = false
     ordering = "NONE"
     side = "BOTH"
 
+# Optional (v0.63.0): WTHIT shows the same as Jade. Only checked if WTHIT is installed.
+[[dependencies.${mod_id}]]
+    modId = "wthit"
+    type = "optional"
+    versionRange = "[12.0,)"
+    ordering = "NONE"
+    side = "BOTH"
+
 # Optional (v0.58.0): CC: Tweaked computers can use radio transmitters, receivers and telegraphs as
 # peripherals. 1.114.0 is the first 1.21.1 release with the API this uses.
 [[dependencies.${mod_id}]]

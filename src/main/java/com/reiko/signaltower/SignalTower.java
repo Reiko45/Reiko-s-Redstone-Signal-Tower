@@ -108,6 +108,9 @@ public final class SignalTower {
         // v0.61.0: hoppers can load a Launch Pad.
         event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.LAUNCH_PAD_BE.get(),
                 (pad, side) -> pad.items());
+        // v0.63.0: hoppers can give a Ticker Tape Printer a Book and Quill, and take out finished logbooks.
+        event.registerBlockEntity(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, ModRegistry.TICKER_PRINTER_BE.get(),
+                (printer, side) -> printer.items());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
@@ -339,6 +342,7 @@ public final class SignalTower {
             event.accept(ModRegistry.SOLAR_PANEL_ITEM.get());
             event.accept(ModRegistry.RADIO_TELEGRAPH_ITEM.get());
             event.accept(ModRegistry.MORSE_KEY_ITEM.get()); // v0.62.0
+            event.accept(ModRegistry.TICKER_PRINTER_ITEM.get()); // v0.63.0
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

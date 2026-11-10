@@ -1,0 +1,10 @@
+{
+  "reikos_signal_tower:radio": {
+    "entrypoints": {
+      "common": "com.reiko.signaltower.compat.wthit.SignalTowerWthitCommon",
+      "client": "com.reiko.signaltower.compat.wthit.SignalTowerWthitClient"
+    },
+    "side": "*",
+    "required": []
+  }
+}

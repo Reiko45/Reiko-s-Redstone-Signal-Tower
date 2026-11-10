@@ -168,7 +168,8 @@ public final class RadioInfo {
                 }
                 if (level.getBlockEntity(pos) instanceof RadioBlockEntity radio
                         && (radio instanceof RadioReceiverBlockEntity || radio instanceof RadioRepeaterBlockEntity relay && relay.isConverter()
-                            || radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity)) {
+                            || radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity
+                            || radio instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity)) {
                     FrequencyClaims.Claim heard = FrequencyClaims.get(level.getServer()).get(radio.getFrequency());
                     if (heard != null && !heard.hears(radio.getTunedBy()) && radio.getTunedBy() != null) {
                         tag.putString("deaf_to", heard.ownerName());
@@ -338,6 +339,17 @@ public final class RadioInfo {
             tag.putString("morse_letter", key.pendingCode(now));
             tag.putString("morse_last", key.lastSent());
             tag.putBoolean("morse_down", key.isDown());
+        } else if (radio instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer) {
+            // v0.63.0: its book, how many messages it printed and the last, and how many are waiting for a book.
+            tag.putString("printer_book", !printer.hasBook() ? "none" : printer.isFull() ? "full" : "writing");
+            tag.putInt("printer_pages", printer.pages());
+            tag.putInt("printer_max", com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.PAGES);
+            tag.putInt("printer_count", printer.printedCount());
+            tag.putInt("printer_waiting", printer.waiting(level));
+            if (!printer.lastText().isEmpty()) {
+                tag.putString("printer_last_text", printer.lastText());
+                tag.putString("printer_last_from", printer.lastFrom());
+            }
         } else if (radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraph) {
             // v0.51.0: how far it sends, how many messages reached it, and the last one (unless it can't read them).
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
@@ -643,7 +655,8 @@ public final class RadioInfo {
             lines.add(Component.translatable(LANG + "jammed", data.getInt("jammed")).withStyle(ChatFormatting.LIGHT_PURPLE));
         }
         boolean deaf = data != null && data.contains("deaf_to");
-        boolean receiver = state.getBlock() instanceof RadioReceiverBlock || state.getBlock() instanceof com.reiko.signaltower.block.RadioTelegraphBlock;
+        boolean receiver = state.getBlock() instanceof RadioReceiverBlock || state.getBlock() instanceof com.reiko.signaltower.block.RadioTelegraphBlock
+                || state.getBlock() instanceof com.reiko.signaltower.block.TickerPrinterBlock;
         // A deaf receiver's own frequency is the one it can't hear: one line says both.
         if (data != null && data.contains("private_to") && !(deaf && receiver)) {
             Component owner = Component.literal(data.getString("private_to"));
@@ -826,6 +839,34 @@ public final class RadioInfo {
                     lines.add(Component.translatable(LANG + "morse_last", Component.literal(data.getString("morse_last"))).withStyle(ChatFormatting.AQUA));
                 }
                 lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.TickerPrinterBlock) {
+            // v0.63.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                String book = data.getString("printer_book");
+                lines.add((book.equals("none") ? Component.translatable(LANG + "printer_no_book").withStyle(ChatFormatting.GOLD)
+                        : book.equals("full") ? Component.translatable(LANG + "printer_full").withStyle(ChatFormatting.GOLD)
+                        : Component.translatable(LANG + "printer_book", data.getInt("printer_pages"), data.getInt("printer_max"))
+                                .withStyle(ChatFormatting.AQUA)));
+                if (data.getInt("printer_waiting") > 0) {
+                    lines.add(Component.translatable(LANG + "printer_waiting", data.getInt("printer_waiting")).withStyle(ChatFormatting.YELLOW));
+                }
+                if (data.contains("printer_last_text")) {
+                    lines.add(Component.translatable(LANG + "printer_last", Component.literal(data.getString("printer_last_text")),
+                            Component.literal(data.getString("printer_last_from"))).withStyle(ChatFormatting.YELLOW));
+                }
+                int count = data.getInt("printer_count");
+                lines.add(Component.translatable(LANG + (count == 1 ? "printer_count_one" : "printer_count"), count).withStyle(ChatFormatting.GRAY));
+            } else {
+                lines.add(Component.translatable(LANG + (state.getValue(com.reiko.signaltower.block.TickerPrinterBlock.BOOK)
+                        ? "printer_has_book" : "printer_no_book")).withStyle(ChatFormatting.GRAY));
+            }
+            if (state.getValue(com.reiko.signaltower.block.TickerPrinterBlock.PRINTING)) {
+                lines.add(Component.translatable(LANG + "printer_printing").withStyle(ChatFormatting.GREEN));
             }
             return lines;
         }
