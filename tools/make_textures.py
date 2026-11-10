@@ -997,6 +997,35 @@ def tuner_item():
     return img
 
 
+def walkie_item():
+    """v0.64.0: a Walkie-Talkie: a tall yellow handset with a black aerial, a small screen, a speaker
+    grille, a red LED and a push-to-talk button on its side."""
+    img = blank()
+    px = img.load()
+    outline, body, light, shade = (40, 34, 20, 255), (226, 176, 36, 255), (250, 212, 90, 255), (180, 134, 24, 255)
+    for y in range(0, 5):  # the aerial
+        px[9, y] = (34, 34, 38, 255)
+        px[10, y] = (60, 60, 66, 255)
+    px[9, 0] = px[10, 0] = (90, 90, 98, 255)
+    for y in range(4, 16):
+        for x in range(4, 12):
+            edge = x in (4, 11) or y in (4, 15)
+            px[x, y] = outline if edge else body
+    for y in range(5, 15):
+        px[5, y] = light
+        px[10, y] = shade
+    for x in range(6, 10):  # the screen
+        for y in (6, 7):
+            px[x, y] = (40, 60, 44, 255) if x in (6, 9) else (120, 210, 120, 255)
+    px[6, 5] = (230, 40, 30, 255)  # the LED
+    for y in (10, 12, 14):  # the speaker grille
+        for x in range(6, 10):
+            px[x, y] = (60, 48, 24, 255)
+    for y in (7, 8, 9):  # push to talk
+        px[3, y] = (34, 34, 38, 255)
+    return img
+
+
 def compact_receiver(lit):
     """Button-sized receiver. The model reads the front from uv 5..11 x 6..10 and the edges from
     rows 14-15, the same layout as vanilla button textures."""
@@ -1606,6 +1635,7 @@ items = {"frequency_tuner": tuner_item(), "wall_redstone": wall_redstone_item(),
          "multi_remote_heard": multi_remote_item("heard"), "multi_remote_missed": multi_remote_item("missed"),
          **{f"multi_remote_button_{i}": multi_remote_button(i) for i in range(1, 5)},
          "pager": pager_item(), "pager_on": pager_item(True), "signal_scanner": scanner_item(),
+         "walkie_talkie": walkie_item(),
          "signal_meter": meter_item(0), **{f"signal_meter_{i}": meter_item(i) for i in range(1, 4)},
          **{f"{tier}_antenna": antenna_item(tier) for tier in ("iron", "gold", "diamond", "netherite")},
          "dish_antenna": dish_item(), "coverage_map": coverage_map_item(), "ender_antenna": antenna_item("ender"),

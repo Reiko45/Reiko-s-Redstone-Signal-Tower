@@ -172,6 +172,8 @@ public class LogScreen extends Screen {
                 ? Component.translatable(KEY + "kind_keypad_guest", entry.detail())
                 : entry.kind() == SignalNetwork.CauseKind.TELEGRAPH
                 ? Component.translatable(KEY + "kind_telegraph_text", entry.detail()).withStyle(ChatFormatting.YELLOW)
+                : entry.kind() == SignalNetwork.CauseKind.WALKIE
+                ? Component.translatable(KEY + "kind_walkie_text", entry.detail()).withStyle(ChatFormatting.YELLOW)
                 : Component.translatable(KEY + "kind_" + entry.kind().name().toLowerCase(java.util.Locale.ROOT));
         return entry.from() != 0 ? Component.translatable(KEY + "kind_from", kind, entry.from()).withStyle(ChatFormatting.AQUA) : kind;
     }
@@ -276,6 +278,13 @@ public class LogScreen extends Screen {
                         ? Component.translatable(KEY + "tip_other_telegraph", entry.who()).withStyle(ChatFormatting.RED)
                         : Component.translatable(KEY + "tip_telegraph", entry.who()).withStyle(ChatFormatting.YELLOW)));
                 entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
+            }
+            case WALKIE -> {
+                // v0.64.0: what was said and who said it (never where they stood).
+                lines.add(Component.literal(entry.detail()).withStyle(ChatFormatting.YELLOW));
+                lines.add((entry.whoKind() == FrequencyAudit.Who.OTHER
+                        ? Component.translatable(KEY + "tip_other_walkie", entry.who()).withStyle(ChatFormatting.RED)
+                        : Component.translatable(KEY + "tip_walkie", entry.who()).withStyle(ChatFormatting.YELLOW)));
             }
             case MORSE -> {
                 // v0.62.0: a Morse message starting: who keyed it (nobody: redstone), where the key is.

@@ -673,6 +673,9 @@ public final class ModRegistry {
             ITEMS.register("multi_remote", () -> new MultiRemoteItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<PagerItem> PAGER =
             ITEMS.register("pager", () -> new PagerItem(new Item.Properties().stacksTo(1)));
+    /** v0.64.0: a two-way handheld radio. */
+    public static final DeferredItem<com.reiko.signaltower.item.WalkieTalkieItem> WALKIE_TALKIE =
+            ITEMS.register("walkie_talkie", () -> new com.reiko.signaltower.item.WalkieTalkieItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<SignalMeterItem> SIGNAL_METER =
             ITEMS.register("signal_meter", () -> new SignalMeterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredItem<SignalScannerItem> SIGNAL_SCANNER =

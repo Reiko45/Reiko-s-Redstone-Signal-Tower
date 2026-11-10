@@ -1293,7 +1293,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.60.0: a Radio Jukebox playing a song (the detail is the song). */
         JUKEBOX,
         /** v0.62.0: a Morse message starting, from a Morse Key (keyed by a player, or redstone) or a telegraph keying it. */
-        MORSE;
+        MORSE,
+        /** v0.64.0: something said into a Walkie-Talkie (in the log only, like a telegraph message; no position). */
+        WALKIE;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1441,10 +1443,15 @@ public final class SignalNetwork extends SavedData {
      * reach, towers that relayed it, repeaters on its frequency), the telegraph it came from, who
      * sent it, and the text.
      */
-    public record Message(long gameTime, long dayTime, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text) {
+    public record Message(long gameTime, long dayTime, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text,
+                          boolean handheld) {
         public Message {
             coverage = List.copyOf(coverage);
             from = from.immutable();
+        }
+
+        public Message(long gameTime, long dayTime, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text) {
+            this(gameTime, dayTime, coverage, from, who, name, text, false);
         }
     }
 
@@ -1455,7 +1462,16 @@ public final class SignalNetwork extends SavedData {
 
     /** Remembers a message sent on {@code frequency} over {@code coverage}, and returns it. */
     public Message recordMessage(int frequency, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text) {
-        Message message = new Message(now, nowDayTime, coverage, from, who, name, text);
+        return recordMessage(frequency, coverage, from, who, name, text, false);
+    }
+
+    /**
+     * v0.64.0: {@link #recordMessage(int, List, BlockPos, UUID, String, String)}, said into a
+     * Walkie-Talkie when {@code handheld}: {@code from} is where the player stood, which the log doesn't show.
+     */
+    public Message recordMessage(int frequency, List<Coverage> coverage, BlockPos from, @Nullable UUID who, String name, String text,
+                                 boolean handheld) {
+        Message message = new Message(now, nowDayTime, coverage, from, who, name, text, handheld);
         ArrayDeque<Message> list = messages.computeIfAbsent(frequency, f -> new ArrayDeque<>());
         list.addLast(message);
         while (list.size() > MAX_MESSAGES) {
@@ -3236,6 +3252,9 @@ public final class SignalNetwork extends SavedData {
                 }
                 entry.putString("name", message.name());
                 entry.putString("text", message.text());
+                if (message.handheld()) {
+                    entry.putBoolean("handheld", true); // v0.64.0
+                }
                 ListTag areas = new ListTag();
                 for (Coverage area : message.coverage()) {
                     CompoundTag areaTag = new CompoundTag();
@@ -3414,7 +3433,8 @@ public final class SignalNetwork extends SavedData {
             }
             ArrayDeque<Message> recent = network.messages.computeIfAbsent(Frequency.clamp(entry.getInt("frequency")), f -> new ArrayDeque<>());
             recent.addLast(new Message(entry.getLong("time"), entry.getLong("day_time"), coverage, BlockPos.of(entry.getLong("from")),
-                    entry.hasUUID("who") ? entry.getUUID("who") : null, entry.getString("name"), entry.getString("text")));
+                    entry.hasUUID("who") ? entry.getUUID("who") : null, entry.getString("name"), entry.getString("text"),
+                    entry.getBoolean("handheld")));
             while (recent.size() > MAX_MESSAGES) {
                 recent.removeFirst();
             }

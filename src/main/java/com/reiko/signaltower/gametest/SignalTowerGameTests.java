@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 52) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 53) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 52, "All the mod's items: " + items.size());
+        check(items.size() == 53, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9817,7 +9817,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * The mod's own sounds: all twelve are registered; sounds.json lists each with a subtitle that
+     * The mod's own sounds: all thirteen are registered; sounds.json lists each with a subtitle that
      * en_us.json has, and each one's file is there, an Ogg Vorbis file, mono (so it's heard from
      * where it's played) at 44.1 kHz. The Speaker's three new sounds are the mod's, the Radio
      * Operator works its telegraph's key. A new Radio Transmitter coming on the air plays its "on"
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 12 && sounds.size() == 12, "Twelve sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 13 && sounds.size() == 13, "Thirteen sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10816,5 +10816,152 @@ public final class SignalTowerGameTests {
             }
         }
         helper.succeed();
+    }
+
+    // ---- v0.64.0: the Walkie-Talkie ----
+
+    /**
+     * Walkie-Talkie lines: clear up to 70% of the way to the edge; past it words are cut off ("g..."),
+     * more the farther out, the same way for the same seed, cut words running together; the signal
+     * bars; how far out a spot is in the best area that reaches it; and "Heard by 2 walkie-talkies,
+     * 1 pager and 1 telegraph".
+     */
+    @GameTest(template = PLATFORM)
+    public static void walkieGarble(GameTestHelper helper) {
+        String text = "Meet at the gate by the old tower at dusk";
+        check(com.reiko.signaltower.radio.WalkieTalkie.garble(text, 0.5, 7).equals(text)
+                && com.reiko.signaltower.radio.WalkieTalkie.garble(text, 0.7, 7).equals(text), "Clear up to 70%");
+        String edge = com.reiko.signaltower.radio.WalkieTalkie.garble(text, 1.0, 7);
+        check(!edge.equals(text) && edge.contains("...") && edge.equals(com.reiko.signaltower.radio.WalkieTalkie.garble(text, 1.0, 7)),
+                "Broken up at the edge, the same way each time: " + edge);
+        int cutNear = 0;
+        int cutEdge = 0;
+        for (long seed = 0; seed < 200; seed++) {
+            String near = com.reiko.signaltower.radio.WalkieTalkie.garble(text, 0.8, seed);
+            String far = com.reiko.signaltower.radio.WalkieTalkie.garble(text, 1.0, seed);
+            check(!far.contains("... ...") && !far.contains("......"), "Cut words run together: " + far);
+            cutNear += near.split("\\.\\.\\.", -1).length - 1;
+            cutEdge += far.split("\\.\\.\\.", -1).length - 1;
+        }
+        check(cutNear > 0 && cutEdge > cutNear, "More is lost farther out: " + cutNear + " at 80%, " + cutEdge + " at the edge");
+        check(com.reiko.signaltower.radio.WalkieTalkie.bars(0.3) == 4 && com.reiko.signaltower.radio.WalkieTalkie.bars(0.6) == 3
+                && com.reiko.signaltower.radio.WalkieTalkie.bars(0.8) == 2 && com.reiko.signaltower.radio.WalkieTalkie.bars(0.95) == 1, "Signal bars");
+        List<SignalNetwork.Coverage> coverage = List.of(new SignalNetwork.Coverage(BlockPos.ZERO, 100, false),
+                new SignalNetwork.Coverage(new BlockPos(300, 0, 0), 50, true));
+        check(Math.abs(com.reiko.signaltower.radio.WalkieTalkie.edgeFraction(coverage, new BlockPos(40, 0, 0)) - 0.4) < 1e-9
+                && Math.abs(com.reiko.signaltower.radio.WalkieTalkie.edgeFraction(coverage, new BlockPos(280, 0, 0)) - 0.4) < 1e-9
+                && com.reiko.signaltower.radio.WalkieTalkie.edgeFraction(coverage, new BlockPos(200, 0, 0)) > 1, "How far out");
+        check(com.reiko.signaltower.radio.WalkieTalkie.heardBy(2, 1, 1).getString().equals("Heard by 2 walkie-talkies, 1 pager and 1 telegraph")
+                && com.reiko.signaltower.radio.WalkieTalkie.heardBy(1, 0, 0).getString().equals("Heard by 1 walkie-talkie")
+                && keyOf(com.reiko.signaltower.radio.WalkieTalkie.heardBy(0, 0, 0)).endsWith("walkie_heard_none"), "Heard by");
+        helper.succeed();
+    }
+
+    /**
+     * The Walkie-Talkie: one only in the inventory can't talk; nothing said is refused; Dev's line
+     * goes out (his own line in chat, "Said on 4642 ... | Heard by ..."), is kept as a handheld message
+     * from Dev, and a second at once is too fast; Alex, carrying one on 4642 nearby, hears it in full
+     * with four bars, and Dev, someone on another frequency and someone 5,000 blocks away don't; a
+     * telegraph's message on 4642 reaches Alex's walkie-talkie too; a Ticker Tape Printer prints Dev's
+     * line and a telegraph shows it. On an encrypted frequency of Dev's, Alex hears "(encrypted)",
+     * someone who isn't a member is refused, and the log lists a Walkie-Talkie entry with no position.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void walkieTalkie(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        com.reiko.signaltower.radio.WalkieTalkie.resetForTests();
+        BlockPos printerPos = new BlockPos(6, 1, 2);
+        BlockPos telegraphPos = new BlockPos(8, 1, 2);
+        place(helper, printerPos, ModRegistry.TICKER_PRINTER.get(), 4642);
+        place(helper, telegraphPos, ModRegistry.RADIO_TELEGRAPH.get(), 4642);
+        BlockPos absTelegraph = helper.absolutePos(telegraphPos);
+        SignalNetwork network = SignalNetwork.get(level);
+        UUID devId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> devChat = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 2), devId, "Dev", false, devBar, devChat);
+        ItemStack devWalkie = new ItemStack(ModRegistry.WALKIE_TALKIE.get());
+        FrequencyTunerItem.setFrequency(devWalkie, 4642);
+        dev.setItemInHand(InteractionHand.MAIN_HAND, devWalkie);
+        List<Component> alexChat = new java.util.ArrayList<>();
+        Player alex = namedPlayer(helper, new BlockPos(4, 1, 4), UUID.randomUUID(), "Alex", false, new java.util.ArrayList<>(), alexChat);
+        ItemStack alexWalkie = new ItemStack(ModRegistry.WALKIE_TALKIE.get());
+        FrequencyTunerItem.setFrequency(alexWalkie, 4642);
+        alex.getInventory().setItem(9, alexWalkie); // in the inventory, not in hand
+        List<Component> otherChat = new java.util.ArrayList<>();
+        Player other = namedPlayer(helper, new BlockPos(4, 1, 5), UUID.randomUUID(), "Other", false, new java.util.ArrayList<>(), otherChat);
+        ItemStack otherWalkie = new ItemStack(ModRegistry.WALKIE_TALKIE.get());
+        FrequencyTunerItem.setFrequency(otherWalkie, 4699);
+        other.getInventory().setItem(9, otherWalkie);
+        Player far = namedPlayer(helper, new BlockPos(2, 1, 2), UUID.randomUUID(), "Far", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        ItemStack farWalkie = new ItemStack(ModRegistry.WALKIE_TALKIE.get());
+        FrequencyTunerItem.setFrequency(farWalkie, 4642);
+        far.getInventory().setItem(9, farWalkie);
+        far.moveTo(far.getX() + 5000, far.getY(), far.getZ());
+        com.reiko.signaltower.radio.FrequencyClaims claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer = helper.getBlockEntity(printerPos);
+                    printer.load(new ItemStack(net.minecraft.world.item.Items.WRITABLE_BOOK));
+                    check(com.reiko.signaltower.radio.WalkieTalkie.talk(alex, false, "Hello") == null, "One only in the inventory can't talk");
+                    var empty = com.reiko.signaltower.radio.WalkieTalkie.talk(dev, false, "   ");
+                    check(empty != null && !empty.sent() && keyOf(empty.message()).endsWith("walkie_empty"), "Nothing said");
+                    var said = com.reiko.signaltower.radio.WalkieTalkie.talk(dev, false, "Meet at the gate");
+                    check(said != null && said.sent() && keyOf(said.message()).endsWith("remote_result"), "Said: " + (said == null ? null : said.message().getString()));
+                    check(!devChat.isEmpty() && devChat.get(devChat.size() - 1).getString().endsWith("Dev (you): Meet at the gate"),
+                            "Dev's own line: " + devChat);
+                    var again = com.reiko.signaltower.radio.WalkieTalkie.talk(dev, false, "Again");
+                    check(again != null && !again.sent() && keyOf(again.message()).endsWith("walkie_too_fast"), "Too fast");
+                    List<SignalNetwork.Message> kept = network.messages(4642);
+                    SignalNetwork.Message message = kept.get(kept.size() - 1);
+                    check(message.handheld() && devId.equals(message.who()) && message.name().equals("Dev") && message.text().equals("Meet at the gate"),
+                            "Kept as a handheld message: " + message);
+                    check(com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, alex, 4642, message) == 1
+                            && alexChat.get(alexChat.size() - 1).getString().equals("[4642] ▮▮▮▮ Dev: Meet at the gate"),
+                            "Alex hears it: " + alexChat);
+                    check(com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, dev, 4642, message) == 0
+                            && com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, other, 4642, message) == 0 && otherChat.isEmpty()
+                            && com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, far, 4642, message) == 0,
+                            "Not Dev, not another frequency, not 5000 blocks away");
+                    SignalNetwork.Message station = com.reiko.signaltower.radio.Telegraph.broadcast(level, absTelegraph, 4642,
+                            com.reiko.signaltower.radio.Telegraph.coverage(level, absTelegraph, 4642), "Station", "Storm coming");
+                    check(com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, alex, 4642, station) == 1
+                            && alexChat.get(alexChat.size() - 1).getString().endsWith("Station: Storm coming"), "A telegraph's message too: " + alexChat);
+                })
+                .thenIdle(com.reiko.signaltower.blockentity.TickerPrinterBlockEntity.CHECK_TICKS + 1)
+                .thenExecute(() -> {
+                    String page = printedPage(helper, printerPos, 0);
+                    check(page.contains("Dev:\nMeet at the gate"), "The printer has it: " + page);
+                    check(com.reiko.signaltower.radio.Telegraph.feed(level, absTelegraph, 4642, null).stream()
+                            .anyMatch(line -> line.who().equals("Dev") && line.text().equals("Meet at the gate")), "The telegraph shows it");
+                    claims.put(4643, devId, "Dev", java.util.Map.of(), List.of(), true);
+                    network.invalidate(4643);
+                    try {
+                        FrequencyTunerItem.setFrequency(devWalkie, 4643);
+                        FrequencyTunerItem.setFrequency(alexWalkie, 4643);
+                        com.reiko.signaltower.radio.WalkieTalkie.resetForTests();
+                        var secret = com.reiko.signaltower.radio.WalkieTalkie.talk(dev, false, "The secret plan");
+                        check(secret != null && secret.sent(), "The owner talks on it");
+                        List<SignalNetwork.Message> kept = network.messages(4643);
+                        check(com.reiko.signaltower.radio.WalkieTalkie.deliverTo(level, alex, 4643, kept.get(kept.size() - 1)) == 1
+                                && alexChat.get(alexChat.size() - 1).getString().endsWith("Dev: (encrypted)"), "Alex hears it's encrypted: " + alexChat);
+                        List<Component> eveBar = new java.util.ArrayList<>();
+                        Player eve = namedPlayer(helper, new BlockPos(3, 1, 3), UUID.randomUUID(), "Eve", false, eveBar, new java.util.ArrayList<>());
+                        ItemStack eveWalkie = new ItemStack(ModRegistry.WALKIE_TALKIE.get());
+                        FrequencyTunerItem.setFrequency(eveWalkie, 4643);
+                        eve.setItemInHand(InteractionHand.MAIN_HAND, eveWalkie);
+                        var refused = com.reiko.signaltower.radio.WalkieTalkie.talk(eve, false, "Let me in");
+                        check(refused != null && !refused.sent() && keyOf(refused.message()).endsWith("private_refused_walkie"), "Eve is refused");
+                        var walkieEntries = com.reiko.signaltower.radio.FrequencyLog.log(level.getServer(), 4643).stream()
+                                .filter(entry -> entry.kind() == SignalNetwork.CauseKind.WALKIE).toList();
+                        check(walkieEntries.size() == 1 && walkieEntries.get(0).pos().isEmpty() && walkieEntries.get(0).detail().equals("The secret plan"),
+                                "The log: a Walkie-Talkie entry, without where Dev stood: " + walkieEntries);
+                    } finally {
+                        claims.remove(4643);
+                        network.invalidate(4643);
+                    }
+                })
+                .thenSucceed();
     }
 }

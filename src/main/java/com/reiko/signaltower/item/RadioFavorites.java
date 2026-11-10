@@ -28,7 +28,7 @@ public final class RadioFavorites {
     public static boolean isScrollable(ItemStack stack) {
         Item item = stack.getItem();
         return item instanceof FrequencyTunerItem || item instanceof RemoteControlItem || item instanceof PagerItem
-                || item instanceof SignalMeterItem;
+                || item instanceof SignalMeterItem || item instanceof WalkieTalkieItem;
     }
 
     public static TunerPresets get(ItemStack stack) {

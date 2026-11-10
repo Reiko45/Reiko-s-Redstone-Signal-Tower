@@ -34,6 +34,16 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new FrequencyScreen(hand, frequency, title, favorites, sound, chatLog));
     }
 
+    /** v0.64.0: a Walkie-Talkie's screen: frequency, favorites and Sound. */
+    public static void openWalkieScreen(InteractionHand hand, int frequency, Component title, TunerPresets favorites, boolean sound) {
+        Minecraft.getInstance().setScreen(FrequencyScreen.walkie(hand, frequency, title, favorites, sound));
+    }
+
+    /** v0.64.0: the box to say something into the Walkie-Talkie in {@code hand}. */
+    public static void openTalkScreen(InteractionHand hand) {
+        Minecraft.getInstance().setScreen(new TalkScreen(hand));
+    }
+
     /** v0.60.0: what the Radio Speaker at {@code pos} plays now, from a Radio Jukebox (null: nothing). */
     public static void speakerMusic(net.minecraft.core.BlockPos pos,
                                     net.minecraft.resources.@Nullable ResourceKey<net.minecraft.world.item.JukeboxSong> song,

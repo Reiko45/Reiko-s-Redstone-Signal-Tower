@@ -125,6 +125,8 @@ public final class SignalTower {
                 RemoteScanRequestPayload::handle);
         registrar.playToServer(ConfigurePagerPayload.TYPE, ConfigurePagerPayload.STREAM_CODEC,
                 ConfigurePagerPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.WalkieTalkPayload.TYPE, com.reiko.signaltower.network.WalkieTalkPayload.STREAM_CODEC,
+                com.reiko.signaltower.network.WalkieTalkPayload::handle); // v0.64.0
         registrar.playToServer(ScrollFrequencyPayload.TYPE, ScrollFrequencyPayload.STREAM_CODEC,
                 ScrollFrequencyPayload::handle);
         registrar.playToServer(ConfigureFavoritesPayload.TYPE, ConfigureFavoritesPayload.STREAM_CODEC,
@@ -358,6 +360,7 @@ public final class SignalTower {
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
+            event.accept(ModRegistry.WALKIE_TALKIE.get()); // v0.64.0
             event.accept(ModRegistry.SIGNAL_SCANNER.get());
             event.accept(ModRegistry.SIGNAL_METER.get());
         } else if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
@@ -365,6 +368,7 @@ public final class SignalTower {
             event.accept(ModRegistry.REMOTE_CONTROL.get());
             event.accept(ModRegistry.MULTI_REMOTE.get());
             event.accept(ModRegistry.PAGER.get());
+            event.accept(ModRegistry.WALKIE_TALKIE.get()); // v0.64.0
             event.accept(ModRegistry.SIGNAL_SCANNER.get());
             event.accept(ModRegistry.SIGNAL_METER.get());
         }

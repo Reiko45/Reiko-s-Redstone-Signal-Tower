@@ -62,6 +62,8 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     /** Pager only: its Sound and Chat log settings (null for the tuner and remote). */
     private @Nullable Boolean pagerSound;
     private boolean pagerChatLog;
+    /** v0.64.0: a Walkie-Talkie's screen (the meter's layout, with a Sound button). */
+    private boolean walkie;
     /** Signal Meter (v0.40.0): the pager's screen with only a Sound button (its tick). */
     private boolean meter;
     private final Button[] presetButtons = new Button[TunerPresets.COUNT];
@@ -119,6 +121,13 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     public FrequencyScreen(InteractionHand hand, int frequency, Component title, TunerPresets presets, boolean sound) {
         this(hand, frequency, title, presets, sound, true);
         this.meter = true;
+    }
+
+    /** v0.64.0: a Walkie-Talkie's screen: like the meter's, its one button being Sound (the squelch). */
+    public static FrequencyScreen walkie(InteractionHand hand, int frequency, Component title, TunerPresets presets, boolean sound) {
+        FrequencyScreen screen = new FrequencyScreen(hand, frequency, title, presets, sound);
+        screen.walkie = true;
+        return screen;
     }
 
     @Override
@@ -263,7 +272,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
             addRenderableWidget(Button.builder(pagerSoundLabel(), button -> {
                 pagerSound = !pagerSound;
                 button.setMessage(pagerSoundLabel());
-            }).tooltip(Tooltip.create(Component.translatable(KEY + ".meter_sound_tooltip")))
+            }).tooltip(Tooltip.create(Component.translatable(KEY + (walkie ? ".walkie_sound_tooltip" : ".meter_sound_tooltip"))))
                     .bounds(centerX - 102, buttonsY, 204, 20).build());
             buttonsY += 24;
         } else if (pagerSound != null) {
@@ -570,7 +579,7 @@ public class FrequencyScreen extends Screen implements RemoteScanListener {
     }
 
     private Component pagerSoundLabel() {
-        return CommonComponents.optionNameValue(Component.translatable(KEY + (meter ? ".meter_sound" : ".pager_sound")),
+        return CommonComponents.optionNameValue(Component.translatable(KEY + (meter && !walkie ? ".meter_sound" : ".pager_sound")),
                 CommonComponents.optionStatus(Boolean.TRUE.equals(pagerSound)));
     }
 

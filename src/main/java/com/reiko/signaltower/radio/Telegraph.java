@@ -137,7 +137,7 @@ public final class Telegraph {
         SignalNetwork.Message message = network.recordMessage(frequency, coverage, pos, who, name, text);
         telegraph.markSent(now);
         level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(), SoundSource.BLOCKS, 0.7F, 1.0F);
-        int[] read = deliver(level, pos, frequency, coverage, message);
+        int[] read = deliverMessage(level, pos, frequency, coverage, message);
         int pagers = read[0];
         int telegraphs = read[1];
         Component reach = RemoteControlItem.describeReach(own.get(0).reach(), own.size() - 1, coverage.size() - own.size());
@@ -146,9 +146,12 @@ public final class Telegraph {
         return new Result(Component.translatable(KEY + "remote_result", sent, readBy(pagers, telegraphs)), true, pagers, telegraphs);
     }
 
-    /** Hands {@code message} to the pagers and (other) telegraphs on {@code frequency} in {@code coverage}: how many of each read it. */
-    private static int[] deliver(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
-                                 SignalNetwork.Message message) {
+    /**
+     * Hands {@code message} to the pagers, (other) telegraphs and (v0.64.0) Walkie-Talkies on
+     * {@code frequency} in {@code coverage}: {pagers, telegraphs, walkie-talkies} that read it.
+     */
+    public static int[] deliverMessage(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
+                                       SignalNetwork.Message message) {
         int pagers = 0;
         for (ServerPlayer player : level.players()) {
             pagers += PagerItem.deliverMessage(level, player, frequency, message);
@@ -164,7 +167,8 @@ public final class Telegraph {
             }
         }
         com.reiko.signaltower.compat.MobileRadio.deliver(level, frequency, coverage, message); // v0.59.0: radio turtles and pocket computers
-        return new int[]{pagers, telegraphs};
+        int walkies = WalkieTalkie.deliver(level, frequency, message); // v0.64.0
+        return new int[]{pagers, telegraphs, walkies};
     }
 
     /**
@@ -175,7 +179,7 @@ public final class Telegraph {
     public static SignalNetwork.Message broadcast(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
                                                   String name, String text) {
         SignalNetwork.Message message = SignalNetwork.get(level).recordMessage(frequency, coverage, pos, null, name, text);
-        deliver(level, pos, frequency, coverage, message);
+        deliverMessage(level, pos, frequency, coverage, message);
         return message;
     }
 
@@ -187,7 +191,7 @@ public final class Telegraph {
     public static int[] morseMessage(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
                                      @Nullable UUID who, String name, String text) {
         SignalNetwork.Message message = SignalNetwork.get(level).recordMessage(frequency, coverage, pos, who, name, clean(text));
-        return deliver(level, pos, frequency, coverage, message);
+        return deliverMessage(level, pos, frequency, coverage, message);
     }
 
     /** "Read by 2 pagers and 1 telegraph", or that nothing was in range. */

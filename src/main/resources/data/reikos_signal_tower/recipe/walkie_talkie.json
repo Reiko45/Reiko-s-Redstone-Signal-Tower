@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    {
+      "item": "reikos_signal_tower:pager"
+    },
+    {
+      "item": "reikos_signal_tower:remote_control"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:walkie_talkie"
+  }
+}

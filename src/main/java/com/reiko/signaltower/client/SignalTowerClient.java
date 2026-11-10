@@ -45,6 +45,7 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::registerItemColors);
         modEventBus.addListener(SignalTowerClient::clientSetup);
         modEventBus.addListener(SignalTowerClient::registerGuiLayers);
+        modEventBus.addListener(TalkKey::register); // v0.64.0: the Walkie-Talkie's Talk key
         // v0.43.0: the status board's rows.
         modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) -> {
             event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new);
@@ -61,6 +62,7 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(SignalMeterHud::onClientTick);
         NeoForge.EVENT_BUS.addListener(BroadcastMusic::onClientTick); // v0.60.0
         NeoForge.EVENT_BUS.addListener(SatelliteSky::onRenderLevel); // v0.61.0
+        NeoForge.EVENT_BUS.addListener(TalkKey::onClientTick); // v0.64.0
         if (com.reiko.signaltower.compat.map.MapWaypoints.anyMap()) {
             NeoForge.EVENT_BUS.addListener(com.reiko.signaltower.compat.map.MapWaypoints::onClientTick);
         }

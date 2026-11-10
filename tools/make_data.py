@@ -418,6 +418,7 @@ write(items / "pager_on.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("pager_on", "item")},
 })
+write(items / "walkie_talkie.json", {"parent": "minecraft:item/handheld", "textures": {"layer0": tex("walkie_talkie", "item")}})  # v0.64.0
 write(items / "pager.json", {
     "parent": "minecraft:item/handheld",
     "textures": {"layer0": tex("pager", "item")},
@@ -1540,6 +1541,38 @@ write(ASSETS / "lang" / "en_us.json", {
     f"map.{MOD}.tracked": "Tracked: %s",
     f"advancements.{MOD}.we_have_liftoff.title": "We Have Liftoff",
     f"advancements.{MOD}.we_have_liftoff.description": "Put a satellite in orbit from a Launch Pad",
+    # v0.64.0: the Walkie-Talkie
+    f"item.{MOD}.walkie_talkie": "Walkie-Talkie",
+    f"tooltip.{MOD}.walkie_sound": "Sound: on (a squelch when someone talks)",
+    f"tooltip.{MOD}.walkie_silent": "Sound: off",
+    f"tooltip.{MOD}.walkie_use": "Right-click, or press the Talk key (V) holding it, to say something on its frequency",
+    f"tooltip.{MOD}.walkie_configure": "Sneak + right-click the air to set its frequency",
+    f"tooltip.{MOD}.walkie_copy": "Sneak + right-click a radio block to copy its frequency",
+    f"message.{MOD}.frequency_copied_walkie": "Walkie-Talkie tuned to %s",
+    f"message.{MOD}.walkie_empty": "Say something first",
+    f"message.{MOD}.walkie_too_fast": "Wait a moment before talking again",
+    f"message.{MOD}.walkie_hold": "Hold a Walkie-Talkie to talk",
+    f"message.{MOD}.walkie_sent": "Said on %s (%s)",
+    f"message.{MOD}.walkie_heard": "Heard by %s",
+    f"message.{MOD}.walkie_heard_none": "Nobody heard it",
+    f"message.{MOD}.walkie_one": "%s walkie-talkie",
+    f"message.{MOD}.walkie_many": "%s walkie-talkies",
+    f"message.{MOD}.walkie_comma": "%s, %s",
+    f"message.{MOD}.walkie_line": "[%s] %s %s: %s",
+    f"message.{MOD}.walkie_you": "%s (you)",
+    f"message.{MOD}.private_refused_walkie": "Frequency %s is private to %s: you can't talk on it",
+    f"message.{MOD}.intruder_walkie": "%1$s tried to talk on %3$s with a Walkie-Talkie, but it's private: refused",
+    f"screen.{MOD}.talk.title": "Walkie-Talkie",
+    f"screen.{MOD}.talk.label": "%s on %s: press Enter to talk",
+    f"screen.{MOD}.talk.hint": "Say something...",
+    f"screen.{MOD}.tuner.walkie_sound_tooltip": "On: a squelch from the Walkie-Talkie when someone talks on its frequency. Off: just the line in chat.",
+    f"screen.{MOD}.log.kind_walkie": "Walkie-Talkie",
+    f"screen.{MOD}.log.kind_walkie_text": "Walkie-Talkie: \u201c%s\u201d",
+    f"screen.{MOD}.log.tip_walkie": "Said by %s",
+    f"screen.{MOD}.log.tip_other_walkie": "Said by %s (not a member)",
+    f"key.{MOD}.talk": "Talk (Walkie-Talkie)",
+    f"key.categories.{MOD}": "Reiko's Redstone Signal Tower",
+    f"subtitles.{MOD}.walkie.squelch": "Walkie-talkie crackles",
     # v0.63.0: the Ticker Tape Printer
     f"block.{MOD}.ticker_printer": "Ticker Tape Printer",
     f"block.{MOD}.ticker_printer.tooltip": "Prints every message that reaches its frequency into a Book and Quill: the day and time, the sender and the text. A full book is signed as a logbook.",
@@ -2754,6 +2787,12 @@ recipes["radio_telegraph"] = ({  # v0.51.0
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:writable_book"}],
     "result": {"count": 1, "id": f"{MOD}:radio_telegraph"},
 }, f"{MOD}:radio_transmitter")
+recipes["walkie_talkie"] = ({  # v0.64.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "equipment",
+    "ingredients": [{"item": f"{MOD}:pager"}, {"item": f"{MOD}:remote_control"}],
+    "result": {"count": 1, "id": f"{MOD}:walkie_talkie"},
+}, f"{MOD}:pager")
 recipes["ticker_printer"] = ({  # v0.63.0
     "type": "minecraft:crafting_shapeless",
     "category": "redstone",
@@ -3027,6 +3066,7 @@ INFO = {
     "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",
     "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
     "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
+    "walkie_talkie": "A two-way radio: right-click it (or press the Talk key, V, holding it) and type a line. Everyone carrying a Walkie-Talkie on its frequency where it reaches hears it in chat, broken up near the edge; pagers, telegraphs and printers get it as a message. Sneak and right-click the air to set its frequency.",
     "ticker_printer": "Tune it to a frequency and give it a Book and Quill (by hand or hopper): every message that reaches it is printed in the book, with the day and time and who sent it, even ones that came while it wasn't loaded. A full book is signed as a logbook, which a hopper can take out. A comparator reads how full the book is.",
     "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",
     "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",

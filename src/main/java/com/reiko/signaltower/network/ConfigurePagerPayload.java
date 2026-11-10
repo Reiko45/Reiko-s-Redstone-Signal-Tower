@@ -44,6 +44,12 @@ public record ConfigurePagerPayload(boolean offhand, int frequency, boolean soun
             PagerItem.setSilent(stack, !payload.sound());
             return;
         }
+        if (stack.getItem() instanceof com.reiko.signaltower.item.WalkieTalkieItem) {
+            // v0.64.0: the Walkie-Talkie uses the pager's screen and packet too (frequency and Sound).
+            FrequencyTunerItem.setFrequency(stack, payload.frequency());
+            PagerItem.setSilent(stack, !payload.sound());
+            return;
+        }
         if (!(stack.getItem() instanceof PagerItem)) {
             return;
         }

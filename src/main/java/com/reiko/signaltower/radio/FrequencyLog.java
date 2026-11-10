@@ -65,8 +65,8 @@ public final class FrequencyLog {
                         : claim.allows(message.who()) ? FrequencyAudit.Who.MEMBER : FrequencyAudit.Who.OTHER;
                 String who = message.who() == null ? message.name()
                         : whoKind == FrequencyAudit.Who.OTHER ? message.name() : FrequencyAudit.nameOf(server, claim, message.who());
-                entries.add(new Entry(SignalNetwork.CauseKind.TELEGRAPH, dimension,
-                        whoKind == FrequencyAudit.Who.OTHER ? Optional.empty() : Optional.of(message.from()),
+                entries.add(new Entry(message.handheld() ? SignalNetwork.CauseKind.WALKIE : SignalNetwork.CauseKind.TELEGRAPH, dimension,
+                        whoKind == FrequencyAudit.Who.OTHER || message.handheld() ? Optional.empty() : Optional.of(message.from()),
                         who, whoKind, message.gameTime(), message.dayTime(), 0, message.text()));
             }
         }

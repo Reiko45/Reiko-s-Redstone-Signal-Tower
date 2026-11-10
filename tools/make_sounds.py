@@ -257,6 +257,18 @@ def printer_print():
     return normalize(out * envelope(len(out), 0.002, 0.03), 0.8)
 
 
+def walkie_squelch():
+    """v0.64.0: a Walkie-Talkie opening: a burst of hiss cut off short, then a quick two-tone chirp."""
+    d = 0.32
+    n = int(0.2 * RATE)
+    hiss = static(0.2, 900, 6000) * np.linspace(1.0, 0.6, n) * envelope(n, 0.002, 0.01)
+    out = place(silence(d), hiss, 0.0)
+    for f0, at in ((1300, 0.215), (1750, 0.26)):
+        beep = soft_square(f0, 0.04, 2.5) * envelope(int(0.04 * RATE), 0.002, 0.008) * 0.45
+        out = place(out, beep, at)
+    return normalize(out * envelope(len(out), 0.001, 0.02), 0.75)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -271,6 +283,7 @@ SOUND_LIST = {
     "satellite.launch": ("satellite_launch", satellite_launch),
     "speaker.tone": ("speaker_tone", speaker_tone),
     "printer.print": ("printer_print", printer_print),
+    "walkie.squelch": ("walkie_squelch", walkie_squelch),
 }
 
 
