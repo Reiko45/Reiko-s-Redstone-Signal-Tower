@@ -19,37 +19,44 @@ Every block and item has a page in JEI and EMI with its recipe and what it does.
 ## What's in it
 
 **Towers and signals**
+
 - Transmitters, receivers and button-sized compact versions for walls, floors and ceilings.
 - Repeaters to relay a signal tower to tower, and converters that carry it onto another frequency.
 - Iron, Gold, Diamond and Netherite antennas (up to 4× the reach), a Dish Antenna that beams one way, an Ender Antenna that sends into the Nether, and satellites that carry a tower across a whole dimension.
 - Weather, hills and lightning affect towers: rain shortens their reach, a thunderstorm can knock a tall one off the air for a moment, and a Lightning Rod near the top protects it.
 
 **Receivers that do more**
+
 - Toggle, inverted, AND/OR/XOR logic, delay and counter receivers: wireless T flip-flops, NOT gates, timers and secret knocks.
 - Radio Lamps, Radio Speakers (bells, chimes, doorbells, sirens) and Status Boards that show four frequencies at a glance.
 - Timer transmitters, signal recorders that replay up to 30 seconds of redstone, and a Radio Jukebox that plays music on every speaker in reach.
 
 **In your hand**
+
 - Remote Controls and 4-button remotes, like garage door openers.
 - Radio Pagers that beep when a frequency turns on, and Walkie-Talkies for chatting with friends on the same frequency.
 - A Signal Scanner that lists everything you can hear and points to it, and a Signal Meter showing the strength where you stand.
 
 **Messages and screens**
+
 - Radio Telegraphs and a Morse Key for sending short messages, and a Ticker Tape Printer that prints them into a book.
 - A Radar Dish and Radar Screen that show players, mobs and vehicles around a tower.
 - TV Cameras and TV Monitors with live pictures, and monitors that join into video walls up to 8 × 5.
 - A Radio Drone you fly with a Drone Controller and see through its camera. It can carry items and act as a flying relay.
 
 **Security**
+
 - A Security Console that watches up to 8 zones. Door Sensors, Motion Sensors or anything else that turns a zone's frequency on trips it, and a Code Keypad arms and disarms it.
 - When the alarm goes off, sirens sound, pagers and walkie-talkies get "ALARM: Front Door (Alex)" and TV Monitors switch to the camera on that zone.
 - Code Keypads with guest codes, and Motion Sensors.
 
 **Your frequencies**
+
 - Name your frequencies, make them private to you and your friends, or encrypt them so only your receivers hear them.
 - A directory of named frequencies, a log of who turned what on, and an alert when someone else uses yours.
 
 **The world**
+
 - Abandoned radio towers to find and revive, radio shacks in villages, and Radio Operator villagers who trade tower parts.
 - Climbable masts, Tower Platforms, guy wires, aviation beacons, solar panels and Coverage Maps.
 - Advancements, sounds with subtitles, and raid alerts from village stations.

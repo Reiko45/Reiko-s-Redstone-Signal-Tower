@@ -20,6 +20,8 @@ If CurseForge refuses one of the optional mods' names, the script uploads again 
 
 ## Setting it up (once)
 
+The project exists: https://www.curseforge.com/minecraft/mc-mods/reikos-wireless-redstone (Project ID 1797165, already in `gradle.properties`). Steps 1, 2 and 5 are done; steps 3, 4 and 6 are left.
+
 1. **Create the project.** Sign in to CurseForge and go to https://www.curseforge.com/project/create. Choose Minecraft and **Mods**, then fill in the page from `docs/curseforge/`:
    - **Name:** Reiko's Wireless Redstone.
    - **Summary:** `summary.txt`.
