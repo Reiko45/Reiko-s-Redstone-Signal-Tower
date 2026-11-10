@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.reiko.signaltower.SignalTower;
 import com.reiko.signaltower.block.TvCameraBlock;
 import com.reiko.signaltower.blockentity.TvCameraBlockEntity;
+import com.reiko.signaltower.entity.RadioDroneEntity;
 import com.reiko.signaltower.radio.TvCamera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -46,7 +47,8 @@ public final class CameraFeeds {
     }
 
     private static final class Feed {
-        final BlockPos camera;
+        /** A TV Camera's BlockPos, or a Radio Drone's entity id (an Integer; v0.67.0). */
+        final Object camera;
         final ResourceLocation id;
         final DynamicTexture texture;
         final int[] drawing = new int[CameraRaycaster.WIDTH * CameraRaycaster.HEIGHT];
@@ -56,8 +58,8 @@ public final class CameraFeeds {
         long wantedAt;
         int frames;
 
-        Feed(BlockPos camera, int index) {
-            this.camera = camera.immutable();
+        Feed(Object camera, int index) {
+            this.camera = camera instanceof BlockPos pos ? pos.immutable() : camera;
             this.id = ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "tv_feed/" + index);
             this.texture = new DynamicTexture(CameraRaycaster.WIDTH, CameraRaycaster.HEIGHT, true);
             Minecraft.getInstance().getTextureManager().register(id, texture);
@@ -68,7 +70,7 @@ public final class CameraFeeds {
         }
     }
 
-    private static final Map<BlockPos, Feed> FEEDS = new LinkedHashMap<>();
+    private static final Map<Object, Feed> FEEDS = new LinkedHashMap<>();
     private static final List<Feed> ORDER = new ArrayList<>();
     private static int nextIndex;
     private static int turn;
@@ -93,6 +95,21 @@ public final class CameraFeeds {
         if (!(level.getBlockEntity(camera) instanceof TvCameraBlockEntity)) {
             return new Picture(Status.NO_CAMERA, null, 0);
         }
+        return feed(camera);
+    }
+
+    /**
+     * Asks for the picture of the Radio Drone {@code droneId} (v0.67.0). A client only has the
+     * drones near its player, so one farther away is {@link Status#TOO_FAR}.
+     */
+    public static Picture pictureOfDrone(ClientLevel level, int droneId) {
+        if (!(level.getEntity(droneId) instanceof RadioDroneEntity)) {
+            return new Picture(Status.TOO_FAR, null, 0);
+        }
+        return feed(droneId);
+    }
+
+    private static Picture feed(Object camera) {
         Feed feed = FEEDS.get(camera);
         if (feed == null) {
             if (FEEDS.size() >= MAX_FEEDS) {
@@ -166,14 +183,21 @@ public final class CameraFeeds {
 
     /** Draws rows of {@code feed} until {@code deadline}. Returns true if there's more of this picture to draw. */
     private static boolean draw(ClientLevel level, Feed feed, float partialTick, long deadline) {
-        if (feed.shot == null) {
-            BlockState state = level.getBlockState(feed.camera);
-            if (!(state.getBlock() instanceof TvCameraBlock) || !(level.getBlockEntity(feed.camera) instanceof TvCameraBlockEntity camera)) {
+        if (feed.shot == null && feed.camera instanceof Integer droneId) {
+            if (!(level.getEntity(droneId) instanceof RadioDroneEntity drone)) {
+                return false;
+            }
+            feed.shot = CameraRaycaster.droneShot(level, droneId, drone.cameraPose(partialTick), drone.has(RadioDroneEntity.NIGHT_VISION), partialTick);
+            feed.nextRow = 0;
+        }
+        if (feed.shot == null && feed.camera instanceof BlockPos cameraPos) {
+            BlockState state = level.getBlockState(cameraPos);
+            if (!(state.getBlock() instanceof TvCameraBlock) || !(level.getBlockEntity(cameraPos) instanceof TvCameraBlockEntity camera)) {
                 return false;
             }
             int settings = camera.getSettings();
-            TvCamera.Pose pose = TvCamera.pose(feed.camera, state, settings, level.getGameTime(), partialTick);
-            feed.shot = CameraRaycaster.shot(level, feed.camera, pose, (settings & TvCamera.NIGHT_VISION) != 0, partialTick);
+            TvCamera.Pose pose = TvCamera.pose(cameraPos, state, settings, level.getGameTime(), partialTick);
+            feed.shot = CameraRaycaster.shot(level, cameraPos, pose, (settings & TvCamera.NIGHT_VISION) != 0, partialTick);
             feed.nextRow = 0;
         }
         while (feed.nextRow < CameraRaycaster.HEIGHT) {

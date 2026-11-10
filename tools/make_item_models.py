@@ -651,6 +651,116 @@ def wall_redstone():
     return m.build(flat_thing())
 
 
+# ---------------------------------------------------------------- v0.67.0: the Radio Drone and its controller
+
+DRONE_ARM = 4.5  # the rotors' distance from the middle, along x and z (DroneRenderer.ARM)
+DRONE_SHELL = (70, 74, 82)
+DRONE_SHELL_DARK = (44, 47, 54)
+BLADE = (206, 208, 214)
+
+
+def drone_body(m):
+    """The drone's frame, looking south (+z), its middle at (8, 0, 8): a hull with a battery pack on top,
+    a camera under its nose, four arms out to the motors, two skids, and its navigation lights (red on its
+    left, green on its right)."""
+    shell = solid(DRONE_SHELL, seed=301)
+
+    def top(d, px, w, h):
+        d.line([1, h // 2, w - 2, h // 2], fill=rgb(shade(DRONE_SHELL, 0.8)))
+        d.rectangle([w // 2 - 1, 1, w // 2, 2], fill=rgb(TEAL))
+    m.box((5.5, 1.5, 4.5), (10.5, 4.5, 11.5), shell, up=custom(top, DRONE_SHELL))           # the hull
+
+    def battery(d, px, w, h):
+        d.rectangle([0, h - 3, w - 1, h - 2], fill=rgb(GOLD))
+    m.box((6, 4.5, 5.2), (10, 5.4, 9.4), solid(DRONE_SHELL_DARK, seed=302),
+          north=custom(battery, DRONE_SHELL_DARK), east=custom(battery, DRONE_SHELL_DARK), west=custom(battery, DRONE_SHELL_DARK))
+    # the camera: a dark gimbal under the nose, its lens looking forward
+    m.box((6.5, 0.6, 11.5), (9.5, 3.4, 13.4), solid(BLACK, seed=303))
+    m.box((7.1, 1.2, 13.4), (8.9, 3.0, 14.0), glossy((44, 70, 112), seed=304))
+    # four arms, corner to corner, and a motor at the end of each
+    arm = solid(DRONE_SHELL_DARK, seed=305)
+    half = DRONE_ARM * math.sqrt(2)
+    for angle in (45, -45):
+        m.box((8 - half, 2.7, 7.4), (8 + half, 3.5, 8.6), arm, rotation={"origin": [8, 3, 8], "axis": "y", "angle": angle})
+    motor = solid(STEEL, seed=306)
+    for cx in (8 - DRONE_ARM, 8 + DRONE_ARM):
+        for cz in (8 - DRONE_ARM, 8 + DRONE_ARM):
+            m.box((cx - 1, 2.4, cz - 1), (cx + 1, 4.4, cz + 1), motor)
+    # the skids and their struts
+    rubber = solid(RUBBER, seed=307)
+    for x0 in (5.0, 10.0):
+        m.box((x0, 0, 5), (x0 + 1, 0.6, 11), rubber)
+        for z0 in (6.5, 9.0):
+            m.box((x0 + 0.25, 0.6, z0), (x0 + 0.75, 1.5, z0 + 0.5), solid(STEEL_DARK))
+    # the lights: red on its left (+x as it looks south), green on its right
+    m.box((9.6, 2.9, 12.0), (10.4, 3.7, 12.8), led(RED_LIT), glow=True)
+    m.box((5.6, 2.9, 12.0), (6.4, 3.7, 12.8), led(GREEN_LIT), glow=True)
+
+
+def drone_rotor(m, cx=8.0, cz=8.0, along_x=True):
+    """One rotor: a black hub and a two-bladed propeller, its middle at ({cx}, {cz})."""
+    m.box((cx - 0.6, 4.4, cz - 0.6), (cx + 0.6, 5.2, cz + 0.6), solid(BLACK, seed=311))
+    blade = solid(BLADE, noise=0.02, seed=312, bevel=False)
+    if along_x:
+        m.box((cx - 3.6, 4.7, cz - 0.5), (cx + 3.6, 4.95, cz + 0.5), blade)
+    else:
+        m.box((cx - 0.5, 4.7, cz - 3.6), (cx + 0.5, 4.95, cz + 3.6), blade)
+
+
+def drone():
+    # What the entity renderer draws: the body, and one rotor it turns and moves to each motor.
+    body = Model("radio_drone_body")
+    drone_body(body)
+    body.build(flat_thing())
+    rotor = Model("radio_drone_rotor")
+    drone_rotor(rotor)
+    rotor.build(flat_thing())
+    # The item: the same drone with its rotors still.
+    m = Model("radio_drone")
+    drone_body(m)
+    for i, (cx, cz) in enumerate(((8 - DRONE_ARM, 8 - DRONE_ARM), (8 + DRONE_ARM, 8 - DRONE_ARM),
+                                  (8 - DRONE_ARM, 8 + DRONE_ARM), (8 + DRONE_ARM, 8 + DRONE_ARM))):
+        drone_rotor(m, cx, cz, along_x=i in (0, 3))
+    return m.build({
+        "gui": {"rotation": [30, 160, 0], "translation": [0, 3, 0], "scale": [1.15] * 3},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.5] * 3},
+        "fixed": {"rotation": [-90, 0, 0], "translation": [0, 0, -2], "scale": [1.0] * 3},
+        "head": {"rotation": [0, 180, 0], "translation": [0, 14, 0], "scale": [1, 1, 1]},
+        "thirdperson_righthand": {"rotation": [10, 180, 0], "translation": [0, 4, 1], "scale": [0.55] * 3},
+        "thirdperson_lefthand": {"rotation": [10, 180, 0], "translation": [0, 4, 1], "scale": [0.55] * 3},
+        "firstperson_righthand": {"rotation": [10, 160, 0], "translation": [1.5, 5, 0], "scale": [0.6] * 3},
+        "firstperson_lefthand": {"rotation": [10, 160, 0], "translation": [1.5, 5, 0], "scale": [0.6] * 3},
+    })
+
+
+def drone_controller():
+    """The Drone Controller: a two-stick transmitter with grips, a little screen between the sticks, a
+    compass rose under it and an antenna with a red tip."""
+    m = Model("drone_controller")
+    body = solid(CHARCOAL, seed=321)
+
+    def face(d, px, w, h):
+        d.rectangle([1, 1, w - 2, 2], fill=rgb(shade(CHARCOAL, 0.8)))
+    m.box((3.5, 1, 7), (12.5, 8.5, 9.5), body, south=custom(face, CHARCOAL))
+    grip = solid(RUBBER, seed=322)
+    m.box((2.4, 0, 7.3), (4.4, 5, 9.3), grip)
+    m.box((11.6, 0, 7.3), (13.6, 5, 9.3), grip)
+    for cx in (5.8, 10.2):
+        m.box((cx - 1.1, 3.0, 9.5), (cx + 1.1, 5.2, 9.9), solid(BLACK, seed=323))         # the stick's well
+        m.box((cx - 0.3, 3.8, 9.9), (cx + 0.3, 4.4, 11.0), solid(STEEL_LIGHT))           # the stick
+        m.box((cx - 0.6, 3.5, 11.0), (cx + 0.6, 4.7, 11.6), solid(BLACK, seed=324))      # its knob
+    m.box((6.6, 5.6, 9.5), (9.4, 7.9, 9.7), solid(BLACK))
+    m.box((6.9, 5.9, 9.7), (9.1, 7.6, 9.75), None, faces=("south",), south=custom(
+        lambda d, px, w, h: d.line([1, h - 2, w - 2, 1], fill=rgb(shade(LCD, 0.6))), LCD), glow=True)
+
+    def rose(d, px, w, h):
+        d.line([w // 2, 0, w // 2, h - 1], fill=rgb(RED))
+    m.box((7.4, 1.6, 9.5), (8.6, 2.8, 9.8), solid(CREAM, seed=325), south=custom(rose, CREAM))
+    m.box((10.9, 8.5, 7.9), (11.6, 14.5, 8.6), solid(STEEL_LIGHT), up=solid(STEEL_LIGHT))
+    m.box((10.75, 14.5, 7.75), (11.75, 15.4, 8.75), led(RED_LIT), glow=True)
+    return m.build(device(gui_scale=1.0))
+
+
 # ---------------------------------------------------------------- all of them
 
 if __name__ == "__main__":
@@ -670,4 +780,6 @@ if __name__ == "__main__":
     satellite_dish()
     coverage_map()
     wall_redstone()
+    drone()
+    drone_controller()
     print("wrote", len(list(MODELS.glob("*.json"))), "item models;", len(list(TEXTURES.glob("*.png"))), "model textures")

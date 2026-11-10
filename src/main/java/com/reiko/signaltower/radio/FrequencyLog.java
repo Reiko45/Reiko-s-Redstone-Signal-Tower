@@ -96,7 +96,7 @@ public final class FrequencyLog {
                 : (cause.kind() == SignalNetwork.CauseKind.TRANSMITTER || cause.kind() == SignalNetwork.CauseKind.GATE
                         || cause.kind() == SignalNetwork.CauseKind.TIMER || cause.kind() == SignalNetwork.CauseKind.RECORDER
                         || cause.kind() == SignalNetwork.CauseKind.WEATHER_STATION || cause.kind() == SignalNetwork.CauseKind.JUKEBOX
-                        || cause.kind() == SignalNetwork.CauseKind.RADAR)
+                        || cause.kind() == SignalNetwork.CauseKind.RADAR || cause.kind() == SignalNetwork.CauseKind.DRONE)
                     && whoKind != FrequencyAudit.Who.OTHER ? Optional.of(cause.pos())
                 : Optional.empty();
         int from = turnOn.from() != 0 && turnOn.from() != frequency ? turnOn.from() : 0;

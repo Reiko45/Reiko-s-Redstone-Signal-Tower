@@ -54,6 +54,9 @@ public final class ModRegistry {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(SignalTower.MOD_ID);
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, SignalTower.MOD_ID);
+    /** v0.67.0: the Radio Drone. */
+    public static final DeferredRegister<net.minecraft.world.entity.EntityType<?>> ENTITY_TYPES =
+            DeferredRegister.create(Registries.ENTITY_TYPE, SignalTower.MOD_ID);
     public static final DeferredRegister.DataComponents DATA_COMPONENTS =
             DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, SignalTower.MOD_ID);
 
@@ -88,6 +91,24 @@ public final class ModRegistry {
             DATA_COMPONENTS.registerComponentType("tv_channels", builder -> builder
                     .persistent(Codec.intRange(0, Frequency.MAX).listOf(0, 5))
                     .networkSynchronized(ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list(5))));
+
+    /** v0.67.0: a Radio Drone item's charge, settings and identity (so controllers stay paired), and a controller's drone. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> DRONE_CHARGE =
+            DATA_COMPONENTS.registerComponentType("drone_charge", builder -> builder
+                    .persistent(Codec.intRange(0, com.reiko.signaltower.entity.RadioDroneEntity.CAPACITY))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> DRONE_SETTINGS =
+            DATA_COMPONENTS.registerComponentType("drone_settings", builder -> builder
+                    .persistent(Codec.intRange(0, 7))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.UUID>> DRONE_ID =
+            DATA_COMPONENTS.registerComponentType("drone_id", builder -> builder
+                    .persistent(net.minecraft.core.UUIDUtil.CODEC)
+                    .networkSynchronized(net.minecraft.core.UUIDUtil.STREAM_CODEC));
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<com.reiko.signaltower.item.DroneLink>> DRONE_LINK =
+            DATA_COMPONENTS.registerComponentType("drone_link", builder -> builder
+                    .persistent(com.reiko.signaltower.item.DroneLink.CODEC)
+                    .networkSynchronized(com.reiko.signaltower.item.DroneLink.STREAM_CODEC));
 
     /** v0.49.0: a Coverage Map's zoom, 0 (1:1) to 4 (1:16), like a vanilla map's scale. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COVERAGE_ZOOM =
@@ -410,6 +431,15 @@ public final class ModRegistry {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.TvMonitorBlock.ACTIVE) ? 6 : 0)));
 
+    /** v0.67.0: where a Radio Drone lands to charge. */
+    public static final DeferredBlock<com.reiko.signaltower.block.LandingPadBlock> LANDING_PAD = BLOCKS.register("landing_pad",
+            () -> new com.reiko.signaltower.block.LandingPadBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
     /** v0.63.0: prints the messages on its frequency into a Book and Quill. */
     public static final DeferredBlock<com.reiko.signaltower.block.TickerPrinterBlock> TICKER_PRINTER = BLOCKS.register("ticker_printer",
             () -> new com.reiko.signaltower.block.TickerPrinterBlock(BlockBehaviour.Properties.of()
@@ -683,6 +713,13 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("tv_camera", TV_CAMERA); // v0.66.0
     public static final DeferredItem<BlockItem> TV_MONITOR_ITEM =
             ITEMS.registerSimpleBlockItem("tv_monitor", TV_MONITOR); // v0.66.0
+    /** v0.67.0: the Radio Drone, its controller and its pad. */
+    public static final DeferredItem<com.reiko.signaltower.item.RadioDroneItem> RADIO_DRONE = ITEMS.register("radio_drone",
+            () -> new com.reiko.signaltower.item.RadioDroneItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<com.reiko.signaltower.item.DroneControllerItem> DRONE_CONTROLLER = ITEMS.register("drone_controller",
+            () -> new com.reiko.signaltower.item.DroneControllerItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<BlockItem> LANDING_PAD_ITEM =
+            ITEMS.registerSimpleBlockItem("landing_pad", LANDING_PAD);
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
@@ -824,6 +861,14 @@ public final class ModRegistry {
             BLOCK_ENTITIES.register("radar_screen",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadarScreenBlockEntity::new, RADAR_SCREEN.get()).build(null));
 
+    public static final DeferredHolder<net.minecraft.world.entity.EntityType<?>, net.minecraft.world.entity.EntityType<com.reiko.signaltower.entity.RadioDroneEntity>> RADIO_DRONE_ENTITY =
+            ENTITY_TYPES.register("radio_drone", () -> net.minecraft.world.entity.EntityType.Builder
+                    .<com.reiko.signaltower.entity.RadioDroneEntity>of(com.reiko.signaltower.entity.RadioDroneEntity::new, net.minecraft.world.entity.MobCategory.MISC)
+                    .sized(0.75F, 0.35F)
+                    .clientTrackingRange(10)
+                    .updateInterval(1)
+                    .build(SignalTower.MOD_ID + ":radio_drone"));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TvCameraBlockEntity>> TV_CAMERA_BE =
             BLOCK_ENTITIES.register("tv_camera",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TvCameraBlockEntity::new, TV_CAMERA.get()).build(null));
@@ -853,6 +898,7 @@ public final class ModRegistry {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
+        ENTITY_TYPES.register(modEventBus);
     }
 
     private ModRegistry() {}

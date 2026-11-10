@@ -66,6 +66,8 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
     // The picture (worked out on the server, sent to clients; not saved).
     private boolean shown;
     private long cameraPos;
+    /** v0.67.0: the Radio Drone it shows (its entity id), or -1 for a TV Camera. */
+    private int droneId = -1;
     private String cameraName = "";
     private float fraction;
     private String lockedBy = "";
@@ -238,6 +240,11 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
         return cameraName;
     }
 
+    /** The Radio Drone it shows (its entity id; v0.67.0), or -1 if it shows a TV Camera (or nothing). */
+    public int droneId() {
+        return droneId;
+    }
+
     /** How far out in the camera's reach it is: 0 in the middle, 1 at the edge (snowy past 0.7). */
     public float fraction() {
         return fraction;
@@ -272,10 +279,12 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
         int dz = camera.getZ() - worldPosition.getZ();
         int distance = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
         int direction = SignalNetwork.compassDirection(dx, dz);
-        Component where = direction < 0 ? Component.translatable(KEY + "tv_camera_here")
-                : Component.translatable(KEY + "tv_camera_away", distance,
+        String thing = droneId >= 0 ? "tv_drone" : "tv_camera";
+        Component where = direction < 0 ? Component.translatable(KEY + thing + "_here")
+                : Component.translatable(KEY + thing + "_away", distance,
                 Component.translatable("screen." + SignalTower.MOD_ID + ".locator.dir_" + DIRECTIONS[direction]));
-        Component name = cameraName.isEmpty() ? Component.translatable(KEY + "tv_camera_unnamed") : Component.literal("\"" + cameraName + "\"");
+        Component name = cameraName.isEmpty() ? Component.translatable(KEY + (droneId >= 0 ? "tv_drone_unnamed" : "tv_camera_unnamed"))
+                : Component.literal("\"" + cameraName + "\"");
         return Component.translatable(KEY + (fraction > WalkieTalkie.CLEAR_FRACTION ? "tv_monitor_shows_snowy" : "tv_monitor_shows"),
                 channelText, name, where);
     }
@@ -301,6 +310,7 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
         MonitorWall.Wall newWall = MonitorWall.find(level, worldPosition);
         boolean nowShown = false;
         long newCamera = 0;
+        int newDrone = -1;
         String newName = "";
         float newFraction = 0;
         String locked = "";
@@ -329,7 +339,32 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
                     }
                 }
             }
-            if (best != null) {
+            // v0.67.0: Radio Drones on the frequency count as cameras too (where they are now).
+            SignalNetwork.DroneSpot bestDrone = null;
+            if (locked.isEmpty()) {
+                for (Map.Entry<java.util.UUID, SignalNetwork.DroneSpot> entry : network.dronesOn(frequency)) {
+                    SignalNetwork.DroneSpot spot = entry.getValue();
+                    if (!FrequencyClaims.maySend(level, frequency, spot.tunedBy())) {
+                        continue;
+                    }
+                    double edge = WalkieTalkie.edgeFraction(spot.coverage(), worldPosition);
+                    double distance = spot.pos().distSqr(worldPosition);
+                    if (edge <= 1.0 && distance < bestDistance) {
+                        best = null;
+                        bestDrone = spot;
+                        bestFraction = edge;
+                        bestDistance = distance;
+                    }
+                }
+            }
+            if (bestDrone != null) {
+                nowShown = true;
+                newCamera = bestDrone.pos().asLong();
+                newDrone = bestDrone.entityId();
+                newName = bestDrone.name();
+                newFraction = Math.round(bestFraction * 100) / 100.0F;
+                network.unwatch(worldPosition);
+            } else if (best != null) {
                 nowShown = true;
                 newCamera = best.getKey().asLong();
                 newName = best.getValue().name();
@@ -339,10 +374,11 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
                 network.unwatch(worldPosition);
             }
         }
-        boolean changed = nowShown != shown || newCamera != cameraPos || !newName.equals(cameraName)
+        boolean changed = nowShown != shown || newCamera != cameraPos || newDrone != droneId || !newName.equals(cameraName)
                 || newFraction != fraction || !locked.equals(lockedBy) || !newWall.equals(wall);
         shown = nowShown;
         cameraPos = newCamera;
+        droneId = newDrone;
         cameraName = newName;
         fraction = newFraction;
         lockedBy = locked;
@@ -405,6 +441,7 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
         if (tag.contains("tv_shown")) {
             shown = tag.getBoolean("tv_shown");
             cameraPos = tag.getLong("tv_camera");
+            droneId = tag.contains("tv_drone") ? tag.getInt("tv_drone") : -1;
             cameraName = tag.getString("tv_camera_name");
             fraction = tag.getFloat("tv_fraction");
             lockedBy = tag.getString("tv_locked");
@@ -430,6 +467,7 @@ public class TvMonitorBlockEntity extends RadioBlockEntity {
         tag.putInt(FLAGS_TAG, flags);
         tag.putBoolean("tv_shown", shown);
         tag.putLong("tv_camera", cameraPos);
+        tag.putInt("tv_drone", droneId);
         tag.putString("tv_camera_name", cameraName);
         tag.putFloat("tv_fraction", fraction);
         tag.putString("tv_locked", lockedBy);

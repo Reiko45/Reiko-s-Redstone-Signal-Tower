@@ -1343,6 +1343,43 @@ def tv_monitor_front(item=False):
     return img
 
 
+def landing_pad_top():
+    """The Landing Pad's deck (v0.67.0): dark rubber matting with a yellow H in a white ring, and a
+    yellow edge."""
+    import math
+    rng = random.Random(6701)
+    img = blank()
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            g = 52 + rng.randint(-5, 5)
+            px[x, y] = (g, g, g + 3, 255)
+    for y in range(16):
+        for x in range(16):
+            if x in (0, 15) or y in (0, 15):
+                px[x, y] = (226, 186, 36, 255)
+            d = math.hypot(x - 7.5, y - 7.5)
+            if 5.6 <= d <= 6.6:
+                px[x, y] = (226, 226, 220, 255)
+    for y in range(4, 12):
+        for x in (5, 10):
+            px[x, y] = (240, 196, 40, 255)
+    for x in range(5, 11):
+        px[x, 7] = (240, 196, 40, 255)
+        px[x, 8] = (240, 196, 40, 255)
+    return img
+
+
+def landing_pad_side():
+    """Its edge: steel with a yellow band."""
+    img = casing(6702, rivets=False)
+    px = img.load()
+    for x in range(16):
+        for y in (14, 15):
+            px[x, y] = (226, 186, 36, 255) if (x // 2) % 2 == 0 else (40, 40, 42, 255)
+    return img
+
+
 def tv_monitor_side():
     """v0.66.0: the monitor's thin sides and back: dark plastic."""
     rnd = random.Random(68)
@@ -1481,6 +1518,8 @@ blocks = {
     "tv_monitor_front": tv_monitor_front(),
     "tv_monitor_front_item": tv_monitor_front(item=True),
     "tv_monitor_side": tv_monitor_side(),
+    "landing_pad_top": landing_pad_top(),  # v0.67.0
+    "landing_pad_side": landing_pad_side(),
 }
 # v0.65.0: the items' textures are painted by tools/make_item_models.py (3D models), not here.
 

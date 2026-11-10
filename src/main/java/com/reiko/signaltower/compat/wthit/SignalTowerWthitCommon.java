@@ -24,6 +24,17 @@ public final class SignalTowerWthitCommon implements IWailaCommonPlugin {
             registrar.blockData(Data.INSTANCE, block);
             WthitBlocks.registered("common", block);
         }
+        registrar.entityData(DroneData.INSTANCE, com.reiko.signaltower.entity.RadioDroneEntity.class); // v0.67.0
+        WthitBlocks.registered("common", com.reiko.signaltower.entity.RadioDroneEntity.class);
+    }
+
+    enum DroneData implements IDataProvider<com.reiko.signaltower.entity.RadioDroneEntity> {
+        INSTANCE;
+
+        @Override
+        public void appendData(IDataWriter data, IServerAccessor<com.reiko.signaltower.entity.RadioDroneEntity> accessor, IPluginConfig config) {
+            data.raw().put(RadioInfo.KEY, RadioInfo.readDrone(accessor.getLevel(), accessor.getTarget(), accessor.getPlayer()));
+        }
     }
 
     enum Data implements IDataProvider<BlockEntity> {

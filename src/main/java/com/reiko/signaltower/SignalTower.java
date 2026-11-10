@@ -84,6 +84,7 @@ public final class SignalTower {
         // v0.61.0: a player in another dimension (or back from death) sees that dimension's satellites.
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerChangedDimensionEvent event) -> {
             if (event.getEntity() instanceof ServerPlayer player) com.reiko.signaltower.network.SatellitesPayload.sendTo(player);
+            com.reiko.signaltower.radio.DronePilots.stop(event.getEntity(), null); // v0.67.0
         });
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerRespawnEvent event) -> {
             if (event.getEntity() instanceof ServerPlayer player) com.reiko.signaltower.network.SatellitesPayload.sendTo(player);
@@ -260,6 +261,18 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenTvMonitorPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTvMonitorPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureTvMonitorPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureTvMonitorPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureTvMonitorPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.DroneControlPayload.TYPE, // v0.67.0
+                com.reiko.signaltower.network.DroneControlPayload.STREAM_CODEC, com.reiko.signaltower.network.DroneControlPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.DroneInputPayload.TYPE,
+                com.reiko.signaltower.network.DroneInputPayload.STREAM_CODEC, com.reiko.signaltower.network.DroneInputPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.DroneGrabPayload.TYPE,
+                com.reiko.signaltower.network.DroneGrabPayload.STREAM_CODEC, com.reiko.signaltower.network.DroneGrabPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.DroneStatusPayload.TYPE,
+                com.reiko.signaltower.network.DroneStatusPayload.STREAM_CODEC, com.reiko.signaltower.network.DroneStatusPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenDronePayload.TYPE,
+                com.reiko.signaltower.network.OpenDronePayload.STREAM_CODEC, com.reiko.signaltower.network.OpenDronePayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureDronePayload.TYPE,
+                com.reiko.signaltower.network.ConfigureDronePayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureDronePayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSensorScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureSensorPayload.TYPE,
@@ -269,6 +282,7 @@ public final class SignalTower {
     /** Pagers note when their owner left, for the catch-up at the next login. */
     private static void onLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         PagerItem.markAway(event.getEntity(), event.getEntity().level().getGameTime());
+        com.reiko.signaltower.radio.DronePilots.stop(event.getEntity(), null); // v0.67.0: their drone hovers
     }
 
     /**
@@ -361,6 +375,9 @@ public final class SignalTower {
             event.accept(ModRegistry.RADAR_SCREEN_ITEM.get());
             event.accept(ModRegistry.TV_CAMERA_ITEM.get()); // v0.66.0
             event.accept(ModRegistry.TV_MONITOR_ITEM.get());
+            event.accept(ModRegistry.RADIO_DRONE.get()); // v0.67.0
+            event.accept(ModRegistry.DRONE_CONTROLLER.get());
+            event.accept(ModRegistry.LANDING_PAD_ITEM.get());
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

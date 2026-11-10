@@ -361,6 +361,88 @@ public final class SignalNetwork extends SavedData {
         watchers.values().removeIf(Map::isEmpty);
     }
 
+    // ---- v0.67.0: Radio Drones (their cameras, beacons and relays; not saved) ----
+
+    /** A Radio Drone in the air or on the ground, for monitors: its camera like a TV Camera's, and which entity it is. */
+    public record DroneSpot(int frequency, @Nullable UUID tunedBy, List<Coverage> coverage, String name, int entityId, BlockPos pos) {
+    }
+
+    private final Map<UUID, DroneSpot> drones = new HashMap<>();
+    /** Where drones hovering as relays are: repeaters that aren't saved and have no block. */
+    private final Set<BlockPos> droneRelays = new HashSet<>();
+
+    public void updateDrone(UUID drone, DroneSpot spot) {
+        drones.put(drone, spot);
+    }
+
+    public void removeDrone(UUID drone) {
+        drones.remove(drone);
+    }
+
+    /** The loaded Radio Drones on {@code frequency}. */
+    public List<Map.Entry<UUID, DroneSpot>> dronesOn(int frequency) {
+        List<Map.Entry<UUID, DroneSpot>> result = new ArrayList<>();
+        drones.forEach((id, spot) -> {
+            if (spot.frequency() == frequency) result.add(Map.entry(id, spot));
+        });
+        result.sort(java.util.Comparator.comparing(entry -> entry.getKey().toString()));
+        return result;
+    }
+
+    public @Nullable DroneSpot droneAt(UUID drone) {
+        return drones.get(drone);
+    }
+
+    /**
+     * A drone hovering as a relay at {@code pos}: a repeater on {@code frequency} with {@code reach}
+     * that isn't saved and has no block (nothing happens if a real tower is there).
+     */
+    public void updateDroneRelay(BlockPos pos, int frequency, int reach, @Nullable UUID tunedBy) {
+        BlockPos key = pos.immutable();
+        if (repeaters.containsKey(key) && !droneRelays.contains(key) || transmitters.containsKey(key) || jammers.containsKey(key)) {
+            return;
+        }
+        droneRelays.add(key);
+        updateRepeater(key, frequency, frequency, reach, tunedBy);
+    }
+
+    /** The drone relaying at {@code pos} moved, landed or went. */
+    public void removeDroneRelay(BlockPos pos) {
+        if (droneRelays.remove(pos)) {
+            removeRepeater(pos);
+        }
+    }
+
+    public boolean isDroneRelay(BlockPos pos) {
+        return droneRelays.contains(pos);
+    }
+
+    /**
+     * A drone's beacon: keeps {@code frequency} on over {@code area} until {@code untilGameTime},
+     * in place of the area it had a moment ago ({@code previous}, or null), so it follows the
+     * drone. {@code cause} goes in the log (null while it's still on from before).
+     */
+    public void beacon(int frequency, @Nullable Coverage previous, Coverage area, long untilGameTime, @Nullable Cause cause) {
+        RemoteSignal current = pulses.get(frequency);
+        List<Coverage> areas = new ArrayList<>();
+        long until = untilGameTime;
+        if (current != null && current.expiresAtGameTime() > now) {
+            areas.addAll(current.coverage());
+            until = Math.max(until, current.expiresAtGameTime());
+            if (previous != null && !previous.equals(area)) {
+                areas.remove(previous);
+            }
+        }
+        if (!areas.contains(area)) {
+            areas.add(area);
+        }
+        pulses.put(frequency, new RemoteSignal(areas, until));
+        if (cause != null) {
+            recordTurnOn(frequency, List.of(area), cause);
+        }
+        bump(frequency);
+    }
+
     /** How many monitors (walls) showed {@code camera} within the last {@link #WATCH_TICKS}. */
     public int watchers(BlockPos camera, long gameTime) {
         Map<BlockPos, Long> map = watchers.get(camera);
@@ -918,7 +1000,7 @@ public final class SignalNetwork extends SavedData {
     private void dropStaleRepeaters(ServerLevel level) {
         List<BlockPos> stale = null;
         for (BlockPos pos : repeaters.keySet()) {
-            if (isStale(level, pos)) {
+            if (!droneRelays.contains(pos) && isStale(level, pos)) {
                 if (stale == null) stale = new ArrayList<>();
                 stale.add(pos);
             }
@@ -951,7 +1033,7 @@ public final class SignalNetwork extends SavedData {
         Map<BlockPos, Repeater> result = new java.util.TreeMap<>();
         for (Map<Integer, Map<BlockPos, Repeater>> index : List.of(repeatersByInput, repeatersByOutput)) {
             index.getOrDefault(frequency, Map.of()).forEach((pos, relay) -> {
-                if (!isStale(level, pos)) {
+                if (droneRelays.contains(pos) || !isStale(level, pos)) { // v0.67.0: a hovering drone has no block
                     result.put(pos, relay);
                 }
             });
@@ -998,7 +1080,7 @@ public final class SignalNetwork extends SavedData {
             for (Map.Entry<BlockPos, Repeater> entry : listening.entrySet()) {
                 BlockPos pos = entry.getKey();
                 Repeater repeater = entry.getValue();
-                if (reached.contains(pos) || !item.getValue().reaches(pos) || isStale(level, pos) || repeater.gated()
+                if (reached.contains(pos) || !item.getValue().reaches(pos) || !droneRelays.contains(pos) && isStale(level, pos) || repeater.gated()
                         || blocked(level, repeater.output(), repeater.tunedBy())
                         || deaf(level, repeater.frequency(), repeater.tunedBy())) {
                     continue;
@@ -1111,8 +1193,8 @@ public final class SignalNetwork extends SavedData {
         List<BlockPos> staleRepeaters = null;
         for (Map.Entry<BlockPos, Repeater> entry : repeaters.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (!own.reaches(pos) || isDown(pos)) {
-                continue;
+            if (!own.reaches(pos) || isDown(pos) || droneRelays.contains(pos)) {
+                continue; // (v0.67.0: a hovering drone only repeats its own frequency, through resolve)
             }
             if (level.isLoaded(pos) && !(level.getBlockState(pos).getBlock() instanceof RadioRepeaterBlock)) {
                 if (staleRepeaters == null) staleRepeaters = new ArrayList<>();
@@ -1409,7 +1491,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.64.0: something said into a Walkie-Talkie (in the log only, like a telegraph message; no position). */
         WALKIE,
         /** v0.65.0: a Radar Dish seeing something (the detail is what it saw first: an entity type's description id). */
-        RADAR;
+        RADAR,
+        /** v0.67.0: a Radio Drone's beacon (where it was, who tuned it, and its name as the detail). */
+        DRONE;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1475,6 +1559,11 @@ public final class SignalNetwork extends SavedData {
         /** A Radar Dish seeing something (v0.65.0): where it is, who tuned it, and what it saw first (a description id). */
         public static Cause radar(BlockPos pos, @Nullable UUID tunedBy, String saw) {
             return new Cause(CauseKind.RADAR, pos.immutable(), tunedBy, "", saw == null ? "" : saw);
+        }
+
+        /** A Radio Drone's beacon turning on (v0.67.0): where the drone was, who tuned it, and its name. */
+        public static Cause drone(BlockPos pos, @Nullable UUID tunedBy, String name) {
+            return new Cause(CauseKind.DRONE, pos.immutable(), tunedBy, "", name == null ? "" : name);
         }
 
         /** A Radio Jukebox playing {@code song} (v0.60.0): where it is and who tuned it. */
@@ -2479,7 +2568,9 @@ public final class SignalNetwork extends SavedData {
         transmitters.forEach((pos, tx) -> {
             if (!tx.compact()) result.add(pos);
         });
-        result.addAll(repeaters.keySet());
+        repeaters.keySet().forEach(pos -> {
+            if (!droneRelays.contains(pos)) result.add(pos); // v0.67.0: not a hovering drone
+        });
         result.addAll(jammers.keySet());
         return result;
     }
@@ -3168,6 +3259,9 @@ public final class SignalNetwork extends SavedData {
 
         ListTag repeaterList = new ListTag();
         repeaters.forEach((pos, repeater) -> {
+            if (droneRelays.contains(pos)) {
+                return; // v0.67.0: a hovering drone, not a block
+            }
             CompoundTag entry = new CompoundTag();
             entry.putLong("pos", pos.asLong());
             entry.putInt("frequency", repeater.frequency());

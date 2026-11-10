@@ -91,7 +91,8 @@ public class TvMonitorRenderer implements BlockEntityRenderer<TvMonitorBlockEnti
             snowAll = true;
         } else {
             BlockPos cameraPos = monitor.cameraPos();
-            CameraFeeds.Picture picture = CameraFeeds.picture(level, cameraPos);
+            CameraFeeds.Picture picture = monitor.droneId() >= 0 ? CameraFeeds.pictureOfDrone(level, monitor.droneId())
+                    : CameraFeeds.picture(level, cameraPos);
             switch (picture.status()) {
                 case LIVE -> {
                     textured(buffers.getBuffer(RenderType.text(picture.texture())), matrix, px, py, px + pw, py + ph, 0xFFFFFFFF, 0.1F);
@@ -135,8 +136,11 @@ public class TvMonitorRenderer implements BlockEntityRenderer<TvMonitorBlockEnti
                          BlockPos cameraPos, float px, float py, float pw, float ph, float scale, float partialTick) {
         String key = "screen." + SignalTower.MOD_ID + ".tv_monitor.";
         String name = monitor.cameraName();
-        if (name.isEmpty() && level.getBlockEntity(cameraPos) instanceof TvCameraBlockEntity camera) {
+        if (name.isEmpty() && monitor.droneId() < 0 && level.getBlockEntity(cameraPos) instanceof TvCameraBlockEntity camera) {
             name = camera.getName();
+        }
+        if (name.isEmpty() && monitor.droneId() >= 0) {
+            name = net.minecraft.client.resources.language.I18n.get(key + "face_drone");
         }
         if (name.isEmpty()) {
             String frequencyName = FrequencyNames.nameOf(null, monitor.channelFrequency());

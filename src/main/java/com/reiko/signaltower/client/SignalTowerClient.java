@@ -46,6 +46,7 @@ public final class SignalTowerClient {
         modEventBus.addListener(SignalTowerClient::clientSetup);
         modEventBus.addListener(SignalTowerClient::registerGuiLayers);
         modEventBus.addListener(TalkKey::register); // v0.64.0: the Walkie-Talkie's Talk key
+        modEventBus.addListener(DronePilot::register); // v0.67.0: the drone's camera and grab keys
         // v0.43.0: the status board's rows.
         modEventBus.addListener((net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) -> {
             event.registerBlockEntityRenderer(ModRegistry.STATUS_BOARD_BE.get(), StatusBoardRenderer::new);
@@ -56,6 +57,7 @@ public final class SignalTowerClient {
             event.registerBlockEntityRenderer(ModRegistry.RADAR_SCREEN_BE.get(), RadarScreenRenderer::new);
             event.registerBlockEntityRenderer(ModRegistry.TV_CAMERA_BE.get(), TvCameraRenderer::new); // v0.66.0
             event.registerBlockEntityRenderer(ModRegistry.TV_MONITOR_BE.get(), TvMonitorRenderer::new);
+            event.registerEntityRenderer(ModRegistry.RADIO_DRONE_ENTITY.get(), DroneRenderer::new); // v0.67.0
         });
         // v0.65.0: the Radar Dish's spinning dish, a model of its own.
         // v0.66.0: the TV Camera's turning head (and with its REC light on).
@@ -63,6 +65,8 @@ public final class SignalTowerClient {
             event.register(RadarDishRenderer.ROTOR);
             event.register(TvCameraRenderer.HEAD);
             event.register(TvCameraRenderer.HEAD_REC);
+            event.register(DroneRenderer.BODY); // v0.67.0
+            event.register(DroneRenderer.ROTOR);
         });
         // v0.66.0: camera pictures are drawn a little before each frame; new textures after a reload.
         NeoForge.EVENT_BUS.addListener(CameraFeeds::onRenderFrame);
@@ -78,6 +82,12 @@ public final class SignalTowerClient {
         NeoForge.EVENT_BUS.addListener(BroadcastMusic::onClientTick); // v0.60.0
         NeoForge.EVENT_BUS.addListener(SatelliteSky::onRenderLevel); // v0.61.0
         NeoForge.EVENT_BUS.addListener(TalkKey::onClientTick); // v0.64.0
+        NeoForge.EVENT_BUS.addListener(DronePilot::onClientTick); // v0.67.0
+        NeoForge.EVENT_BUS.addListener(DronePilot::onMovementInput);
+        NeoForge.EVENT_BUS.addListener(DronePilot::onRenderFrame);
+        NeoForge.EVENT_BUS.addListener(DronePilot::onInteraction);
+        NeoForge.EVENT_BUS.addListener(DronePilot::onLoggingOut);
+        NeoForge.EVENT_BUS.addListener(DronePilot::onRenderHand);
         if (com.reiko.signaltower.compat.map.MapWaypoints.anyMap()) {
             NeoForge.EVENT_BUS.addListener(com.reiko.signaltower.compat.map.MapWaypoints::onClientTick);
         }
@@ -142,6 +152,7 @@ public final class SignalTowerClient {
         event.registerAbove(VanillaGuiLayers.BOSS_OVERLAY, ScannerHud.LAYER_ID, ScannerHud::render);
         event.registerAbove(ScannerHud.LAYER_ID, ReachRing.LAYER_ID, ReachRing::renderHud);
         event.registerAbove(ReachRing.LAYER_ID, SignalMeterHud.LAYER_ID, SignalMeterHud::render);
+        event.registerAbove(SignalMeterHud.LAYER_ID, DroneHud.LAYER_ID, DroneHud::render); // v0.67.0
     }
 
     /** The Multi-Button Remote's four buttons show their chosen colors (model layers 1-4). */

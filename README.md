@@ -41,6 +41,9 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radar Screen** | A panel for a wall that shows what a Radar Dish on its frequency sees: a green sweep line turning with the dish, a blip for each thing (colored by kind), radio towers as small squares and where the screen itself is, north up. It pings when something new shows up. |
 | **TV Camera** | A camera on a stand, a wall bracket or a ceiling mount. TV Monitors on its frequency that it reaches show what it sees, live: the blocks with their own textures, the light, water, the sky, and mobs and players as colored figures. Its red light is on while a monitor shows it. |
 | **TV Monitor** | A flat panel for a wall that shows the nearest TV Camera on its channel. Up to six channels, stepped with a button; monitors side by side join into one big screen, up to 8 by 5. |
+| **Radio Drone** | A little quadcopter with a camera under its nose, on a frequency. Fly it with a Drone Controller and see through its camera; TV Monitors on its frequency show its picture. It can grab and drop an item, turn its frequency on wherever it is (Beacon) and repeat its frequency while it hovers (Relay). |
+| **Drone Controller** | A two-stick transmitter paired with one drone. Right-click to take control and again to let go; while you fly, a panel shows the battery, signal, height, how far away it is and what it carries. |
+| **Landing Pad** | A thin pad with an "H" on it. A drone sitting on it charges from a Radio Battery beside it (or a Solar Panel beside it, slowly, in daylight). |
 | **Ticker Tape Printer** | A stock ticker under a glass dome. Tune it to a frequency and give it a Book and Quill: every message that reaches it is printed in the book, with the day and time and who sent it. A full book is signed as a logbook, and a hopper can take it away. |
 | **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
@@ -797,6 +800,23 @@ Since 0.66 a **TV Camera** sends a live picture to **TV Monitors** on its freque
 
 ![The 3 × 2 video wall on 6600 showing "CH 1 · Deck East" live, with "● REC" and "Day 1 07:00": hay bales, the pool, a Radio Receiver, red concrete, the oak tree and Alex as a figure; the Back Door camera on its wall bracket above it, and a single monitor in night-vision green; the Deck East camera on its stand, its lens to you and its REC light on, Jade "Name: Deck East", "Shown on: 1", "Tilt 0°, Lens Zoom", "Reach: 656 blocks"; the camera's settings: its name, "Tilt: 0°", "Lens: Zoom", "Pan: OFF", "Night vision: OFF", "Shown on 1 monitor (reach 656 blocks)"; the wall's settings: "A wall of 3 × 2 monitors", CH 1 "6600 (its own frequency)", CH 2 6601, "Overlay: ON", Done, Next channel, Cancel; at night, after Alex pressed the button by the wall: "CH 2 · Back Door" in night-vision green with Dev in it, Jade "Channel 2 of 2: 6601", "Shows "Back Door", a camera 2 blocks west", "Wall: 3 × 2"; and a monitor on 6602 whose camera is 207 blocks north, past Dev's render distance: "TOO FAR", next to the Back Door camera's picture on a monitor of its own](docs/images/tv.png)
 
+### Radio Drone
+
+Since 0.67 a **Radio Drone** is a camera that flies.
+
+- **Putting it down:** right-click a block with it. Tune it with a Frequency Tuner (sneak to copy its frequency). Right-click it with an empty hand to name it and set its jobs; sneak + right-click with an empty hand picks it up, keeping its frequency, name, jobs and charge (and which drone it is, so its controller stays paired). Hitting it knocks it about for a moment, and enough hits break it (it drops as an item, keeping all that).
+- **Flying it:** right-click the drone with a **Drone Controller** to pair them, then right-click anywhere to take control. You stand still while **W A S D** fly it forward, back and sideways (the way you look), **Space** climbs and **Shift** comes down; the mouse turns it. Right-click again, or put the controller away, to let go: it hovers where it is. Someone else can't take it while you fly it.
+- **Its camera:** while you fly, you see through it (**B** switches between its view and your own). **G** grabs the nearest dropped stack up to 3 blocks under it, or drops what it carries. A panel in the corner shows its name, what it's doing, the battery, the signal bars, its height, how far away it is and which way, and what it carries. TV Monitors on its frequency show its picture like a TV Camera's, as "CH 1 · Scout".
+- **Reach:** the controller reaches like a walkie-talkie from where you stand: farther the higher you are, and farther through towers and repeaters on its frequency. Past 70% of the way to the edge the view gets snowy; past the edge it loses control and drifts down to land (it says so on your screen).
+- **What it can't do:** your game can only show what it has loaded, so its view works within your render distance; farther out the view goes back to your own eyes ("TOO FAR TO SEE") while the panel still shows its height, distance, direction and battery. Monitors farther from you than your render distance show TOO FAR, as for a camera.
+- **Battery:** a full one flies it about 4 minutes; hovering uses half as much. Nearly empty (3%), it won't take off and, in the air, it comes down and lands by itself. Charge it on a **Landing Pad** with a Radio Battery beside the pad (2% a second), by hand with Redstone Dust (10% each) or a Block of Redstone (fills it), or slowly from a Solar Panel beside the pad.
+- **Jobs** (in its settings): **Beacon** turns its frequency on within 16 blocks of it while it's in the air, following it (the frequency log says the drone did it). **Relay**: hovering with nobody flying it, it repeats its frequency like a Radio Repeater, reaching as far as a tower at its height would, until its battery runs low; it isn't saved with the towers and lightning doesn't hit it. **Night vision** makes its picture bright and green.
+- **Private frequencies:** on someone else's private frequency only the owner and members (and operators) can tune it, pair with it, fly it, pick it up or change its settings; a Beacon or a monitor picture only goes out if whoever tuned it may send there.
+- **Jade and WTHIT** show its frequency (and note), whose it is if it's private, the battery, what it's doing and who flies it, what it carries and its jobs. A monitor showing a drone says "Shows "Scout", a drone 12 blocks north".
+- **In the air** it keeps its chunk loaded, so it doesn't freeze when it flies away from you, and it doesn't fly into chunks that aren't loaded.
+
+![Alex's view of the deck: the drone "Scout" hovering over the grass with four Hay Bales hanging under it, and the 3 × 2 monitor wall behind it showing the drone's own picture; Dev's view through the drone's camera, the panel in the corner reading "Radio Drone "Scout"  Hovering", "Battery 76%", the signal bars, "Height 144, 11 blocks east", "Carrying Hay Bale ×4" and "B: view   G: grab / drop", the monitor wall in the picture showing the picture again; the wall up close, "CH 1 · Scout" over the deck with Alex as a figure, Jade "Channel 1 of 2: 6600", "Shows "Scout", a drone 12 blocks north", "Wall: 3 × 2"; the drone landed on a Landing Pad with a Radio Battery beside it, Jade "Frequency: 6600", "Battery: 53%" (going up) and "Landed"; its settings: the name Scout, "Beacon: ON", "Relay: ON", "Night vision: OFF", with "Frequency 6600 · Battery 100%"; and the drone hovering on its own over the oak, Jade "Hovering", "Beacon: its frequency is on within 16 blocks" and "Relay: repeating its frequency"](docs/images/drone.png)
+
 ### 3D item models
 
 Since 0.65 the handheld radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are small 3D models instead of flat pictures: the Frequency Tuner with its display, tuning dial and aerial; the Remote Control with its red button and the light that turns green or red after a press; the Multi-Button Remote with its four buttons in their own colors; the Radio Pager with its screen lighting up; the Signal Scanner's scope; the Signal Meter, whose needle swings with the strength; the yellow Walkie-Talkie with its rubber aerial; each antenna with its crossed dipoles (a loading coil on the gold one, diamond and netherite knobs, an ender tip); the Dish Antenna and Satellite Dish with round, stepped bowls; the Coverage Map rolled at both sides like a scroll; and Wall Redstone as dust running across a piece of wall. The Radar Dish and Radar Screen items show their dish and a lit scope. The radios are held upright, their face to you in first person and outwards in third person.
@@ -916,6 +936,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A burst of hiss and a chirp | "Walkie-talkie crackles" | Someone talks on a Walkie-Talkie you carry, or you talk (since 0.64) |
 | A soft ping with a ring | "Radar pings" | A Radar Screen when something new shows up on it (since 0.65) |
 | A click and a burst of TV snow | "TV changes channel" | A TV Monitor changes channel (since 0.66) |
+| A rotor's whine | "Drone buzzes" | A Radio Drone in the air, higher as it goes faster (since 0.67) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
@@ -1282,6 +1303,18 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **TV Monitor** (makes two): a Radar Screen and a Glass Pane, in any arrangement in the crafting grid.
 
+**Radio Drone:**
+```
+P . P
+. C .
+P B P
+```
+P = Phantom Membrane, C = TV Camera, B = Radio Battery.
+
+**Drone Controller:** a Multi-Button Remote and a Compass, in any arrangement in the crafting grid.
+
+**Landing Pad:** a Launch Pad and an Iron Trapdoor, in any arrangement in the crafting grid.
+
 **Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
@@ -1501,6 +1534,17 @@ src/main/java/com/reiko/signaltower/
   client/TvCameraRenderer.java           turns the camera's head (block/tv_camera_head) the way it looks
   client/TvCameraScreen.java, TvMonitorScreen.java  the camera's and the monitor's settings
   network/OpenTvCameraPayload.java, ConfigureTvCameraPayload.java, OpenTvMonitorPayload.java, ConfigureTvMonitorPayload.java  TV settings <-> server
+  entity/RadioDroneEntity.java           the Radio Drone: flying from its pilot's controls, battery, landing, grab and drop, Beacon, Relay, its camera for monitors
+  radio/DronePilots.java                 who flies which drone; taking control (or why not) and letting go
+  item/RadioDroneItem.java               puts a drone down (keeping its frequency, name, jobs, charge and which drone it is)
+  item/DroneControllerItem.java, DroneLink.java  the controller and the drone it's paired with (data component)
+  block/LandingPadBlock.java             the Landing Pad (the drone charges itself on it)
+  client/DronePilot.java                 flying on the client: the B and G keys, the movement keys to the drone, its camera view
+  client/DroneHud.java                   the pilot's panel, and snow near the edge of reach
+  client/DroneRenderer.java              draws the drone (item/radio_drone_body), its four spinning rotors and what it carries
+  client/DroneBuzz.java                  the rotors' buzz, looped while it's in the air
+  client/DroneScreen.java                the drone's settings
+  network/DroneControlPayload.java, DroneInputPayload.java, DroneGrabPayload.java, DroneStatusPayload.java, OpenDronePayload.java, ConfigureDronePayload.java  flying and settings <-> server
   network/WalkieTalkPayload.java         talk line -> server
   item/SignalScannerItem.java            handheld that lists every frequency heard where you stand, and tracks one
   item/ScannerTarget.java                the transmitter a scanner is tracking (data component), arrow angle
@@ -1789,8 +1833,15 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 205. the TV Camera: it's in the network with its frequency, tuner and reach; Dev's settings packet names it and sets Pan and Night vision, names are cut short, the item keeps both; a monitor watching it lights its REC light and a comparator reads 1, until it hasn't said so for a while; the status line and Jade; on Dev's private frequency Rex can't change it or tune a camera there, and one Rex tuned says nobody sees it; broken, it's gone;
 206. the TV Monitor: it shows the camera 8 blocks west, by name, says it's watching and lights up; clients get which camera but not who tuned it; Jade and the status line; a second channel set by the packet, a redstone pulse steps to it and another back (not while still powered); the item keeps its channels; the nearer of two cameras; one too far isn't shown and one near the edge is snowy; on Dev's private frequency Rex's monitor shows nothing and says so, Alex's (a friend's) shows it, not a camera Rex tuned, and Rex setting its channels makes it his;
 207. video walls: six monitors 3 by 2 are one screen led from the top left, the lead alone watches and the rest light up with it, a pulse on a corner changes the wall's channel, tuning one tunes them all; an L, another frequency in it or a row of nine leaves each on its own, eight wide is fine.
+208. the Radio Drone item: right-clicking the floor puts the drone there, landed, with the item's frequency, charge, jobs and name and its placer as tuner, using up the item; it's in the network for monitors, on its frequency only; saving and loading keep it all and what it carries; sneak + empty hand picks it up (dropping its cargo) keeping which drone it is, so put down again it's the same drone and its controller still flies it; the tooltip;
+209. tuning and pairing a drone: a tuner tunes it and sneaking copies its frequency; a controller pairs with it (name and frequency); Redstone Dust charges it, a Block of Redstone fills it using only one; Jade with and without the server's data; on Dev's private frequency Rex can't retune it, pair, fly, pick it up or set it, and Jade says whose it is; Dev's settings packet sets its jobs and trimmed name, not from 20 blocks away;
+210. flying: an unpaired controller doesn't fly it; Dev's does, and Rex can't take it; Space climbs, W flies the way he looks, nothing pressed hovers; the battery runs down 2 a tick flying and 1 hovering; walking 3000 blocks away loses it, it drifts down and lands below where it was, and it's out of reach to start again; back in reach it flies, putting the controller away lets go (it hovers), and nearly flat it won't take off and lands itself;
+211. the Landing Pad: a thin pad; a drone on it charges from the Radio Battery beside it, about 10 a tick, until it's full, one off the pad doesn't; a Solar Panel beside it charges it in daylight;
+212. grab and Beacon: a drone in the air holds itself up, grabs a stack under it (Jade says so), drops it again, finds nothing to grab; Jade's Beacon line in the air and landed; its Beacon turns its frequency on within 16 blocks of it and not 36 away, the log says the drone did it, and off it goes off;
+213. Relay: a drone hovering on its own repeats its frequency with the reach of its height, shows in the frequency audit and isn't saved with the towers; flown, it doesn't; let go, it does again; Relay off, it doesn't;
+214. a TV Monitor shows a drone on its frequency (its entity, where it is, its name; no camera is watched), clients get which drone, the status line and Jade say it's a drone; a camera nearer than the drone wins, then the drone again; a drone that's gone isn't shown.
 
-All 207 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
+All 214 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
 
 ## License
 

@@ -626,6 +626,19 @@ write(models / "launch_pad.json", {
            for x in (0.5, 13.5) for z in (0.5, 13.5)],
 })
 write(states / "launch_pad.json", {"variants": {"": {"model": f"{MOD}:block/launch_pad"}}})
+# v0.67.0: the Landing Pad, a two-pixel rubber mat with an H on it
+write(models / "landing_pad.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("landing_pad_side"), "top": tex("landing_pad_top"), "side": tex("landing_pad_side"),
+                 "bottom": tex("radio_bottom")},
+    "elements": [{"from": [0, 0, 0], "to": [16, 2, 16], "faces": {
+        "up": {"texture": "#top", "uv": [0, 0, 16, 16]},
+        "down": {"texture": "#bottom", "uv": [0, 0, 16, 16], "cullface": "down"},
+        **{face: {"texture": "#side", "uv": [0, 14, 16, 16], "cullface": face} for face in ("north", "south", "east", "west")},
+    }}],
+})
+write(states / "landing_pad.json", {"variants": {"": {"model": f"{MOD}:block/landing_pad"}}})
+write(items / "landing_pad.json", {"parent": f"{MOD}:block/landing_pad"})
 
 # v0.62.0: the Morse Key: a straight key on a small dark-wood base, its knob towards the front (north
 # here, turned by the blockstate); up, the lever is tipped up at the front on its spring.
@@ -1849,6 +1862,87 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.log.kind_radar": "Radar Dish",
     f"screen.{MOD}.log.tip_radar": "Saw: %s",
     f"subtitles.{MOD}.radar.ping": "Radar pings",
+    # v0.67.0: the Radio Drone, its controller and the Landing Pad
+    f"entity.{MOD}.radio_drone": "Radio Drone",
+    f"item.{MOD}.radio_drone": "Radio Drone",
+    f"item.{MOD}.radio_drone.tooltip": "A little camera drone on a frequency. Right-click a block to put it down, then pair a Drone Controller with it and fly it.",
+    f"item.{MOD}.drone_controller": "Drone Controller",
+    f"item.{MOD}.drone_controller.tooltip": "Right-click a Radio Drone to pair with it; right-click to take control of it, and again to let go.",
+    f"block.{MOD}.landing_pad": "Landing Pad",
+    f"tooltip.{MOD}.landing_pad_help": "A Radio Drone sitting on it charges from a Radio Battery beside the pad, or from a Solar Panel beside it in daylight.",
+    f"tooltip.{MOD}.drone_battery": "Battery: %s%%",
+    f"tooltip.{MOD}.drone_hint": "Right-click a block to put it down. On the drone: an empty hand opens its settings; sneak + empty hand picks it up.",
+    f"tooltip.{MOD}.drone_unpaired": "Not paired: right-click a Radio Drone with it",
+    f"tooltip.{MOD}.drone_paired": "Paired with %s (%s)",
+    f"tooltip.{MOD}.drone_controls": "Flying: WASD, Space and Shift move it, the mouse turns it; B switches the view, G grabs or drops an item",
+    f"message.{MOD}.drone_unnamed": "the Radio Drone",
+    f"message.{MOD}.drone_paired": "Controller paired with %s on %s",
+    f"message.{MOD}.drone_unpaired": "This controller isn't paired: right-click a Radio Drone with it first",
+    f"message.{MOD}.drone_flying": "Flying %s (signal %s/4): right-click again, or put the controller away, to let go",
+    f"message.{MOD}.drone_let_go": "Let go of %s: it hovers there",
+    f"message.{MOD}.drone_not_found": "The paired drone isn't here: picked up, or in another dimension?",
+    f"message.{MOD}.drone_busy": "%s is flying it",
+    f"message.{MOD}.drone_low": "Its battery is too low to fly (%s%%): charge it on a Landing Pad or with Redstone Dust",
+    f"message.{MOD}.drone_out_of_reach": "The drone is out of reach: no signal from here",
+    f"message.{MOD}.drone_lost": "Lost the drone's signal: it drifts down to land",
+    f"message.{MOD}.drone_flat": "The drone's battery is flat: it's falling!",
+    f"message.{MOD}.drone_charge": "Radio Drone charged: %s%%",
+    f"message.{MOD}.drone_grabbed": "Grabbed %s ×%s",
+    f"message.{MOD}.drone_dropped": "Dropped %s ×%s",
+    f"message.{MOD}.drone_nothing": "Nothing under the drone to grab",
+    f"message.{MOD}.drone_set": "Saved the settings of %s",
+    f"message.{MOD}.drone_not_yours": "Can't change it: you're too far away, or its frequency is private",
+    f"message.{MOD}.drone_camera_far": "The drone is past your render distance: you can't see through its camera from here",
+    f"message.{MOD}.drone_not_flying": "You're not flying a drone",
+    f"message.{MOD}.private_refused_drone": "Frequency %s is private to %s: only members can use this drone",
+    f"message.{MOD}.tv_drone_here": "a drone right here",
+    f"message.{MOD}.tv_drone_away": "a drone %s blocks %s",
+    f"message.{MOD}.tv_drone_unnamed": "an unnamed drone",
+    f"key.{MOD}.drone_camera": "Drone: switch the view",
+    f"key.{MOD}.drone_grab": "Drone: grab or drop",
+    f"hud.{MOD}.drone.title": "Radio Drone",
+    f"hud.{MOD}.drone.title_named": "Radio Drone \u201c%s\u201d",
+    f"hud.{MOD}.drone.state_landed": "Landed",
+    f"hud.{MOD}.drone.state_flying": "Flying",
+    f"hud.{MOD}.drone.state_hovering": "Hovering",
+    f"hud.{MOD}.drone.state_sinking": "Coming down",
+    f"hud.{MOD}.drone.battery": "Battery %s%%",
+    f"hud.{MOD}.drone.signal": "Signal",
+    f"hud.{MOD}.drone.no_signal": "NO SIGNAL",
+    f"hud.{MOD}.drone.height": "Height %s, %s",
+    f"hud.{MOD}.drone.overhead": "overhead",
+    f"hud.{MOD}.drone.away": "%s blocks %s",
+    f"hud.{MOD}.drone.carrying": "Carrying %s ×%s",
+    f"hud.{MOD}.drone.carrying_something": "Carrying something",
+    f"hud.{MOD}.drone.carrying_nothing": "Carrying nothing",
+    f"hud.{MOD}.drone.keys": "%s: view   %s: grab / drop",
+    f"hud.{MOD}.drone.camera_far": "TOO FAR TO SEE: the drone is past your render distance",
+    f"screen.{MOD}.drone.status": "Frequency %s · Battery %s%%",
+    f"screen.{MOD}.drone.name": "Name",
+    f"screen.{MOD}.drone.name_hint": "Name (on monitors and the pilot's panel)",
+    f"screen.{MOD}.drone.beacon": "Beacon",
+    f"screen.{MOD}.drone.beacon_tip": "On: it turns its frequency on within 16 blocks of itself, wherever it is.",
+    f"screen.{MOD}.drone.relay": "Relay",
+    f"screen.{MOD}.drone.relay_tip": "On: while it hovers with nobody flying it, it repeats its frequency like a Radio Repeater, reaching farther the higher it is, until its battery runs low.",
+    f"screen.{MOD}.drone.night": "Night vision",
+    f"screen.{MOD}.drone.night_tip": "On: a bright green picture from its camera, even in the dark.",
+    f"screen.{MOD}.tv_monitor.face_drone": "Drone",
+    f"screen.{MOD}.log.kind_drone": "Radio Drone",
+    f"screen.{MOD}.log.tip_drone": "Drone: %s",
+    f"jade.{MOD}.drone_battery": "Battery: %s%%",
+    f"jade.{MOD}.drone_state_landed": "Landed",
+    f"jade.{MOD}.drone_state_flying": "Flying",
+    f"jade.{MOD}.drone_state_hovering": "Hovering",
+    f"jade.{MOD}.drone_state_sinking": "Coming down",
+    f"jade.{MOD}.drone_flown_by": "%s, flown by %s",
+    f"jade.{MOD}.drone_lost": "Lost signal: coming down",
+    f"jade.{MOD}.drone_carrying": "Carrying %s ×%s",
+    f"jade.{MOD}.drone_beacon": "Beacon: its frequency is on within %s blocks",
+    f"jade.{MOD}.drone_beacon_idle": "Beacon: in the air, its frequency is on within %s blocks",
+    f"jade.{MOD}.drone_relaying": "Relay: repeating its frequency",
+    f"jade.{MOD}.drone_relay_idle": "Relay: while it hovers on its own",
+    f"jade.{MOD}.drone_night": "Night vision",
+    f"subtitles.{MOD}.drone.buzz": "Drone buzzes",
     # v0.66.0: the TV Camera and the TV Monitor
     f"block.{MOD}.tv_camera": "TV Camera",
     f"block.{MOD}.tv_camera.tooltip": "Put it on a floor, a wall or a ceiling: TV Monitors on its frequency that it reaches show what it sees, live. Reach like a walkie-talkie's.",
@@ -3158,6 +3252,25 @@ recipes["tv_monitor"] = ({  # v0.66.0: two, so walls of them don't cost too much
     "ingredients": [{"item": f"{MOD}:radar_screen"}, {"item": "minecraft:glass_pane"}],
     "result": {"count": 2, "id": f"{MOD}:tv_monitor"},
 }, f"{MOD}:radar_screen")
+recipes["radio_drone"] = ({  # v0.67.0
+    "type": "minecraft:crafting_shaped",
+    "category": "redstone",
+    "pattern": ["P P", " C ", "PBP"],
+    "key": {"P": {"item": "minecraft:phantom_membrane"}, "C": {"item": f"{MOD}:tv_camera"}, "B": {"item": f"{MOD}:radio_battery"}},
+    "result": {"count": 1, "id": f"{MOD}:radio_drone"},
+}, f"{MOD}:tv_camera")
+recipes["drone_controller"] = ({  # v0.67.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "equipment",
+    "ingredients": [{"item": f"{MOD}:multi_remote"}, {"item": "minecraft:compass"}],
+    "result": {"count": 1, "id": f"{MOD}:drone_controller"},
+}, f"{MOD}:radio_drone")
+recipes["landing_pad"] = ({  # v0.67.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:launch_pad"}, {"item": "minecraft:iron_trapdoor"}],
+    "result": {"count": 1, "id": f"{MOD}:landing_pad"},
+}, f"{MOD}:radio_drone")
 recipes["walkie_talkie"] = ({  # v0.64.0
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -3308,7 +3421,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen", "tv_camera", "tv_monitor"):
+             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen", "tv_camera", "tv_monitor", "landing_pad"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -3318,7 +3431,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
         entry["functions"] = [{"function": "minecraft:copy_state", "block": f"{MOD}:aviation_beacon",
                                "properties": ["when", "pattern", "color"]}]
     elif name not in ("radio_mast", "wall_redstone", "solar_panel", "dish_rotator", "bundled_cable", "cable_tap", "guy_anchor", "tower_platform",
-                      "launch_pad"):
+                      "launch_pad", "landing_pad"):
         # Copy the block's frequency (and a converter's output frequency) onto the dropped item so it keeps its tuning.
         entry["functions"] = [{
             "function": "minecraft:copy_components",
@@ -3369,7 +3482,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
                f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer",
-               f"{MOD}:radar_dish", f"{MOD}:radar_screen", f"{MOD}:tv_camera", f"{MOD}:tv_monitor"]
+               f"{MOD}:radar_dish", f"{MOD}:radar_screen", f"{MOD}:tv_camera", f"{MOD}:tv_monitor", f"{MOD}:landing_pad"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -3445,6 +3558,9 @@ INFO = {
     "radar_dish": "Put it on top of a mast like a transmitter. Once a second it sweeps its reach for players, hostile mobs, peaceful mobs and vehicles (not under 8 or more solid blocks, as in a cave), and with Send on it turns its frequency on with how many it sees (at most 15). A comparator reads the count. Right-click it to choose what it tracks.",
     "radar_screen": "Hang it on a wall and tune it like a receiver: it shows the nearest Radar Dish on its frequency that reaches it, with a sweep line, colored blips and towers, north up. On a private frequency only members' screens show anything. Right-click it to choose how far round the dish it shows (128 blocks at first) or turn the ping off.",
     "tv_camera": "Put it on a floor (a stand), a wall (a bracket) or a ceiling and tune it: it looks the way it faces (on a floor or ceiling, the way you looked as you placed it), and TV Monitors on its frequency that it reaches show what it sees, live. It reaches like a walkie-talkie: farther the higher it is, and farther with towers and repeaters on its frequency; near the edge the picture gets snowy. Right-click it to name it and set its tilt, lens, pan and night vision. Its red light is on while a monitor shows it; a comparator reads how many do. On a private frequency only members can tune one.",
+    "radio_drone": "Right-click a block to put it down, and tune it with a Frequency Tuner. Pair a Drone Controller with it and fly it: WASD, Space and Shift move it while you stand still, the mouse turns it, B switches between your eyes and its camera (only while it's within your render distance), and G grabs the nearest dropped item under it or drops what it carries. It reaches like a walkie-talkie: farther the higher it is, and farther with towers and repeaters on its frequency; past the edge it loses control and drifts down. TV Monitors on its frequency show its camera. A full battery flies it about 4 minutes (hovering uses less); nearly empty, it lands itself. Charge it on a Landing Pad or with Redstone Dust. Right-click it with an empty hand to name it and set Beacon (its frequency is on within 16 blocks of it), Relay (hovering on its own, it repeats its frequency, farther the higher it is) and night vision; sneak and right-click to pick it up, keeping its frequency, name and charge.",
+    "drone_controller": "Right-click a Radio Drone to pair with it, then right-click anywhere to fly it, and again (or put the controller away) to let go: it hovers where it is. While you fly it a panel shows its battery, signal, height, how far away it is and what it carries. On a private frequency only members can pair or fly one.",
+    "landing_pad": "A Radio Drone that lands on it charges, from a Radio Battery beside the pad, or from a Solar Panel beside it in daylight.",
     "tv_monitor": "Hang it on a wall and tune it: it shows the nearest TV Camera on its frequency that reaches it. Right-click it to add up to five more channels (frequencies); a redstone pulse or a button next to it steps to the next. Monitors side by side on one wall, on one frequency, join into one big screen (a full rectangle, up to 8 by 5); tuning one tunes them all. Each player's game draws the picture itself, so a camera past your render distance shows TOO FAR. On a private frequency only members' monitors show anything.",
     "ticker_printer": "Tune it to a frequency and give it a Book and Quill (by hand or hopper): every message that reaches it is printed in the book, with the day and time and who sent it, even ones that came while it wasn't loaded. A full book is signed as a logbook, which a hopper can take out. A comparator reads how full the book is.",
     "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",

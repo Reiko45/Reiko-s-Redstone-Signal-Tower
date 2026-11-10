@@ -196,7 +196,7 @@ public class LogScreen extends Screen {
             return (entry.kind() == SignalNetwork.CauseKind.TRANSMITTER || entry.kind() == SignalNetwork.CauseKind.GATE
                     || entry.kind() == SignalNetwork.CauseKind.TIMER || entry.kind() == SignalNetwork.CauseKind.RECORDER
                     || entry.kind() == SignalNetwork.CauseKind.WEATHER_STATION || entry.kind() == SignalNetwork.CauseKind.JUKEBOX
-                    || entry.kind() == SignalNetwork.CauseKind.RADAR
+                    || entry.kind() == SignalNetwork.CauseKind.RADAR || entry.kind() == SignalNetwork.CauseKind.DRONE
                     ? Component.translatable(AUDIT_KEY + "hidden") : Component.literal("-")).withStyle(ChatFormatting.DARK_GRAY);
         }
         BlockPos pos = entry.pos().get();
@@ -246,7 +246,10 @@ public class LogScreen extends Screen {
         }
         switch (entry.kind()) {
             case UNKNOWN -> lines.add(Component.translatable(KEY + "tip_unknown").withStyle(ChatFormatting.DARK_GRAY));
-            case TRANSMITTER, GATE, TIMER, WEATHER_STATION, JUKEBOX, RADAR -> {
+            case TRANSMITTER, GATE, TIMER, WEATHER_STATION, JUKEBOX, RADAR, DRONE -> {
+                if (entry.kind() == SignalNetwork.CauseKind.DRONE && !entry.detail().isEmpty()) {
+                    lines.add(Component.translatable(KEY + "tip_drone", entry.detail()).withStyle(ChatFormatting.AQUA)); // v0.67.0
+                }
                 if (entry.kind() == SignalNetwork.CauseKind.JUKEBOX && !entry.detail().isEmpty()) {
                     lines.add(Component.translatable(KEY + "tip_jukebox", entry.detail()).withStyle(ChatFormatting.AQUA)); // v0.60.0
                 }

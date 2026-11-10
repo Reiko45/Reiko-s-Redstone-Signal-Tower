@@ -82,6 +82,8 @@ public final class CameraRaycaster {
     public static final class Shot {
         final ClientLevel level;
         final BlockPos camera;
+        /** v0.67.0: an entity left out of the picture (the drone it's taken from), or -1. */
+        final int skipEntity;
         final Vec3 eye;
         final Vec3 forward;
         final Vec3 right;
@@ -102,9 +104,10 @@ public final class CameraRaycaster {
         int chunkX = Integer.MIN_VALUE;
         int chunkZ = Integer.MIN_VALUE;
 
-        Shot(ClientLevel level, BlockPos camera, TvCamera.Pose pose, boolean night, float partialTick) {
+        Shot(ClientLevel level, BlockPos camera, TvCamera.Pose pose, boolean night, float partialTick, int skipEntity) {
             this.level = level;
             this.camera = camera.immutable();
+            this.skipEntity = skipEntity;
             this.eye = pose.eye();
             this.forward = pose.forward();
             Vec3 r = forward.cross(new Vec3(0, 1, 0));
@@ -140,7 +143,7 @@ public final class CameraRaycaster {
                     break;
                 }
                 int kind = kindOf(entity);
-                if (kind < 0 || entity.isInvisible()) {
+                if (kind < 0 || entity.isInvisible() || entity.getId() == skipEntity) {
                     continue;
                 }
                 Vec3 at = entity.getPosition(partialTick);
@@ -224,7 +227,7 @@ public final class CameraRaycaster {
         if (entity instanceof Player) return 0;
         if (entity instanceof LivingEntity) return 1;
         if (entity instanceof ItemEntity) return 2;
-        if (entity instanceof VehicleEntity) return 3;
+        if (entity instanceof VehicleEntity || entity instanceof com.reiko.signaltower.entity.RadioDroneEntity) return 3;
         if (entity instanceof HangingEntity) return 4;
         if (entity instanceof FallingBlockEntity || entity instanceof PrimedTnt) return 5;
         return -1;
@@ -265,7 +268,12 @@ public final class CameraRaycaster {
 
     /** Sets up a picture of the camera at {@code camera} ({@code pose}) at this moment. */
     public static Shot shot(ClientLevel level, BlockPos camera, TvCamera.Pose pose, boolean night, float partialTick) {
-        return new Shot(level, camera, pose, night, partialTick);
+        return new Shot(level, camera, pose, night, partialTick, -1);
+    }
+
+    /** v0.67.0: a picture from a Radio Drone's camera (no block of its own; the drone itself left out). */
+    public static Shot droneShot(ClientLevel level, int droneId, TvCamera.Pose pose, boolean night, float partialTick) {
+        return new Shot(level, new BlockPos(0, Integer.MIN_VALUE / 2, 0), pose, night, partialTick, droneId);
     }
 
     /** Draws rows {@code from} (inclusive) to {@code to} (exclusive) of {@code shot} into {@code out} (ARGB, WIDTH × HEIGHT). */

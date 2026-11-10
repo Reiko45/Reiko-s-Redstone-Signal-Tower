@@ -88,5 +88,11 @@
     "sounds": [
       "reikos_signal_tower:tv_switch"
     ]
+  },
+  "drone.buzz": {
+    "subtitle": "subtitles.reikos_signal_tower.drone.buzz",
+    "sounds": [
+      "reikos_signal_tower:drone_buzz"
+    ]
   }
 }

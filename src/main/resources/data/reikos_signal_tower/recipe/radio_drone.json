@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "P P",
+    " C ",
+    "PBP"
+  ],
+  "key": {
+    "P": {
+      "item": "minecraft:phantom_membrane"
+    },
+    "C": {
+      "item": "reikos_signal_tower:tv_camera"
+    },
+    "B": {
+      "item": "reikos_signal_tower:radio_battery"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:radio_drone"
+  }
+}

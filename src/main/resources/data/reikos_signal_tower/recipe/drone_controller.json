@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    {
+      "item": "reikos_signal_tower:multi_remote"
+    },
+    {
+      "item": "minecraft:compass"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "reikos_signal_tower:drone_controller"
+  }
+}

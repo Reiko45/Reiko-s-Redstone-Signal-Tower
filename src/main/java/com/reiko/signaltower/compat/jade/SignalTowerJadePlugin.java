@@ -9,6 +9,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import snownee.jade.api.BlockAccessor;
+import snownee.jade.api.EntityAccessor;
+import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.IBlockComponentProvider;
 import snownee.jade.api.IServerDataProvider;
 import snownee.jade.api.ITooltip;
@@ -42,6 +44,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.CableTapBlock.class);
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.GuyAnchorBlock.class);
         registration.registerBlockDataProvider(RadioProvider.INSTANCE, com.reiko.signaltower.block.LaunchPadBlock.class); // v0.61.0
+        registration.registerEntityDataProvider(DroneProvider.INSTANCE, com.reiko.signaltower.entity.RadioDroneEntity.class); // v0.67.0
     }
 
     @Override
@@ -56,6 +59,7 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.CableTapBlock.class);
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.GuyAnchorBlock.class);
         registration.registerBlockComponent(RadioProvider.INSTANCE, com.reiko.signaltower.block.LaunchPadBlock.class); // v0.61.0
+        registration.registerEntityComponent(DroneProvider.INSTANCE, com.reiko.signaltower.entity.RadioDroneEntity.class); // v0.67.0
     }
 
     /** Sends the server's data along, and draws the lines on the client. */
@@ -92,6 +96,33 @@ public final class SignalTowerJadePlugin implements IWailaPlugin {
                 tooltip.remove(JadeIds.MC_REDSTONE);
             }
             RadioInfo.lines(accessor.getBlockState(), info).forEach(tooltip::add);
+        }
+    }
+
+    /** v0.67.0: a Radio Drone's frequency, battery, pilot, cargo and jobs. */
+    enum DroneProvider implements IEntityComponentProvider, IServerDataProvider<EntityAccessor> {
+        INSTANCE;
+
+        static final ResourceLocation DRONE_UID = ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "radio_drone");
+
+        @Override
+        public ResourceLocation getUid() {
+            return DRONE_UID;
+        }
+
+        @Override
+        public void appendServerData(CompoundTag data, EntityAccessor accessor) {
+            if (accessor.getLevel() instanceof ServerLevel level && accessor.getEntity() instanceof com.reiko.signaltower.entity.RadioDroneEntity drone) {
+                data.put(RadioInfo.KEY, RadioInfo.readDrone(level, drone, accessor.getPlayer()));
+            }
+        }
+
+        @Override
+        public void appendTooltip(ITooltip tooltip, EntityAccessor accessor, IPluginConfig config) {
+            if (accessor.getEntity() instanceof com.reiko.signaltower.entity.RadioDroneEntity drone) {
+                CompoundTag server = accessor.getServerData();
+                RadioInfo.droneLines(drone, server.contains(RadioInfo.KEY) ? server.getCompound(RadioInfo.KEY) : null).forEach(tooltip::add);
+            }
         }
     }
 }

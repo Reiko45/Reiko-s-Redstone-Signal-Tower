@@ -140,6 +140,30 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new RadarSettingsScreen(state));
     }
 
+    /** v0.67.0: the server says this player flies a drone now, or not. */
+    public static void droneControl(com.reiko.signaltower.network.DroneControlPayload payload) {
+        DronePilot.onControl(payload);
+    }
+
+    public static void droneStatus(com.reiko.signaltower.network.DroneStatusPayload payload) {
+        DronePilot.onStatus(payload);
+    }
+
+    /** A drone in the air near this player: its buzz. */
+    public static void droneBuzz(com.reiko.signaltower.entity.RadioDroneEntity drone) {
+        DroneBuzz.keep(drone);
+    }
+
+    /** True if this player flies the drone {@code entityId} (its rotation is theirs, not the server's). */
+    public static boolean pilotsDrone(int entityId) {
+        return DronePilot.pilots(entityId);
+    }
+
+    /** Opens a Radio Drone's settings (v0.67.0). */
+    public static void openDrone(com.reiko.signaltower.network.OpenDronePayload state) {
+        Minecraft.getInstance().setScreen(new DroneScreen(state));
+    }
+
     /** Opens a TV Camera's settings (v0.66.0). */
     public static void openTvCamera(com.reiko.signaltower.network.OpenTvCameraPayload state) {
         Minecraft.getInstance().setScreen(new TvCameraScreen(state));

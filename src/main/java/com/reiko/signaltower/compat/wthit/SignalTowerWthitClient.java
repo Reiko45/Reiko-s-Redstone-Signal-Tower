@@ -23,6 +23,20 @@ public final class SignalTowerWthitClient implements IWailaClientPlugin {
             registrar.body(Lines.INSTANCE, block, PRIORITY);
             WthitBlocks.registered("client", block);
         }
+        registrar.body(DroneLines.INSTANCE, com.reiko.signaltower.entity.RadioDroneEntity.class, PRIORITY); // v0.67.0
+        WthitBlocks.registered("client", com.reiko.signaltower.entity.RadioDroneEntity.class);
+    }
+
+    enum DroneLines implements mcp.mobius.waila.api.IEntityComponentProvider {
+        INSTANCE;
+
+        @Override
+        public void appendBody(ITooltip tooltip, mcp.mobius.waila.api.IEntityAccessor accessor, IPluginConfig config) {
+            if (accessor.getEntity() instanceof com.reiko.signaltower.entity.RadioDroneEntity drone) {
+                CompoundTag server = accessor.getData().raw();
+                RadioInfo.droneLines(drone, server.contains(RadioInfo.KEY) ? server.getCompound(RadioInfo.KEY) : null).forEach(tooltip::addLine);
+            }
+        }
     }
 
     enum Lines implements IBlockComponentProvider {

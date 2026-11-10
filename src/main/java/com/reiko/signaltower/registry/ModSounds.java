@@ -48,10 +48,13 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> RADAR_PING = register("radar.ping");
     /** v0.66.0: a TV Monitor changing channel (a burst of static). */
     public static final DeferredHolder<SoundEvent, SoundEvent> TV_SWITCH = register("tv.switch");
+    /** v0.67.0: a Radio Drone's rotors (looped while it's in the air). */
+    public static final DeferredHolder<SoundEvent, SoundEvent> DRONE_BUZZ = register("drone.buzz");
 
     /** Every one, for the tests. */
     public static final List<DeferredHolder<SoundEvent, SoundEvent>> ALL = List.of(TUNER_TUNE, TUNER_STEP, TELEGRAPH_KEY,
-            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH, RADAR_PING, TV_SWITCH);
+            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH, RADAR_PING, TV_SWITCH,
+            DRONE_BUZZ);
 
     private ModSounds() {
     }

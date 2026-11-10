@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 57, "All the mod's items: " + items.size());
+        check(items.size() == 60, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 15 && sounds.size() == 15, "Fifteen sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 16 && sounds.size() == 16, "Sixteen sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10799,6 +10799,7 @@ public final class SignalTowerGameTests {
             for (Class<?> block : com.reiko.signaltower.compat.wthit.WthitBlocks.COVERED) {
                 check(registered.contains("common:" + block.getSimpleName()), "Registered with WTHIT: " + block.getSimpleName() + " in " + registered);
             }
+            check(registered.contains("common:RadioDroneEntity"), "The Radio Drone is registered with WTHIT: " + registered); // v0.67.0
             try {
                 Object registrar = Class.forName("mcp.mobius.waila.registry.Registrar").getMethod("get").invoke(null);
                 Object blockData = registrar.getClass().getField("blockData").get(registrar);
@@ -11628,6 +11629,509 @@ public final class SignalTowerGameTests {
                     check(com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(new BlockPos(5, 5, 1))).size() == 1, "Nine wide: too wide");
                     helper.setBlock(new BlockPos(9, 5, 1), Blocks.AIR);
                     check(com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(new BlockPos(5, 5, 1))).width() == 8, "Eight wide is fine");
+                })
+                .thenSucceed();
+    }
+
+    // ---- v0.67.0: the Radio Drone ----
+
+    private static com.reiko.signaltower.entity.RadioDroneEntity spawnDrone(GameTestHelper helper, BlockPos at, int frequency, UUID tunedBy) {
+        ServerLevel level = helper.getLevel();
+        var drone = ModRegistry.RADIO_DRONE_ENTITY.get().create(level);
+        check(drone != null, "A drone");
+        Vec3 feet = helper.absoluteVec(Vec3.atBottomCenterOf(at));
+        drone.moveTo(feet.x, feet.y, feet.z, -90.0F, 15.0F);
+        drone.setTunedBy(tunedBy);
+        level.addFreshEntity(drone);
+        drone.setFrequency(frequency);
+        return drone;
+    }
+
+    private static ItemStack pairedController(com.reiko.signaltower.entity.RadioDroneEntity drone) {
+        ItemStack controller = new ItemStack(ModRegistry.DRONE_CONTROLLER.get());
+        com.reiko.signaltower.item.DroneControllerItem.link(controller, drone);
+        return controller;
+    }
+
+    /**
+     * The Radio Drone as an item (on 4657, 52% charged, Beacon and Night vision, named "Scout"):
+     * right-clicking the floor puts it down there, landed, with all of that and its placer as its
+     * tuner, and uses up the item; it's in the network for monitors. Saving and loading keep it all
+     * (and what it carries). Sneak + empty hand picks it up into the inventory (dropping its cargo),
+     * keeping which drone it is, so put down again it's the same drone (and a paired controller still
+     * flies it).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void radioDroneItem(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(1, 1, 1), devId, "Dev", false, bar, new java.util.ArrayList<>());
+        var D = com.reiko.signaltower.entity.RadioDroneEntity.class;
+        ItemStack item = new ItemStack(ModRegistry.RADIO_DRONE.get());
+        item.set(ModRegistry.FREQUENCY.get(), 4657);
+        item.set(ModRegistry.DRONE_CHARGE.get(), 5000);
+        item.set(ModRegistry.DRONE_SETTINGS.get(), com.reiko.signaltower.entity.RadioDroneEntity.BEACON | com.reiko.signaltower.entity.RadioDroneEntity.NIGHT_VISION);
+        item.set(DataComponents.CUSTOM_NAME, Component.literal("Scout"));
+        dev.setItemInHand(InteractionHand.MAIN_HAND, item);
+        BlockPos floor = helper.absolutePos(new BlockPos(4, -1, 1));
+        Vec3 hit = new Vec3(floor.getX() + 0.5, floor.getY() + 1.0, floor.getZ() + 0.5);
+        var result = item.useOn(new UseOnContext(dev, InteractionHand.MAIN_HAND, new BlockHitResult(hit, Direction.UP, floor, false)));
+        var placed = level.getEntitiesOfClass(D, new net.minecraft.world.phys.AABB(floor).inflate(2));
+        check(result.consumesAction() && placed.size() == 1 && dev.getMainHandItem().isEmpty(), "Put down, the item used up: " + result + " " + placed);
+        var drone = placed.get(0);
+        check(drone.getFrequency() == 4657 && drone.getCharge() == 5000 && drone.percent() == 52 && drone.droneName().equals("Scout")
+                && drone.has(com.reiko.signaltower.entity.RadioDroneEntity.BEACON) && drone.has(com.reiko.signaltower.entity.RadioDroneEntity.NIGHT_VISION)
+                && !drone.has(com.reiko.signaltower.entity.RadioDroneEntity.RELAY) && devId.equals(drone.getTunedBy())
+                && drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.LANDED
+                && Math.abs(drone.getY() - (floor.getY() + 1.0)) < 1.0E-6, "It keeps its frequency, charge, jobs and name: " + drone.position());
+        SignalNetwork network = SignalNetwork.get(level);
+        drone.publish(level);
+        var spot = network.droneAt(drone.getUUID());
+        check(spot != null && spot.frequency() == 4657 && spot.name().equals("Scout") && spot.entityId() == drone.getId()
+                && spot.pos().equals(drone.blockPosition()) && !spot.coverage().isEmpty(), "In the network: " + spot);
+        check(network.dronesOn(4657).size() == 1 && network.dronesOn(4658).isEmpty(), "On its frequency only");
+        // Saving and loading.
+        drone.setCarried(new ItemStack(Items.COBBLESTONE, 5));
+        CompoundTag saved = drone.saveWithoutId(new CompoundTag());
+        var loaded = ModRegistry.RADIO_DRONE_ENTITY.get().create(level);
+        loaded.load(saved);
+        check(loaded.getFrequency() == 4657 && loaded.getCharge() == 5000 && loaded.getSettings() == drone.getSettings()
+                && loaded.droneName().equals("Scout") && devId.equals(loaded.getTunedBy()) && loaded.getUUID().equals(drone.getUUID())
+                && loaded.getCarried().is(Items.COBBLESTONE) && loaded.getCarried().getCount() == 5, "Saved and loaded");
+        UUID id = drone.getUUID();
+        ItemStack controller = pairedController(drone);
+        // Picked up.
+        dev.setShiftKeyDown(true);
+        var picked = drone.interact(dev, InteractionHand.MAIN_HAND);
+        dev.setShiftKeyDown(false);
+        ItemStack back = dev.getInventory().items.stream().filter(stack -> stack.is(ModRegistry.RADIO_DRONE.get())).findFirst().orElse(ItemStack.EMPTY);
+        check(picked.consumesAction() && drone.isRemoved() && !back.isEmpty() && id.equals(back.get(ModRegistry.DRONE_ID.get()))
+                && back.get(ModRegistry.FREQUENCY.get()) == 4657 && back.get(ModRegistry.DRONE_CHARGE.get()) == 5000
+                && "Scout".equals(back.getHoverName().getString()), "Picked up, keeping it all: " + back.getComponents());
+        check(network.droneAt(id) == null, "Gone from the network");
+        check(!level.getEntitiesOfClass(ItemEntity.class, new net.minecraft.world.phys.AABB(floor).inflate(3),
+                e -> e.getItem().is(Items.COBBLESTONE)).isEmpty(), "Its cargo is dropped");
+        // Put down again: the same drone.
+        dev.getInventory().clearContent();
+        dev.setItemInHand(InteractionHand.MAIN_HAND, back);
+        BlockPos floor2 = helper.absolutePos(new BlockPos(8, -1, 1));
+        back.useOn(new UseOnContext(dev, InteractionHand.MAIN_HAND,
+                new BlockHitResult(new Vec3(floor2.getX() + 0.5, floor2.getY() + 1.0, floor2.getZ() + 0.5), Direction.UP, floor2, false)));
+        var again = level.getEntitiesOfClass(D, new net.minecraft.world.phys.AABB(floor2).inflate(2));
+        check(again.size() == 1 && again.get(0).getUUID().equals(id), "Put down again, it's the same drone");
+        dev.setItemInHand(InteractionHand.MAIN_HAND, controller);
+        check(com.reiko.signaltower.item.DroneControllerItem.holdsLinked(dev, again.get(0).getUUID()), "So its controller still flies it");
+        // Some of it shows in the item's tooltip.
+        List<Component> tooltip = new java.util.ArrayList<>();
+        ModRegistry.RADIO_DRONE.get().appendHoverText(again.get(0).toItem(), Item.TooltipContext.of(level), tooltip, net.minecraft.world.item.TooltipFlag.NORMAL);
+        check(lineKeys(tooltip).equals(List.of("tooltip", "frequency", "drone_battery", "drone_hint")), "Tooltip: " + lineKeys(tooltip));
+        again.get(0).discard();
+        helper.succeed();
+    }
+
+    /**
+     * A drone on 4658: a Frequency Tuner tunes it (sneaking copies its frequency); a Drone
+     * Controller pairs with it (its name and frequency go on the controller); Redstone Dust
+     * charges it. On Dev's private 4658 Rex can't tune it, pair with it, fly it, pick it up or set
+     * it; Dev sets its jobs and name with the settings packet (only near it). Jade and WTHIT lines.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void radioDroneTuneAndPair(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> rexBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 1), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(5, 1, 1), rexId, "Rex", false, rexBar, new java.util.ArrayList<>());
+        var drone = spawnDrone(helper, new BlockPos(4, 0, 1), 4000, null);
+        try {
+            ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+            FrequencyTunerItem.setFrequency(tuner, 4658);
+            dev.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+            drone.interact(dev, InteractionHand.MAIN_HAND);
+            check(drone.getFrequency() == 4658 && devId.equals(drone.getTunedBy()) && lastKey(devBar).endsWith("frequency_set"), "Tuned: " + lastKey(devBar));
+            ItemStack other = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+            FrequencyTunerItem.setFrequency(other, 77);
+            rex.setItemInHand(InteractionHand.MAIN_HAND, other);
+            rex.setShiftKeyDown(true);
+            drone.interact(rex, InteractionHand.MAIN_HAND);
+            rex.setShiftKeyDown(false);
+            check(FrequencyTunerItem.getFrequency(other) == 4658 && drone.getFrequency() == 4658, "Sneaking copies its frequency");
+
+            ItemStack controller = new ItemStack(ModRegistry.DRONE_CONTROLLER.get());
+            dev.setItemInHand(InteractionHand.MAIN_HAND, controller);
+            drone.setDroneName("Hawk");
+            drone.interact(dev, InteractionHand.MAIN_HAND);
+            var link = com.reiko.signaltower.item.DroneControllerItem.linkOf(controller);
+            check(link != null && link.drone().equals(drone.getUUID()) && link.name().equals("Hawk") && link.frequency() == 4658
+                    && lastKey(devBar).endsWith("drone_paired"), "Paired: " + link);
+
+            drone.setCharge(1000);
+            dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.REDSTONE, 2));
+            drone.interact(dev, InteractionHand.MAIN_HAND);
+            check(drone.getCharge() == 3000 && dev.getMainHandItem().isEmpty() && lastKey(devBar).endsWith("drone_charge"), "Redstone charges it: " + drone.getCharge());
+            dev.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.REDSTONE_BLOCK, 3));
+            drone.interact(dev, InteractionHand.MAIN_HAND);
+            check(drone.getCharge() == com.reiko.signaltower.entity.RadioDroneEntity.CAPACITY && dev.getMainHandItem().getCount() == 2,
+                    "A block of redstone fills it (only one used): " + drone.getCharge());
+
+            // Jade.
+            CompoundTag info = com.reiko.signaltower.compat.RadioInfo.readDrone(level, drone, dev);
+            List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, info));
+            check(jade.equals(List.of("frequency", "drone_battery", "drone_state_landed")), "Jade (its name is the title): " + jade);
+            check(lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, null)).equals(List.of("frequency", "drone_battery", "drone_state_landed")),
+                    "Without server data");
+
+            // Private.
+            claims.put(4658, devId, "Dev", java.util.Map.of());
+            SignalNetwork.get(level).invalidate(4658);
+            ItemStack rexTuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+            FrequencyTunerItem.setFrequency(rexTuner, 31);
+            rex.setItemInHand(InteractionHand.MAIN_HAND, rexTuner);
+            drone.interact(rex, InteractionHand.MAIN_HAND);
+            check(drone.getFrequency() == 4658 && lastKey(rexBar).endsWith("private_refused_drone"), "Rex can't retune it: " + lastKey(rexBar));
+            ItemStack rexController = new ItemStack(ModRegistry.DRONE_CONTROLLER.get());
+            rex.setItemInHand(InteractionHand.MAIN_HAND, rexController);
+            drone.interact(rex, InteractionHand.MAIN_HAND);
+            check(com.reiko.signaltower.item.DroneControllerItem.linkOf(rexController) == null, "Nor pair with it");
+            check(keyOf(com.reiko.signaltower.radio.DronePilots.start(rex, drone.getUUID())).endsWith("private_refused_drone") && drone.getPilot() == null,
+                    "Nor fly it");
+            rex.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            rex.setShiftKeyDown(true);
+            drone.interact(rex, InteractionHand.MAIN_HAND);
+            rex.setShiftKeyDown(false);
+            check(!drone.isRemoved() && lastKey(rexBar).endsWith("private_refused_drone"), "Nor pick it up");
+            int bits = com.reiko.signaltower.entity.RadioDroneEntity.RELAY | com.reiko.signaltower.entity.RadioDroneEntity.NIGHT_VISION;
+            Component refused = com.reiko.signaltower.network.ConfigureDronePayload.apply(rex,
+                    new com.reiko.signaltower.network.ConfigureDronePayload(drone.getId(), bits, "Mine"));
+            check(refused != null && keyOf(refused).endsWith("drone_not_yours") && drone.getSettings() == 0 && drone.droneName().equals("Hawk"), "Nor set it");
+            check(com.reiko.signaltower.compat.RadioInfo.readDrone(level, drone, rex).getString("private_to").equals("Dev"), "Jade says whose it is");
+            Component set = com.reiko.signaltower.network.ConfigureDronePayload.apply(dev,
+                    new com.reiko.signaltower.network.ConfigureDronePayload(drone.getId(), bits | 64, "  Scout  "));
+            check(set != null && keyOf(set).endsWith("drone_set") && drone.getSettings() == bits && drone.droneName().equals("Scout"),
+                    "Dev sets it (trimmed): " + drone.getSettings() + " " + drone.droneName());
+            dev.moveTo(drone.getX() + 20, drone.getY(), drone.getZ());
+            check(com.reiko.signaltower.network.ConfigureDronePayload.apply(dev,
+                    new com.reiko.signaltower.network.ConfigureDronePayload(drone.getId(), 0, "")) == null && drone.getSettings() == bits, "Not from 20 blocks away");
+            jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, com.reiko.signaltower.compat.RadioInfo.readDrone(level, drone, dev)));
+            check(jade.equals(List.of("frequency", "private", "drone_battery", "drone_state_landed", "drone_relay_idle", "drone_night")),
+                    "Jade: " + jade);
+        } finally {
+            claims.remove(4658);
+            SignalNetwork.get(level).invalidate(4658);
+            drone.discard();
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Flying a drone (on 4659): Dev, holding its paired controller, takes control; with Space held
+     * it climbs, with W it flies the way he looks (east), and with nothing pressed it hovers. Its
+     * battery runs down as it flies. Walking far away loses its signal: he lets go, and it drifts
+     * down and lands. Putting the controller away lets go too. Rex can't take it while Dev flies
+     * it; an unpaired controller, or one with the drone nearly flat, doesn't.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void radioDroneFlight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> rexBar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 1), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(2, 1, 2), UUID.randomUUID(), "Rex", false, rexBar, new java.util.ArrayList<>());
+        var drone = spawnDrone(helper, new BlockPos(4, 0, 1), 4659, devId);
+        var State = com.reiko.signaltower.entity.RadioDroneEntity.State.class;
+        dev.setItemInHand(InteractionHand.MAIN_HAND, pairedController(drone));
+        rex.setItemInHand(InteractionHand.MAIN_HAND, pairedController(drone));
+        double startY = drone.getY();
+        double[] at = new double[3];
+        int[] charge = new int[1];
+        com.reiko.signaltower.radio.DronePilots.resetForTests();
+        helper.startSequence()
+                .thenExecute(() -> {
+                    Player nobody = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Nobody", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    nobody.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModRegistry.DRONE_CONTROLLER.get()));
+                    List<Component> nobodyBar = new java.util.ArrayList<>();
+                    ModRegistry.DRONE_CONTROLLER.get().use(level, nobody, InteractionHand.MAIN_HAND);
+                    check(drone.getPilot() == null, "An unpaired controller doesn't fly it");
+                    ModRegistry.DRONE_CONTROLLER.get().use(level, dev, InteractionHand.MAIN_HAND);
+                    check(drone.getPilot() == dev && com.reiko.signaltower.radio.DronePilots.droneOf(dev) == drone
+                            && lastKey(devBar).endsWith("drone_flying"), "Dev flies it: " + lastKey(devBar));
+                    check(keyOf(com.reiko.signaltower.radio.DronePilots.start(rex, drone.getUUID())).endsWith("drone_busy"), "Rex can't take it");
+                    charge[0] = drone.getCharge();
+                })
+                .thenExecuteFor(12, () -> drone.steer(0, 0, 1, -90.0F, 10.0F))
+                .thenExecute(() -> {
+                    check(drone.getY() > startY + 1.5 && drone.getState().airborne(), "Space: it climbs: " + (drone.getY() - startY));
+                    at[0] = drone.getX();
+                    at[1] = drone.getY();
+                })
+                .thenExecuteFor(12, () -> drone.steer(1, 0, 0, -90.0F, 10.0F))
+                .thenExecute(() -> {
+                    check(drone.getX() > at[0] + 2.0 && Math.abs(drone.getZ() - helper.absoluteVec(new Vec3(4.5, 0, 1.5)).z) < 0.05
+                            && Math.abs(drone.getY() - at[1]) < 1.2 && drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.FLYING,
+                            "W: east, the way he looks: " + (drone.getX() - at[0]) + " " + drone.getState());
+                    check(Math.abs(drone.getYRot() + 90.0F) < 0.01F, "Turned his way");
+                })
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    check(drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.HOVERING && drone.getDeltaMovement().length() < 0.02,
+                            "Nothing pressed: it hovers: " + drone.getState() + " " + drone.getDeltaMovement());
+                    int used = charge[0] - drone.getCharge();
+                    check(used >= 60 && used <= 82, "The battery runs down (2 a tick flying, 1 hovering): " + used);
+                    at[0] = drone.getX();
+                    at[1] = drone.getY();
+                    // Out of reach: lost.
+                    dev.moveTo(dev.getX() + 3000, dev.getY(), dev.getZ());
+                })
+                .thenIdle(11)
+                .thenExecute(() -> {
+                    check(drone.getPilot() == null && drone.hasLostSignal() && com.reiko.signaltower.radio.DronePilots.droneOf(dev) == null
+                            && lastKey(devBar).endsWith("drone_lost"), "Too far: lost: " + lastKey(devBar));
+                    check(keyOf(com.reiko.signaltower.radio.DronePilots.start(dev, drone.getUUID())).endsWith("drone_out_of_reach"), "Out of reach to start again");
+                })
+                .thenWaitUntil(() -> check(drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.LANDED, "Drifting down: " + drone.getState()))
+                .thenExecute(() -> {
+                    check(Math.abs(drone.getY() - startY) < 0.01 && Math.abs(drone.getX() - at[0]) < 0.3 && !drone.hasLostSignal(),
+                            "Landed below where it was: " + drone.position());
+                    dev.moveTo(drone.getX() - 2, startY, drone.getZ());
+                    check(keyOf(com.reiko.signaltower.radio.DronePilots.start(dev, drone.getUUID())).endsWith("drone_flying"), "Back in reach");
+                })
+                .thenExecuteFor(6, () -> drone.steer(0, 0, 1, -90.0F, 0.0F))
+                .thenExecute(() -> {
+                    check(drone.getState().airborne(), "Up again");
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(drone.getPilot() == null && drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.HOVERING && !drone.hasLostSignal(),
+                            "The controller put away: it hovers on its own");
+                    drone.setCharge(com.reiko.signaltower.entity.RadioDroneEntity.LOW_CHARGE - 1);
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, pairedController(drone));
+                    check(keyOf(com.reiko.signaltower.radio.DronePilots.start(dev, drone.getUUID())).endsWith("drone_low") && drone.getPilot() == null,
+                            "Nearly flat: it won't fly");
+                })
+                .thenWaitUntil(() -> check(drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.LANDED, "Nearly flat: it lands itself"))
+                .thenExecute(() -> {
+                    drone.discard();
+                    check(com.reiko.signaltower.radio.DronePilots.droneOf(dev) == null, "Gone");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A Landing Pad (with a Radio Battery beside it): a drone on it charges from the battery, 10 a
+     * tick, until it's full; off the pad it doesn't. A Solar Panel beside the pad charges it in
+     * daylight. Jade on the pad's drone.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radioDroneLandingPad(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos padAt = new BlockPos(4, 1, 1);
+        helper.setBlock(padAt, ModRegistry.LANDING_PAD.get().defaultBlockState());
+        helper.setBlock(padAt.east(), ModRegistry.RADIO_BATTERY.get().defaultBlockState());
+        com.reiko.signaltower.blockentity.RadioBatteryBlockEntity battery = helper.getBlockEntity(padAt.east());
+        battery.setCharge(5000);
+        var drone = ModRegistry.RADIO_DRONE_ENTITY.get().create(level);
+        Vec3 top = helper.absoluteVec(new Vec3(4.5, 1.125, 1.5));
+        drone.moveTo(top.x, top.y, top.z, 0, 0);
+        level.addFreshEntity(drone);
+        drone.setFrequency(4660);
+        drone.setCharge(1000);
+        var off = spawnDrone(helper, new BlockPos(8, 0, 1), 4660, null);
+        off.setCharge(1000);
+        check(helper.getBlockState(padAt).getShape(level, helper.absolutePos(padAt)).max(Direction.Axis.Y) == 0.125, "A thin pad");
+        helper.startSequence()
+                .thenIdle(20)
+                .thenExecute(() -> {
+                    check(drone.padUnder() != null && drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.LANDED, "On the pad");
+                    int gained = drone.getCharge() - 1000;
+                    check(gained >= 180 && gained <= 220 && battery.getCharge() == 5000 - gained, "It charges from the battery: " + gained + " " + battery.getCharge());
+                    check(off.getCharge() == 1000, "Off the pad, no");
+                    drone.setCharge(com.reiko.signaltower.entity.RadioDroneEntity.CAPACITY - 5);
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    check(drone.getCharge() == com.reiko.signaltower.entity.RadioDroneEntity.CAPACITY, "Full");
+                    int left = battery.getCharge();
+                    helper.setBlock(padAt.east(), ModRegistry.SOLAR_PANEL.get().defaultBlockState());
+                    drone.setCharge(1000);
+                    level.setDayTime(6000);
+                })
+                .thenIdle(41)
+                .thenExecute(() -> {
+                    int daylight = com.reiko.signaltower.blockentity.SolarPanelBlockEntity.daylight(level, helper.absolutePos(padAt.east()).above());
+                    check(daylight == 0 || drone.getCharge() > 1000, "A Solar Panel beside it charges it in daylight: " + drone.getCharge() + " (" + daylight + ")");
+                    off.discard();
+                    drone.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A drone hovering over a stack of cobblestone: G grabs it (it's gone from the ground; Jade says
+     * what it carries), G again drops it; nothing under it, nothing to grab. Its Beacon (on 4661)
+     * turns its frequency on within 16 blocks of it while it's in the air, and moves with it; off,
+     * the frequency goes off. The log says a drone did it.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radioDroneGrabAndBeacon(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var drone = spawnDrone(helper, new BlockPos(4, 3, 1), 4661, null);
+        drone.setDroneName("Lifter");
+        Vec3 ground = helper.absoluteVec(new Vec3(4.5, 1.0, 1.5));
+        ItemEntity stack = new ItemEntity(level, ground.x, ground.y, ground.z, new ItemStack(Items.COBBLESTONE, 5));
+        stack.setNoGravity(true);
+        level.addFreshEntity(stack);
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos near = helper.absolutePos(new BlockPos(12, 1, 1));
+        BlockPos far = helper.absolutePos(new BlockPos(40, 1, 1));
+        helper.startSequence()
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(drone.getState() == com.reiko.signaltower.entity.RadioDroneEntity.State.HOVERING, "In the air, it holds itself up");
+                    drone.setSettings(com.reiko.signaltower.entity.RadioDroneEntity.BEACON);
+                    CompoundTag up = com.reiko.signaltower.compat.RadioInfo.readDrone(level, drone, null);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, up)).contains("drone_beacon"), "Jade: the Beacon is on");
+                    up.putString("drone_state", "landed");
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, up)).contains("drone_beacon_idle"), "Landed: only in the air");
+                    drone.setSettings(0);
+                    Component grabbed = drone.grabOrDrop(level);
+                    check(keyOf(grabbed).endsWith("drone_grabbed") && drone.getCarried().is(Items.COBBLESTONE) && drone.getCarried().getCount() == 5
+                            && stack.isRemoved(), "Grabbed: " + keyOf(grabbed));
+                    List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.droneLines(drone, com.reiko.signaltower.compat.RadioInfo.readDrone(level, drone, null)));
+                    check(jade.contains("drone_carrying"), "Jade: " + jade);
+                    Component dropped = drone.grabOrDrop(level);
+                    check(keyOf(dropped).endsWith("drone_dropped") && drone.getCarried().isEmpty(), "Dropped");
+                    var down = level.getEntitiesOfClass(ItemEntity.class, drone.getBoundingBox().inflate(2, 4, 2), e -> e.getItem().is(Items.COBBLESTONE));
+                    check(down.size() == 1 && down.get(0).getItem().getCount() == 5, "On the ground again");
+                    down.get(0).discard();
+                    check(keyOf(drone.grabOrDrop(level)).endsWith("drone_nothing"), "Nothing to grab");
+                    check(network.listen(level, 4661, near).power() == 0, "Its frequency is off");
+                    drone.setSettings(com.reiko.signaltower.entity.RadioDroneEntity.BEACON);
+                })
+                .thenIdle(12)
+                .thenExecute(() -> {
+                    check(network.listen(level, 4661, near).power() == 15 && network.listen(level, 4661, far).power() == 0,
+                            "Beacon: on within 16 blocks of it, not farther");
+                    var history = network.history(4661);
+                    check(!history.isEmpty() && history.get(history.size() - 1).cause().kind() == SignalNetwork.CauseKind.DRONE
+                            && history.get(history.size() - 1).cause().detail().equals("Lifter"), "The log says the drone did it: " + history);
+                    drone.setSettings(0);
+                })
+                .thenIdle(25)
+                .thenExecute(() -> {
+                    check(network.listen(level, 4661, near).power() == 0, "Beacon off: the frequency goes off");
+                    drone.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Relay: a drone on 4662 hovering on its own repeats its frequency like a repeater with the
+     * reach of its height (so a signal near it is carried farther), shows in the frequency audit and
+     * isn't saved with the towers; flown by someone, or with Relay off, or landed, it doesn't.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void radioDroneRelay(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var drone = spawnDrone(helper, new BlockPos(4, 4, 1), 4662, null);
+        drone.setSettings(com.reiko.signaltower.entity.RadioDroneEntity.RELAY);
+        SignalNetwork network = SignalNetwork.get(level);
+        UUID devId = UUID.randomUUID();
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 1), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        dev.setItemInHand(InteractionHand.MAIN_HAND, pairedController(drone));
+        com.reiko.signaltower.radio.DronePilots.resetForTests();
+        BlockPos[] at = new BlockPos[1];
+        helper.startSequence()
+                .thenIdle(22)
+                .thenExecute(() -> {
+                    at[0] = drone.blockPosition();
+                    check(drone.isRelaying() && network.isDroneRelay(at[0]), "Hovering on its own: a relay");
+                    List<SignalNetwork.Coverage> carried = network.withRepeaters(level, 4662, List.of(new SignalNetwork.Coverage(at[0], 5, false)));
+                    check(carried.size() == 2 && carried.get(1).origin().equals(at[0]) && carried.get(1).reach() >= RadioHelper.reachAt(level, at[0]) - 1,
+                            "A signal near it is carried with the reach of its height: " + carried);
+                    check(network.relaysOn(level, 4662).containsKey(at[0]), "In the audit");
+                    CompoundTag saved = network.save(new CompoundTag(), level.registryAccess());
+                    check(!saved.toString().contains(Long.toString(at[0].asLong())), "Not saved with the towers");
+                    ModRegistry.DRONE_CONTROLLER.get().use(level, dev, InteractionHand.MAIN_HAND);
+                    check(drone.getPilot() == dev, "Dev flies it");
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(!drone.isRelaying() && !network.isDroneRelay(at[0]), "Flown: not a relay");
+                    com.reiko.signaltower.radio.DronePilots.stop(dev, null);
+                })
+                .thenIdle(22)
+                .thenExecute(() -> {
+                    check(drone.isRelaying(), "Let go: a relay again");
+                    drone.setSettings(0);
+                    check(!drone.isRelaying() && !network.isDroneRelay(drone.blockPosition()), "Relay off: not");
+                    drone.discard();
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A TV Monitor on 4663 shows a drone on 4663 that reaches it (its entity, where it is now and its
+     * name; not watched, so no REC); clients get which drone; Jade and the status line say it's a
+     * drone. Of a drone and a TV Camera, the nearer. A drone that's gone isn't shown.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 100)
+    public static void radioDroneOnMonitor(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        BlockPos monitorAt = new BlockPos(10, 2, 1);
+        helper.setBlock(monitorAt.south(), Blocks.STONE);
+        helper.setBlock(monitorAt, ModRegistry.TV_MONITOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.TvMonitorBlock.FACING, Direction.NORTH));
+        BlockPos monitorAbs = helper.absolutePos(monitorAt);
+        com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor = helper.getBlockEntity(monitorAt);
+        monitor.setTunedBy(devId);
+        monitor.setFrequency(4663);
+        var drone = spawnDrone(helper, new BlockPos(6, 1, 1), 4663, devId);
+        drone.setDroneName("Eye");
+        BlockPos cameraAt = new BlockPos(1, 1, 1);
+        helper.setBlock(cameraAt, ModRegistry.TV_CAMERA.get().defaultBlockState());
+        com.reiko.signaltower.blockentity.TvCameraBlockEntity camera = helper.getBlockEntity(cameraAt);
+        camera.setTunedBy(devId);
+        camera.setFrequency(4663);
+        SignalNetwork network = SignalNetwork.get(level);
+        helper.startSequence()
+                .thenExecute(() -> {
+                    camera.publish(level);
+                    drone.publish(level);
+                    monitor.update(level);
+                    check(monitor.isShowing() && monitor.droneId() == drone.getId() && monitor.cameraPos().equals(drone.blockPosition())
+                            && monitor.cameraName().equals("Eye"), "It shows the (nearer) drone: " + monitor.droneId() + " " + monitor.cameraName());
+                    check(network.watchers(helper.absolutePos(cameraAt), level.getGameTime()) == 0, "Not the camera");
+                    check(keyOf(monitor.statusText()).endsWith("tv_monitor_shows")
+                            && keyOf((Component) ((TranslatableContents) monitor.statusText().getContents()).getArgs()[2]).endsWith("tv_drone_away"),
+                            "Status: a drone");
+                    CompoundTag update = monitor.getUpdateTag(level.registryAccess());
+                    var client = new com.reiko.signaltower.blockentity.TvMonitorBlockEntity(monitorAbs, helper.getBlockState(monitorAt));
+                    client.loadWithComponents(update, level.registryAccess());
+                    check(client.isShowing() && client.droneId() == drone.getId(), "Clients get which drone");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, monitorAbs, null);
+                    check(info.getBoolean("tv_drone"), "Jade knows it's a drone");
+                    // The camera nearer: the camera.
+                    drone.moveTo(helper.absoluteVec(new Vec3(3.5, 2, 1.5)));
+                    BlockPos cameraNear = monitorAbs.offset(-2, 0, 0);
+                    network.updateCamera(cameraNear, new SignalNetwork.CameraSpot(4663, null, List.of(new SignalNetwork.Coverage(cameraNear, 40, false)), 0, "Near"));
+                    drone.publish(level);
+                    monitor.update(level);
+                    check(monitor.isShowing() && monitor.droneId() == -1 && monitor.cameraName().equals("Near"), "A camera nearer than the drone");
+                    network.removeCamera(cameraNear);
+                    monitor.update(level);
+                    check(monitor.droneId() == drone.getId(), "The drone again");
+                    drone.discard();
+                    camera.setFrequency(4664);
+                    camera.publish(level);
+                    monitor.update(level);
+                    check(!monitor.isShowing() && monitor.droneId() == -1, "Gone: nothing");
                 })
                 .thenSucceed();
     }

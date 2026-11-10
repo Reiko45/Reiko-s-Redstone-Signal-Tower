@@ -377,6 +377,7 @@ public final class RadioInfo {
             tag.putInt("tv_camera_dx", lead.cameraPos().getX() - pos.getX());
             tag.putInt("tv_camera_dz", lead.cameraPos().getZ() - pos.getZ());
             tag.putFloat("tv_fraction", lead.fraction());
+            tag.putBoolean("tv_drone", lead.droneId() >= 0);
             com.reiko.signaltower.radio.MonitorWall.Wall wall = com.reiko.signaltower.radio.MonitorWall.find(level, pos);
             tag.putInt("tv_wall_width", wall.width());
             tag.putInt("tv_wall_height", wall.height());
@@ -547,6 +548,86 @@ public final class RadioInfo {
                 tag.putString("weather_reikos", local.id());
             }
         }
+    }
+
+    /**
+     * v0.67.0: the server's data for a Radio Drone: its frequency (and the name and note on it, and
+     * who it's private to), battery, what it's doing, who flies it, what it carries, and its jobs.
+     */
+    public static CompoundTag readDrone(ServerLevel level, com.reiko.signaltower.entity.RadioDroneEntity drone, @Nullable Player viewer) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("frequency", drone.getFrequency());
+        tag.putInt("drone_percent", drone.percent());
+        tag.putString("drone_state", drone.getState().name().toLowerCase(java.util.Locale.ROOT));
+        tag.putInt("drone_settings", drone.getSettings());
+        tag.putBoolean("drone_relaying", drone.isRelaying());
+        tag.putBoolean("drone_lost", drone.hasLostSignal());
+        if (!drone.droneName().isEmpty()) {
+            tag.putString("drone_name", drone.droneName());
+        }
+        Player pilot = drone.getPilot();
+        if (pilot != null) {
+            tag.putString("drone_pilot", pilot.getGameProfile().getName());
+        }
+        if (!drone.getCarried().isEmpty()) {
+            putComponent(tag, "drone_carrying", drone.getCarried().getHoverName());
+            tag.putInt("drone_carrying_count", drone.getCarried().getCount());
+        }
+        addName(level, tag, "frequency", "name");
+        addNote(level, tag, "frequency", "note", viewer);
+        FrequencyClaims.Claim claim = FrequencyClaims.get(level.getServer()).get(drone.getFrequency());
+        if (claim != null) {
+            tag.putString("private_to", claim.ownerName());
+        }
+        return tag;
+    }
+
+    /** v0.67.0: the lines for a Radio Drone, from {@link #readDrone} (or, without it, what the client knows of it). */
+    public static List<Component> droneLines(com.reiko.signaltower.entity.RadioDroneEntity drone, @Nullable CompoundTag data) {
+        List<Component> lines = new ArrayList<>();
+        if (data == null) {
+            data = new CompoundTag();
+            data.putInt("frequency", drone.getFrequency());
+            data.putInt("drone_percent", drone.percent());
+            data.putString("drone_state", drone.getState().name().toLowerCase(java.util.Locale.ROOT));
+            data.putInt("drone_settings", drone.getSettings());
+        }
+        // (Its name is the tooltip's title.)
+        lines.add(frequencyLine(data));
+        addNoteLine(lines, data, "note");
+        if (data.contains("private_to")) {
+            lines.add(Component.translatable(LANG + "private", Component.literal(data.getString("private_to"))).withStyle(ChatFormatting.GOLD));
+        }
+        int percent = data.getInt("drone_percent");
+        lines.add(Component.translatable(LANG + "drone_battery", percent)
+                .withStyle(percent * com.reiko.signaltower.entity.RadioDroneEntity.CAPACITY / 100 < com.reiko.signaltower.entity.RadioDroneEntity.LOW_CHARGE
+                        ? ChatFormatting.RED : percent < 40 ? ChatFormatting.GOLD : ChatFormatting.GREEN));
+        Component state = Component.translatable(LANG + "drone_state_" + data.getString("drone_state"));
+        lines.add(data.contains("drone_pilot")
+                ? Component.translatable(LANG + "drone_flown_by", state, Component.literal(data.getString("drone_pilot")).withStyle(ChatFormatting.WHITE))
+                        .withStyle(ChatFormatting.YELLOW)
+                : state.copy().withStyle(ChatFormatting.YELLOW));
+        if (data.getBoolean("drone_lost")) {
+            lines.add(Component.translatable(LANG + "drone_lost").withStyle(ChatFormatting.RED));
+        }
+        if (data.contains("drone_carrying")) {
+            lines.add(Component.translatable(LANG + "drone_carrying", getComponent(data, "drone_carrying"), data.getInt("drone_carrying_count"))
+                    .withStyle(ChatFormatting.GRAY));
+        }
+        int settings = data.getInt("drone_settings");
+        if ((settings & com.reiko.signaltower.entity.RadioDroneEntity.BEACON) != 0) {
+            boolean up = !data.getString("drone_state").equals("landed"); // the Beacon is only on in the air
+            lines.add(Component.translatable(LANG + (up ? "drone_beacon" : "drone_beacon_idle"), com.reiko.signaltower.entity.RadioDroneEntity.BEACON_REACH)
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+        if ((settings & com.reiko.signaltower.entity.RadioDroneEntity.RELAY) != 0) {
+            lines.add(Component.translatable(LANG + (data.getBoolean("drone_relaying") ? "drone_relaying" : "drone_relay_idle"))
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+        if ((settings & com.reiko.signaltower.entity.RadioDroneEntity.NIGHT_VISION) != 0) {
+            lines.add(Component.translatable(LANG + "drone_night").withStyle(ChatFormatting.DARK_AQUA));
+        }
+        return lines;
     }
 
     /** v0.53.0: a text that's worked out on the server (a weather station's reading), kept as it is. */
@@ -948,8 +1029,9 @@ public final class RadioInfo {
                     int distance = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
                     int direction = SignalNetwork.compassDirection(dx, dz);
                     String key = "message." + SignalTower.MOD_ID + ".";
-                    Component where = direction < 0 ? Component.translatable(key + "tv_camera_here")
-                            : Component.translatable(key + "tv_camera_away", distance,
+                    String thing = data.getBoolean("tv_drone") ? "tv_drone" : "tv_camera"; // v0.67.0: or a Radio Drone
+                    Component where = direction < 0 ? Component.translatable(key + thing + "_here")
+                            : Component.translatable(key + thing + "_away", distance,
                             Component.translatable("screen." + SignalTower.MOD_ID + ".locator.dir_" + RADAR_DIRECTIONS[direction]));
                     String name = data.getString("tv_camera_name");
                     Component shows = name.isEmpty() ? where : Component.literal("\"" + name + "\", ").append(where);

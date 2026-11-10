@@ -297,6 +297,30 @@ def tv_switch():
     return normalize(out * envelope(len(out), 0.001, 0.03), 0.6)
 
 
+def drone_buzz():
+    """v0.67.0: a Radio Drone's rotors: one second that loops without a click (every part repeats a
+    whole number of times a second): a motor whine on 190 Hz and its harmonics, a second rotor a
+    little off it (205 Hz) so the two beat, a faint high whine, and a soft rush of air (noise made
+    from random phases, so it's periodic too)."""
+    tt = t(1.0)
+    n = len(tt)
+    x = np.zeros(n)
+    for f0, gain in ((190, 1.0), (205, 0.8)):
+        for k, h in ((1, 1.0), (2, 0.55), (3, 0.3), (4, 0.18), (6, 0.08)):
+            x += gain * h * np.sin(2 * np.pi * f0 * k * tt + rng.uniform(0, 2 * np.pi))
+    x += 0.06 * np.sin(2 * np.pi * 3420 * tt)
+    spectrum = np.zeros(n // 2 + 1, dtype=complex)
+    band = np.arange(len(spectrum))
+    shape = np.where((band > 250) & (band < 4000), 1.0, 0.0) / np.maximum(1.0, band / 600.0)
+    spectrum[:] = shape * np.exp(1j * rng.uniform(0, 2 * np.pi, len(spectrum)))
+    air = np.fft.irfft(spectrum, n)
+    air /= np.max(np.abs(air))
+    x = x / np.max(np.abs(x)) + 0.35 * air
+    # A gentle 5 Hz wobble (whole cycles, so it loops).
+    x *= 0.85 + 0.15 * np.sin(2 * np.pi * 5 * tt)
+    return x / np.max(np.abs(x)) * 0.5
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -314,6 +338,7 @@ SOUND_LIST = {
     "walkie.squelch": ("walkie_squelch", walkie_squelch),
     "radar.ping": ("radar_ping", radar_ping),
     "tv.switch": ("tv_switch", tv_switch),
+    "drone.buzz": ("drone_buzz", drone_buzz),
 }
 
 
