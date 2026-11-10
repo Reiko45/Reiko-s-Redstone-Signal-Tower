@@ -313,6 +313,64 @@ public final class SignalNetwork extends SavedData {
         return radars.get(pos);
     }
 
+    // ---- v0.66.0: TV cameras and the monitors watching them (not saved) ----
+
+    /** A loaded TV Camera: its frequency, who tuned it, what its picture reaches, its settings and name. */
+    public record CameraSpot(int frequency, @Nullable UUID tunedBy, List<Coverage> coverage, int settings, String name) {
+    }
+
+    private final Map<BlockPos, CameraSpot> cameras = new HashMap<>();
+    /** Each camera's watchers: the monitors (wall leads) showing it, and the game time each last said so. */
+    private final Map<BlockPos, Map<BlockPos, Long>> watchers = new HashMap<>();
+    /** A monitor counts as watching for this long after it last said so. */
+    public static final int WATCH_TICKS = 45;
+
+    public void updateCamera(BlockPos pos, CameraSpot spot) {
+        cameras.put(pos.immutable(), spot);
+    }
+
+    /** A TV Camera was broken or unloaded: nobody watches it any more. */
+    public void removeCamera(BlockPos pos) {
+        cameras.remove(pos);
+        watchers.remove(pos);
+    }
+
+    /** The loaded TV Cameras on {@code frequency}. */
+    public List<Map.Entry<BlockPos, CameraSpot>> camerasOn(int frequency) {
+        List<Map.Entry<BlockPos, CameraSpot>> result = new ArrayList<>();
+        cameras.forEach((pos, spot) -> {
+            if (spot.frequency() == frequency) result.add(Map.entry(pos, spot));
+        });
+        result.sort(java.util.Comparator.comparingLong(entry -> entry.getKey().asLong())); // the same order every time
+        return result;
+    }
+
+    public @Nullable CameraSpot cameraAt(BlockPos pos) {
+        return cameras.get(pos);
+    }
+
+    /** The monitor (wall) at {@code monitor} shows {@code camera} now, and nothing else. */
+    public void watch(BlockPos camera, BlockPos monitor, long gameTime) {
+        unwatch(monitor);
+        watchers.computeIfAbsent(camera.immutable(), key -> new HashMap<>()).put(monitor.immutable(), gameTime);
+    }
+
+    /** The monitor at {@code monitor} shows no camera. */
+    public void unwatch(BlockPos monitor) {
+        watchers.values().forEach(map -> map.remove(monitor));
+        watchers.values().removeIf(Map::isEmpty);
+    }
+
+    /** How many monitors (walls) showed {@code camera} within the last {@link #WATCH_TICKS}. */
+    public int watchers(BlockPos camera, long gameTime) {
+        Map<BlockPos, Long> map = watchers.get(camera);
+        if (map == null) {
+            return 0;
+        }
+        map.values().removeIf(seen -> seen < gameTime - WATCH_TICKS || seen > gameTime + WATCH_TICKS);
+        return map.size();
+    }
+
     /**
      * The full-size towers (transmitters, repeaters, converters and jammers, on any frequency) within
      * {@code reach} of {@code center} (measured flat), nearest first, at most {@code limit}; not

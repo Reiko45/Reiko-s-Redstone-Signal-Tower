@@ -1,0 +1,94 @@
+{
+  "variants": {
+    "face=floor,facing=north,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_floor"
+    },
+    "face=floor,facing=north,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_floor"
+    },
+    "face=floor,facing=east,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 90
+    },
+    "face=floor,facing=east,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 90
+    },
+    "face=floor,facing=south,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 180
+    },
+    "face=floor,facing=south,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 180
+    },
+    "face=floor,facing=west,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 270
+    },
+    "face=floor,facing=west,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_floor",
+      "y": 270
+    },
+    "face=wall,facing=north,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_wall"
+    },
+    "face=wall,facing=north,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_wall"
+    },
+    "face=wall,facing=east,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 90
+    },
+    "face=wall,facing=east,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 90
+    },
+    "face=wall,facing=south,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 180
+    },
+    "face=wall,facing=south,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 180
+    },
+    "face=wall,facing=west,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 270
+    },
+    "face=wall,facing=west,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_wall",
+      "y": 270
+    },
+    "face=ceiling,facing=north,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling"
+    },
+    "face=ceiling,facing=north,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling"
+    },
+    "face=ceiling,facing=east,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 90
+    },
+    "face=ceiling,facing=east,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 90
+    },
+    "face=ceiling,facing=south,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 180
+    },
+    "face=ceiling,facing=south,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 180
+    },
+    "face=ceiling,facing=west,rec=false": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 270
+    },
+    "face=ceiling,facing=west,rec=true": {
+      "model": "reikos_signal_tower:block/tv_camera_ceiling",
+      "y": 270
+    }
+  }
+}

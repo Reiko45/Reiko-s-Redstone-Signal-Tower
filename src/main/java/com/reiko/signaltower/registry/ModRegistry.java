@@ -77,6 +77,18 @@ public final class ModRegistry {
                     .persistent(Codec.intRange(0, 255))
                     .networkSynchronized(ByteBufCodecs.VAR_INT));
 
+    /** v0.66.0: a TV Camera's tilt, lens, pan and night vision ({@link com.reiko.signaltower.radio.TvCamera}). */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> CAMERA_SETTINGS =
+            DATA_COMPONENTS.registerComponentType("camera_settings", builder -> builder
+                    .persistent(Codec.intRange(0, 127))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT));
+
+    /** v0.66.0: a TV Monitor's extra channels (frequencies 2 to 6; 0 for none), kept on the item. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<java.util.List<Integer>>> TV_CHANNELS =
+            DATA_COMPONENTS.registerComponentType("tv_channels", builder -> builder
+                    .persistent(Codec.intRange(0, Frequency.MAX).listOf(0, 5))
+                    .networkSynchronized(ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list(5))));
+
     /** v0.49.0: a Coverage Map's zoom, 0 (1:1) to 4 (1:16), like a vanilla map's scale. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> COVERAGE_ZOOM =
             DATA_COMPONENTS.registerComponentType("coverage_zoom", builder -> builder
@@ -381,6 +393,23 @@ public final class ModRegistry {
                     .pushReaction(PushReaction.DESTROY)
                     .lightLevel(state -> state.getValue(com.reiko.signaltower.block.RadarScreenBlock.ACTIVE) ? 5 : 0)));
 
+    /** v0.66.0: a camera on a tripod, a wall bracket or a ceiling mount, and the wall panel that shows its picture. */
+    public static final DeferredBlock<com.reiko.signaltower.block.TvCameraBlock> TV_CAMERA = BLOCKS.register("tv_camera",
+            () -> new com.reiko.signaltower.block.TvCameraBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(1.0F, 3.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)));
+    public static final DeferredBlock<com.reiko.signaltower.block.TvMonitorBlock> TV_MONITOR = BLOCKS.register("tv_monitor",
+            () -> new com.reiko.signaltower.block.TvMonitorBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .strength(1.0F, 3.0F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .pushReaction(PushReaction.DESTROY)
+                    .lightLevel(state -> state.getValue(com.reiko.signaltower.block.TvMonitorBlock.ACTIVE) ? 6 : 0)));
+
     /** v0.63.0: prints the messages on its frequency into a Book and Quill. */
     public static final DeferredBlock<com.reiko.signaltower.block.TickerPrinterBlock> TICKER_PRINTER = BLOCKS.register("ticker_printer",
             () -> new com.reiko.signaltower.block.TickerPrinterBlock(BlockBehaviour.Properties.of()
@@ -650,6 +679,10 @@ public final class ModRegistry {
             ITEMS.registerSimpleBlockItem("radar_dish", RADAR_DISH); // v0.65.0
     public static final DeferredItem<BlockItem> RADAR_SCREEN_ITEM =
             ITEMS.registerSimpleBlockItem("radar_screen", RADAR_SCREEN); // v0.65.0
+    public static final DeferredItem<BlockItem> TV_CAMERA_ITEM =
+            ITEMS.registerSimpleBlockItem("tv_camera", TV_CAMERA); // v0.66.0
+    public static final DeferredItem<BlockItem> TV_MONITOR_ITEM =
+            ITEMS.registerSimpleBlockItem("tv_monitor", TV_MONITOR); // v0.66.0
     /** v0.50.0: on a transmitter, also sends into another dimension. */
     public static final DeferredItem<com.reiko.signaltower.item.AntennaItem> ENDER_ANTENNA = ITEMS.register("ender_antenna",
             () -> new com.reiko.signaltower.item.AntennaItem(com.reiko.signaltower.radio.AntennaTier.ENDER, new Item.Properties()));
@@ -790,6 +823,14 @@ public final class ModRegistry {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.RadarScreenBlockEntity>> RADAR_SCREEN_BE =
             BLOCK_ENTITIES.register("radar_screen",
                     () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.RadarScreenBlockEntity::new, RADAR_SCREEN.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TvCameraBlockEntity>> TV_CAMERA_BE =
+            BLOCK_ENTITIES.register("tv_camera",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TvCameraBlockEntity::new, TV_CAMERA.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TvMonitorBlockEntity>> TV_MONITOR_BE =
+            BLOCK_ENTITIES.register("tv_monitor",
+                    () -> BlockEntityType.Builder.of(com.reiko.signaltower.blockentity.TvMonitorBlockEntity::new, TV_MONITOR.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.reiko.signaltower.blockentity.TickerPrinterBlockEntity>> TICKER_PRINTER_BE =
             BLOCK_ENTITIES.register("ticker_printer",

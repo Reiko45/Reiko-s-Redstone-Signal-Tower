@@ -123,6 +123,13 @@ public abstract class RadioBlock extends BaseEntityBlock {
             // v0.65.0: on someone else's private frequency it shows nothing.
             return screen.lockNotice(level);
         }
+        if (entity instanceof com.reiko.signaltower.blockentity.TvCameraBlockEntity camera) {
+            // v0.66.0: on someone else's private frequency no monitor shows it; a monitor there shows nothing.
+            return camera.lockNotice(level);
+        }
+        if (entity instanceof com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor) {
+            return monitor.lockNotice(level);
+        }
         if (entity instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer) {
             // v0.63.0: it prints "(encrypted)" for messages on someone else's encrypted frequency.
             return FrequencyClaims.deafness(level, printer.getFrequency(), printer.getTunedBy(), "encrypted_deaf");

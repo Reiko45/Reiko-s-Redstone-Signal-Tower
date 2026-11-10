@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 55) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 57) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 55, "All the mod's items: " + items.size());
+        check(items.size() == 57, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 14 && sounds.size() == 14, "Fourteen sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 15 && sounds.size() == 15, "Fifteen sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -11247,6 +11247,387 @@ public final class SignalTowerGameTests {
                         zombie.discard();
                         pig.discard();
                     }
+                })
+                .thenSucceed();
+    }
+
+    // ---- v0.66.0: TV Cameras and TV Monitors ----
+
+    /**
+     * Where a TV Camera looks: Auto tilt is level on a floor, 15° down on a wall and 30° down from a
+     * ceiling; the lens is a little in front of the head's pivot (high on a stand, out from a wall);
+     * Pan swings it 40° each way over 400 ticks; settings are trimmed to ones that exist; snow starts
+     * past 0.7 of the way to the edge and is 0.85 at the edge. The shapes stick to their floor, wall
+     * or ceiling.
+     */
+    @GameTest(template = PLATFORM)
+    public static void tvCameraPose(GameTestHelper helper) {
+        BlockState floor = ModRegistry.TV_CAMERA.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.TvCameraBlock.FACE, AttachFace.FLOOR)
+                .setValue(com.reiko.signaltower.block.TvCameraBlock.FACING, Direction.NORTH);
+        BlockState wall = floor.setValue(com.reiko.signaltower.block.TvCameraBlock.FACE, AttachFace.WALL)
+                .setValue(com.reiko.signaltower.block.TvCameraBlock.FACING, Direction.EAST);
+        BlockState ceiling = floor.setValue(com.reiko.signaltower.block.TvCameraBlock.FACE, AttachFace.CEILING);
+        BlockPos at = new BlockPos(100, 64, 200);
+        int auto = com.reiko.signaltower.radio.TvCamera.DEFAULT;
+        var onFloor = com.reiko.signaltower.radio.TvCamera.pose(at, floor, auto, 0, 0);
+        check(onFloor.yaw() == 180.0F && onFloor.pitch() == 0.0F && onFloor.fov() == 70.0F
+                && onFloor.eye().distanceTo(new Vec3(100.5, 64.72, 200.5 - 0.36)) < 1.0E-6, "On a stand, looking north: " + onFloor);
+        var onWall = com.reiko.signaltower.radio.TvCamera.pose(at, wall, auto, 0, 0);
+        Vec3 forward = onWall.forward();
+        check(onWall.yaw() == 270.0F && onWall.pitch() == 15.0F && forward.x > 0.96 && forward.y < -0.25 && Math.abs(forward.z) < 1.0E-6,
+                "On a wall facing east, 15° down: " + forward);
+        check(com.reiko.signaltower.radio.TvCamera.pose(at, ceiling, auto, 0, 0).pitch() == 30.0F, "From a ceiling, 30° down");
+        int up = 0 | 2 << com.reiko.signaltower.radio.TvCamera.LENS_SHIFT; // 15° up, zoom
+        var zoomed = com.reiko.signaltower.radio.TvCamera.pose(at, floor, up, 0, 0);
+        check(zoomed.pitch() == -15.0F && zoomed.fov() == 35.0F, "Tilted up, zoomed: " + zoomed);
+        int pan = auto | com.reiko.signaltower.radio.TvCamera.PAN;
+        check(com.reiko.signaltower.radio.TvCamera.panOffset(pan, 0, 0) == 0.0F
+                && Math.abs(com.reiko.signaltower.radio.TvCamera.panOffset(pan, 100, 0) - 40.0F) < 1.0E-3
+                && Math.abs(com.reiko.signaltower.radio.TvCamera.panOffset(pan, 300, 0) + 40.0F) < 1.0E-3
+                && com.reiko.signaltower.radio.TvCamera.panOffset(auto, 100, 0) == 0.0F, "Pan: 40° each way");
+        check(com.reiko.signaltower.radio.TvCamera.settings(6 | 3 << 3 | 1 << 7) == (com.reiko.signaltower.radio.TvCamera.TILT_AUTO | 2 << 3)
+                && com.reiko.signaltower.radio.TvCamera.settings(127) == 119, "Settings trimmed: "
+                + com.reiko.signaltower.radio.TvCamera.settings(6 | 3 << 3) + " " + com.reiko.signaltower.radio.TvCamera.settings(127));
+        check(com.reiko.signaltower.radio.TvCamera.snow(0.5) == 0.0F && com.reiko.signaltower.radio.TvCamera.snow(0.7) == 0.0F
+                && Math.abs(com.reiko.signaltower.radio.TvCamera.snow(0.85) - 0.425F) < 1.0E-3
+                && Math.abs(com.reiko.signaltower.radio.TvCamera.snow(1.0) - 0.85F) < 1.0E-3, "Snow near the edge");
+        // It sticks to what's behind it.
+        BlockPos spot = new BlockPos(2, 2, 2);
+        helper.setBlock(spot.below(), Blocks.STONE);
+        helper.setBlock(spot.west(), Blocks.STONE);
+        ServerLevel level = helper.getLevel();
+        BlockPos abs = helper.absolutePos(spot);
+        check(floor.canSurvive(level, abs) && wall.canSurvive(level, abs) && !ceiling.canSurvive(level, abs), "Floor and wall yes, no ceiling");
+        check(!floor.getShape(level, abs).isEmpty() && !wall.getShape(level, abs).isEmpty()
+                && wall.getShape(level, abs).bounds().minX == 0.0, "The bracket is on the west wall: " + wall.getShape(level, abs).bounds());
+        helper.succeed();
+    }
+
+    /**
+     * A TV Camera (on 4647, tuned by Dev): it's in the network with its frequency, tuner, reach and
+     * settings; the settings packet names it and sets Pan and Night vision; the item keeps both. A
+     * monitor watching it lights its REC light and a comparator reads 1, until the monitor hasn't
+     * said so for a while. On Dev's private 4647 Rex can neither set it nor tune one there; one Rex
+     * tuned says nobody sees it. The status line and Jade keep up; broken, it's gone.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void tvCamera(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        List<Component> devBar = new java.util.ArrayList<>();
+        List<Component> rexBar = new java.util.ArrayList<>();
+        BlockPos at = new BlockPos(2, 1, 1);
+        helper.setBlock(at, ModRegistry.TV_CAMERA.get().defaultBlockState());
+        BlockPos abs = helper.absolutePos(at);
+        Player dev = namedPlayer(helper, new BlockPos(3, 1, 1), devId, "Dev", false, devBar, new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(2, 1, 2), rexId, "Rex", false, rexBar, new java.util.ArrayList<>());
+        ModRegistry.TV_CAMERA.get().setPlacedBy(level, abs, helper.getBlockState(at), dev, new ItemStack(ModRegistry.TV_CAMERA_ITEM.get()));
+        com.reiko.signaltower.blockentity.TvCameraBlockEntity camera = helper.getBlockEntity(at);
+        camera.setFrequency(4647);
+        SignalNetwork network = SignalNetwork.get(level);
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    try {
+                        camera.publish(level);
+                        var spot = network.cameraAt(abs);
+                        int reach = RadioHelper.reachAt(level, abs);
+                        check(spot != null && spot.frequency() == 4647 && devId.equals(spot.tunedBy()) && camera.getReach() == reach
+                                && spot.coverage().get(0).reach() == reach && spot.coverage().get(0).reaches(abs.offset(reach - 1, 0, 0))
+                                && !spot.coverage().get(0).reaches(abs.offset(reach + 2, 0, 0)), "In the network, reaching " + reach);
+                        check(network.camerasOn(4647).size() == 1 && network.camerasOn(4647).get(0).getKey().equals(abs) && network.camerasOn(4690).isEmpty(), "On its frequency");
+                        int settings = com.reiko.signaltower.radio.TvCamera.DEFAULT | com.reiko.signaltower.radio.TvCamera.PAN
+                                | com.reiko.signaltower.radio.TvCamera.NIGHT_VISION;
+                        Component set = com.reiko.signaltower.network.ConfigureTvCameraPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureTvCameraPayload(abs, settings, "  Front Gate  "));
+                        check(set != null && keyOf(set).endsWith("tv_camera_set") && camera.getSettings() == settings
+                                && camera.getName().equals("Front Gate") && network.cameraAt(abs).name().equals("Front Gate")
+                                && network.cameraAt(abs).settings() == settings, "Dev names it and sets Pan and Night vision");
+                        camera.setName("A name much too long for a little camera label");
+                        check(camera.getName().length() == com.reiko.signaltower.blockentity.TvCameraBlockEntity.NAME_LENGTH, "Names are cut short");
+                        camera.setName("Front Gate");
+                        ItemStack item = new ItemStack(ModRegistry.TV_CAMERA_ITEM.get());
+                        item.applyComponents(camera.collectComponents());
+                        check(Integer.valueOf(settings).equals(item.get(ModRegistry.CAMERA_SETTINGS.get()))
+                                && item.get(DataComponents.CUSTOM_NAME) != null && item.get(DataComponents.CUSTOM_NAME).getString().equals("Front Gate")
+                                && Integer.valueOf(4647).equals(item.get(ModRegistry.FREQUENCY.get())), "The item keeps its settings and name");
+                        var open = com.reiko.signaltower.network.OpenTvCameraPayload.of(level, camera);
+                        check(open.name().equals("Front Gate") && open.settings() == settings && open.frequency() == 4647 && open.watchers() == 0,
+                                "Settings packet: " + open);
+
+                        // Watched: REC on, the comparator reads 1; not watched for a while: off again.
+                        BlockPos monitor = abs.offset(5, 0, 0);
+                        network.watch(abs, monitor, level.getGameTime());
+                        camera.count(level);
+                        check(camera.getWatchers() == 1 && helper.getBlockState(at).getValue(com.reiko.signaltower.block.TvCameraBlock.REC)
+                                && helper.getBlockState(at).getAnalogOutputSignal(level, abs) == 1, "Watched: REC on, comparator 1");
+                        check(keyOf(camera.statusText(level)).endsWith("tv_camera_watched"), "Status: " + keyOf(camera.statusText(level)));
+                        List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(at),
+                                com.reiko.signaltower.compat.RadioInfo.read(level, abs, dev)));
+                        check(jade.equals(List.of("frequency", "tv_camera_name", "tv_camera_watchers", "tv_camera_settings", "reach")), "Jade: " + jade);
+                        check(keyOf(ModRegistry.TV_CAMERA.get().describe(level, abs, helper.getBlockState(at))).endsWith("tv_camera_status"), "Status line");
+                        network.watch(abs, monitor, level.getGameTime() - SignalNetwork.WATCH_TICKS - 5);
+                        camera.count(level);
+                        check(camera.getWatchers() == 0 && !helper.getBlockState(at).getValue(com.reiko.signaltower.block.TvCameraBlock.REC)
+                                && helper.getBlockState(at).getAnalogOutputSignal(level, abs) == 0, "Not watched for a while: off");
+
+                        // A private frequency.
+                        claims.put(4647, devId, "Dev", java.util.Map.of());
+                        network.invalidate(4647);
+                        Component refused = com.reiko.signaltower.network.ConfigureTvCameraPayload.apply(rex,
+                                new com.reiko.signaltower.network.ConfigureTvCameraPayload(abs, 0, "Mine"));
+                        check(refused != null && keyOf(refused).endsWith("tv_not_yours") && camera.getName().equals("Front Gate"),
+                                "Rex can't change it");
+                        BlockPos second = new BlockPos(4, 1, 1);
+                        place(helper, second, ModRegistry.TV_CAMERA.get(), 4600);
+                        ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+                        FrequencyTunerItem.setFrequency(tuner, 4647);
+                        rex.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+                        useTunerOn(helper, rex, second);
+                        check(frequencyAt(helper, second) == 4600 && lastKey(rexBar).endsWith("private_refused_block"),
+                                "Rex can't tune a camera to it: " + lastKey(rexBar));
+                        camera.setTunedBy(rexId);
+                        check(keyOf(com.reiko.signaltower.block.RadioBlock.deafNotice(level, abs)).endsWith("tv_camera_locked"),
+                                "One Rex tuned says nobody sees it");
+                        camera.setTunedBy(devId);
+                        check(com.reiko.signaltower.block.RadioBlock.deafNotice(level, abs) == null, "Dev's is fine");
+                    } finally {
+                        claims.remove(4647);
+                        network.invalidate(4647);
+                    }
+                })
+                .thenExecute(() -> {
+                    helper.setBlock(at, Blocks.AIR);
+                    check(network.cameraAt(abs) == null, "Broken: gone from the network");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A TV Monitor (on a wall, on 4648): it shows the camera on 4648 (8 blocks west), says it's
+     * watching (the camera's REC light), and lights up; clients get which camera (not who tuned
+     * it). A second channel (4649, set by the settings packet) has no camera: a redstone pulse steps
+     * to it (with static), another pulse back. Of two cameras that reach it, the nearer; a camera too
+     * far away isn't shown, and one near the edge of its reach is snowy. On Dev's private 4648 a
+     * monitor tuned by Rex shows nothing (and says whose it is), Alex's (a friend's) shows the
+     * camera, but not one Rex tuned; Rex setting its channels makes it his. Jade and the status line
+     * keep up; the item keeps its channels.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void tvMonitor(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        var claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+        UUID devId = UUID.randomUUID();
+        UUID alexId = UUID.randomUUID();
+        UUID rexId = UUID.randomUUID();
+        BlockPos cameraAt = new BlockPos(2, 1, 1);
+        BlockPos monitorAt = new BlockPos(10, 2, 1);
+        helper.setBlock(cameraAt, ModRegistry.TV_CAMERA.get().defaultBlockState());
+        helper.setBlock(monitorAt.south(), Blocks.STONE);
+        helper.setBlock(monitorAt, ModRegistry.TV_MONITOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.TvMonitorBlock.FACING, Direction.NORTH));
+        BlockPos cameraAbs = helper.absolutePos(cameraAt);
+        BlockPos monitorAbs = helper.absolutePos(monitorAt);
+        Player dev = namedPlayer(helper, new BlockPos(9, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        Player rex = namedPlayer(helper, new BlockPos(11, 1, 0), rexId, "Rex", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        com.reiko.signaltower.blockentity.TvCameraBlockEntity camera = helper.getBlockEntity(cameraAt);
+        com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor = helper.getBlockEntity(monitorAt);
+        camera.setTunedBy(devId);
+        camera.setFrequency(4648);
+        camera.setName("Front Gate");
+        monitor.setTunedBy(devId);
+        monitor.setFrequency(4648);
+        SignalNetwork network = SignalNetwork.get(level);
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    try {
+                        check(helper.getBlockState(monitorAt).canSurvive(level, monitorAbs), "It hangs on the wall");
+                        camera.publish(level);
+                        monitor.update(level);
+                        check(monitor.isShowing() && monitor.cameraPos().equals(cameraAbs) && monitor.cameraName().equals("Front Gate")
+                                && monitor.fraction() < 0.5F && monitor.lockedBy().isEmpty(), "It shows the camera: " + monitor.fraction() + " " + monitor.cameraName());
+                        check(helper.getBlockState(monitorAt).getValue(com.reiko.signaltower.block.TvMonitorBlock.ACTIVE), "Lit");
+                        check(network.watchers(cameraAbs, level.getGameTime()) == 1, "It's watching");
+                        camera.count(level);
+                        check(helper.getBlockState(cameraAt).getValue(com.reiko.signaltower.block.TvCameraBlock.REC), "The camera's REC light is on");
+                        check(keyOf(monitor.statusText()).endsWith("tv_monitor_shows"), "Status: " + keyOf(monitor.statusText()));
+
+                        CompoundTag update = monitor.getUpdateTag(level.registryAccess());
+                        var client = new com.reiko.signaltower.blockentity.TvMonitorBlockEntity(monitorAbs, helper.getBlockState(monitorAt));
+                        client.loadWithComponents(update, level.registryAccess());
+                        check(client.isShowing() && client.cameraPos().equals(cameraAbs) && client.cameraName().equals("Front Gate")
+                                && client.getFrequency() == 4648 && client.getTunedBy() == null && client.wall().isLead()
+                                && client.wall().size() == 1, "Clients get the picture (not who tuned it)");
+                        List<String> jade = lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(monitorAt),
+                                com.reiko.signaltower.compat.RadioInfo.read(level, monitorAbs, dev)));
+                        check(jade.equals(List.of("frequency", "tv_monitor_channel", "tv_monitor_camera")), "Jade: " + jade);
+                        check(keyOf(ModRegistry.TV_MONITOR.get().describe(level, monitorAbs, helper.getBlockState(monitorAt))).endsWith("tv_monitor_status"),
+                                "Status line");
+
+                        // A second channel, and stepping with redstone.
+                        Component set = com.reiko.signaltower.network.ConfigureTvMonitorPayload.apply(dev,
+                                new com.reiko.signaltower.network.ConfigureTvMonitorPayload(monitorAbs, List.of(0, 4649, 0, 0, 0), 0, false));
+                        check(set != null && keyOf(set).endsWith("tv_monitor_set") && monitor.channels().equals(List.of(4648, 4649))
+                                && monitor.channelIndex() == 0 && !monitor.showsOverlay(), "Two channels, no overlay: " + monitor.channels());
+                        int switches = monitor.switches();
+                        monitor.powered(level, true);
+                        check(monitor.channelIndex() == 1 && monitor.channelFrequency() == 4649 && !monitor.isShowing()
+                                && monitor.switches() == switches + 1 && network.watchers(cameraAbs, level.getGameTime()) == 0
+                                && keyOf(monitor.statusText()).endsWith("tv_monitor_none"), "A pulse: CH 2, no camera there");
+                        monitor.powered(level, true);
+                        check(monitor.channelIndex() == 1, "Still powered: no step");
+                        monitor.powered(level, false);
+                        monitor.powered(level, true);
+                        check(monitor.channelIndex() == 0 && monitor.isShowing(), "Another pulse: back to CH 1");
+                        ItemStack item = new ItemStack(ModRegistry.TV_MONITOR_ITEM.get());
+                        item.applyComponents(monitor.collectComponents());
+                        check(List.of(0, 4649, 0, 0, 0).equals(item.get(ModRegistry.TV_CHANNELS.get())), "The item keeps its channels");
+
+                        // Nearest, too far, snowy.
+                        BlockPos near = monitorAbs.offset(-3, 0, 0);
+                        network.updateCamera(near, new SignalNetwork.CameraSpot(4648, null, List.of(new SignalNetwork.Coverage(near, 40, false)), 0, "Near"));
+                        monitor.update(level);
+                        check(monitor.cameraPos().equals(near) && monitor.cameraName().equals("Near"), "The nearer camera");
+                        network.removeCamera(near);
+                        BlockPos far = monitorAbs.offset(20, 0, 0);
+                        network.updateCamera(far, new SignalNetwork.CameraSpot(4650, null, List.of(new SignalNetwork.Coverage(far, 10, false)), 0, ""));
+                        monitor.setFrequency(4650);
+                        monitor.update(level);
+                        check(!monitor.isShowing(), "A camera too far away");
+                        network.updateCamera(far, new SignalNetwork.CameraSpot(4650, null, List.of(new SignalNetwork.Coverage(far, 25, false)), 0, ""));
+                        monitor.update(level);
+                        check(monitor.isShowing() && Math.abs(monitor.fraction() - 0.8F) < 0.011F && keyOf(monitor.statusText()).endsWith("tv_monitor_shows_snowy")
+                                && com.reiko.signaltower.radio.TvCamera.snow(monitor.fraction()) > 0.2F, "Near its edge: snowy");
+                        network.removeCamera(far);
+                        monitor.setFrequency(4648);
+
+                        // Private.
+                        claims.put(4648, devId, "Dev", java.util.Map.of(alexId, "Alex"));
+                        network.invalidate(4648);
+                        monitor.setTunedBy(rexId);
+                        monitor.update(level);
+                        check(!monitor.isShowing() && monitor.lockedBy().equals("Dev") && keyOf(monitor.statusText()).endsWith("tv_monitor_locked"),
+                                "Rex's monitor shows nothing on Dev's private frequency");
+                        check(keyOf(com.reiko.signaltower.block.RadioBlock.deafNotice(level, monitorAbs)).endsWith("tv_monitor_locked_line"), "And says so");
+                        monitor.setTunedBy(alexId);
+                        monitor.update(level);
+                        check(monitor.isShowing() && monitor.lockedBy().isEmpty(), "Alex's (a friend's) shows it");
+                        camera.setTunedBy(rexId);
+                        camera.publish(level);
+                        monitor.update(level);
+                        check(!monitor.isShowing(), "Not a camera Rex tuned (it may not send there)");
+                        camera.setTunedBy(devId);
+                        camera.publish(level);
+                        com.reiko.signaltower.network.ConfigureTvMonitorPayload.apply(rex,
+                                new com.reiko.signaltower.network.ConfigureTvMonitorPayload(monitorAbs, List.of(4651, 0, 0, 0, 0), 1, false));
+                        check(rexId.equals(monitor.getTunedBy()) && !monitor.isShowing() && monitor.lockedBy().equals("Dev"),
+                                "Rex setting its channels makes it his: it shows nothing");
+                    } finally {
+                        claims.remove(4648);
+                        network.invalidate(4648);
+                    }
+                })
+                .thenExecute(() -> {
+                    helper.setBlock(monitorAt, Blocks.AIR);
+                    check(network.watchers(cameraAbs, level.getGameTime()) == 0, "Broken: not watching");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Video walls: six monitors on 4652 on one wall (3 wide, 2 high, facing north) are one screen,
+     * its lead the top left one as you look at it (the east end, facing north); the lead alone
+     * watches the camera, the others light up with it; a pulse on any of them changes the wall's
+     * channel. Tuning one tunes them all. One gone (an L) or another frequency in it, or a row of 9,
+     * and each is on its own.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 200)
+    public static void tvMonitorWall(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        UUID devId = UUID.randomUUID();
+        BlockState facingNorth = ModRegistry.TV_MONITOR.get().defaultBlockState()
+                .setValue(com.reiko.signaltower.block.TvMonitorBlock.FACING, Direction.NORTH);
+        List<BlockPos> wall = new java.util.ArrayList<>();
+        for (int y = 2; y <= 3; y++) {
+            for (int x = 3; x <= 5; x++) {
+                BlockPos pos = new BlockPos(x, y, 1);
+                helper.setBlock(pos.south(), Blocks.STONE);
+                helper.setBlock(pos, facingNorth);
+                com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor = helper.getBlockEntity(pos);
+                monitor.setTunedBy(devId);
+                monitor.setFrequency(4652);
+                wall.add(pos);
+            }
+        }
+        BlockPos cameraAt = new BlockPos(4, 1, 6);
+        helper.setBlock(cameraAt, ModRegistry.TV_CAMERA.get().defaultBlockState());
+        com.reiko.signaltower.blockentity.TvCameraBlockEntity camera = helper.getBlockEntity(cameraAt);
+        camera.setFrequency(4652);
+        SignalNetwork network = SignalNetwork.get(level);
+        BlockPos lead = helper.absolutePos(new BlockPos(5, 3, 1));
+
+        helper.startSequence()
+                .thenExecute(() -> {
+                    camera.publish(level);
+                    for (BlockPos pos : wall) {
+                        var found = com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(pos));
+                        check(found.lead().equals(lead) && found.width() == 3 && found.height() == 2
+                                && found.column() == 5 - pos.getX() && found.row() == 3 - pos.getY(), "One wall, led from the top left: " + pos + " " + found);
+                    }
+                    check(com.reiko.signaltower.radio.MonitorWall.members(com.reiko.signaltower.radio.MonitorWall.find(level, lead), Direction.NORTH)
+                            .equals(List.of(lead, lead.west(), lead.west(2), lead.below(), lead.below().west(), lead.below().west(2))), "Its members, row by row");
+                    for (BlockPos pos : wall) {
+                        ((com.reiko.signaltower.blockentity.TvMonitorBlockEntity) helper.getBlockEntity(pos)).update(level);
+                    }
+                    for (BlockPos pos : wall) {
+                        ((com.reiko.signaltower.blockentity.TvMonitorBlockEntity) helper.getBlockEntity(pos)).update(level);
+                    }
+                    com.reiko.signaltower.blockentity.TvMonitorBlockEntity leader = (com.reiko.signaltower.blockentity.TvMonitorBlockEntity) level.getBlockEntity(lead);
+                    check(leader.isShowing() && leader.wall().size() == 6 && network.watchers(helper.absolutePos(cameraAt), level.getGameTime()) == 1,
+                            "The lead shows the camera; the wall counts once");
+                    for (BlockPos pos : wall) {
+                        check(helper.getBlockState(pos).getValue(com.reiko.signaltower.block.TvMonitorBlock.ACTIVE), "All lit: " + pos);
+                    }
+                    com.reiko.signaltower.blockentity.TvMonitorBlockEntity corner = helper.getBlockEntity(new BlockPos(3, 2, 1));
+                    check(!corner.wall().isLead() && corner.wall().lead().equals(lead) && corner.lead(level) == leader, "The others follow the lead");
+                    leader.setExtraChannels(new int[]{4653, 0, 0, 0, 0});
+                    corner.powered(level, true);
+                    check(leader.channelIndex() == 1, "A pulse on a corner changes the wall's channel");
+
+                    // Tuning one tunes them all.
+                    ItemStack tuner = new ItemStack(ModRegistry.FREQUENCY_TUNER.get());
+                    FrequencyTunerItem.setFrequency(tuner, 4654);
+                    Player dev = namedPlayer(helper, new BlockPos(4, 1, 0), devId, "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+                    dev.setItemInHand(InteractionHand.MAIN_HAND, tuner);
+                    useTunerOn(helper, dev, new BlockPos(4, 2, 1));
+                    for (BlockPos pos : wall) {
+                        check(frequencyAt(helper, pos) == 4654, "Tuned with the rest: " + pos);
+                    }
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, lead).size() == 6, "Still one wall");
+
+                    // Not a rectangle: each on its own.
+                    helper.setBlock(new BlockPos(3, 3, 1), Blocks.AIR);
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, lead).size() == 1
+                            && com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(new BlockPos(3, 2, 1))).size() == 1, "An L: each alone");
+                    helper.setBlock(new BlockPos(3, 3, 1), facingNorth);
+                    setFrequency(helper, new BlockPos(3, 3, 1), 4655);
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, lead).size() == 1, "Another frequency in it: each alone");
+                    setFrequency(helper, new BlockPos(3, 3, 1), 4654);
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, lead).size() == 6, "Back together");
+                    // A row of nine is too wide.
+                    for (int x = 1; x <= 9; x++) {
+                        BlockPos pos = new BlockPos(x, 5, 1);
+                        helper.setBlock(pos.south(), Blocks.STONE);
+                        helper.setBlock(pos, facingNorth);
+                        setFrequency(helper, pos, 4656);
+                    }
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(new BlockPos(5, 5, 1))).size() == 1, "Nine wide: too wide");
+                    helper.setBlock(new BlockPos(9, 5, 1), Blocks.AIR);
+                    check(com.reiko.signaltower.radio.MonitorWall.find(level, helper.absolutePos(new BlockPos(5, 5, 1))).width() == 8, "Eight wide is fine");
                 })
                 .thenSucceed();
     }

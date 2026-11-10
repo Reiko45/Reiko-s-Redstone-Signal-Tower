@@ -54,10 +54,20 @@ public final class SignalTowerClient {
             event.registerBlockEntityRenderer(ModRegistry.LAUNCH_PAD_BE.get(), LaunchPadRenderer::new); // v0.61.0
             event.registerBlockEntityRenderer(ModRegistry.RADAR_DISH_BE.get(), RadarDishRenderer::new); // v0.65.0
             event.registerBlockEntityRenderer(ModRegistry.RADAR_SCREEN_BE.get(), RadarScreenRenderer::new);
+            event.registerBlockEntityRenderer(ModRegistry.TV_CAMERA_BE.get(), TvCameraRenderer::new); // v0.66.0
+            event.registerBlockEntityRenderer(ModRegistry.TV_MONITOR_BE.get(), TvMonitorRenderer::new);
         });
         // v0.65.0: the Radar Dish's spinning dish, a model of its own.
-        modEventBus.addListener((net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional event) ->
-                event.register(RadarDishRenderer.ROTOR));
+        // v0.66.0: the TV Camera's turning head (and with its REC light on).
+        modEventBus.addListener((net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional event) -> {
+            event.register(RadarDishRenderer.ROTOR);
+            event.register(TvCameraRenderer.HEAD);
+            event.register(TvCameraRenderer.HEAD_REC);
+        });
+        // v0.66.0: camera pictures are drawn a little before each frame; new textures after a reload.
+        NeoForge.EVENT_BUS.addListener(CameraFeeds::onRenderFrame);
+        modEventBus.addListener((net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent event) ->
+                event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener) manager -> CameraFeeds.clear()));
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onMouseScroll);
         NeoForge.EVENT_BUS.addListener(SignalTowerClient::onLoggingOut);
         NeoForge.EVENT_BUS.addListener(AuditBeamRenderer::onRenderLevel);

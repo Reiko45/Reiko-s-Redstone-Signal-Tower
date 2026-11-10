@@ -843,6 +843,147 @@ write(items / "radar_screen.json", {"parent": f"{MOD}:block/radar_screen", "text
 }})
 
 
+# v0.66.0: the TV Camera: a stand (floor), a bracket (wall) or a rod (ceiling), looking north here, turned by
+# the blockstate; and its head, a model of its own (looking south, its pivot in the middle of the block),
+# that the block entity renderer turns the way the camera looks. The item stands it on its stand, facing you.
+TV_TEXTURES = {"particle": tex("tv_camera_body"), "body": tex("tv_camera_body"), "dark": tex("tv_camera_dark"),
+               "lens": tex("tv_camera_lens"), "steel": "minecraft:block/iron_block", "rec": tex("tv_camera_rec")}
+
+
+def tv_box(frm, to, texture, uv_faces=None, cull=None, glow=False, rotation=None):
+    element = {"from": frm, "to": to, "faces": {}}
+    for face in ("north", "south", "east", "west", "up", "down"):
+        entry = {"texture": texture, "uv": sized_uv(frm, to, face)}
+        if uv_faces and face in uv_faces:
+            entry = {"texture": uv_faces[face][0], "uv": uv_faces[face][1]}
+        if cull and face in cull:
+            entry["cullface"] = face
+        element["faces"][face] = entry
+    if glow:
+        element["neoforge_data"] = GLOW
+    if rotation:
+        element["rotation"] = rotation
+    return element
+
+
+def tv_camera_head(rec):
+    return [
+        tv_box([5.5, 5.5, 3.5], [10.5, 10.5, 12.5], "#body"),                                 # the housing
+        tv_box([6, 6, 12.5], [10, 10, 14], "#dark", uv_faces={"south": ("#lens", [0, 0, 16, 16])}),  # the lens hood and lens
+        tv_box([5, 10.5, 4], [11, 11, 14.5], "#body"),                                         # the sun visor
+        tv_box([9, 11, 11.5], [10, 11.6, 12.5], "#rec", glow=rec),                             # the REC light
+        tv_box([7.5, 7, 2.5], [8.5, 8, 3.5], "#dark"),                                         # the cable at the back
+        tv_box([7, 4.5, 6.5], [9, 5.5, 9.5], "#steel"),                                        # the yoke
+    ]
+
+
+def tv_camera_base(face):
+    if face == "floor":
+        return [
+            tv_box([7.25, 2, 7.25], [8.75, 8, 8.75], "#steel"),                                # the column
+            tv_box([6.75, 6.5, 6.75], [9.25, 7.5, 9.25], "#dark"),                             # its clamp
+            tv_box([7.5, 0.4, 7.5], [8.5, 6.5, 8.5], "#dark",                                  # three legs: back, and two at the sides
+                   rotation={"origin": [8, 6.5, 8], "axis": "x", "angle": -22.5}),
+            tv_box([7.5, 0.4, 6.5], [8.5, 6.5, 7.5], "#dark",
+                   rotation={"origin": [8, 6.5, 7], "axis": "z", "angle": 22.5}),
+            tv_box([7.5, 0.4, 6.5], [8.5, 6.5, 7.5], "#dark",
+                   rotation={"origin": [8, 6.5, 7], "axis": "z", "angle": -22.5}),
+        ]
+    if face == "wall":
+        return [
+            tv_box([5.5, 3, 15], [10.5, 9, 16], "#dark", cull=("south",)),                     # the plate on the wall
+            tv_box([7.25, 4.3, 8.5], [8.75, 5.3, 15], "#steel"),                               # the arm out to the head
+        ]
+    return [
+        tv_box([5.5, 15, 5.5], [10.5, 16, 10.5], "#dark", cull=("up",)),                       # the plate on the ceiling
+        tv_box([7.25, 10, 7.25], [8.75, 15, 8.75], "#steel"),                                  # the rod down to the head
+    ]
+
+
+for face in ("floor", "wall", "ceiling"):
+    write(models / f"tv_camera_{face}.json", {
+        "parent": "minecraft:block/block", "render_type": "minecraft:cutout",
+        "textures": TV_TEXTURES, "elements": tv_camera_base(face),
+    })
+for rec in (False, True):
+    write(models / ("tv_camera_head" + ("_rec" if rec else "") + ".json"), {
+        "parent": "minecraft:block/block", "render_type": "minecraft:cutout", "ambientocclusion": False,
+        "textures": {**TV_TEXTURES, "rec": tex("tv_camera_rec_on" if rec else "tv_camera_rec")},
+        "elements": tv_camera_head(rec),
+    })
+write(states / "tv_camera.json", {"variants": {
+    f"face={face},facing={facing},rec={rec}": {"model": f"{MOD}:block/tv_camera_{face}", **({"y": y} if y else {})}
+    for face in ("floor", "wall", "ceiling") for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270))
+    for rec in ("false", "true")
+}})
+
+
+def shifted(element, dy):
+    out = dict(element)
+    out["from"] = [element["from"][0], element["from"][1] + dy, element["from"][2]]
+    out["to"] = [element["to"][0], element["to"][1] + dy, element["to"][2]]
+    if "rotation" in element:
+        r = dict(element["rotation"])
+        r["origin"] = [r["origin"][0], r["origin"][1] + dy, r["origin"][2]]
+        out["rotation"] = r
+    return out
+
+
+def facing_south_rotated(element):
+    """{facing_south}, keeping a rotation's origin and turning an x-axis tilt the other way."""
+    out = facing_south(element)
+    if "rotation" in element:
+        r = dict(element["rotation"])
+        r["origin"] = [r["origin"][0], r["origin"][1], 16 - r["origin"][2]]
+        if r["axis"] == "x":
+            r["angle"] = -r["angle"]
+        out["rotation"] = r
+    return out
+
+
+write(items / "tv_camera.json", {
+    "parent": "minecraft:block/block",
+    "textures": {**TV_TEXTURES, "rec": tex("tv_camera_rec_on")},
+    "elements": [facing_south_rotated(e) for e in tv_camera_base("floor")] + [shifted(e, 3.5) for e in tv_camera_head(True)],
+    "display": {
+        "gui": {"rotation": [25, 210, 0], "translation": [0, -1.5, 0], "scale": [0.85, 0.85, 0.85]},
+        "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.4, 0.4, 0.4]},
+        "fixed": {"rotation": [0, 180, 0], "translation": [0, -1, 0], "scale": [0.75, 0.75, 0.75]},
+        "thirdperson_righthand": {"rotation": [75, 180, 0], "translation": [0, 1.5, 1], "scale": [0.45, 0.45, 0.45]},
+        "thirdperson_lefthand": {"rotation": [75, 180, 0], "translation": [0, 1.5, 1], "scale": [0.45, 0.45, 0.45]},
+        "firstperson_righthand": {"rotation": [0, 160, 0], "translation": [0, 1, 0], "scale": [0.5, 0.5, 0.5]},
+        "firstperson_lefthand": {"rotation": [0, 160, 0], "translation": [0, 1, 0], "scale": [0.5, 0.5, 0.5]},
+    },
+})
+
+# v0.66.0: the TV Monitor: a flat panel 2 pixels deep on a wall, facing north here, black glass to its edges (so a
+# wall of them joins up); the picture is drawn on its face. The item shows color bars.
+write(models / "tv_monitor.json", {
+    "parent": "minecraft:block/block",
+    "textures": {"particle": tex("tv_monitor_side"), "front": tex("tv_monitor_front"), "side": tex("tv_monitor_side")},
+    "elements": [
+        {"from": [0, 0, 14], "to": [16, 16, 16], "faces": {
+            "north": {"uv": [0, 0, 16, 16], "texture": "#front"},
+            "south": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "south"},
+            "east": {"uv": [14, 0, 16, 16], "texture": "#side"},
+            "west": {"uv": [0, 0, 2, 16], "texture": "#side"},
+            "up": {"uv": [0, 14, 16, 16], "texture": "#side"},
+            "down": {"uv": [0, 0, 16, 2], "texture": "#side"}}},
+    ],
+})
+write(states / "tv_monitor.json", {"variants": {
+    f"active={active},facing={facing}": {"model": f"{MOD}:block/tv_monitor", **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for active in ("false", "true")
+}})
+write(items / "tv_monitor.json", {"parent": f"{MOD}:block/tv_monitor", "textures": {"front": tex("tv_monitor_front_item")}, "display": {
+    "gui": {"rotation": [15, 200, 0], "translation": [0, 0, 0], "scale": [0.8, 0.8, 0.8]},
+    "fixed": {"rotation": [0, 0, 0], "translation": [0, 0, -7], "scale": [0.85, 0.85, 0.85]},
+    "ground": {"rotation": [0, 0, 0], "translation": [0, 3, -3], "scale": [0.4, 0.4, 0.4]},
+    "thirdperson_righthand": {"rotation": [75, 225, 0], "translation": [0, 2.5, -2], "scale": [0.375, 0.375, 0.375]},
+    "firstperson_righthand": {"rotation": [0, 200, 0], "translation": [0, 1, -3], "scale": [0.4, 0.4, 0.4]},
+    "firstperson_lefthand": {"rotation": [0, 200, 0], "translation": [0, 1, -3], "scale": [0.4, 0.4, 0.4]},
+}})
+
 # v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
 # with a lamp at the back; facing north here, turned by the blockstate.
 def telegraph_model(lit):
@@ -1708,6 +1849,77 @@ write(ASSETS / "lang" / "en_us.json", {
     f"screen.{MOD}.log.kind_radar": "Radar Dish",
     f"screen.{MOD}.log.tip_radar": "Saw: %s",
     f"subtitles.{MOD}.radar.ping": "Radar pings",
+    # v0.66.0: the TV Camera and the TV Monitor
+    f"block.{MOD}.tv_camera": "TV Camera",
+    f"block.{MOD}.tv_camera.tooltip": "Put it on a floor, a wall or a ceiling: TV Monitors on its frequency that it reaches show what it sees, live. Reach like a walkie-talkie's.",
+    f"block.{MOD}.tv_monitor": "TV Monitor",
+    f"block.{MOD}.tv_monitor.tooltip": "Hang it on a wall: it shows the nearest TV Camera on its channel that reaches it. Monitors side by side on one frequency make one big screen.",
+    f"tooltip.{MOD}.tv_channels": "Channels: %s",
+    f"message.{MOD}.tv_camera_status": "TV Camera | Frequency %s | %s",
+    f"message.{MOD}.tv_camera_unwatched": "%sNo monitor shows it | Reach %s",
+    f"message.{MOD}.tv_camera_watched": "%sShown on %s monitor | Reach %s",
+    f"message.{MOD}.tv_camera_watched_many": "%sShown on %s monitors | Reach %s",
+    f"message.{MOD}.tv_camera_locked": "Frequency %s is private to %s: no monitor shows this camera",
+    f"message.{MOD}.tv_camera_set": "TV Camera: %s",
+    f"message.{MOD}.tv_not_yours": "Frequency is private to %s: only its members change this TV Camera",
+    f"message.{MOD}.tv_monitor_status": "TV Monitor | Frequency %s | %s",
+    f"message.{MOD}.tv_channel_of": "CH %s of %s",
+    f"message.{MOD}.tv_monitor_locked": "%s: private to %s, shows nothing",
+    f"message.{MOD}.tv_monitor_locked_line": "Frequency %s is private to %s: this monitor shows nothing",
+    f"message.{MOD}.tv_monitor_none": "%s: no TV Camera on this frequency reaches here",
+    f"message.{MOD}.tv_monitor_shows": "%s: %s, %s",
+    f"message.{MOD}.tv_monitor_shows_snowy": "%s: %s, %s (snowy: near the edge of its reach)",
+    f"message.{MOD}.tv_camera_here": "a camera right here",
+    f"message.{MOD}.tv_camera_away": "a camera %s blocks %s",
+    f"message.{MOD}.tv_camera_unnamed": "an unnamed camera",
+    f"message.{MOD}.tv_monitor_set": "TV Monitor: %s channels, on CH %s (%s)",
+    f"screen.{MOD}.tv_camera.frequency": "Frequency %s",
+    f"screen.{MOD}.tv_camera.name": "Name",
+    f"screen.{MOD}.tv_camera.name_hint": "Name (shown on monitors)",
+    f"screen.{MOD}.tv_camera.tilt": "Tilt",
+    f"screen.{MOD}.tv_camera.tilt_auto": "Auto",
+    f"screen.{MOD}.tv_camera.tilt_degrees": "%s°",
+    f"screen.{MOD}.tv_camera.tilt_tip": "How far it looks up or down. Auto: level on a floor, 15° down on a wall, 30° down from a ceiling.",
+    f"screen.{MOD}.tv_camera.lens": "Lens",
+    f"screen.{MOD}.tv_camera.lens_0": "Wide",
+    f"screen.{MOD}.tv_camera.lens_1": "Normal",
+    f"screen.{MOD}.tv_camera.lens_2": "Zoom",
+    f"screen.{MOD}.tv_camera.lens_tip": "Wide sees the most, Zoom sees far things bigger.",
+    f"screen.{MOD}.tv_camera.pan": "Pan",
+    f"screen.{MOD}.tv_camera.pan_tip": "On: it slowly turns 40° each way and back, every 20 seconds.",
+    f"screen.{MOD}.tv_camera.pan_on": "Pan",
+    f"screen.{MOD}.tv_camera.night": "Night vision",
+    f"screen.{MOD}.tv_camera.night_tip": "On: a bright green picture, even in the dark.",
+    f"screen.{MOD}.tv_camera.night_on": "Night vision",
+    f"screen.{MOD}.tv_camera.summary": "Tilt %s, Lens %s",
+    f"screen.{MOD}.tv_camera.unwatched": "No monitor shows it (reach %s blocks)",
+    f"screen.{MOD}.tv_camera.watched": "Shown on %s monitor (reach %s blocks)",
+    f"screen.{MOD}.tv_camera.watched_many": "Shown on %s monitors (reach %s blocks)",
+    f"screen.{MOD}.tv_monitor.channel": "CH %s",
+    f"screen.{MOD}.tv_monitor.own": "%s (its own frequency)",
+    f"screen.{MOD}.tv_monitor.empty": "none",
+    f"screen.{MOD}.tv_monitor.single": "One monitor",
+    f"screen.{MOD}.tv_monitor.wall": "A wall of %s × %s monitors",
+    f"screen.{MOD}.tv_monitor.overlay": "Overlay",
+    f"screen.{MOD}.tv_monitor.overlay_tip": "On: the channel and camera name, REC and the time over the picture.",
+    f"screen.{MOD}.tv_monitor.next": "Next channel",
+    f"screen.{MOD}.tv_monitor.next_tip": "Saves, then steps to the next channel (so does a redstone pulse or a button next to it).",
+    f"screen.{MOD}.tv_monitor.face_channel": "CH %s · %s",
+    f"screen.{MOD}.tv_monitor.face_rec": "● REC",
+    f"screen.{MOD}.tv_monitor.face_time": "Day %s  %s",
+    f"screen.{MOD}.tv_monitor.face_no_signal": "NO SIGNAL",
+    f"screen.{MOD}.tv_monitor.face_too_far": "TOO FAR",
+    f"screen.{MOD}.tv_monitor.face_private": "PRIVATE (%s)",
+    f"jade.{MOD}.tv_camera_watchers": "Shown on: %s",
+    f"jade.{MOD}.tv_camera_settings": "%s",
+    f"jade.{MOD}.tv_camera_name": "Name: %s",
+    f"jade.{MOD}.tv_monitor_channel": "Channel %s of %s: %s",
+    f"jade.{MOD}.tv_monitor_camera": "Shows %s",
+    f"jade.{MOD}.tv_monitor_none": "No TV Camera on this channel reaches here",
+    f"jade.{MOD}.tv_monitor_locked": "Private to %s: shows nothing",
+    f"jade.{MOD}.tv_monitor_snowy": "Snowy: near the edge of the camera's reach",
+    f"jade.{MOD}.tv_monitor_wall": "Wall: %s × %s",
+    f"subtitles.{MOD}.tv.switch": "TV changes channel",
     # v0.63.0: the Ticker Tape Printer
     f"block.{MOD}.ticker_printer": "Ticker Tape Printer",
     f"block.{MOD}.ticker_printer.tooltip": "Prints every message that reaches its frequency into a Book and Quill: the day and time, the sender and the text. A full book is signed as a logbook.",
@@ -2934,6 +3146,18 @@ recipes["radar_screen"] = ({  # v0.65.0
     "ingredients": [{"item": f"{MOD}:radio_status_board"}, {"item": "minecraft:compass"}, {"item": "minecraft:lime_dye"}],
     "result": {"count": 1, "id": f"{MOD}:radar_screen"},
 }, f"{MOD}:radio_status_board")
+recipes["tv_camera"] = ({  # v0.66.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": "minecraft:spyglass"}, {"item": "minecraft:observer"}],
+    "result": {"count": 1, "id": f"{MOD}:tv_camera"},
+}, f"{MOD}:radio_transmitter")
+recipes["tv_monitor"] = ({  # v0.66.0: two, so walls of them don't cost too much
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:radar_screen"}, {"item": "minecraft:glass_pane"}],
+    "result": {"count": 2, "id": f"{MOD}:tv_monitor"},
+}, f"{MOD}:radar_screen")
 recipes["walkie_talkie"] = ({  # v0.64.0
     "type": "minecraft:crafting_shapeless",
     "category": "equipment",
@@ -3084,7 +3308,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen"):
+             "launch_pad", "morse_key", "ticker_printer", "radar_dish", "radar_screen", "tv_camera", "tv_monitor"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -3108,6 +3332,8 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
                        + ([f"{MOD}:station_mode", f"{MOD}:station_announce"] if name == "radio_weather_station" else [])
                        + ([f"{MOD}:speaker"] if name == "radio_speaker" else [])
                        + ([f"{MOD}:radar_settings"] if name in ("radar_dish", "radar_screen") else [])
+                       + ([f"{MOD}:camera_settings", "minecraft:custom_name"] if name == "tv_camera" else [])
+                       + ([f"{MOD}:tv_channels"] if name == "tv_monitor" else [])
                        + ([f"{MOD}:recorder_tape"] if name == "radio_signal_recorder" else [])
                        + ([f"{MOD}:board_frequencies"] if name == "radio_status_board" else [])
                        + ([f"{MOD}:second_frequency", f"{MOD}:logic_mode"] if name == "radio_logic_receiver" else []),
@@ -3143,7 +3369,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
                f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key", f"{MOD}:ticker_printer",
-               f"{MOD}:radar_dish", f"{MOD}:radar_screen"]
+               f"{MOD}:radar_dish", f"{MOD}:radar_screen", f"{MOD}:tv_camera", f"{MOD}:tv_monitor"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -3218,6 +3444,8 @@ INFO = {
     "walkie_talkie": "A two-way radio: right-click it (or press the Talk key, V, holding it) and type a line. Everyone carrying a Walkie-Talkie on its frequency where it reaches hears it in chat, broken up near the edge; pagers, telegraphs and printers get it as a message. Sneak and right-click the air to set its frequency.",
     "radar_dish": "Put it on top of a mast like a transmitter. Once a second it sweeps its reach for players, hostile mobs, peaceful mobs and vehicles (not under 8 or more solid blocks, as in a cave), and with Send on it turns its frequency on with how many it sees (at most 15). A comparator reads the count. Right-click it to choose what it tracks.",
     "radar_screen": "Hang it on a wall and tune it like a receiver: it shows the nearest Radar Dish on its frequency that reaches it, with a sweep line, colored blips and towers, north up. On a private frequency only members' screens show anything. Right-click it to choose how far round the dish it shows (128 blocks at first) or turn the ping off.",
+    "tv_camera": "Put it on a floor (a stand), a wall (a bracket) or a ceiling and tune it: it looks the way it faces (on a floor or ceiling, the way you looked as you placed it), and TV Monitors on its frequency that it reaches show what it sees, live. It reaches like a walkie-talkie: farther the higher it is, and farther with towers and repeaters on its frequency; near the edge the picture gets snowy. Right-click it to name it and set its tilt, lens, pan and night vision. Its red light is on while a monitor shows it; a comparator reads how many do. On a private frequency only members can tune one.",
+    "tv_monitor": "Hang it on a wall and tune it: it shows the nearest TV Camera on its frequency that reaches it. Right-click it to add up to five more channels (frequencies); a redstone pulse or a button next to it steps to the next. Monitors side by side on one wall, on one frequency, join into one big screen (a full rectangle, up to 8 by 5); tuning one tunes them all. Each player's game draws the picture itself, so a camera past your render distance shows TOO FAR. On a private frequency only members' monitors show anything.",
     "ticker_printer": "Tune it to a frequency and give it a Book and Quill (by hand or hopper): every message that reaches it is printed in the book, with the day and time and who sent it, even ones that came while it wasn't loaded. A full book is signed as a logbook, which a hopper can take out. A comparator reads how full the book is.",
     "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",
     "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",

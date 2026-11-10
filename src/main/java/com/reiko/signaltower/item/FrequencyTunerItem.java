@@ -134,7 +134,8 @@ public class FrequencyTunerItem extends Item {
 
     /** The frequency {@code radio} would send on if tuned to {@code frequency} (a converter: its output), or -1 for a receiver. */
     private static int sendsOn(RadioBlockEntity radio, int frequency) {
-        if (radio instanceof RadioTransmitterBlockEntity || radio instanceof CodeKeypadBlockEntity) {
+        if (radio instanceof RadioTransmitterBlockEntity || radio instanceof CodeKeypadBlockEntity
+                || radio instanceof com.reiko.signaltower.blockentity.TvCameraBlockEntity) { // v0.66.0: a camera sends its picture
             return frequency;
         }
         if (radio instanceof RadioRepeaterBlockEntity relay) {

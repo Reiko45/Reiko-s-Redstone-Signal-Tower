@@ -252,6 +252,14 @@ public final class SignalTower {
                 com.reiko.signaltower.network.OpenRadarScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenRadarScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureRadarPayload.TYPE,
                 com.reiko.signaltower.network.ConfigureRadarPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureRadarPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenTvCameraPayload.TYPE, // v0.66.0
+                com.reiko.signaltower.network.OpenTvCameraPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTvCameraPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureTvCameraPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureTvCameraPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureTvCameraPayload::handle);
+        registrar.playToClient(com.reiko.signaltower.network.OpenTvMonitorPayload.TYPE,
+                com.reiko.signaltower.network.OpenTvMonitorPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenTvMonitorPayload::handle);
+        registrar.playToServer(com.reiko.signaltower.network.ConfigureTvMonitorPayload.TYPE,
+                com.reiko.signaltower.network.ConfigureTvMonitorPayload.STREAM_CODEC, com.reiko.signaltower.network.ConfigureTvMonitorPayload::handle);
         registrar.playToClient(com.reiko.signaltower.network.OpenSensorScreenPayload.TYPE,
                 com.reiko.signaltower.network.OpenSensorScreenPayload.STREAM_CODEC, com.reiko.signaltower.network.OpenSensorScreenPayload::handle);
         registrar.playToServer(com.reiko.signaltower.network.ConfigureSensorPayload.TYPE,
@@ -351,6 +359,8 @@ public final class SignalTower {
             event.accept(ModRegistry.TICKER_PRINTER_ITEM.get()); // v0.63.0
             event.accept(ModRegistry.RADAR_DISH_ITEM.get()); // v0.65.0
             event.accept(ModRegistry.RADAR_SCREEN_ITEM.get());
+            event.accept(ModRegistry.TV_CAMERA_ITEM.get()); // v0.66.0
+            event.accept(ModRegistry.TV_MONITOR_ITEM.get());
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

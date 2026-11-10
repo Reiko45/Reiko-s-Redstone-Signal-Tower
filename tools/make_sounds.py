@@ -283,6 +283,20 @@ def radar_ping():
     return normalize((tone * decay * attack + echo) * envelope(n, 0.001, 0.08), 0.6)
 
 
+def tv_switch():
+    """v0.66.0: a TV Monitor changing channel: a soft click, a short burst of TV snow, and the hum of the picture."""
+    d = 0.42
+    n = int(0.28 * RATE)
+    snow = static(0.28, 1200, 9000) * envelope(n, 0.003, 0.06) * 0.55
+    out = place(silence(d), click(body=520, ring=3200, length=0.025) * 0.7, 0.0)
+    out = place(out, snow, 0.02)
+    m = int(0.14 * RATE)
+    t = np.arange(m) / RATE
+    hum = (np.sin(2 * np.pi * 15734 / 4 * t) * 0.05 + np.sin(2 * np.pi * 120 * t) * 0.12) * envelope(m, 0.01, 0.08)
+    out = place(out, hum, 0.28)
+    return normalize(out * envelope(len(out), 0.001, 0.03), 0.6)
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -299,6 +313,7 @@ SOUND_LIST = {
     "printer.print": ("printer_print", printer_print),
     "walkie.squelch": ("walkie_squelch", walkie_squelch),
     "radar.ping": ("radar_ping", radar_ping),
+    "tv.switch": ("tv_switch", tv_switch),
 }
 
 

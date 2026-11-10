@@ -46,10 +46,12 @@ public final class ModSounds {
 
     /** v0.65.0: a Radar Screen's ping when something new shows up. */
     public static final DeferredHolder<SoundEvent, SoundEvent> RADAR_PING = register("radar.ping");
+    /** v0.66.0: a TV Monitor changing channel (a burst of static). */
+    public static final DeferredHolder<SoundEvent, SoundEvent> TV_SWITCH = register("tv.switch");
 
     /** Every one, for the tests. */
     public static final List<DeferredHolder<SoundEvent, SoundEvent>> ALL = List.of(TUNER_TUNE, TUNER_STEP, TELEGRAPH_KEY,
-            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH, RADAR_PING);
+            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE, PRINTER_PRINT, WALKIE_SQUELCH, RADAR_PING, TV_SWITCH);
 
     private ModSounds() {
     }

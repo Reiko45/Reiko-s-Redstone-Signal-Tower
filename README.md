@@ -39,6 +39,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. With **Morse** on, it keys its messages out in Morse code first. |
 | **Radar Dish** | A tower top with a spinning radar dish. It sweeps its reach for players, hostile mobs, peaceful mobs, and boats and minecarts (not ones in caves), and turns its frequency on with how many it sees, so receivers, lamps and pagers react when something comes near. A comparator reads the count. |
 | **Radar Screen** | A panel for a wall that shows what a Radar Dish on its frequency sees: a green sweep line turning with the dish, a blip for each thing (colored by kind), radio towers as small squares and where the screen itself is, north up. It pings when something new shows up. |
+| **TV Camera** | A camera on a stand, a wall bracket or a ceiling mount. TV Monitors on its frequency that it reaches show what it sees, live: the blocks with their own textures, the light, water, the sky, and mobs and players as colored figures. Its red light is on while a monitor shows it. |
+| **TV Monitor** | A flat panel for a wall that shows the nearest TV Camera on its channel. Up to six channels, stepped with a button; monitors side by side join into one big screen, up to 8 by 5. |
 | **Ticker Tape Printer** | A stock ticker under a glass dome. Tune it to a frequency and give it a Book and Quill: every message that reaches it is printed in the book, with the day and time and who sent it. A full book is signed as a logbook, and a hopper can take it away. |
 | **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
@@ -778,6 +780,23 @@ Since 0.65 a **Radar Dish** on a tower shows on a **Radar Screen** what's moving
 
 ![A Radar Screen on a wall on 6500: the green scope with range rings, the sweep line and its trail, red, cyan and pale yellow blips, amber tower squares and a white cross, "128 blocks · 27", and Jade "Shows a dish 23 blocks north-east (reach 672)", "38 contacts", "Shows: 128 blocks"; the Radar Dish on its mast with its curved reflector turning above the cabinet; Jade on the dish: "Sending: 15", "Sees: 2 players, 9 hostile mobs, 23 peaceful mobs, 2 vehicles", "Reach: 672 blocks", its battery; the dish's settings: Players, Hostile mobs, Peaceful mobs, Vehicles, Strangers only: OFF, Send: ON and what it sees; Alex's Radar Screen settings: "Shows: 64 blocks", "Ping: ON", "Show towers: ON"; and the screen at 64 blocks, "64 blocks · 12"](docs/images/radar.png)
 
+### TV Cameras and Monitors
+
+Since 0.66 a **TV Camera** sends a live picture to **TV Monitors** on its frequency.
+
+- **The camera** goes on a floor (on a little stand), on a wall (on a bracket) or under a ceiling, and looks the way it faces: on a wall away from the wall, on a floor or ceiling the way you looked as you placed it. Its head turns on its mount to show where it looks.
+- **Its settings** (right-click it; sneak + right-click for its status line): a **name** for the monitors (an anvil name works too); **Tilt** (15° up to 60° down; Auto is level on a floor, 15° down on a wall and 30° down from a ceiling); **Lens** (Wide, Normal or Zoom); **Pan** (it slowly turns 40° each way and back, every 20 seconds); and **Night vision** (a bright green picture, even in the dark). On a private frequency only the owner and members (and operators) change them.
+- **Reach:** a camera reaches like a walkie-talkie: farther the higher it stands, and farther again through towers and repeaters on its frequency. Past 70% of the way to the edge of its reach the picture gets snowy.
+- **The REC light** on its head is red while a monitor shows it, and a comparator next to it reads how many monitors do.
+- **The monitor** hangs on a wall, tuned like a receiver. It shows the nearest TV Camera on its frequency whose picture reaches it. Over the picture: "CH 1 · Front Gate" (the channel and the camera's name), a blinking "● REC" and the day and time; the Overlay setting turns them off.
+- **Channels:** channel 1 is the monitor's own frequency; its settings (right-click it) take up to five more frequencies. A redstone pulse (a button next to it) or **Next channel** steps to the next one, with a moment of static and a click.
+- **Video walls:** monitors side by side and above one another on one wall, facing the same way and on the same frequency, make one big screen if together they're a full rectangle, up to 8 wide and 5 high. The picture fills it in the middle, at 16:9; the top left monitor (as you look at it) keeps the channels, and a button by any of them changes the channel. Tuning one monitor of a wall tunes them all.
+- **The picture** is drawn by each player's own game, from what it has loaded: 128 by 72 pixels, a few times a second, without touching how the game draws the world. The blocks have their own textures (grass and leaves tinted for their biome, leaves and glass see-through), lit by the light where they are (dimmed at night) and shaded by which way they face; water tints what's under it; far away it fades into the sky. Mobs are boxes in their spawn egg's colors and players in Steve's. A camera farther away than your render distance shows **TOO FAR**; with no camera reaching it a monitor shows **NO SIGNAL** on snow.
+- **Private frequencies:** a monitor placed, tuned or set by someone who isn't the owner or a member shows nothing ("PRIVATE (Dev)"), a camera tuned by someone who isn't a member isn't shown, and only members can tune a camera there.
+- **Jade and WTHIT** show a camera's name, settings, reach and how many monitors show it, and a monitor's channel, which camera it shows and how far off, whether it's snowy, and its wall's size.
+
+![The 3 × 2 video wall on 6600 showing "CH 1 · Deck East" live, with "● REC" and "Day 1 07:00": hay bales, the pool, a Radio Receiver, red concrete, the oak tree and Alex as a figure; the Back Door camera on its wall bracket above it, and a single monitor in night-vision green; the Deck East camera on its stand, its lens to you and its REC light on, Jade "Name: Deck East", "Shown on: 1", "Tilt 0°, Lens Zoom", "Reach: 656 blocks"; the camera's settings: its name, "Tilt: 0°", "Lens: Zoom", "Pan: OFF", "Night vision: OFF", "Shown on 1 monitor (reach 656 blocks)"; the wall's settings: "A wall of 3 × 2 monitors", CH 1 "6600 (its own frequency)", CH 2 6601, "Overlay: ON", Done, Next channel, Cancel; at night, after Alex pressed the button by the wall: "CH 2 · Back Door" in night-vision green with Dev in it, Jade "Channel 2 of 2: 6601", "Shows "Back Door", a camera 2 blocks west", "Wall: 3 × 2"; and a monitor on 6602 whose camera is 207 blocks north, past Dev's render distance: "TOO FAR", next to the Back Door camera's picture on a monitor of its own](docs/images/tv.png)
+
 ### 3D item models
 
 Since 0.65 the handheld radios, the antennas, the Coverage Map, the Satellite Dish and Wall Redstone are small 3D models instead of flat pictures: the Frequency Tuner with its display, tuning dial and aerial; the Remote Control with its red button and the light that turns green or red after a press; the Multi-Button Remote with its four buttons in their own colors; the Radio Pager with its screen lighting up; the Signal Scanner's scope; the Signal Meter, whose needle swings with the strength; the yellow Walkie-Talkie with its rubber aerial; each antenna with its crossed dipoles (a loading coil on the gold one, diamond and netherite knobs, an ender tip); the Dish Antenna and Satellite Dish with round, stepped bowls; the Coverage Map rolled at both sides like a scroll; and Wall Redstone as dust running across a piece of wall. The Radar Dish and Radar Screen items show their dish and a lit scope. The radios are held upright, their face to you in first person and outwards in third person.
@@ -896,6 +915,7 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A type wheel's chatter and a clunk | "Ticker tape prints" | A Ticker Tape Printer prints a message (since 0.63) |
 | A burst of hiss and a chirp | "Walkie-talkie crackles" | Someone talks on a Walkie-Talkie you carry, or you talk (since 0.64) |
 | A soft ping with a ring | "Radar pings" | A Radar Screen when something new shows up on it (since 0.65) |
+| A click and a burst of TV snow | "TV changes channel" | A TV Monitor changes channel (since 0.66) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
 - **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
@@ -1258,6 +1278,10 @@ G = Red Stained Glass   R = Redstone Dust   L = Redstone Lamp   I = Iron Ingot
 
 **Radar Screen:** a Radio Status Board, a Compass and Lime Dye, in any arrangement in the crafting grid.
 
+**TV Camera:** a Radio Transmitter, a Spyglass and an Observer, in any arrangement in the crafting grid.
+
+**TV Monitor** (makes two): a Radar Screen and a Glass Pane, in any arrangement in the crafting grid.
+
 **Signal Scanner:** a Radio Receiver, a Compass and an Iron Ingot, in any arrangement in the crafting grid.
 
 **Signal Meter:** a Compact Radio Receiver, a Redstone Comparator and an Iron Ingot, in any arrangement in the crafting grid.
@@ -1465,6 +1489,18 @@ src/main/java/com/reiko/signaltower/
   client/RadarDishRenderer.java          spins the dish (the block/radar_dish_rotor model)
   client/RadarSettingsScreen.java        the dish's and the screen's settings
   network/OpenRadarScreenPayload.java, ConfigureRadarPayload.java  radar settings screen <-> server
+  radio/TvCamera.java                    TV cameras: settings (tilt, lens, pan, night vision), where one looks, snow near the edge
+  radio/MonitorWall.java                 video walls: which monitors make one screen, its lead (top left)
+  block/TvCameraBlock.java               the TV Camera: floor, wall or ceiling; REC light; comparator; opens its settings
+  blockentity/TvCameraBlockEntity.java   its reach (like a walkie-talkie's) and settings in the network; counts who watches
+  block/TvMonitorBlock.java              the TV Monitor: a wall panel; a redstone pulse changes channel
+  blockentity/TvMonitorBlockEntity.java  channels; the wall's lead picks the camera, watches it, sends which to clients
+  client/CameraRaycaster.java            draws a camera's picture from the blocks and entities the client has
+  client/CameraFeeds.java                the pictures monitors ask for, drawn a few rows before each frame; the snow
+  client/TvMonitorRenderer.java          draws the picture over a monitor or a wall, the overlay, snow and messages
+  client/TvCameraRenderer.java           turns the camera's head (block/tv_camera_head) the way it looks
+  client/TvCameraScreen.java, TvMonitorScreen.java  the camera's and the monitor's settings
+  network/OpenTvCameraPayload.java, ConfigureTvCameraPayload.java, OpenTvMonitorPayload.java, ConfigureTvMonitorPayload.java  TV settings <-> server
   network/WalkieTalkPayload.java         talk line -> server
   item/SignalScannerItem.java            handheld that lists every frequency heard where you stand, and tracks one
   item/ScannerTarget.java                the transmitter a scanner is tracking (data component), arrow angle
@@ -1748,9 +1784,13 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 200. the Walkie-Talkie: one only in the inventory can't talk, nothing said is refused; Dev's line goes out (his own line in chat, "Said on 4642 ... | Heard by ..."), is kept as a handheld message from Dev, and a second at once is too fast; Alex, carrying one nearby, hears it in full with four bars, while Dev, someone on another frequency and someone 5,000 blocks away don't; a telegraph's message reaches Alex's too; a Ticker Tape Printer prints Dev's line and a telegraph shows it; on Dev's encrypted frequency Alex hears "(encrypted)", someone who isn't a member is refused, and the log has a Walkie-Talkie entry with no position;
 201. what a radar makes of things: zombies are hostile, pigs and villagers peaceful, boats and minecarts vehicles, players players, but not armor stands, items or spectators; bearings clockwise from north; one turn every 4 seconds; the ranges a screen shows (never more than the dish's reach) and the settings kept to their bits;
 202. the Radar Dish: in its reach it sees a zombie, a pig, a boat, Dev and Alex, nearest first, but not someone 11 blocks under a pillar or past its reach; it sends 5, which a receiver hears and a comparator reads, it's lit and sweeping, and its sweep is in the network; tracking players and hostile mobs it counts 3, strangers only leaves Dev (its tuner) out, Send off sends nothing but the comparator still counts; the status line, Jade, the settings packet and the item keep up; on Dev's private frequency the log lists a Radar Dish with what it saw, and Rex can't change it; broken, it's gone from the network;
-203. the Radar Screen: it shows the dish 8 blocks west with its reach and contacts, and the tower 12 blocks east of the dish; no ping for the same contacts, a ping for a new one, none with Ping off; clients get the picture but not who tuned it; Jade, the status line and the settings packet; Dev sets it to 256 blocks with the packet; a dish 20 blocks off reaching 10 isn't shown, one reaching 30 is; on Dev's private frequency Rex's screen shows nothing and says whose it is, Alex's (a friend's) shows the dish, but not once the dish is tuned by Rex.
+203. the Radar Screen: it shows the dish 8 blocks west with its reach and contacts, and the tower 12 blocks east of the dish; no ping for the same contacts, a ping for a new one, none with Ping off; clients get the picture but not who tuned it; Jade, the status line and the settings packet; Dev sets it to 256 blocks with the packet; a dish 20 blocks off reaching 10 isn't shown, one reaching 30 is; on Dev's private frequency Rex's screen shows nothing and says whose it is, Alex's (a friend's) shows the dish, but not once the dish is tuned by Rex;
+204. where a TV Camera looks: Auto tilt is level on a stand, 15° down on a wall and 30° down from a ceiling; the lens a little in front of the head; Pan swings 40° each way; settings kept to ones that exist; snow from 70% of the way to the edge; it sticks to a floor or a wall, not to nothing;
+205. the TV Camera: it's in the network with its frequency, tuner and reach; Dev's settings packet names it and sets Pan and Night vision, names are cut short, the item keeps both; a monitor watching it lights its REC light and a comparator reads 1, until it hasn't said so for a while; the status line and Jade; on Dev's private frequency Rex can't change it or tune a camera there, and one Rex tuned says nobody sees it; broken, it's gone;
+206. the TV Monitor: it shows the camera 8 blocks west, by name, says it's watching and lights up; clients get which camera but not who tuned it; Jade and the status line; a second channel set by the packet, a redstone pulse steps to it and another back (not while still powered); the item keeps its channels; the nearer of two cameras; one too far isn't shown and one near the edge is snowy; on Dev's private frequency Rex's monitor shows nothing and says so, Alex's (a friend's) shows it, not a camera Rex tuned, and Rex setting its channels makes it his;
+207. video walls: six monitors 3 by 2 are one screen led from the top left, the lead alone watches and the rest light up with it, a pulse on a corner changes the wall's channel, tuning one tunes them all; an L, another frequency in it or a row of nine leaves each on its own, eight wide is fine.
 
-All 203 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
+All 207 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades, and with WTHIT (`-PwithWthit`), where test 198 checks the plugin.
 
 ## License
 

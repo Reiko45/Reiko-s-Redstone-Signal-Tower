@@ -82,5 +82,11 @@
     "sounds": [
       "reikos_signal_tower:radar_ping"
     ]
+  },
+  "tv.switch": {
+    "subtitle": "subtitles.reikos_signal_tower.tv.switch",
+    "sounds": [
+      "reikos_signal_tower:tv_switch"
+    ]
   }
 }

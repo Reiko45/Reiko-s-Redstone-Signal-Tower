@@ -140,6 +140,16 @@ public final class ClientHooks {
         Minecraft.getInstance().setScreen(new RadarSettingsScreen(state));
     }
 
+    /** Opens a TV Camera's settings (v0.66.0). */
+    public static void openTvCamera(com.reiko.signaltower.network.OpenTvCameraPayload state) {
+        Minecraft.getInstance().setScreen(new TvCameraScreen(state));
+    }
+
+    /** Opens a TV Monitor's settings (v0.66.0). */
+    public static void openTvMonitor(com.reiko.signaltower.network.OpenTvMonitorPayload state) {
+        Minecraft.getInstance().setScreen(new TvMonitorScreen(state));
+    }
+
     /** Opens a Radio Speaker's screen (v0.43.0). */
     public static void openSpeakerScreen(com.reiko.signaltower.network.OpenSpeakerScreenPayload state) {
         Minecraft.getInstance().setScreen(new SpeakerScreen(state));

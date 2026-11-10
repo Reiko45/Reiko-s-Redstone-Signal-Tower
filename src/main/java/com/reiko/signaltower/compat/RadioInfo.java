@@ -359,6 +359,27 @@ public final class RadioInfo {
             tag.putInt("radar_contacts", screen.contactCount());
             tag.putInt("radar_settings", screen.getSettings());
             tag.putString("radar_locked", screen.lockedBy());
+        } else if (radio instanceof com.reiko.signaltower.blockentity.TvCameraBlockEntity camera) {
+            // v0.66.0: its name, settings, reach and how many monitors show it (as of its last look, once a second).
+            tag.putString("tv_name", camera.getName());
+            tag.putInt("tv_settings", camera.getSettings());
+            tag.putInt("tv_watchers", camera.getWatchers());
+            tag.putInt("reach", camera.getReach());
+        } else if (radio instanceof com.reiko.signaltower.blockentity.TvMonitorBlockEntity monitor) {
+            // v0.66.0: its wall's channel, the camera it shows (where, its name, snowy?), or who it's locked out by.
+            com.reiko.signaltower.blockentity.TvMonitorBlockEntity lead = monitor.lead(level);
+            tag.putInt("tv_channel", lead.channelIndex() + 1);
+            tag.putInt("tv_channels", lead.channels().size());
+            tag.putInt("tv_frequency", lead.channelFrequency());
+            tag.putBoolean("tv_shown", lead.isShowing());
+            tag.putString("tv_locked", lead.lockedBy());
+            tag.putString("tv_camera_name", lead.cameraName());
+            tag.putInt("tv_camera_dx", lead.cameraPos().getX() - pos.getX());
+            tag.putInt("tv_camera_dz", lead.cameraPos().getZ() - pos.getZ());
+            tag.putFloat("tv_fraction", lead.fraction());
+            com.reiko.signaltower.radio.MonitorWall.Wall wall = com.reiko.signaltower.radio.MonitorWall.find(level, pos);
+            tag.putInt("tv_wall_width", wall.width());
+            tag.putInt("tv_wall_height", wall.height());
         } else if (radio instanceof com.reiko.signaltower.blockentity.TickerPrinterBlockEntity printer) {
             // v0.63.0: its book, how many messages it printed and the last, and how many are waiting for a book.
             tag.putString("printer_book", !printer.hasBook() ? "none" : printer.isFull() ? "full" : "writing");
@@ -888,6 +909,59 @@ public final class RadioInfo {
                 }
                 lines.add(Component.translatable(LANG + "radar_screen_zoom",
                         com.reiko.signaltower.block.RadarScreenBlock.zoomLabel(data.getInt("radar_settings"))).withStyle(ChatFormatting.GRAY));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.TvCameraBlock) {
+            // v0.66.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                if (!data.getString("tv_name").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "tv_camera_name", Component.literal(data.getString("tv_name")).withStyle(ChatFormatting.WHITE))
+                            .withStyle(ChatFormatting.GRAY));
+                }
+                int watchers = data.getInt("tv_watchers");
+                lines.add(Component.translatable(LANG + "tv_camera_watchers", watchers).withStyle(watchers > 0 ? ChatFormatting.RED : ChatFormatting.GRAY));
+                lines.add(Component.translatable(LANG + "tv_camera_settings",
+                        com.reiko.signaltower.block.TvCameraBlock.settingsText(data.getInt("tv_settings"))).withStyle(ChatFormatting.YELLOW));
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+            return lines;
+        }
+        if (block instanceof com.reiko.signaltower.block.TvMonitorBlock) {
+            // v0.66.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                Object channel = com.reiko.signaltower.radio.FrequencyNames.label(null, data.getInt("tv_frequency"));
+                lines.add(Component.translatable(LANG + "tv_monitor_channel", data.getInt("tv_channel"), data.getInt("tv_channels"), channel)
+                        .withStyle(ChatFormatting.AQUA));
+                if (!data.getString("tv_locked").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "tv_monitor_locked", Component.literal(data.getString("tv_locked")))
+                            .withStyle(ChatFormatting.RED));
+                } else if (!data.getBoolean("tv_shown")) {
+                    lines.add(Component.translatable(LANG + "tv_monitor_none").withStyle(ChatFormatting.GOLD));
+                } else {
+                    int dx = data.getInt("tv_camera_dx");
+                    int dz = data.getInt("tv_camera_dz");
+                    int distance = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
+                    int direction = SignalNetwork.compassDirection(dx, dz);
+                    String key = "message." + SignalTower.MOD_ID + ".";
+                    Component where = direction < 0 ? Component.translatable(key + "tv_camera_here")
+                            : Component.translatable(key + "tv_camera_away", distance,
+                            Component.translatable("screen." + SignalTower.MOD_ID + ".locator.dir_" + RADAR_DIRECTIONS[direction]));
+                    String name = data.getString("tv_camera_name");
+                    Component shows = name.isEmpty() ? where : Component.literal("\"" + name + "\", ").append(where);
+                    lines.add(Component.translatable(LANG + "tv_monitor_camera", shows).withStyle(ChatFormatting.GREEN));
+                    if (data.getFloat("tv_fraction") > com.reiko.signaltower.radio.TvCamera.CLEAR_FRACTION) {
+                        lines.add(Component.translatable(LANG + "tv_monitor_snowy").withStyle(ChatFormatting.GRAY));
+                    }
+                }
+                if (data.getInt("tv_wall_width") * data.getInt("tv_wall_height") > 1) {
+                    lines.add(Component.translatable(LANG + "tv_monitor_wall", data.getInt("tv_wall_width"), data.getInt("tv_wall_height"))
+                            .withStyle(ChatFormatting.GRAY));
+                }
             }
             return lines;
         }

@@ -1252,6 +1252,112 @@ def radar_screen_front(lit=False):
         px[5, 9] = (255, 240, 140, 255)
     return img
 
+def tv_camera_body():
+    """v0.66.0: the TV Camera's housing: off-white plastic with a seam, little vents and a bit of grime."""
+    rnd = random.Random(66)
+    img = blank((214, 216, 212, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            v = rnd.randint(-7, 5)
+            px[x, y] = (214 + v, 216 + v, 212 + v, 255)
+    for i in range(16):
+        px[i, 0] = px[i, 15] = (150, 152, 150, 255)
+        px[0, i] = px[15, i] = (164, 166, 164, 255)
+    for x in range(1, 15):
+        px[x, 8] = (184, 186, 184, 255)  # the seam
+    for x in range(3, 13, 2):
+        for y in (11, 12, 13):
+            px[x, y] = (120, 122, 124, 255)  # vents
+    return img
+
+
+def tv_camera_dark():
+    """v0.66.0: the camera's dark parts (lens hood, mounts): charcoal with a soft highlight."""
+    rnd = random.Random(67)
+    img = blank((44, 46, 50, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            v = rnd.randint(-4, 4)
+            px[x, y] = (44 + v, 46 + v, 50 + v, 255)
+    for i in range(16):
+        px[i, 0] = (70, 72, 78, 255)
+    return img
+
+
+def tv_camera_lens():
+    """v0.66.0: the lens, seen from the front: rings of dark glass with a blue sheen and a glint."""
+    img = blank((24, 26, 30, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5
+            if d <= 7.6:
+                px[x, y] = (34, 36, 42, 255)
+            if d <= 6.2:
+                px[x, y] = (12, 16, 28, 255)
+            if d <= 4.8:
+                px[x, y] = (18, 34, 70, 255)
+            if d <= 3.0:
+                px[x, y] = (40, 70, 130, 255)
+            if d <= 1.4:
+                px[x, y] = (10, 14, 26, 255)
+            if 6.2 < d <= 6.9:
+                px[x, y] = (88, 90, 98, 255)
+    for (x, y) in [(5, 4), (6, 4), (4, 5), (5, 5)]:
+        px[x, y] = (210, 230, 255, 255)
+    return img
+
+
+def tv_camera_rec(lit):
+    """v0.66.0: the REC light: bright red with a hot middle while a monitor shows the camera, dull otherwise."""
+    img = blank((90, 20, 18, 255) if not lit else (230, 30, 24, 255))
+    px = img.load()
+    if lit:
+        for y in range(5, 11):
+            for x in range(5, 11):
+                px[x, y] = (255, 120, 100, 255)
+    return img
+
+
+def tv_monitor_front(item=False):
+    """v0.66.0: the TV Monitor's face: black glass to the edges with a hairline charcoal rim (so walls of
+    them join with thin seams). {item}: showing color bars, for the inventory."""
+    img = blank((8, 9, 10, 255))
+    px = img.load()
+    for i in range(16):
+        px[i, 0] = px[i, 15] = (34, 36, 40, 255)
+        px[0, i] = px[15, i] = (34, 36, 40, 255)
+    if item:
+        bars = [(190, 190, 190), (190, 190, 20), (20, 190, 190), (20, 190, 20), (190, 20, 190), (190, 20, 20), (20, 20, 190)]
+        for x in range(1, 15):
+            color = bars[min(6, (x - 1) * 7 // 14)]
+            for y in range(3, 11):
+                px[x, y] = (*color, 255)
+            for y in range(11, 13):
+                px[x, y] = (20, 20, 40, 255) if x % 2 else (200, 200, 200, 255)
+        for x in range(1, 15):
+            px[x, 2] = (16, 16, 16, 255)
+        px[13, 2] = (255, 50, 40, 255)  # REC
+    return img
+
+
+def tv_monitor_side():
+    """v0.66.0: the monitor's thin sides and back: dark plastic."""
+    rnd = random.Random(68)
+    img = blank((30, 31, 34, 255))
+    px = img.load()
+    for y in range(16):
+        for x in range(16):
+            v = rnd.randint(-3, 3)
+            px[x, y] = (30 + v, 31 + v, 34 + v, 255)
+    for x in range(2, 14, 3):
+        for y in range(6, 10):
+            px[x, y] = (18, 18, 20, 255)  # vents on the back
+    return img
+
+
 blocks = {
     "ticker_tape": ticker_tape(),
     "ticker_book_cover": ticker_book_cover(),
@@ -1367,6 +1473,14 @@ blocks = {
     "radar_reflector_back": radar_reflector_back(),
     "radar_screen_front": radar_screen_front(),
     "radar_screen_front_item": radar_screen_front(lit=True),
+    "tv_camera_body": tv_camera_body(),  # v0.66.0
+    "tv_camera_dark": tv_camera_dark(),
+    "tv_camera_lens": tv_camera_lens(),
+    "tv_camera_rec": tv_camera_rec(False),
+    "tv_camera_rec_on": tv_camera_rec(True),
+    "tv_monitor_front": tv_monitor_front(),
+    "tv_monitor_front_item": tv_monitor_front(item=True),
+    "tv_monitor_side": tv_monitor_side(),
 }
 # v0.65.0: the items' textures are painted by tools/make_item_models.py (3D models), not here.
 
