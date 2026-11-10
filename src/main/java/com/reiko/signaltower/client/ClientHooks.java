@@ -41,6 +41,11 @@ public final class ClientHooks {
         BroadcastMusic.set(pos, song, start, volume);
     }
 
+    /** v0.62.0: the speaker at {@code pos} with the Tone hears its frequency: keep its tone sounding. */
+    public static void speakerTone(net.minecraft.core.BlockPos pos, float pitch, float volume) {
+        SpeakerTone.keep(pos, pitch, volume);
+    }
+
     /** v0.61.0: the satellites over the player's dimension (for the night sky). */
     public static void satellites(net.minecraft.resources.ResourceLocation dimension,
                                   java.util.List<com.reiko.signaltower.radio.SignalNetwork.Satellite> satellites) {

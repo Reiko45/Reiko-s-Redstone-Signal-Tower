@@ -83,14 +83,16 @@ public final class FrequencyLog {
                 : claim.allows(player) ? FrequencyAudit.Who.MEMBER
                 : FrequencyAudit.Who.OTHER;
         boolean remote = cause.kind() == SignalNetwork.CauseKind.REMOTE_PULSE || cause.kind() == SignalNetwork.CauseKind.REMOTE_TOGGLE
-                || cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR;
+                || cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR
+                || cause.kind() == SignalNetwork.CauseKind.MORSE;
         String who = player == null ? ""
                 : remote && !cause.name().isEmpty() && whoKind == FrequencyAudit.Who.OTHER ? cause.name()
                 : FrequencyAudit.nameOf(server, claim, player);
         // A keypad's (or motion sensor's) position is shown whoever typed the code (or was seen): on a
         // private frequency only a member's keypad or sensor sends.
         Optional<BlockPos> pos = cause.pos() == null ? Optional.empty()
-                : cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR ? Optional.of(cause.pos())
+                : cause.kind() == SignalNetwork.CauseKind.KEYPAD || cause.kind() == SignalNetwork.CauseKind.SENSOR
+                        || cause.kind() == SignalNetwork.CauseKind.MORSE ? Optional.of(cause.pos())
                 : (cause.kind() == SignalNetwork.CauseKind.TRANSMITTER || cause.kind() == SignalNetwork.CauseKind.GATE
                         || cause.kind() == SignalNetwork.CauseKind.TIMER || cause.kind() == SignalNetwork.CauseKind.RECORDER
                         || cause.kind() == SignalNetwork.CauseKind.WEATHER_STATION || cause.kind() == SignalNetwork.CauseKind.JUKEBOX)

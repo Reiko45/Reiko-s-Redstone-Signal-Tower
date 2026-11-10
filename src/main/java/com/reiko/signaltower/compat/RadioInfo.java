@@ -330,10 +330,20 @@ public final class RadioInfo {
                     tag.putInt("gate_heard", converter.gateHeard(level));
                 }
             }
+        } else if (radio instanceof com.reiko.signaltower.blockentity.MorseKeyBlockEntity key) {
+            // v0.62.0: what's being keyed, the letter going on, the last message sent, and how far it reaches.
+            tag.putInt("reach", RadioHelper.reachAt(level, pos));
+            long now = level.getGameTime();
+            tag.putString("morse_keyed", key.keyedText(now));
+            tag.putString("morse_letter", key.pendingCode(now));
+            tag.putString("morse_last", key.lastSent());
+            tag.putBoolean("morse_down", key.isDown());
         } else if (radio instanceof com.reiko.signaltower.blockentity.TelegraphBlockEntity telegraph) {
             // v0.51.0: how far it sends, how many messages reached it, and the last one (unless it can't read them).
             tag.putInt("reach", RadioHelper.reachAt(level, pos));
             tag.putBoolean("telegraph", true);
+            tag.putBoolean("telegraph_morse", telegraph.isMorse()); // v0.62.0
+            tag.putBoolean("telegraph_keying", telegraph.isKeying());
             List<SignalNetwork.Message> heard = SignalNetwork.get(level).messagesAt(frequency, pos);
             tag.putInt("telegraph_count", heard.size());
             if (!heard.isEmpty() && FrequencyClaims.mayHear(level, frequency, telegraph.getTunedBy())) {
@@ -796,10 +806,38 @@ public final class RadioInfo {
             }
             return lines;
         }
+        if (block instanceof com.reiko.signaltower.block.MorseKeyBlock) {
+            // v0.62.0
+            if (hasData) {
+                lines.add(frequencyLine(data));
+                addNoteLine(lines, data, "note");
+                if (data.getBoolean("morse_down")) {
+                    lines.add(Component.translatable(LANG + "morse_down").withStyle(ChatFormatting.GREEN));
+                }
+                if (!data.getString("morse_keyed").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "morse_keying", Component.literal(data.getString("morse_keyed")).withStyle(ChatFormatting.WHITE))
+                            .withStyle(ChatFormatting.YELLOW));
+                }
+                if (!data.getString("morse_letter").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "morse_letter", Component.literal(data.getString("morse_letter")).withStyle(ChatFormatting.WHITE))
+                            .withStyle(ChatFormatting.GRAY));
+                }
+                if (!data.getString("morse_last").isEmpty()) {
+                    lines.add(Component.translatable(LANG + "morse_last", Component.literal(data.getString("morse_last"))).withStyle(ChatFormatting.AQUA));
+                }
+                lines.add(Component.translatable(LANG + "reach", data.getInt("reach")));
+            }
+            return lines;
+        }
         if (block instanceof com.reiko.signaltower.block.RadioTelegraphBlock) {
             if (hasData) {
                 lines.add(frequencyLine(data));
                 addNoteLine(lines, data, "note");
+                if (data.getBoolean("telegraph_keying")) {
+                    lines.add(Component.translatable(LANG + "telegraph_keying").withStyle(ChatFormatting.LIGHT_PURPLE)); // v0.62.0
+                } else if (data.getBoolean("telegraph_morse")) {
+                    lines.add(Component.translatable(LANG + "telegraph_morse").withStyle(ChatFormatting.GRAY));
+                }
                 if (data.contains("telegraph_text")) {
                     lines.add(Component.translatable(LANG + "telegraph_last", Component.literal(data.getString("telegraph_text")),
                             Component.literal(data.getString("telegraph_from")),

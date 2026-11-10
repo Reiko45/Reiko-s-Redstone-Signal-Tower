@@ -277,6 +277,14 @@ public class LogScreen extends Screen {
                         : Component.translatable(KEY + "tip_telegraph", entry.who()).withStyle(ChatFormatting.YELLOW)));
                 entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
             }
+            case MORSE -> {
+                // v0.62.0: a Morse message starting: who keyed it (nobody: redstone), where the key is.
+                lines.add(entry.who().isEmpty() ? Component.translatable(KEY + "tip_morse_redstone").withStyle(ChatFormatting.GRAY)
+                        : entry.whoKind() == FrequencyAudit.Who.OTHER
+                        ? Component.translatable(KEY + "tip_other_morse", entry.who()).withStyle(ChatFormatting.RED)
+                        : Component.translatable(KEY + "tip_morse", entry.who()).withStyle(ChatFormatting.YELLOW));
+                entry.pos().ifPresent(pos -> lines.add(place(entry, pos)));
+            }
             case SENSOR -> {
                 lines.add(entry.who().isEmpty() ? Component.translatable(KEY + "tip_sensor_nobody").withStyle(ChatFormatting.GRAY)
                         : entry.whoKind() == FrequencyAudit.Who.OTHER

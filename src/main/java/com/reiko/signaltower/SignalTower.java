@@ -338,6 +338,7 @@ public final class SignalTower {
             event.accept(ModRegistry.RADIO_BATTERY_ITEM.get());
             event.accept(ModRegistry.SOLAR_PANEL_ITEM.get());
             event.accept(ModRegistry.RADIO_TELEGRAPH_ITEM.get());
+            event.accept(ModRegistry.MORSE_KEY_ITEM.get()); // v0.62.0
             event.accept(ModRegistry.COVERAGE_MAP.get());
             event.accept(ModRegistry.IRON_ANTENNA.get());
             event.accept(ModRegistry.GOLD_ANTENNA.get());

@@ -36,15 +36,21 @@ public record TelegraphFeedPayload(Header header, List<Telegraph.Line> lines, Op
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "telegraph_feed"));
 
     /** The telegraph: where, its frequency, its own reach, how many towers relay it, and whether it's deaf (encrypted). */
-    public record Header(BlockPos pos, int frequency, int reach, int towers, int repeaters, boolean deaf) {
+    public record Header(BlockPos pos, int frequency, int reach, int towers, int repeaters, boolean deaf, boolean morse, boolean keying) {
         static final StreamCodec<ByteBuf, Header> CODEC = StreamCodec.composite(
                 BlockPos.STREAM_CODEC, Header::pos,
                 ByteBufCodecs.VAR_INT, Header::frequency,
                 ByteBufCodecs.VAR_INT, Header::reach,
                 ByteBufCodecs.VAR_INT, Header::towers,
                 ByteBufCodecs.VAR_INT, Header::repeaters,
-                ByteBufCodecs.BOOL, Header::deaf,
-                Header::new);
+                ByteBufCodecs.VAR_INT, Header::flags,
+                (pos, frequency, reach, towers, repeaters, flags) -> new Header(pos, frequency, reach, towers, repeaters,
+                        (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0));
+
+        /** Deaf, Morse (v0.62.0) and keying, in one number for sending. */
+        int flags() {
+            return (deaf ? 1 : 0) | (morse ? 2 : 0) | (keying ? 4 : 0);
+        }
     }
 
     private static final StreamCodec<ByteBuf, Telegraph.Line> LINE_CODEC = StreamCodec.composite(
@@ -77,7 +83,7 @@ public record TelegraphFeedPayload(Header header, List<Telegraph.Line> lines, Op
                 com.reiko.signaltower.Config.TOWERS_RELAY_REMOTES.get());
         int repeaters = network.withRepeaters(level, frequency, own).size() - own.size();
         Header header = new Header(pos, frequency, own.get(0).reach(), own.size() - 1, repeaters,
-                !FrequencyClaims.mayHear(level, frequency, telegraph.getTunedBy()));
+                !FrequencyClaims.mayHear(level, frequency, telegraph.getTunedBy()), telegraph.isMorse(), telegraph.isKeying());
         return new TelegraphFeedPayload(header, Telegraph.feed(level, pos, frequency, telegraph.getTunedBy()), Optional.ofNullable(notice), sent, open);
     }
 

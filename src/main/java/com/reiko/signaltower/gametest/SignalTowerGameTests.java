@@ -9359,7 +9359,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * What JEI and EMI show: every one of the mod's items (all 50) has an information page, with its
+     * What JEI and EMI show: every one of the mod's items (all 51) has an information page, with its
      * text in en_us.json; the trades page has a title. The trades listed are the Radio Operator's own:
      * as many at each level as the villager has, with the same results.
      */
@@ -9367,7 +9367,7 @@ public final class SignalTowerGameTests {
     public static void recipeViewerInfo(GameTestHelper helper) {
         var lang = modLang();
         var items = com.reiko.signaltower.compat.RecipeViewerInfo.items();
-        check(items.size() == 50, "All the mod's items: " + items.size());
+        check(items.size() == 51, "All the mod's items: " + items.size());
         for (var item : items) {
             String key = com.reiko.signaltower.compat.RecipeViewerInfo.infoKey(item);
             check(lang.has(key) && lang.get(key).getAsString().length() > 40, "An information page for " + item + ": " + key);
@@ -9817,7 +9817,7 @@ public final class SignalTowerGameTests {
     }
 
     /**
-     * The mod's own sounds: all ten are registered; sounds.json lists each with a subtitle that
+     * The mod's own sounds: all eleven are registered; sounds.json lists each with a subtitle that
      * en_us.json has, and each one's file is there, an Ogg Vorbis file, mono (so it's heard from
      * where it's played) at 44.1 kHz. The Speaker's three new sounds are the mod's, the Radio
      * Operator works its telegraph's key. A new Radio Transmitter coming on the air plays its "on"
@@ -9829,7 +9829,7 @@ public final class SignalTowerGameTests {
         com.google.gson.JsonObject lang = modLang();
         com.google.gson.JsonObject sounds = com.google.gson.JsonParser.parseString(new String(
                 modResource("assets/reikos_signal_tower/sounds.json"), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 10 && sounds.size() == 10, "Ten sounds: " + sounds.keySet());
+        check(com.reiko.signaltower.registry.ModSounds.ALL.size() == 11 && sounds.size() == 11, "Eleven sounds: " + sounds.keySet());
         for (var holder : com.reiko.signaltower.registry.ModSounds.ALL) {
             String event = holder.getId().getPath();
             check(holder.isBound() && holder.get().getLocation().equals(holder.getId()), "Registered: " + event);
@@ -10387,5 +10387,251 @@ public final class SignalTowerGameTests {
             for (BlockPos pos : List.of(own, compact, theirs, old)) network.removeTransmitter(pos);
         }
         helper.succeed();
+    }
+
+
+    // ---------------------------------------------------------------- v0.62.0: the mod icon, Morse code
+
+    /**
+     * Morse code itself: the table (SOS, letters either case, an unknown code), text made sendable,
+     * and keyed text decoding back to what was sent at the telegraph's speed, by hand-like timing
+     * (a click 5 ticks, a held key 13 or more, uneven gaps), and with only dots or only dashes.
+     * Also: the mod's logo is declared and is a 512-pixel square PNG.
+     */
+    @GameTest(template = PLATFORM)
+    public static void morseCode(GameTestHelper helper) {
+        check(com.reiko.signaltower.radio.Morse.codes("sos").equals("... --- ...") && com.reiko.signaltower.radio.Morse.letterOf("......") == '*'
+                && com.reiko.signaltower.radio.Morse.codes("Hi there").equals(".... .. / - .... . .-. ."), "The table");
+        check(com.reiko.signaltower.radio.Morse.sendable("  héllo,   wörld #1!  ").equals("HLLO, WRLD 1!"), "Sendable: "
+                + com.reiko.signaltower.radio.Morse.sendable("  héllo,   wörld #1!  "));
+        for (String text : List.of("SOS", "HELLO WORLD", "CQ CQ DE DEV 73", "TEST 123?", "EEE", "MOM", "OM OM", "E")) {
+            var elements = com.reiko.signaltower.radio.Morse.encode(text, com.reiko.signaltower.radio.Morse.TELEGRAPH_UNIT);
+            List<Integer> presses = new java.util.ArrayList<>();
+            List<Integer> gaps = new java.util.ArrayList<>();
+            for (var element : elements) {
+                (element.on() ? presses : gaps).add(element.ticks());
+            }
+            String back = com.reiko.signaltower.radio.Morse.decode(presses, gaps, true);
+            check(back.equals(text), "At the telegraph's speed, " + text + " comes back as " + back);
+        }
+        // By hand: a click holds 6 ticks (10 if the game repeated it), a held key 13 to 25; gaps uneven, some 1 tick.
+        java.util.Random random = new java.util.Random(62);
+        for (String text : List.of("SOS", "HELP ME", "OK", "TNT", "ESE", "MO", "T", "EIS", "SIH 5", "MOM")) {
+            List<Integer> presses = new java.util.ArrayList<>();
+            List<Integer> gaps = new java.util.ArrayList<>();
+            String[] words = text.split(" ");
+            for (int w = 0; w < words.length; w++) {
+                for (int l = 0; l < words[w].length(); l++) {
+                    String code = com.reiko.signaltower.radio.Morse.codeOf(words[w].charAt(l));
+                    for (int i = 0; i < code.length(); i++) {
+                        if (!presses.isEmpty()) {
+                            gaps.add(i > 0 ? 1 + random.nextInt(5) : l > 0 ? 16 + random.nextInt(8) : 40 + random.nextInt(10));
+                        }
+                        presses.add(code.charAt(i) == '-' ? 13 + 4 * random.nextInt(4) : random.nextInt(4) == 0 ? 10 : 6);
+                    }
+                }
+            }
+            String back = com.reiko.signaltower.radio.Morse.decode(presses, gaps, true, true);
+            check(back.equals(text), "By hand, " + text + " comes back as " + back + " from " + presses + " / " + gaps);
+        }
+        check(com.reiko.signaltower.radio.Morse.pendingCode(List.of(5, 13), List.of(4)).equals(".-")
+                && com.reiko.signaltower.radio.Morse.decode(List.of(5, 13), List.of(4), false).isEmpty(), "A letter being keyed");
+
+        var info = net.neoforged.fml.ModList.get().getModContainerById(com.reiko.signaltower.SignalTower.MOD_ID).orElseThrow().getModInfo();
+        check(info.getLogoFile().orElse("").equals("reikos_signal_tower_logo.png") && !info.getLogoBlur(), "The logo is declared, kept sharp");
+        try (var in = com.reiko.signaltower.SignalTower.class.getResourceAsStream("/reikos_signal_tower_logo.png")) {
+            check(in != null, "The logo is in the jar");
+            byte[] head = in.readNBytes(24);
+            int w = java.nio.ByteBuffer.wrap(head, 16, 4).getInt();
+            int h = java.nio.ByteBuffer.wrap(head, 20, 4).getInt();
+            check(head[1] == 'P' && head[2] == 'N' && head[3] == 'G' && w == 512 && h == 512, "A 512 x 512 PNG: " + w + " x " + h);
+        } catch (java.io.IOException e) {
+            throw new net.minecraft.gametest.framework.GameTestAssertException("Couldn't read the logo: " + e);
+        }
+        helper.succeed();
+    }
+
+    /**
+     * The Morse Key: keyed by redstone, S O S: a receiver on its frequency is on while the key is
+     * down and off between; a pager there doesn't alert for the dots and dashes; Jade shows what's
+     * keyed; the frequency log gets one entry; 3 seconds after the last press another telegraph and
+     * the network have the message "SOS" from the Morse Key. Clicked by a player it goes down for a
+     * moment; on someone else's private frequency a click is refused.
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 400)
+    public static void morseKey(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos key = new BlockPos(2, 1, 2);
+        BlockPos power = new BlockPos(1, 1, 2);
+        BlockPos rx = new BlockPos(6, 1, 2);
+        BlockPos telegraph = new BlockPos(9, 1, 2);
+        helper.setBlock(new BlockPos(2, 0, 2), Blocks.STONE);
+        place(helper, key, ModRegistry.MORSE_KEY.get(), 4637);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4637);
+        place(helper, telegraph, ModRegistry.RADIO_TELEGRAPH.get(), 4637);
+        BlockPos absKey = helper.absolutePos(key);
+        SignalNetwork network = SignalNetwork.get(level);
+        int historyBefore = network.history(4637).size();
+        List<Component> bar = new java.util.ArrayList<>();
+        Player dev = namedPlayer(helper, new BlockPos(6, 1, 1), UUID.randomUUID(), "Dev", false, bar, new java.util.ArrayList<>());
+        ItemStack pager = new ItemStack(ModRegistry.PAGER.get());
+        PagerItem.setFrequency(pager, 4637);
+        boolean[] sawOn = new boolean[1];
+        boolean[] sawOff = new boolean[1];
+        // S: dot dot dot; O: dash dash dash; S: dot dot dot. Dots 4 ticks, dashes 12, gaps 4, between letters 12.
+        var sequence = helper.startSequence().thenIdle(2);
+        String code = "...|---|...";
+        for (int i = 0; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == '|') {
+                sequence = sequence.thenIdle(8); // with the 4 after the last element: 12
+                continue;
+            }
+            final boolean first = i == 0;
+            sequence = sequence.thenExecute(() -> helper.setBlock(power, Blocks.REDSTONE_BLOCK))
+                    .thenIdle(2)
+                    .thenExecute(() -> {
+                        sawOn[0] |= helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15;
+                        if (first) {
+                            check(PagerItem.checkSignal(level, dev, pager) == null && PagerItem.lastSignal(pager) == 15, "The pager hears it, but doesn't alert");
+                            check(network.isMorse(4637, level.getGameTime()), "The frequency carries Morse");
+                        }
+                    })
+                    .thenIdle(c == '-' ? 10 : 2)
+                    .thenExecute(() -> helper.setBlock(power, Blocks.AIR))
+                    .thenIdle(3)
+                    .thenExecute(() -> sawOff[0] |= helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0)
+                    .thenIdle(1);
+        }
+        sequence.thenIdle(2)
+                .thenExecute(() -> {
+                    check(sawOn[0] && sawOff[0], "The receiver pulsed with the key");
+                    CompoundTag info = com.reiko.signaltower.compat.RadioInfo.read(level, absKey);
+                    check(info != null && (info.getString("morse_keyed").equals("SOS")
+                            || info.getString("morse_keyed").equals("SO") && info.getString("morse_letter").equals("...")), "Jade, keying: " + info);
+                    check(lineKeys(com.reiko.signaltower.compat.RadioInfo.lines(helper.getBlockState(key), info)).contains("morse_keying"), "Jade's line");
+                    check(network.history(4637).size() == historyBefore + 1
+                            && network.history(4637).get(network.history(4637).size() - 1).cause().kind() == SignalNetwork.CauseKind.MORSE,
+                            "One log entry for the message, not one per dot: " + network.history(4637).size());
+                })
+                .thenIdle(com.reiko.signaltower.blockentity.MorseKeyBlockEntity.END_TICKS + 2)
+                .thenExecute(() -> {
+                    List<SignalNetwork.Message> kept = network.messages(4637);
+                    check(!kept.isEmpty() && kept.get(kept.size() - 1).text().equals("SOS")
+                            && kept.get(kept.size() - 1).name().equals("Morse Key"), "Sent as a message: " + kept);
+                    check(com.reiko.signaltower.radio.Telegraph.feed(level, helper.absolutePos(telegraph), 4637, null).stream()
+                            .anyMatch(line -> line.text().equals("SOS")), "The telegraph has it");
+                    com.reiko.signaltower.blockentity.MorseKeyBlockEntity be = helper.getBlockEntity(key);
+                    check(be.lastSent().equals("SOS") && be.keyedText(level.getGameTime()).isEmpty(), "The key: sent, and ready again");
+                    check(be.press(level, dev) == null, "A click");
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    check(helper.getBlockState(key).getValue(com.reiko.signaltower.block.MorseKeyBlock.DOWN)
+                            && helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15, "Down for the click, and heard");
+                })
+                .thenIdle(com.reiko.signaltower.blockentity.MorseKeyBlockEntity.RELEASE_TICKS + 1)
+                .thenExecute(() -> {
+                    check(!helper.getBlockState(key).getValue(com.reiko.signaltower.block.MorseKeyBlock.DOWN)
+                            && helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 0, "Up again");
+                    // Then held, the game's repeats coming late (7 ticks apart, not 4): one long press, not dots.
+                    check(helper.<com.reiko.signaltower.blockentity.MorseKeyBlockEntity>getBlockEntity(key).press(level, dev) == null, "Held");
+                })
+                .thenIdle(com.reiko.signaltower.blockentity.MorseKeyBlockEntity.RELEASE_TICKS)
+                .thenExecute(() -> helper.<com.reiko.signaltower.blockentity.MorseKeyBlockEntity>getBlockEntity(key).press(level, dev))
+                .thenIdle(com.reiko.signaltower.blockentity.MorseKeyBlockEntity.RELEASE_TICKS)
+                .thenExecute(() -> helper.<com.reiko.signaltower.blockentity.MorseKeyBlockEntity>getBlockEntity(key).press(level, dev))
+                .thenIdle(com.reiko.signaltower.blockentity.MorseKeyBlockEntity.RELEASE_TICKS + 3)
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.MorseKeyBlockEntity held = helper.getBlockEntity(key);
+                    check(!held.isDown() && held.pendingCode(level.getGameTime()).equals(".-"), "A click and a hold: .- (" + held.pendingCode(level.getGameTime()) + ")");
+                    com.reiko.signaltower.radio.FrequencyClaims claims = com.reiko.signaltower.radio.FrequencyClaims.get(level.getServer());
+                    UUID owner = UUID.randomUUID();
+                    claims.put(4638, owner, "Owner", java.util.Map.of());
+                    try {
+                        setFrequency(helper, key, 4638);
+                        com.reiko.signaltower.blockentity.MorseKeyBlockEntity be = helper.getBlockEntity(key);
+                        Component refused = be.press(level, dev);
+                        check(refused != null && keyOf(refused).endsWith("private_refused_morse"), "Someone else's private frequency: refused " + refused);
+                    } finally {
+                        claims.remove(4638);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A telegraph with Morse on keys its message out before sending it: a receiver on its
+     * frequency pulses, another telegraph gets nothing until the keying is done and then gets the
+     * text (as it was keyed: upper case); a second message while keying is refused; Jade and the
+     * screen say it's keying. A Radio Speaker's Tone is played by clients only (it doesn't ring).
+     */
+    @GameTest(template = PLATFORM, timeoutTicks = 300)
+    public static void telegraphMorse(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos a = new BlockPos(1, 1, 1);
+        BlockPos b = new BlockPos(5, 1, 1);
+        BlockPos rx = new BlockPos(9, 1, 1);
+        BlockPos speaker = new BlockPos(12, 1, 1);
+        place(helper, a, ModRegistry.RADIO_TELEGRAPH.get(), 4639);
+        place(helper, b, ModRegistry.RADIO_TELEGRAPH.get(), 4639);
+        place(helper, rx, ModRegistry.RADIO_RECEIVER.get(), 4639);
+        place(helper, speaker, ModRegistry.RADIO_SPEAKER.get(), 4639);
+        BlockPos absA = helper.absolutePos(a);
+        BlockPos absB = helper.absolutePos(b);
+        Player dev = namedPlayer(helper, new BlockPos(2, 1, 0), UUID.randomUUID(), "Dev", false, new java.util.ArrayList<>(), new java.util.ArrayList<>());
+        SignalNetwork network = SignalNetwork.get(level);
+        int[] ticks = new int[1];
+        boolean[] sawOn = new boolean[1];
+        helper.startSequence()
+                .thenExecute(() -> {
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity sp = helper.getBlockEntity(speaker);
+                    sp.setSpeaker(com.reiko.signaltower.radio.SpeakerSound.TONE, 12, com.reiko.signaltower.radio.SpeakerSound.Volume.NORMAL, false);
+                    check(com.reiko.signaltower.radio.SpeakerSound.TONE.whileOn() && !com.reiko.signaltower.radio.SpeakerSound.BELL.whileOn()
+                            && com.reiko.signaltower.radio.SpeakerSound.byId(com.reiko.signaltower.blockentity.RadioReceiverBlockEntity.packSpeaker(com.reiko.signaltower.radio.SpeakerSound.TONE, 12, com.reiko.signaltower.radio.SpeakerSound.Volume.LOUD, false) & 15) == com.reiko.signaltower.radio.SpeakerSound.TONE,
+                            "The Tone fits in a speaker's settings");
+                    var payload = com.reiko.signaltower.network.TelegraphActionPayload.apply(dev,
+                            new com.reiko.signaltower.network.TelegraphActionPayload(absA, 4639, "", false, 1));
+                    com.reiko.signaltower.blockentity.TelegraphBlockEntity ta = helper.getBlockEntity(a);
+                    check(payload != null && ta.isMorse() && payload.header().morse(), "The screen's Morse button turns it on");
+                    var sent = com.reiko.signaltower.radio.Telegraph.send(level, absA, dev, "sos ok");
+                    check(sent != null && sent.sent() && keyOf(sent.message()).endsWith("telegraph_keying_started") && ta.isKeying(),
+                            "Keying it out: " + (sent == null ? null : sent.message()));
+                    ticks[0] = com.reiko.signaltower.radio.Morse.length(com.reiko.signaltower.radio.Morse.encode("SOS OK", com.reiko.signaltower.radio.Morse.TELEGRAPH_UNIT));
+                    var again = com.reiko.signaltower.radio.Telegraph.send(level, absA, dev, "more");
+                    check(!again.sent() && keyOf(again.message()).endsWith("telegraph_keying"), "Another while keying: refused");
+                    check(com.reiko.signaltower.network.TelegraphFeedPayload.of(level, ta, null, false).header().keying()
+                            && com.reiko.signaltower.compat.RadioInfo.read(level, absA).getBoolean("telegraph_keying"), "The screen and Jade say so");
+                })
+                .thenIdle(1)
+                .thenExecute(() -> {
+                    sawOn[0] |= helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15;
+                    check(network.messages(4639).isEmpty() || network.messages(4639).stream().noneMatch(m -> m.text().equals("SOS OK")),
+                            "Nothing arrives as text yet");
+                })
+                .thenIdle(3)
+                .thenExecute(() -> {
+                    sawOn[0] |= helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15;
+                    com.reiko.signaltower.blockentity.RadioReceiverBlockEntity sp = helper.getBlockEntity(speaker);
+                    check(helper.getBlockState(speaker).getValue(RadioReceiverBlock.POWER) >= 0 && sp.getSpeakerSound() == com.reiko.signaltower.radio.SpeakerSound.TONE, "The speaker on the Tone");
+                })
+                .thenWaitUntil(() -> {
+                    sawOn[0] |= helper.getBlockState(rx).getValue(RadioReceiverBlock.POWER) == 15;
+                    com.reiko.signaltower.blockentity.TelegraphBlockEntity ta = helper.getBlockEntity(a);
+                    if (ta.isKeying()) {
+                        throw new net.minecraft.gametest.framework.GameTestAssertException("Still keying");
+                    }
+                })
+                .thenExecute(() -> {
+                    check(sawOn[0], "A receiver on the frequency pulsed");
+                    List<SignalNetwork.Message> kept = network.messages(4639);
+                    check(!kept.isEmpty() && kept.get(kept.size() - 1).text().equals("SOS OK") && kept.get(kept.size() - 1).name().equals("Dev"),
+                            "Then the text, as it was keyed: " + kept);
+                    check(com.reiko.signaltower.radio.Telegraph.feed(level, absB, 4639, null).stream().anyMatch(line -> line.text().equals("SOS OK")),
+                            "The other telegraph has it");
+                    check(network.history(4639).stream().filter(t -> t.cause().kind() == SignalNetwork.CauseKind.MORSE).count() == 1, "One log entry");
+                    check(ticks[0] > 40, "It took " + ticks[0] + " ticks");
+                })
+                .thenSucceed();
     }
 }

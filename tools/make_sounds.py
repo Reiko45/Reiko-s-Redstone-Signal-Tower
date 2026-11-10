@@ -232,6 +232,15 @@ def satellite_launch():
     return normalize(x * envelope(len(x), 0.01, 0.5), 0.9)
 
 
+def speaker_tone():
+    """v0.62.0: a Radio Speaker's Tone: one second of a 740 Hz sine (F#5, so a speaker's notes
+    tune it like its other sounds) with a little of its octave, a whole number of cycles so it
+    loops without a click. No fade: the client loops it while the frequency is on."""
+    tt = t(1.0)
+    x = np.sin(2 * np.pi * 740 * tt) + 0.18 * np.sin(2 * np.pi * 1480 * tt)
+    return x / np.max(np.abs(x)) * 0.55
+
+
 SOUND_LIST = {
     # event id: (file name, the function that makes it)
     "tuner.tune": ("tuner_tune", tuner_tune),
@@ -244,6 +253,7 @@ SOUND_LIST = {
     "tower.off": ("tower_off", tower_off),
     "station.siren": ("station_siren", station_siren),
     "satellite.launch": ("satellite_launch", satellite_launch),
+    "speaker.tone": ("speaker_tone", speaker_tone),
 }
 
 

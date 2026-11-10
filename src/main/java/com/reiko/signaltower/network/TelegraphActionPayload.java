@@ -26,9 +26,14 @@ import org.jetbrains.annotations.Nullable;
  * Client to server (v0.51.0), from a Radio Telegraph's screen: {@code send} is Send (or Enter):
  * re-tune it first if the frequency box changed (the player becomes the one it reads as), then
  * send {@code text} if there is any. Otherwise it's the screen's once-a-second check. Either way
- * the answer is a {@link TelegraphFeedPayload}.
+ * the answer is a {@link TelegraphFeedPayload}. {@code morse} (v0.62.0) is the screen's Morse
+ * button: 1 on, 0 off, -1 leave it.
  */
-public record TelegraphActionPayload(BlockPos pos, int frequency, String text, boolean send) implements CustomPacketPayload {
+public record TelegraphActionPayload(BlockPos pos, int frequency, String text, boolean send, int morse) implements CustomPacketPayload {
+    public TelegraphActionPayload(BlockPos pos, int frequency, String text, boolean send) {
+        this(pos, frequency, text, send, -1);
+    }
+
     public static final Type<TelegraphActionPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(SignalTower.MOD_ID, "telegraph_action"));
 
@@ -37,6 +42,7 @@ public record TelegraphActionPayload(BlockPos pos, int frequency, String text, b
             ByteBufCodecs.VAR_INT, TelegraphActionPayload::frequency,
             ByteBufCodecs.stringUtf8(256), TelegraphActionPayload::text,
             ByteBufCodecs.BOOL, TelegraphActionPayload::send,
+            ByteBufCodecs.VAR_INT, TelegraphActionPayload::morse,
             TelegraphActionPayload::new);
 
     @Override
@@ -64,6 +70,9 @@ public record TelegraphActionPayload(BlockPos pos, int frequency, String text, b
         }
         Component notice = null;
         boolean sent = false;
+        if (payload.morse() >= 0) {
+            telegraph.setMorse(payload.morse() == 1); // v0.62.0
+        }
         if (payload.send()) {
             int frequency = Frequency.clamp(payload.frequency());
             if (frequency != telegraph.getFrequency()) {

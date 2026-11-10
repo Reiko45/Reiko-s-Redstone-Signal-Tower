@@ -1,5 +1,7 @@
 # Reiko's Redstone Signal Tower
 
+<img src="docs/images/icon.png" width="128" align="right" alt="The mod's icon: a pixel-art radio tower with a red light on top and signal arcs, against a starry night sky">
+
 A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a transmitter high up on a tower and it sends your redstone signal to receivers far away. The higher the tower, the farther it reaches.
 
 ![Two radio towers](docs/images/towers.png)
@@ -21,7 +23,7 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Radio Logic Receiver** | A receiver on two frequencies. It outputs when both are on (AND), when either is on (OR), or when exactly one is on (XOR), so one switch can arm or disarm what another one triggers. |
 | **Radio Delay Receiver** | A receiver with a timer. It turns on and off a set **delay** after its frequency does (up to a minute, like a very long redstone repeater), and its **hold** keeps it on for a while after the frequency turns off, so a short button press can light a hallway for 30 seconds. |
 | **Radio Counter Receiver** | Counts how many times its frequency turns on, and turns on once the count reaches a set number (1 to 64): for a 1-second pulse, or until a second **reset frequency** turns on. It can forget the count after a pause, so three quick presses work and three slow ones don't (a secret knock). |
-| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass, beep, pager, static or siren, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). It outputs like a plain receiver, and plays a Radio Jukebox's song when one broadcasts on its frequency. |
+| **Radio Speaker** | A receiver that also plays a sound when its frequency turns on: a bell, chime, ding, doorbell, pling, bass, beep, pager, static or siren, at any note-block pitch, quiet, normal or loud (heard 48 blocks away). Once, or every second while it stays on (an alarm). Or a steady **tone** for as long as the frequency is on, to hear Morse code. It outputs like a plain receiver, and plays a Radio Jukebox's song when one broadcasts on its frequency. |
 | **Radio Status Board** | A panel for a wall that shows up to four frequencies at a glance: each one's name, a light and the strength heard there, glowing so it reads at night. A control-room display for your base. |
 | **Compact Radio Receiver** | A button-sized receiver. Sticks to walls, floors and ceilings like a button, and like a button it also powers the block it's stuck to, so it can drive redstone on the other side of a wall. Pops off (keeping its frequency) if that block is removed. |
 | **Compact Radio Transmitter** | A button-sized transmitter. Sticks to walls, floors and ceilings like a button and broadcasts the redstone signal around it (a lever next to it, dust running to it), but only over a short fixed reach (16 blocks by default), whatever its height. Handy for wiring inside a base without building a tower. |
@@ -34,7 +36,8 @@ A Minecraft **1.21.1 NeoForge** mod that adds radio towers for redstone. Put a t
 | **Satellite** and **Launch Pad** | Put a Satellite and eight Firework Rockets on a Launch Pad and give it a redstone pulse: a rocket climbs out of sight, and the satellite is in orbit over the dimension, crossing the night sky. |
 | **Satellite Dish** | A transmitter upgrade for open sky: with a satellite in orbit over its dimension, the tower is heard everywhere in that dimension, at full strength, at four times the power. |
 | **Solar Panel** | Sits on a Radio Battery and charges it by daylight: fastest at noon in clear weather, slower in rain, nothing at night. |
-| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. |
+| **Radio Telegraph** | A desk with a brass key for typing short messages onto a frequency (up to 64 characters). Pagers, other telegraphs and Status Boards on that frequency within reach read them, and a telegraph that gets one clicks and gives a redstone pulse. It's also the workstation of the **Radio Operator**, a villager who trades tower parts for emeralds. Some villages have one already, in a radio shack with its own small tower. Computers with CC: Tweaked can send and read messages too. With **Morse** on, it keys its messages out in Morse code first. |
+| **Morse Key** | A brass key on a little wooden base. Click it for a dot, hold right-click for a dash (or give it redstone): receivers on its frequency pulse along and Radio Speakers set to Tone beep. Three seconds after you stop, what you spelled goes out as a message, like a telegraph's. |
 | **Coverage Map** | A map you tune to a frequency. It paints where that frequency can be heard: green where it's strong, yellow, orange and red as it gets weaker, blank where it isn't heard, with markers on the towers. |
 | **Dish Antenna** | A tower upgrade that points: fitted, it faces the way you look, and the tower reaches three times as far in a narrow beam that way (and as far as with no antenna everywhere else). For a long, straight link to one place. |
 | **Radio Lamp** | A lamp with a receiver built in. It gives off as much light as the strength it hears, from dim to full, glowing in any of the 16 dye colors (right-click it with a dye). Wireless lighting in one block. |
@@ -444,6 +447,7 @@ A **Radio Counter Receiver** (since 0.42) counts how many times its frequency tu
 A **Radio Speaker** (since 0.43) is a receiver (it outputs what it hears, like a Radio Receiver) that also plays a sound when its frequency turns on. Right-click it with an empty hand to open its screen:
 
 - **Sound:** Bell, Chime, Ding, Doorbell (two notes, "ding-dong"), Pling, Bass or Beep, which are the game's own note block sounds ("Bell rings", "Note Block plays" in subtitles), or, since 0.59, Pager, Static or Siren, the mod's own ("Pager beeps", "Radio tunes in", "Raid siren wails"). All follow the Blocks volume slider.
+- **Tone:** since 0.62, a steady beep ("Speaker beeps") that sounds for as long as the frequency is on and stops the moment it goes off, so a Morse Key or a telegraph keying in Morse is heard as dots and dashes (see Morse code). "Plays" doesn't apply to it, and it doesn't ring when the frequency turns on: it lasts as long as the signal.
 - **Pitch:** any of a note block's 25 notes, F♯3 to F♯5 (F♯4 is the sound's own pitch).
 - **Volume:** quiet or normal (heard within 16 blocks) or loud (within 48).
 - **Plays:** **Once when it turns on** (the default), or **Every second while on**, for an alarm that rings until the signal stops.
@@ -707,8 +711,24 @@ A **Radio Telegraph** (since 0.51) is a desk for sending short text messages ove
 - Messages don't turn the frequency on (receivers don't react). One telegraph can send one every 2 seconds. Each dimension keeps the last 16 per frequency.
 - **Private frequencies:** only the owner and members can send (others are refused, and the owner is told). On an encrypted one only members' pagers and telegraphs (and boards set by members) can read the text; others see that a message came, but "(encrypted)". The frequency log lists messages with who sent them, where from, and the text.
 - Jade: "Last message (just now): “Lights on in the hall too” from Dev", "Messages here: 2", "A message just arrived" while its lamp is lit.
+- **Morse:** since 0.62, the **Morse: Off / On** button under the messages. With it on, a message is keyed out in Morse on the frequency first (see Morse code).
 
 ![Dev raising the tower on 4601 by right-clicking its bottom mast with a Radio Mast: "Mast added: the Radio Transmitter is 3 masts up, reach 72 → 80 blocks", Jade on the mast "Top: Radio Transmitter, 3 blocks up"; the raised tower with its Aviation Beacon still on top, Jade "Reach: 80 blocks", "Battery: 80% (about 17h 45m left at 1.25 a second)"; Dev's Radio Telegraph screen on 4600 with two messages and "Sent on 4600 (reach 56 blocks + 2 towers) | Read by 1 pager and 1 telegraph"; Alex 40 blocks away by his own telegraph, its lamp lit, Jade "Last message (just now): “Lights on in the hall too” from Dev", "A message just arrived", and his pager's line in chat; the Status Board with the message under row 4600; and Alex logging back in to "Radio Pager: while you were away, a message on 4600 from Dev (Day 1, 12:00): “Back in 5 minutes”"](docs/images/mast-builder-and-telegraph.png)
+
+### Morse code
+
+Since 0.62 you can send messages in **Morse code**, and hear them.
+
+- **Morse Key:** place it on top of a block and tune it with a Frequency Tuner. **Right-click** it to key: a **click** is a dot, and **holding** right-click (for a third of a second or more) is a dash. A redstone signal into it keys it too (on is key down), so a clock or a computer can key it. Sneak + right-click shows its frequency, reach and what it last sent.
+- **While the key is down** its frequency is on, over where a telegraph standing there would reach (its reach by its height, plus the towers and repeaters in that reach): receivers, Radio Lamps and Status Boards blink with the dots and dashes, and a **Radio Speaker set to Tone** beeps them. Pagers on the frequency don't go off for each dot and dash.
+- **Three seconds after the last press**, what was keyed is decoded and goes out as a **message**, like a telegraph's: pagers ("Radio Pager: message on 2026 from Dev: “SOS”"), telegraphs (a computer on one gets `radio_message`), Status Boards. It's signed with the name of whoever keyed it, or "Morse Key" for redstone. The keyer sees "Sent in Morse: SOS (Read by 1 pager and 2 telegraphs)". Up to 64 characters (it goes out at 64).
+- **Decoding** follows your speed. A press at least twice as long as the shortest one is a dash. A pause of about two dots ends a letter, and five a word. A code that isn't a letter, a digit or punctuation comes out as "*". If every press is the same length, clicks by hand are dots unless they're long; by redstone, the gaps between them decide. When the game lags and a held click's repeats come late, the press still counts as one.
+- **Jade** shows it as you key: "Key down", "Keying: SO", "Letter: ..." (the letter you're on), "Last sent: SOS".
+- **Private frequencies:** someone who can't send on one gets "Frequency 4638 is private to Owner: your Morse doesn't go out", and the owner is told. Redstone keys it as whoever tuned it.
+- **The frequency log** gets one entry per message, of the kind **Morse**, "Keyed by Dev", not one per dot.
+- **From a telegraph:** turn **Morse: On** on its screen and **Send** keys the message out at 12 words a minute (a dot is 2 ticks), then the text arrives, as it was keyed (in capitals, without what has no code). "Keying it in Morse on 2026 (656 blocks + 9 towers): about 8 seconds"; **Send** says "Keying..." until it's done, and Jade "Sends in Morse" and "Keying".
+
+![The mod list with the mod's new pixel-art icon; Dev holding right-click on a Morse Key, its lever down, Jade "Key down", "Keying: SO", "Letter: ."; Alex 17 blocks away as a dash comes in: his receiver and the redstone lamp on it lit, "Speaker beeps" in the subtitles from his Radio Speaker set to Tone, and his pager's screen lit; three seconds after the last dot, his pager's message "Radio Pager: message on 2026 from Dev: “SOS”", with "Telegraph clacks" and "Pager beeps"; Dev's Radio Telegraph screen with "Morse: On", Send showing "Keying..." and "Keying it in Morse on 2026 (656 blocks + 9 towers): about 8 seconds"; and Alex's telegraph afterwards with both messages, "SOS" and "CQ DE DEV"](docs/images/morse-code.png)
 
 ### Radio Weather Station
 
@@ -818,9 +838,10 @@ Since 0.59 the mod has its own sounds, each with a subtitle:
 | A falling hum, static and a clunk | "Tower goes off the air" | It stops |
 | A two-tone siren | "Raid siren wails" | A village station when a raid starts, heard 48 blocks away |
 | A bang and a roar | "Rocket lifts off" | A Launch Pad launches, heard 64 blocks away (since 0.61) |
+| A steady beep | "Speaker beeps" | A Radio Speaker set to Tone, for as long as its frequency is on (since 0.62) |
 
 - **On and off the air** is only for the full-size Radio Transmitter. It doesn't sound when a tower loads, and at most once every 2 seconds, so a fast clock doesn't buzz.
-- **A Radio Speaker** can play three of them too: Pager, Static (the tuning sound) and Siren.
+- **A Radio Speaker** can play four of them too: Pager, Static (the tuning sound), Siren and Tone.
 - They're made by `tools/make_sounds.py` (synthesized from sine waves and noise, no recordings), and follow the Players or Blocks volume slider like the game's own.
 
 ### Advancements
@@ -1124,6 +1145,8 @@ G = Glass Pane   C = Copper Ingot   D = Daylight Detector
 
 **Radio Telegraph:** a Radio Transmitter, a Radio Receiver and a Book and Quill, in any arrangement in the crafting grid.
 
+**Morse Key:** a Compact Radio Transmitter, a Stone Button and a Gold Ingot, in any arrangement in the crafting grid.
+
 **Dish Rotator:** a Radio Mast, a Redstone Comparator and a Copper Ingot, in any arrangement in the crafting grid.
 
 **Radio Signal Recorder:** a Radio Transmitter, a Radio Receiver and a Book, in any arrangement in the crafting grid.
@@ -1316,6 +1339,10 @@ src/main/java/com/reiko/signaltower/
   blockentity/TelegraphBlockEntity.java  checks in with the network; clicks and pulses; sending cooldown
   client/TelegraphScreen.java            the telegraph's screen (frequency, messages, typing)
   network/TelegraphFeedPayload.java, TelegraphActionPayload.java  telegraph screen <-> server
+  radio/Morse.java                       Morse code: the table, text to key timings, key timings back to text (adapting to the speed)
+  block/MorseKeyBlock.java               the Morse Key: a click or held click keys it, redstone too, sneak for its status
+  blockentity/MorseKeyBlockEntity.java   times the presses and gaps, holds the frequency on while down, sends the message
+  client/SpeakerTone.java                a Radio Speaker's Tone: a looping sound for as long as the speaker is on
   block/RadioSignalRecorderBlock.java    transmitter that records a frequency and plays it back; opens its screen
   blockentity/SignalRecorderBlockEntity.java  the recorder's tape: record, stop, play, loop, labels
   radio/RecorderTape.java                what the recorder's item keeps (frequencies, mode, recording)
@@ -1418,6 +1445,7 @@ tools/
   make_textures.py                       draws all textures (needs Pillow)
   make_data.py                           writes models, blockstates, lang, recipes, loot tables, advancements, worldgen, the village shacks' templates
   make_sounds.py                         synthesizes the sounds and writes sounds.json (needs numpy and ffmpeg)
+  make_logo.py                           draws the mod's icon (the mod list's logo and docs/images/icon.png)
 docs/
   DESIGN.md                              how it works under the hood, ideas for later
 ```
@@ -1609,14 +1637,14 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 175. the advancement tree: all seven loaded, each under its parent (root; First Broadcast; Over the Horizon a challenge and Head for Heights under it; Lost Signal; Finders Keepers a goal under it; Call Sign), with Weathered the Storm (under Head for Heights) only with Reiko's Weather; the tower trigger registered; Over the Horizon matches "on_air" at 500 and 4,000 but not 499 or another event; First Broadcast any "on_air"; Finders Keepers "found_tower_revived"; Head for Heights matches a player on a Tower Platform, not one beside it; Lost Signal one inside an old tower's piece (put in the chunk for the test), not one outside it;
 176. the tower events: an old tower off the air (4616) is quiet and fires nothing; a plain transmitter off the air (4617) and a powered jammer (4618) fire nothing; the old tower's lever on fires "found_tower_revived" once, for everyone within 24 blocks, and it's no longer quiet (saved); the plain one powered fires "on_air" for its tuner with its reach, and never "found_tower_revived"; the lever off, quiet again; on again, it fires again; the jammer never;
 177. Radio Operators (in a batch of their own): every Radio Telegraph state is their workstation, in the acquirable job sites tag, and the profession is registered; their trades at all five levels (12 redstone or copper for an emerald and 4 masts or a tuner at Novice ... 8 platforms, an iron antenna and a battery at Journeyman, a gold antenna and solar panel at Expert, a Diamond Antenna for 24 emeralds and a diamond at Master); a new one offers 2 Novice trades; Call Sign matches trading with one and not with a librarian; a villager with no job 6 blocks from a telegraph walks over and becomes one, with the telegraph as its job site;
-178. JEI and EMI: all 46 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
+178. JEI and EMI: all 51 of the mod's blocks and items have an info text in en_us.json that says something, the trades page has its title, and its 17 trades are the ones Radio Operators really offer, level by level;
 179. village radio shacks: at the default weight of 3, each of the five villages' house pools (plains, desert, savanna, snowy, taiga) holds the shack 3 times, and adding it again changes nothing; each shack is 8 by 7 by 7, with a telegraph, a 2-block bed, 4 masts, a transmitter marked as a village station, a battery charged to 80,000, a "Radio Station" sign, and its two jigsaws (onto the street, and for its villager);
 180. two plains shacks placed as a village would (one turned a quarter): both go on the air, each on its own free frequency between 100,000 and 999,999 written on its sign; Jade calls each a village's radio station; taking its torch away and putting it back doesn't count as an old tower going quiet and coming back (no Finders Keepers);
 181. computers (without CC: Tweaked's classes): a transmitter sends what a computer sets, and stops when the last computer goes; a receiver's computers get `radio_signal` as what it hears changes, and it can listen on any frequency and scan; a transmitter can't be tuned onto someone else's private frequency or out of range (a receiver can listen to it); a telegraph sends as "Computer 7", the other one's computers get `radio_message`, and its messages are listed; too fast and empty are refused; Jade shows what the computer sends;
 182. with CC: Tweaked loaded: transmitters, receivers (plain, toggle, lamp) and telegraphs are its peripherals, and a mast isn't (without it there's nothing to check);
 183. raid alerts step by step: a raid puts a station whose torch is gone on the air at 15, and it telegraphs "RAID!" as "Village Radio" (a telegraph on its frequency pulses); each wave once; a won raid "the village held", and it goes quiet; a raid that goes away "The raid has ended"; one already over when it's first seen, nothing; a lost one "the village fell"; Jade shows the raid, and it's saved;
 184. a real raid, started at a village shack whose bed is someone's home (in a batch of its own): the station telegraphs "RAID!" within 2 seconds, Jade shows 5 waves coming (Normal), and when the raid stops it telegraphs "The raid has ended";
-185. sounds: all ten are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static and Siren are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
+185. sounds: all eleven are registered and listed in sounds.json with a subtitle in the lang file, and each file is a mono 44.1 kHz Ogg Vorbis; the speaker's Pager, Static, Siren and Tone are the mod's own; a Radio Operator works its telegraph's key; a new Radio Transmitter coming on the air plays its "on" sound, going off its "off" sound, and on again at once nothing (too soon), while a Compact Radio Transmitter beside it makes none;
 186. a radio on the move (without CC: Tweaked's classes): it hears a tower where it is and scans it; its pulse reaches a receiver (heard by 1) and ends; its message, signed "Turtle 3", reaches a telegraph and is listed, but not back to itself; empty is refused, and so is someone else's private frequency; a telegraph's message reaches it, but not once it has moved 5,000 blocks away;
 187. with CC: Tweaked loaded: the Radio Turtle and Radio Pocket Computer upgrades are registered, take a pager (and nothing else), keep its frequency and give it back, are called "Radio", and make a "radio" peripheral on that frequency that can be re-tuned (without it there's nothing to check);
 188. the Radio Jukebox: quiet with no disc; stone doesn't go in (by hand or hopper); a disc does and it goes on the air with its song in the network, and a comparator reads the song's level; one disc at a time, and no taking it out while it plays; a receiver on its frequency hears it; a speaker on it plays the song (not its own sound) and tells clients, one on another frequency doesn't; Jade shows the song on both; a redstone pulse plays it again from the start and the speaker starts again, steady redstone repeats it (the network agrees on when this repeat began), and without the redstone the play going on is the last; at the end it goes quiet and the speaker and receiver stop; a hopper takes the disc out and another goes in and plays; taken out by hand, it's quiet; broken, it's off the air and drops its disc;
@@ -1624,9 +1652,12 @@ The `tools/` scripts are how the textures, sounds and JSON files were generated.
 190. the satellite uplink, with the tower far away (not loaded): a Satellite Dish with no satellite up changes nothing; with one up the tower is heard at full strength 5,000 blocks off and across the world, the meter says it's in reach there, its music plays there, and it uses four times the power; its tuner's map gets it with reach "everywhere"; satellites and uplinks are saved with the network; each satellite's path rises and sets once every 3 to 7 minutes, and the satellites go to the client as they are; with the dish off, or no satellites, just its own reach; 64 at most (the oldest fall out); gone with its tower;
 191. the Satellite Dish on real blocks: a repeater can't take one; a transmitter under open sky can (Jade says whether it's uplinked); roofed over it can't reach a satellite and says so, under glass it can; taken off, it's given back and the uplink goes;
 192. the Launch Pad: an orbit over the Overworld and none over the Nether or the End; a pulse with nothing on it says why and does nothing; a hopper puts in one satellite, in its slot, and rockets (comparator 12 with 5); with too few rockets a pulse does nothing; eight make it ready (comparator 15, the rest stay in the hopper); a block over it stops it; a pulse launches it, using the rockets; nothing goes in or out while it climbs, slowly at first and faster; 6 seconds later the satellite is in orbit and the advancement's event fires;
-193. map waypoints: a player's own full-size towers with their reach, not compact ones or anyone else's; an old tower once they've been near it, found once, updated rather than doubled, with the frequency the network has for it now; the list goes to the client as it is, and what they've found is kept with the player.
+193. map waypoints: a player's own full-size towers with their reach, not compact ones or anyone else's; an old tower once they've been near it, found once, updated rather than doubled, with the frequency the network has for it now; the list goes to the client as it is, and what they've found is kept with the player;
+194. Morse code: the table and what can be sent; messages keyed at a telegraph's speed come back as they went (SOS, HELLO WORLD, CQ CQ DE DEV 73, TEST 123?, EEE, MOM, OM OM, E), and so do ones keyed by hand with uneven timing (clicks of 6 ticks or 10, holds of 13 to 25, gaps inside a letter of 1 to 5), all-dot and all-dash ones too; a letter being keyed shows its dots and dashes; the mod's logo is declared, kept sharp, and is a 512 by 512 PNG;
+195. the Morse Key: keyed by redstone, S O S, a receiver on its frequency pulses with it, a pager hears it but doesn't alert, and the frequency carries Morse; Jade shows what's keyed; one log entry for the message; 3 seconds after the last press the message "SOS" from "Morse Key" is in the network and on a telegraph, and the key is ready again; a click puts it down for a moment (heard) and up again; a hold whose repeats come late (7 ticks apart) is one long press, so a click and a hold are ".-"; on someone else's private frequency a click is refused;
+196. a telegraph with Morse on: a speaker set to Tone doesn't ring; the message is keyed out (a receiver pulses), a second one while keying is refused, the screen and Jade say it's keying, and the text arrives only when it's done, in capitals, from "Dev", on the other telegraph too, with one log entry.
 
-All 193 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
+All 196 also pass with `-PnoJade`, so the mod runs the same without Jade, with Reiko's Weather (`-PwithWeather=...`), where tests 164, 168 and 175 check what's read from it, and with CC: Tweaked (`-PwithCct`), where tests 182 and 187 check the peripherals and upgrades.
 
 ## License
 

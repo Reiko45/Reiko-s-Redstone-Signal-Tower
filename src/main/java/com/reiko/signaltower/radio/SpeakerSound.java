@@ -23,7 +23,9 @@ public enum SpeakerSound {
     // v0.59.0: some of the mod's own
     PAGER("pager", () -> com.reiko.signaltower.registry.ModSounds.PAGER_BEEP.get()),
     STATIC("static", () -> com.reiko.signaltower.registry.ModSounds.TUNER_TUNE.get()),
-    SIREN("siren", () -> com.reiko.signaltower.registry.ModSounds.STATION_SIREN.get());
+    SIREN("siren", () -> com.reiko.signaltower.registry.ModSounds.STATION_SIREN.get()),
+    /** v0.62.0: a steady tone for as long as the frequency is on (played by the client), for Morse. */
+    TONE("tone", () -> com.reiko.signaltower.registry.ModSounds.SPEAKER_TONE.get());
 
     /** The note names from F♯ up, like a note block's. */
     private static final String[] NOTES = {"F♯", "G", "G♯", "A", "A♯", "B", "C", "C♯", "D", "D♯", "E", "F"};
@@ -41,6 +43,11 @@ public enum SpeakerSound {
 
     public SoundEvent sound() {
         return sound.get();
+    }
+
+    /** True for a sound that lasts while the frequency is on (the Tone), rather than ringing when it turns on. */
+    public boolean whileOn() {
+        return this == TONE;
     }
 
     public Component label() {

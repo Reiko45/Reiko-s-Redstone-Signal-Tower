@@ -105,6 +105,9 @@ public final class Telegraph {
             return new Result(Component.translatable(KEY + "telegraph_empty").withStyle(ChatFormatting.GRAY), false, 0, 0);
         }
         long now = level.getGameTime();
+        if (telegraph.isKeying()) {
+            return new Result(Component.translatable(KEY + "telegraph_keying").withStyle(ChatFormatting.GOLD), false, 0, 0); // v0.62.0
+        }
         if (telegraph.coolingDown(now)) {
             return new Result(Component.translatable(KEY + "telegraph_too_fast").withStyle(ChatFormatting.GOLD), false, 0, 0);
         }
@@ -119,6 +122,18 @@ public final class Telegraph {
         SignalNetwork network = SignalNetwork.get(level);
         List<SignalNetwork.Coverage> own = network.remoteCoverage(level, pos, RadioHelper.reachAt(level, pos), Config.TOWERS_RELAY_REMOTES.get());
         List<SignalNetwork.Coverage> coverage = network.withRepeaters(level, frequency, own);
+        if (telegraph.isMorse()) {
+            // v0.62.0: keyed out in Morse first; the text goes out when it's done.
+            String keyed = Morse.sendable(text);
+            if (keyed.isEmpty()) {
+                return new Result(Component.translatable(KEY + "telegraph_morse_nothing").withStyle(ChatFormatting.GOLD), false, 0, 0);
+            }
+            int ticks = telegraph.startKeying(coverage, who, name, keyed);
+            level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(), SoundSource.BLOCKS, 0.7F, 1.0F);
+            Component reach = RemoteControlItem.describeReach(own.get(0).reach(), own.size() - 1, coverage.size() - own.size());
+            return new Result(Component.translatable(KEY + "telegraph_keying_started", FrequencyNames.label(level, frequency), reach,
+                    (ticks + 19) / 20).withStyle(ChatFormatting.GREEN), true, 0, 0);
+        }
         SignalNetwork.Message message = network.recordMessage(frequency, coverage, pos, who, name, text);
         telegraph.markSent(now);
         level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(), SoundSource.BLOCKS, 0.7F, 1.0F);
@@ -162,6 +177,17 @@ public final class Telegraph {
         SignalNetwork.Message message = SignalNetwork.get(level).recordMessage(frequency, coverage, pos, null, name, text);
         deliver(level, pos, frequency, coverage, message);
         return message;
+    }
+
+    /**
+     * v0.62.0: a message that came in Morse (from a Morse Key, or a telegraph keying it) from
+     * {@code pos}: kept and handed out over {@code coverage} like a telegraph's, sent by {@code who}
+     * ({@code name}). Returns {pagers, telegraphs} that read it.
+     */
+    public static int[] morseMessage(ServerLevel level, BlockPos pos, int frequency, List<SignalNetwork.Coverage> coverage,
+                                     @Nullable UUID who, String name, String text) {
+        SignalNetwork.Message message = SignalNetwork.get(level).recordMessage(frequency, coverage, pos, who, name, clean(text));
+        return deliver(level, pos, frequency, coverage, message);
     }
 
     /** "Read by 2 pagers and 1 telegraph", or that nothing was in range. */

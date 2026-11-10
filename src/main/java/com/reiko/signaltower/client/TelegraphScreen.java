@@ -41,6 +41,9 @@ public class TelegraphScreen extends Screen {
     private EditBox frequencyBox;
     private EditBox messageBox;
     private Button sendButton;
+    /** v0.62.0: the Morse button, and whether it's on (the screen's copy; sent with each check). */
+    private Button morseButton;
+    private boolean morse;
     private Component notice;
     private int noticeTicks;
     private int ticks;
@@ -50,6 +53,7 @@ public class TelegraphScreen extends Screen {
     public TelegraphScreen(TelegraphFeedPayload state) {
         super(Component.translatable("block." + SignalTower.MOD_ID + ".radio_telegraph"));
         this.state = state;
+        this.morse = state.header().morse();
         state.notice().ifPresent(this::show);
     }
 
@@ -83,8 +87,21 @@ public class TelegraphScreen extends Screen {
                 .bounds(centerX + FEED_WIDTH / 2 - 58, feedBottom + 6, 58, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(centerX - 50, feedBottom + 54, 100, 20).build());
+        morseButton = addRenderableWidget(Button.builder(morseLabel(), b -> toggleMorse())
+                .tooltip(Tooltip.create(Component.translatable(KEY + "morse_tip")))
+                .bounds(centerX - FEED_WIDTH / 2, feedBottom + 54, 76, 20).build());
         setInitialFocus(messageBox);
         updateSend();
+    }
+
+    private Component morseLabel() {
+        return Component.translatable(KEY + (morse ? "morse_on" : "morse_off"));
+    }
+
+    private void toggleMorse() {
+        morse = !morse;
+        morseButton.setMessage(morseLabel());
+        PacketDistributor.sendToServer(new TelegraphActionPayload(state.header().pos(), state.header().frequency(), "", false, morse ? 1 : 0));
     }
 
     private void openDirectory() {
@@ -108,14 +125,15 @@ public class TelegraphScreen extends Screen {
         }
         OptionalInt frequency = parse();
         boolean retune = frequency.isPresent() && frequency.getAsInt() != state.header().frequency();
-        sendButton.active = frequency.isPresent() && (retune || !Telegraph.clean(messageBox.getValue()).isEmpty());
-        sendButton.setMessage(Component.translatable(KEY + (retune && Telegraph.clean(messageBox.getValue()).isEmpty() ? "tune" : "send")));
+        sendButton.active = frequency.isPresent() && (retune || !Telegraph.clean(messageBox.getValue()).isEmpty()) && !state.header().keying();
+        sendButton.setMessage(Component.translatable(KEY + (state.header().keying() ? "keying"
+                : retune && Telegraph.clean(messageBox.getValue()).isEmpty() ? "tune" : "send")));
     }
 
     private void send() {
         OptionalInt frequency = parse();
         if (sendButton.active && frequency.isPresent()) {
-            PacketDistributor.sendToServer(new TelegraphActionPayload(state.header().pos(), frequency.getAsInt(), messageBox.getValue(), true));
+            PacketDistributor.sendToServer(new TelegraphActionPayload(state.header().pos(), frequency.getAsInt(), messageBox.getValue(), true, morse ? 1 : 0));
         }
     }
 
@@ -148,7 +166,7 @@ public class TelegraphScreen extends Screen {
             noticeTicks--;
         }
         if (++ticks % 20 == 0) {
-            PacketDistributor.sendToServer(new TelegraphActionPayload(state.header().pos(), state.header().frequency(), "", false));
+            PacketDistributor.sendToServer(new TelegraphActionPayload(state.header().pos(), state.header().frequency(), "", false, morse ? 1 : 0));
         }
     }
 

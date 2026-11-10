@@ -28,6 +28,33 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
     private static final int CLICK_GAP_TICKS = 3;
 
     private long lastSent = Long.MIN_VALUE;
+    /** v0.62.0: whether it sends messages as Morse (its screen's Morse button). Saved. */
+    private boolean morse;
+    /** v0.62.0: the Morse message it's keying out now, or null. Not saved. */
+    private @Nullable Keying keying;
+
+    /** A message being keyed: its timings, where it goes, who sent it, and how far along it is. */
+    private static final class Keying {
+        final java.util.List<com.reiko.signaltower.radio.Morse.Element> elements;
+        final java.util.List<SignalNetwork.Coverage> coverage;
+        final int frequency;
+        final @Nullable UUID who;
+        final String name;
+        final String text;
+        int index;
+        int left;
+
+        Keying(java.util.List<com.reiko.signaltower.radio.Morse.Element> elements, java.util.List<SignalNetwork.Coverage> coverage,
+               int frequency, @Nullable UUID who, String name, String text) {
+            this.elements = elements;
+            this.coverage = coverage;
+            this.frequency = frequency;
+            this.who = who;
+            this.name = name;
+            this.text = text;
+            this.left = elements.isEmpty() ? 0 : elements.get(0).ticks();
+        }
+    }
     private long poweredUntil;
     private int clicks;
     private int trackedFrequency = -1;
@@ -44,6 +71,65 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
 
     public void markSent(long gameTime) {
         lastSent = gameTime;
+    }
+
+    /** v0.62.0: true if it sends messages as Morse. */
+    public boolean isMorse() {
+        return morse;
+    }
+
+    public void setMorse(boolean morse) {
+        if (this.morse != morse) {
+            this.morse = morse;
+            setChanged();
+        }
+    }
+
+    /** True while it's keying a message out in Morse. */
+    public boolean isKeying() {
+        return keying != null;
+    }
+
+    /**
+     * v0.62.0: starts keying {@code text} (already {@link com.reiko.signaltower.radio.Morse#sendable})
+     * in Morse on its frequency over {@code coverage}; when it's done, the text goes out as a message
+     * from {@code who} ({@code name}). Returns how many ticks it takes.
+     */
+    public int startKeying(java.util.List<SignalNetwork.Coverage> coverage, @Nullable UUID who, String name, String text) {
+        var elements = com.reiko.signaltower.radio.Morse.encode(text, com.reiko.signaltower.radio.Morse.TELEGRAPH_UNIT);
+        keying = new Keying(elements, coverage, getFrequency(), who, name, text);
+        return com.reiko.signaltower.radio.Morse.length(elements);
+    }
+
+    /** One tick of keying: the key down or up for this element, and the message out at the end. */
+    private void keyTick(ServerLevel level, long now) {
+        Keying k = keying;
+        if (k == null) {
+            return;
+        }
+        SignalNetwork network = SignalNetwork.get(level);
+        if (k.index < k.elements.size()) {
+            var element = k.elements.get(k.index);
+            if (element.on()) {
+                if (k.left == element.ticks()) {
+                    level.playSound(null, worldPosition, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_KEY.get(), SoundSource.BLOCKS, 0.25F, 1.4F);
+                }
+                network.keyMorse(k.frequency, k.coverage, now, SignalNetwork.Cause.morse(worldPosition, k.who, k.name));
+            }
+            if (--k.left <= 0) {
+                if (element.on()) {
+                    network.releaseMorse(k.frequency, now);
+                }
+                k.index++;
+                if (k.index < k.elements.size()) {
+                    k.left = k.elements.get(k.index).ticks();
+                }
+            }
+            return;
+        }
+        keying = null;
+        markSent(now);
+        com.reiko.signaltower.radio.Telegraph.morseMessage(level, worldPosition, k.frequency, k.coverage, k.who, k.name, k.text);
     }
 
     /**
@@ -75,7 +161,25 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
         super.setRemoved();
         if (level instanceof ServerLevel serverLevel) {
             SignalNetwork.get(serverLevel).untrackTelegraph(worldPosition);
+            if (keying != null) {
+                SignalNetwork.get(serverLevel).releaseMorse(keying.frequency, serverLevel.getGameTime()); // a message half keyed is lost
+                keying = null;
+            }
         }
+    }
+
+    @Override
+    protected void saveAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        if (morse) {
+            tag.putBoolean("telegraph_morse", true);
+        }
+    }
+
+    @Override
+    protected void loadAdditional(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        morse = tag.getBoolean("telegraph_morse");
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, TelegraphBlockEntity be) {
@@ -88,6 +192,7 @@ public class TelegraphBlockEntity extends RadioBlockEntity {
             be.trackedTuner = be.getTunedBy();
         }
         long now = level.getGameTime();
+        be.keyTick(serverLevel, now); // v0.62.0
         if (be.clicks > 0 && now % CLICK_GAP_TICKS == 0) {
             be.clicks--;
             level.playSound(null, pos, com.reiko.signaltower.registry.ModSounds.TELEGRAPH_SOUNDER.get(), SoundSource.BLOCKS, 0.6F, be.clicks == 0 ? 0.9F : 1.05F);

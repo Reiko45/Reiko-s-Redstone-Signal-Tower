@@ -8,6 +8,9 @@ version = "${mod_version}"
 displayName = "${mod_name}"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
+# v0.62.0: the logo in the mod list (pixel art, from tools/make_logo.py), kept sharp.
+logoFile = "reikos_signal_tower_logo.png"
+logoBlur = false
 
 [[dependencies.${mod_id}]]
     modId = "neoforge"

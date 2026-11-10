@@ -37,10 +37,12 @@ public final class ModSounds {
     public static final DeferredHolder<SoundEvent, SoundEvent> STATION_SIREN = register("station.siren");
     /** v0.61.0: a Launch Pad's rocket lifting off. */
     public static final DeferredHolder<SoundEvent, SoundEvent> SATELLITE_LAUNCH = register("satellite.launch");
+    /** v0.62.0: a Radio Speaker's Tone (a steady beep, looped while its frequency is on). */
+    public static final DeferredHolder<SoundEvent, SoundEvent> SPEAKER_TONE = register("speaker.tone");
 
     /** Every one, for the tests. */
     public static final List<DeferredHolder<SoundEvent, SoundEvent>> ALL = List.of(TUNER_TUNE, TUNER_STEP, TELEGRAPH_KEY,
-            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH);
+            TELEGRAPH_SOUNDER, PAGER_BEEP, METER_TICK, TOWER_ON, TOWER_OFF, STATION_SIREN, SATELLITE_LAUNCH, SPEAKER_TONE);
 
     private ModSounds() {
     }

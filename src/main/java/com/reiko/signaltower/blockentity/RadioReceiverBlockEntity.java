@@ -389,8 +389,10 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
     /** Plays a note of its sound at its note (the doorbell's first note a major third up), with a note particle. */
     private void playNote(ServerLevel level, boolean high) {
         float pitch = SpeakerSound.pitch(speakerNote) * (high ? 1.26F : 1.0F);
-        level.playSound(null, worldPosition, speakerSound.sound(), net.minecraft.sounds.SoundSource.BLOCKS,
-                speakerVolume.volume(), pitch);
+        if (!speakerSound.whileOn()) { // v0.62.0: the Tone is played by the clients while it hears its frequency
+            level.playSound(null, worldPosition, speakerSound.sound(), net.minecraft.sounds.SoundSource.BLOCKS,
+                    speakerVolume.volume(), pitch);
+        }
         level.sendParticles(net.minecraft.core.particles.ParticleTypes.NOTE, worldPosition.getX() + 0.5, worldPosition.getY() + 1.2,
                 worldPosition.getZ() + 0.5, 0, speakerNote / 24.0, 0, 0, 1);
         notesPlayed++;
@@ -456,6 +458,10 @@ public class RadioReceiverBlockEntity extends RadioBlockEntity {
         if (be.musicDirty) {
             be.musicDirty = false;
             com.reiko.signaltower.client.ClientHooks.speakerMusic(pos.immutable(), be.musicSong, be.musicStart, be.speakerVolume);
+        }
+        // v0.62.0: the Tone sounds while the speaker hears its frequency (its POWER), for Morse.
+        if (be.speakerSound.whileOn() && be.musicSong == null && state.getValue(RadioReceiverBlock.POWER) > 0) {
+            com.reiko.signaltower.client.ClientHooks.speakerTone(pos.immutable(), SpeakerSound.pitch(be.speakerNote), be.speakerVolume.volume());
         }
     }
 

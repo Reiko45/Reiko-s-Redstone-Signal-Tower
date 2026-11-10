@@ -702,6 +702,43 @@ write(models / "launch_pad.json", {
 })
 write(states / "launch_pad.json", {"variants": {"": {"model": f"{MOD}:block/launch_pad"}}})
 
+# v0.62.0: the Morse Key: a straight key on a small dark-wood base, its knob towards the front (north
+# here, turned by the blockstate); up, the lever is tipped up at the front on its spring.
+def morse_key_model(down):
+    lever_turn = {"origin": [8, 4.5, 10], "axis": "x", "angle": 0 if down else 22.5}
+    def box(frm, to, texture, turn=None):
+        element = {"from": frm, "to": to, "faces": {f: {"texture": texture} for f in ("north", "south", "east", "west", "up", "down")}}
+        if turn:
+            element["rotation"] = turn
+        return element
+    return {
+        "parent": "minecraft:block/block",
+        "textures": {"particle": "minecraft:block/dark_oak_planks", "wood": "minecraft:block/dark_oak_planks",
+                     "brass": tex("radio_telegraph_brass"), "knob": tex("radio_telegraph_knob"), "steel": "minecraft:block/iron_block"},
+        "elements": [
+            box([3, 0, 1], [13, 2, 15], "#wood"),
+            box([4, 2, 9], [6, 5.5, 11], "#brass"),     # the pivot's two posts
+            box([10, 2, 9], [12, 5.5, 11], "#brass"),
+            box([6, 4, 9.5], [10, 5, 10.5], "#steel"),  # the pivot
+            box([7, 4, 2.5], [9, 5, 13.5], "#brass", lever_turn),  # the lever
+            box([6, 5, 1.5], [10, 7.5, 5], "#knob", lever_turn),   # the knob
+            box([7, 2, 3], [9, 3, 5], "#brass"),        # the contact under the knob
+            box([7.5, 2, 6], [8.5, 4, 7], "#steel"),    # the spring
+            box([4.5, 2, 12.5], [5.5, 3, 13.5], "#steel"),  # terminals
+            box([10.5, 2, 12.5], [11.5, 3, 13.5], "#steel"),
+        ],
+    }
+
+
+write(models / "morse_key.json", morse_key_model(False))
+write(models / "morse_key_down.json", morse_key_model(True))
+write(states / "morse_key.json", {"variants": {
+    f"down={down},facing={facing}": {"model": f"{MOD}:block/morse_key" + ("_down" if down == "true" else ""), **({"y": y} if y else {})}
+    for facing, y in (("north", 0), ("east", 90), ("south", 180), ("west", 270)) for down in ("false", "true")
+}})
+write(items / "morse_key.json", {"parent": f"{MOD}:block/morse_key"})
+
+
 # v0.51.0: the Radio Telegraph, a desk with a brass key (its knob towards the front) and a sounder
 # with a lamp at the back; facing north here, turned by the blockstate.
 def telegraph_model(lit):
@@ -1454,6 +1491,33 @@ write(ASSETS / "lang" / "en_us.json", {
     f"map.{MOD}.tracked": "Tracked: %s",
     f"advancements.{MOD}.we_have_liftoff.title": "We Have Liftoff",
     f"advancements.{MOD}.we_have_liftoff.description": "Put a satellite in orbit from a Launch Pad",
+    # v0.62.0: Morse code
+    f"block.{MOD}.morse_key": "Morse Key",
+    f"block.{MOD}.morse_key.tooltip": "Key Morse code onto a frequency: receivers on it pulse the dots and dashes, and what you spell reaches telegraphs, pagers and Status Boards as text.",
+    f"tooltip.{MOD}.morse_key_use": "Right-click to key: click for a dot, hold for a dash. Redstone keys it too. Sneak + right-click for its status.",
+    f"message.{MOD}.morse_status": "Morse Key | Frequency %s | Reach %s | Last sent: %s",
+    f"message.{MOD}.morse_nothing_sent": "nothing yet",
+    f"message.{MOD}.morse_sent": "Sent in Morse: %s (%s)",
+    f"message.{MOD}.private_refused_morse": "Frequency %s is private to %s: your Morse doesn't go out",
+    f"message.{MOD}.telegraph_keying": "Still keying the last message in Morse",
+    f"message.{MOD}.telegraph_keying_started": "Keying it in Morse on %s (%s): about %s seconds",
+    f"message.{MOD}.telegraph_morse_nothing": "Nothing in that has a Morse code",
+    f"message.{MOD}.speaker_sound_tone": "Tone",
+    f"subtitles.{MOD}.speaker.tone": "Speaker beeps",
+    f"screen.{MOD}.telegraph.morse_on": "Morse: On",
+    f"screen.{MOD}.telegraph.morse_off": "Morse: Off",
+    f"screen.{MOD}.telegraph.morse_tip": "On: messages are keyed out in Morse on the frequency first (receivers pulse, speakers beep), and the text arrives when that's done.",
+    f"screen.{MOD}.telegraph.keying": "Keying...",
+    f"screen.{MOD}.log.kind_morse": "Morse",
+    f"screen.{MOD}.log.tip_morse": "Keyed by %s",
+    f"screen.{MOD}.log.tip_other_morse": "Keyed by %s (not a member)",
+    f"screen.{MOD}.log.tip_morse_redstone": "Keyed by redstone",
+    f"jade.{MOD}.morse_keying": "Keying: %s",
+    f"jade.{MOD}.morse_letter": "Letter: %s",
+    f"jade.{MOD}.morse_last": "Last sent: %s",
+    f"jade.{MOD}.morse_down": "Key down",
+    f"jade.{MOD}.telegraph_morse": "Sends in Morse",
+    f"jade.{MOD}.telegraph_keying": "Keying a message in Morse",
     # v0.60.0: the Radio Jukebox, and speakers playing its music
     f"block.{MOD}.radio_jukebox": "Radio Jukebox",
     f"block.{MOD}.radio_jukebox.tooltip": "A transmitter with a record player. Put a music disc in and it broadcasts the song on its frequency: Radio Speakers that hear it play the song. A redstone pulse plays it again; steady redstone repeats it. Empty hand takes the disc out.",
@@ -2615,6 +2679,12 @@ recipes["radio_telegraph"] = ({  # v0.51.0
     "ingredients": [{"item": f"{MOD}:radio_transmitter"}, {"item": f"{MOD}:radio_receiver"}, {"item": "minecraft:writable_book"}],
     "result": {"count": 1, "id": f"{MOD}:radio_telegraph"},
 }, f"{MOD}:radio_transmitter")
+recipes["morse_key"] = ({  # v0.62.0
+    "type": "minecraft:crafting_shapeless",
+    "category": "redstone",
+    "ingredients": [{"item": f"{MOD}:compact_radio_transmitter"}, {"item": "minecraft:stone_button"}, {"item": "minecraft:gold_ingot"}],
+    "result": {"count": 1, "id": f"{MOD}:morse_key"},
+}, f"{MOD}:compact_radio_transmitter")
 recipes["coverage_map"] = ({  # v0.49.0
     "type": "minecraft:crafting_shapeless",
     "category": "misc",
@@ -2747,7 +2817,7 @@ for name in ("radio_transmitter", "radio_receiver", "radio_toggle_receiver", "ra
              "radio_repeater", "radio_converter", "compact_radio_receiver", "compact_radio_transmitter", "radio_motion_sensor", "code_keypad", "radio_mast", "wall_redstone",
              "radio_battery", "solar_panel", "radio_telegraph", "dish_rotator", "radio_weather_station",
              "bundled_cable", "cable_tap", "bundled_transmitter", "bundled_receiver", "guy_anchor", "tower_platform", "radio_jukebox",
-             "launch_pad"):
+             "launch_pad", "morse_key"):
     entry = {"type": "minecraft:item", "name": f"{MOD}:{name}"}
     if name == "radio_battery":
         # v0.49.0: it keeps its charge.
@@ -2804,7 +2874,7 @@ write(RES / "data" / "minecraft" / "tags" / "block" / "mineable" / "pickaxe.json
                f"{MOD}:compact_radio_receiver", f"{MOD}:compact_radio_transmitter", f"{MOD}:radio_motion_sensor", f"{MOD}:code_keypad",
                f"{MOD}:radio_mast", f"{MOD}:radio_battery", f"{MOD}:solar_panel", f"{MOD}:radio_telegraph", f"{MOD}:dish_rotator",
                f"{MOD}:radio_weather_station", f"{MOD}:cable_tap", f"{MOD}:bundled_transmitter", f"{MOD}:bundled_receiver",
-               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad"]
+               f"{MOD}:guy_anchor", f"{MOD}:tower_platform", f"{MOD}:radio_jukebox", f"{MOD}:launch_pad", f"{MOD}:morse_key"]
 })
 
 # ---------------------------------------------------------------- v0.55.0: old radio towers in the world
@@ -2876,6 +2946,7 @@ INFO = {
     "solar_panel": "Put it on top of a Radio Battery to charge the battery in daylight.",
     "dish_rotator": "A mast that turns the Dish Antenna on top of its tower by redstone: each strength turns it a sixteenth of the way round.",
     "radio_telegraph": "Type a short message (up to 64 characters) onto a frequency: pagers, other telegraphs and Status Boards in reach get it. A villager with no job takes it as a workstation and becomes a Radio Operator.",
+    "morse_key": "Tune it to a frequency and key Morse code: click for a dot, hold for a dash (or give it redstone). Receivers on the frequency pulse the dots and dashes, a Radio Speaker set to Tone beeps them, and 3 seconds after you stop, the letters go to telegraphs, pagers and Status Boards in reach as a message.",
     "satellite": "Put it on a Launch Pad with 8 Firework Rockets and give the pad a redstone pulse: it goes up to orbit over the dimension, and you can see it cross the night sky. With a satellite up, towers there with a Satellite Dish are heard everywhere in that dimension.",
     "satellite_dish": "Fit it on a transmitter's tower with open sky above: once a satellite is in orbit over the dimension, the tower is heard everywhere in it, at full strength and over any hills. It uses 4 times the power while it's uplinked.",
     "launch_pad": "Load a Satellite and 8 Firework Rockets, by hand or with hoppers, then give it a redstone pulse: the rocket climbs to orbit. It needs open sky above, in a dimension with a sky (not the Nether or the End). A comparator reads 15 when it's ready.",

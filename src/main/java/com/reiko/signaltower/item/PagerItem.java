@@ -237,6 +237,9 @@ public class PagerItem extends Item {
         if (previous > 0 || power == 0) {
             return null; // only the moment it turns on is news
         }
+        if (SignalNetwork.get(level).isMorse(frequency, level.getGameTime())) {
+            return null; // v0.62.0: Morse dots and dashes aren't news; the message they spell comes as text
+        }
         Component alert = Component.translatable(KEY + "pager_alert", label(stack), FrequencyNames.label(level, frequency), power)
                 .withStyle(ChatFormatting.GOLD);
         if (holder instanceof Player player) {

@@ -58,5 +58,11 @@
     "sounds": [
       "reikos_signal_tower:satellite_launch"
     ]
+  },
+  "speaker.tone": {
+    "subtitle": "subtitles.reikos_signal_tower.speaker.tone",
+    "sounds": [
+      "reikos_signal_tower:speaker_tone"
+    ]
   }
 }

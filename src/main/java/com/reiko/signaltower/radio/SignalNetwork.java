@@ -1072,6 +1072,56 @@ public final class SignalNetwork extends SavedData {
         return nowOn;
     }
 
+    // ---- Morse (v0.62.0) ----
+
+    /** How long after its last key-down a frequency still counts as carrying Morse (pagers don't alert, the log isn't added to). */
+    public static final int MORSE_QUIET_TICKS = 100;
+    /** Until when each frequency counts as carrying Morse (not saved). */
+    private final Map<Integer, Long> morseUntil = new HashMap<>();
+
+    /**
+     * A Morse Key (or a telegraph keying a message) holds {@code frequency} on over {@code coverage}
+     * at {@code gameTime}, for a few ticks; called every tick while the key is down. Like a remote
+     * pulse, receivers in the areas hear 15. Only the first key-down of a message goes in the
+     * frequency log, and pagers don't alert for any of them.
+     */
+    public void keyMorse(int frequency, List<Coverage> coverage, long gameTime, Cause cause) {
+        boolean fresh = !isMorse(frequency, gameTime);
+        morseUntil.put(frequency, gameTime + MORSE_QUIET_TICKS);
+        RemoteSignal previous = pulses.get(frequency);
+        if (previous != null && previous.coverage().containsAll(coverage)) {
+            if (previous.expiresAtGameTime() < gameTime + 3) {
+                pulses.put(frequency, new RemoteSignal(previous.coverage(), gameTime + 3)); // still down: no change to hear
+            }
+            return;
+        }
+        List<Coverage> areas = coverage;
+        if (previous != null) {
+            LinkedHashSet<Coverage> merged = new LinkedHashSet<>(previous.coverage());
+            merged.addAll(coverage);
+            areas = new ArrayList<>(merged);
+        }
+        pulses.put(frequency, new RemoteSignal(areas, Math.max(gameTime + 3, previous == null ? 0 : previous.expiresAtGameTime())));
+        if (fresh) {
+            recordTurnOn(frequency, coverage, cause);
+        }
+        bump(frequency);
+    }
+
+    /** The key went up: {@code frequency}'s Morse signal ends now. */
+    public void releaseMorse(int frequency, long gameTime) {
+        morseUntil.put(frequency, gameTime + MORSE_QUIET_TICKS);
+        if (pulses.remove(frequency) != null) {
+            bump(frequency);
+        }
+    }
+
+    /** True if Morse went out on {@code frequency} in the last {@link #MORSE_QUIET_TICKS} (as of {@code gameTime}). */
+    public boolean isMorse(int frequency, long gameTime) {
+        Long until = morseUntil.get(frequency);
+        return until != null && gameTime <= until;
+    }
+
     // ---- Music broadcasts (v0.60.0) ----
 
     /**
@@ -1241,7 +1291,9 @@ public final class SignalNetwork extends SavedData {
         /** v0.53.0: a Radio Weather Station's reading. */
         WEATHER_STATION,
         /** v0.60.0: a Radio Jukebox playing a song (the detail is the song). */
-        JUKEBOX;
+        JUKEBOX,
+        /** v0.62.0: a Morse message starting, from a Morse Key (keyed by a player, or redstone) or a telegraph keying it. */
+        MORSE;
 
         public static CauseKind of(int ordinal) {
             CauseKind[] all = values();
@@ -1305,6 +1357,11 @@ public final class SignalNetwork extends SavedData {
         }
 
         /** A Radio Jukebox playing {@code song} (v0.60.0): where it is and who tuned it. */
+        /** v0.62.0: Morse keyed at {@code pos} (a Morse Key or a telegraph) by {@code player} ({@code name}); null for redstone. */
+        public static Cause morse(BlockPos pos, @Nullable UUID player, String name) {
+            return new Cause(CauseKind.MORSE, pos.immutable(), player, name == null ? "" : name);
+        }
+
         public static Cause jukebox(BlockPos pos, @Nullable UUID tunedBy, String song) {
             return new Cause(CauseKind.JUKEBOX, pos.immutable(), tunedBy, "", song == null ? "" : song);
         }
