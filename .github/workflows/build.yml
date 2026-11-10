@@ -30,3 +30,64 @@ jobs:
         with:
           name: reikos_wireless_redstone
           path: build/libs/*.jar
+
+  # Uploads each new version to CurseForge (see docs/PUBLISHING.md). It runs after the
+  # build and the in-game tests pass on main. A version counts as new until the tag
+  # v<mod_version> exists, which this job pushes after a successful upload. Until the
+  # CURSEFORGE_TOKEN secret and curseforge_project_id (gradle.properties) are set, it
+  # only notes that CurseForge isn't set up.
+  curseforge:
+    name: Upload to CurseForge
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: curseforge
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is this version new?
+        id: check
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          version=$(sed -n 's/^mod_version=//p' gradle.properties | tr -d '[:space:]')
+          project=$(sed -n 's/^curseforge_project_id=//p' gradle.properties | tr -d '[:space:]')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+          if [ -z "$CURSEFORGE_TOKEN" ] || [ -z "$project" ]; then
+            echo "::notice::CurseForge isn't set up yet (the CURSEFORGE_TOKEN secret or curseforge_project_id is missing), so $version wasn't uploaded."
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "Version $version is already on CurseForge (the tag v$version exists)."
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version $version is new: uploading it."
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get the tested jar
+        if: steps.check.outputs.upload == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: reikos_wireless_redstone
+          path: jars
+
+      - name: Upload to CurseForge
+        if: steps.check.outputs.upload == 'true'
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: >
+          python3 .github/scripts/curseforge_upload.py
+          --jar "jars/reikos_wireless_redstone-${{ steps.check.outputs.version }}.jar"
+          --version "${{ steps.check.outputs.version }}"
+          --project-id "${{ steps.check.outputs.project }}"
+
+      - name: Tag the version
+        if: steps.check.outputs.upload == 'true'
+        run: |
+          git tag "v${{ steps.check.outputs.version }}"
+          git push origin "v${{ steps.check.outputs.version }}"

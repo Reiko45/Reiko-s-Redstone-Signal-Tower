@@ -1404,6 +1404,8 @@ On Windows use `gradlew.bat` instead of `./gradlew`.
 
 To play it in your own instance, copy the jar from `build/libs/` into the instance's `mods` folder. Every push to `main` is also built by GitHub Actions. The jar is attached to each run under **Actions → Build → Artifacts**.
 
+**CurseForge:** once it's set up, GitHub Actions uploads each new version to CurseForge by itself after the tests pass: raise `mod_version` in `gradle.properties` and add that version's section to `CHANGELOG.md`. How it works, how to set it up and what to do if an upload fails are in [docs/PUBLISHING.md](docs/PUBLISHING.md); the project page's text and screenshots are in `docs/curseforge/`.
+
 ## Project layout
 
 ```
@@ -1644,6 +1646,12 @@ tools/
   make_logo.py                           draws the mod's icon (the mod list's logo and docs/images/icon.png)
 docs/
   DESIGN.md                              how it works under the hood, ideas for later
+  PUBLISHING.md                          how new versions get to CurseForge
+  curseforge/                            the CurseForge page: summary, description (Markdown and HTML), gallery titles
+.github/
+  workflows/build.yml                    builds, runs the in-game tests, then uploads new versions to CurseForge
+  scripts/curseforge_upload.py           the CurseForge upload (game versions, changelog, optional mods)
+CHANGELOG.md                             what changed in each version (each section becomes that file's changelog on CurseForge)
 ```
 
 The `tools/` scripts are how the textures, sounds and JSON files were generated. You can keep using them, or paint and edit the files directly. Re-running a script overwrites what it writes.
